@@ -31,9 +31,10 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <asm/barrier.h>
-#include <dt-bindings/memory/mt8173-larb-port.h>
+#include <dt-bindings/memory/mt8167-larb-port.h>
 #include <soc/mediatek/smi.h>
 #include <mt-plat/mtk_memcfg.h>
+
 #include "io-pgtable.h"
 #include "mtk_iommu.h"
 
@@ -54,8 +55,7 @@
 #define REG_MMU_DCM_DIS				0x050
 
 #define REG_MMU_CTRL_REG			0x110
-#define F_MMU_PREFETCH_RT_REPLACE_MOD		BIT(4)
-#define F_MMU_TF_PROTECT_SEL(prot)		(((prot) & 0x3) << 5)
+#define F_MMU_TF_PROTECT_SEL(prot)		(((prot) & 0x3) << 4)
 
 #define REG_MMU_IVRP_PADDR			0x114
 #define F_MMU_IVRP_PA_SET(pa, ext)		(((pa) >> 1) | ((!!(ext)) << 31))
@@ -65,6 +65,7 @@
 #define F_TABLE_WALK_FAULT_INT_EN		BIT(1)
 #define F_PREETCH_FIFO_OVERFLOW_INT_EN		BIT(2)
 #define F_MISS_FIFO_OVERFLOW_INT_EN		BIT(3)
+#define F_L2_INVALIDATION_DONE_INT_EN		BIT(4)
 #define F_PREFETCH_FIFO_ERR_INT_EN		BIT(5)
 #define F_MISS_FIFO_ERR_INT_EN			BIT(6)
 #define F_INT_CLR_BIT				BIT(12)
@@ -89,10 +90,45 @@
 
 #define REG_MMU_INVLD_PA			0x140
 #define REG_MMU_INT_ID				0x150
-#define F_MMU0_INT_ID_LARB_ID(a)		(((a) >> 7) & 0x7)
-#define F_MMU0_INT_ID_PORT_ID(a)		(((a) >> 2) & 0x1f)
 
 #define MTK_PROTECT_PA_ALIGN			128
+
+static int mt8167_port_offset[3] = {
+	0, MT8167_LARB0_PORT_NUM, MT8167_LARB0_PORT_NUM + MT8167_LARB1_PORT_NUM
+};
+
+static inline int mt8167_get_larbid(int portid)
+{
+	int i;
+
+	for (i = ARRAY_SIZE(mt8167_port_offset) - 1; i >= 0; i--)
+		if (portid >= mt8167_port_offset[i])
+			return i;
+	return 0;
+}
+
+static inline int mt8167_get_larb_port(int portid)
+{
+	int i;
+
+	for (i = ARRAY_SIZE(mt8167_port_offset) - 1; i >= 0; i--)
+		if (portid >= mt8167_port_offset[i])
+			return portid - mt8167_port_offset[i];
+
+	return 0;
+}
+
+/* bit[9:7] indicate larbid */
+#define F_MMU0_INT_ID_LARB_ID(a)		(((a) >> 7) & 0x7)
+/*
+ * bit[6:2] indicate portid, bit[1:0] indicate master id, every port
+ * have four types of command, master id indicate the m4u port's command
+ * type, iommu do not care about this.
+ */
+#define F_MMU0_INT_ID_PORT_ID(a)		(((a) >> 2) & 0x1f)
+
+#define MTK_M4U_TO_LARB(a)		mt8167_get_larbid((a))
+#define MTK_M4U_TO_PORT(a)		mt8167_get_larb_port((a))
 
 static struct iommu_ops mtk_iommu_ops;
 
@@ -207,6 +243,14 @@ static void mtk_iommu_config(struct mtk_iommu_data *data,
 	}
 }
 
+static unsigned long mtk_iommu_pgt_base;
+
+unsigned long mtk_get_pgt_base(void)
+{
+	return mtk_iommu_pgt_base;
+}
+EXPORT_SYMBOL(mtk_get_pgt_base);
+
 static int mtk_iommu_domain_finalise(struct mtk_iommu_data *data)
 {
 	struct mtk_iommu_domain *dom = data->m4u_dom;
@@ -236,8 +280,11 @@ static int mtk_iommu_domain_finalise(struct mtk_iommu_data *data)
 	/* Update our support page sizes bitmap */
 	mtk_iommu_ops.pgsize_bitmap = dom->cfg.pgsize_bitmap;
 
+	mtk_iommu_pgt_base = data->m4u_dom->cfg.arm_v7s_cfg.ttbr[0];
+
 	writel(data->m4u_dom->cfg.arm_v7s_cfg.ttbr[0],
 	       data->base + REG_MMU_PT_BASE_ADDR);
+
 	return 0;
 }
 
@@ -452,8 +499,12 @@ err_free_mem:
 	return -ENOMEM;
 }
 
+#ifndef CONFIG_MTK_MEMCFG
+#define CONFIG_MTK_MEMCFG
+#endif
+
 #ifdef CONFIG_MTK_MEMCFG
-/* this function would only be called once, we do not need to handle re-entry issue. */
+bool dm_region;
 static void mtk_iommu_get_dm_regions(struct device *dev, struct list_head *list)
 {
 	struct iommu_dm_region *region;
@@ -468,6 +519,8 @@ static void mtk_iommu_get_dm_regions(struct device *dev, struct list_head *list)
 	region->length = mtkfb_get_fb_size();
 	region->prot = IOMMU_READ | IOMMU_WRITE;
 	list_add_tail(&region->list, list);
+
+	dm_region = true;
 }
 
 static void mtk_iommu_put_dm_regions(struct device *dev, struct list_head *list)
@@ -522,16 +575,16 @@ static struct iommu_ops mtk_iommu_ops = {
 static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
 {
 	u32 regval;
-	int ret;
 
-	ret = clk_prepare_enable(data->bclk);
-	if (ret) {
-		dev_err(data->dev, "Failed to enable iommu bclk(%d)\n", ret);
-		return ret;
-	}
+	/*
+	 * ret = clk_prepare_enable(data->bclk);
+	 * if (ret) {
+	 *      dev_err(data->dev, "Failed to enable iommu bclk(%d)\n", ret);
+	 *      return ret;
+	 * }
+	 */
 
-	regval = F_MMU_PREFETCH_RT_REPLACE_MOD |
-		F_MMU_TF_PROTECT_SEL(2);
+	regval = F_MMU_TF_PROTECT_SEL(2);
 	writel_relaxed(regval, data->base + REG_MMU_CTRL_REG);
 
 	regval = F_L2_MULIT_HIT_EN |
@@ -560,7 +613,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
 	if (devm_request_irq(data->dev, data->irq, mtk_iommu_isr, 0,
 			     dev_name(data->dev), (void *)data)) {
 		writel_relaxed(0, data->base + REG_MMU_PT_BASE_ADDR);
-		clk_disable_unprepare(data->bclk);
+		/* clk_disable_unprepare(data->bclk); */
 		dev_err(data->dev, "Failed @ IRQ-%d Request\n", data->irq);
 		return -ENODEV;
 	}
@@ -599,7 +652,8 @@ static int mtk_iommu_probe(struct platform_device *pdev)
 	struct resource         *res;
 	struct component_match  *match = NULL;
 	void                    *protect;
-	int                     i, larb_nr, ret;
+	unsigned int            i, larb_nr;
+	int                     ret;
 
 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
 	if (!data)
@@ -624,9 +678,12 @@ static int mtk_iommu_probe(struct platform_device *pdev)
 	if (data->irq < 0)
 		return data->irq;
 
-	data->bclk = devm_clk_get(dev, "bclk");
-	if (IS_ERR(data->bclk))
-		return PTR_ERR(data->bclk);
+	/* mt8167 bclk clock is emi clock, and will always on */
+	/*
+	 * data->bclk = devm_clk_get(dev, "bclk");
+	 * if (IS_ERR(data->bclk))
+	 *      return PTR_ERR(data->bclk);
+	 */
 
 	larb_nr = of_count_phandle_with_args(dev->of_node,
 					     "mediatek,larbs", NULL);
@@ -651,7 +708,7 @@ static int mtk_iommu_probe(struct platform_device *pdev)
 			plarbdev = of_platform_device_create(
 						larbnode, NULL,
 						platform_bus_type.dev_root);
-			if (!plarbdev)
+			if (IS_ERR(plarbdev))
 				return -EPROBE_DEFER;
 		}
 		data->smi_imu.larb_imu[i].dev = &plarbdev->dev;
@@ -679,13 +736,13 @@ static int mtk_iommu_remove(struct platform_device *pdev)
 		bus_set_iommu(&platform_bus_type, NULL);
 
 	free_io_pgtable_ops(data->m4u_dom->iop);
-	clk_disable_unprepare(data->bclk);
+	/* clk_disable_unprepare(data->bclk); */
 	devm_free_irq(&pdev->dev, data->irq, data);
 	component_master_del(&pdev->dev, &mtk_iommu_com_ops);
 	return 0;
 }
 
-static int __maybe_unused mtk_iommu_suspend(struct device *dev)
+static int mtk_iommu_suspend(struct device *dev)
 {
 	struct mtk_iommu_data *data = dev_get_drvdata(dev);
 	struct mtk_iommu_suspend_reg *reg = &data->reg;
@@ -700,7 +757,7 @@ static int __maybe_unused mtk_iommu_suspend(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused mtk_iommu_resume(struct device *dev)
+static int mtk_iommu_resume(struct device *dev)
 {
 	struct mtk_iommu_data *data = dev_get_drvdata(dev);
 	struct mtk_iommu_suspend_reg *reg = &data->reg;
@@ -719,12 +776,12 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
 	return 0;
 }
 
-const struct dev_pm_ops mtk_iommu_pm_ops = {
+static const struct dev_pm_ops mtk_iommu_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(mtk_iommu_suspend, mtk_iommu_resume)
 };
 
 static const struct of_device_id mtk_iommu_of_ids[] = {
-	{ .compatible = "mediatek,mt8173-m4u", },
+	{ .compatible = "mediatek,mt8167-m4u", },
 	{}
 };
 
@@ -744,8 +801,8 @@ static int mtk_iommu_init_fn(struct device_node *np)
 	struct platform_device *pdev;
 
 	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
-	if (!pdev)
-		return -ENOMEM;
+	if (IS_ERR(pdev))
+		return PTR_ERR(pdev);
 
 	ret = platform_driver_register(&mtk_iommu_driver);
 	if (ret) {
@@ -757,4 +814,4 @@ static int mtk_iommu_init_fn(struct device_node *np)
 	return 0;
 }
 
-IOMMU_OF_DECLARE(mtkm4u, "mediatek,mt8173-m4u", mtk_iommu_init_fn);
+IOMMU_OF_DECLARE(mtkm4u, "mediatek,mt8167-m4u", mtk_iommu_init_fn);
