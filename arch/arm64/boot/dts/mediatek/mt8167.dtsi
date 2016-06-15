@@ -36,6 +36,16 @@
 			enable-method = "mt-boot";
 			cpu-idle-states = <&CLUSTER_SLEEP_0 &CLUSTER_SLEEP_0>,
 					  <&CPU_SLEEP_0_0 &CPU_SLEEP_0_0 &CPU_SLEEP_0_0>;
+			clocks = <&topckgen CLK_TOP_RTC_SEL>,
+				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+			clock-names = "cpu", "intermediate";
+			operating-points = <
+				598000  1150000
+				747500  1150000
+				1040000 1200000
+				1196000 1250000
+				1300000 1300000
+			>;
 			cpu-release-addr = <0x0 0x40000200>;
 			clock-frequency = <1300000000>;
 		};
@@ -47,6 +57,16 @@
 			enable-method = "mt-boot";
 			cpu-idle-states = <&CLUSTER_SLEEP_0 &CLUSTER_SLEEP_0>,
 					  <&CPU_SLEEP_0_0 &CPU_SLEEP_0_0 &CPU_SLEEP_0_0>;
+			clocks = <&topckgen CLK_TOP_RTC_SEL>,
+				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+			clock-names = "cpu", "intermediate";
+			operating-points = <
+				598000  1150000
+				747500  1150000
+				1040000 1200000
+				1196000 1250000
+				1300000 1300000
+			>;
 			cpu-release-addr = <0x0 0x40000200>;
 			clock-frequency = <1300000000>;
 		};
@@ -58,6 +78,16 @@
 			enable-method = "mt-boot";
 			cpu-idle-states = <&CLUSTER_SLEEP_0 &CLUSTER_SLEEP_0>,
 					  <&CPU_SLEEP_0_0 &CPU_SLEEP_0_0 &CPU_SLEEP_0_0>;
+			clocks = <&topckgen CLK_TOP_RTC_SEL>,
+				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+			clock-names = "cpu", "intermediate";
+			operating-points = <
+				598000  1150000
+				747500  1150000
+				1040000 1200000
+				1196000 1250000
+				1300000 1300000
+			>;
 			cpu-release-addr = <0x0 0x40000200>;
 			clock-frequency = <1300000000>;
 		};
@@ -69,6 +99,16 @@
 			enable-method = "mt-boot";
 			cpu-idle-states = <&CLUSTER_SLEEP_0 &CLUSTER_SLEEP_0>,
 					  <&CPU_SLEEP_0_0 &CPU_SLEEP_0_0 &CPU_SLEEP_0_0>;
+			clocks = <&topckgen CLK_TOP_RTC_SEL>,
+				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+			clock-names = "cpu", "intermediate";
+			operating-points = <
+				598000  1150000
+				747500  1150000
+				1040000 1200000
+				1196000 1250000
+				1300000 1300000
+			>;
 			cpu-release-addr = <0x0 0x40000200>;
 			clock-frequency = <1300000000>;
 		};
