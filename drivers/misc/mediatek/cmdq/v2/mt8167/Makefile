@@ -11,11 +11,11 @@
 # GNU General Public License for more details.
 #
 
-# common driver code for CMDQ
-ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6757" "mt8167"))
-	obj-y += v2/
-else
-	obj-y += v3/
-endif
+# drivers/cmdq
 
-# EOF
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v2
+
+# Enable MET
+ccflags-y += -DMET_USER_EVENT_SUPPORT
+
+obj-y += cmdq_mdp.o
