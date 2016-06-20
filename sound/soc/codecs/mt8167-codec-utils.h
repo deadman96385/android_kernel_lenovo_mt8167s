@@ -23,4 +23,10 @@ extern int IMM_GetOneChannelValue(int dwChannel, int data[4], int *rawdata);
 uint32_t mt8167_codec_get_hpl_cali_val(struct snd_soc_codec *codec);
 uint32_t mt8167_codec_get_hpr_cali_val(struct snd_soc_codec *codec);
 
+void mt8167_codec_turn_off_lpbk_path(struct snd_soc_codec *codec,
+	uint32_t lpbk_type);
+
+void mt8167_codec_turn_on_lpbk_path(struct snd_soc_codec *codec,
+	uint32_t lpbk_type);
+
 #endif

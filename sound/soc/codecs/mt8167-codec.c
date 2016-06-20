@@ -54,6 +54,7 @@ struct mt8167_codec_priv {
 	uint32_t right_audio_amp_gain;
 	uint32_t voice_amp_gain;
 	uint32_t dmic_wire_mode;
+	uint32_t loopback_type;
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs;
 #endif
@@ -921,6 +922,61 @@ static int mt8167_codec_hpr_dc_comp_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+/* UL to DL loopback */
+#define ENUM_TO_STR(enum) #enum
+static const char * const mt8167_codec_loopback_text[] = {
+	ENUM_TO_STR(CODEC_LOOPBACK_NONE),
+	ENUM_TO_STR(CODEC_LOOPBACK_AMIC_TO_SPK),
+	ENUM_TO_STR(CODEC_LOOPBACK_AMIC_TO_HP),
+	ENUM_TO_STR(CODEC_LOOPBACK_DMIC_TO_SPK),
+	ENUM_TO_STR(CODEC_LOOPBACK_DMIC_TO_HP),
+	ENUM_TO_STR(CODEC_LOOPBACK_HEADSET_MIC_TO_SPK),
+	ENUM_TO_STR(CODEC_LOOPBACK_HEADSET_MIC_TO_HP),
+};
+
+static const struct soc_enum mt8167_codec_loopback_enum =
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(mt8167_codec_loopback_text),
+		mt8167_codec_loopback_text);
+
+static int mt8167_codec_loopback_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+
+	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
+	ucontrol->value.integer.value[0] = codec_data->loopback_type;
+	return 0;
+}
+
+static int mt8167_codec_loopback_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+	uint32_t prev_lpbk_type = codec_data->loopback_type;
+	uint32_t next_lpbk_type = ucontrol->value.integer.value[0];
+
+	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
+
+	if (next_lpbk_type == prev_lpbk_type) {
+		dev_dbg(codec_data->codec->dev, "%s dummy action\n", __func__);
+		return 0;
+	}
+
+	if (prev_lpbk_type != CODEC_LOOPBACK_NONE)
+		mt8167_codec_turn_off_lpbk_path(
+			codec_data->codec, prev_lpbk_type);
+	else
+		mt8167_codec_turn_on_lpbk_path(
+			codec_data->codec, next_lpbk_type);
+
+	codec_data->loopback_type = ucontrol->value.integer.value[0];
+	return 0;
+}
+
 static const struct snd_kcontrol_new mt8167_codec_controls[] = {
 	/* DL Audio amplifier gain adjustment */
 	SOC_DOUBLE_TLV("Audio Amp Playback Volume",
@@ -943,6 +999,11 @@ static const struct snd_kcontrol_new mt8167_codec_controls[] = {
 		SND_SOC_NOPM, 0, 0x8000, 0,
 		mt8167_codec_hpr_dc_comp_get,
 		mt8167_codec_hpr_dc_comp_put),
+	/* UL to DL loopback */
+	SOC_ENUM_EXT("Codec_Loopback_Select",
+		mt8167_codec_loopback_enum,
+		mt8167_codec_loopback_get,
+		mt8167_codec_loopback_put),
 };
 
 /* Left PGA Mux/Right PGA Mux */
