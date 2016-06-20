@@ -787,7 +787,7 @@
 			compatible = "mediatek,mt8167-afe-pcm";
 			reg = <0 0x11140000 0 0x1000>,
 			      <0 0x11141000 0 0x9000>;
-			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
+			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_LOW>;
 			power-domains = <&scpsys MT8167_POWER_DOMAIN_AUDIO>;
 		};
 
