@@ -248,7 +248,7 @@
 			reg = <0 0x10001000 0 0x1000>, /*AUDIO_INFRA_BASE_PHYSICAL*/
 			      <0 0x18000000 0 0x10000>, /*PKV_PHYSICAL_BASE*/
 			      <0 0x18080000 0 0x8000>; /*SRAM_BANK2*/
-			interrupts = <GIC_SPI 226 IRQ_TYPE_LEVEL_LOW>;
+			interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>;
 		};
 
 		mt_soc_btcvsd_rx_pcm@10001000 {
