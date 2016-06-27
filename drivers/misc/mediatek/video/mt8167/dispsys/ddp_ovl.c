@@ -67,11 +67,11 @@ struct OVL_REG {
 	unsigned int value;
 };
 
-DISP_OVL1_STATUS ovl1_status = DDP_OVL1_STATUS_IDLE;
+enum DISP_OVL1_STATUS ovl1_status = DDP_OVL1_STATUS_IDLE;
 static int reg_back_cnt[OVL_NUM];
 static struct OVL_REG reg_back[OVL_NUM][OVL_REG_BACK_MAX];
 
-static char *ovl_get_status_name(DISP_OVL1_STATUS status)
+static char *ovl_get_status_name(enum DISP_OVL1_STATUS status)
 {
 	switch (status) {
 	case DDP_OVL1_STATUS_IDLE:
@@ -94,13 +94,13 @@ static char *ovl_get_status_name(DISP_OVL1_STATUS status)
 }
 
 /* get ovl1 status */
-DISP_OVL1_STATUS ovl_get_status(void)
+enum DISP_OVL1_STATUS ovl_get_status(void)
 {
 	return ovl1_status;
 }
 
 /* set ovl1 status */
-void ovl_set_status(DISP_OVL1_STATUS status)
+void ovl_set_status(enum DISP_OVL1_STATUS status)
 {
 	DDPMSG("cascade, set_ovl1 from %s to %s!\n", ovl_get_status_name(ovl1_status),
 	       ovl_get_status_name(status));
@@ -108,7 +108,7 @@ void ovl_set_status(DISP_OVL1_STATUS status)
 	ovl1_status = status;	/* atomic operation */
 }
 
-static enum OVL_INPUT_FORMAT ovl_input_fmt_convert(DpColorFormat fmt)
+static enum OVL_INPUT_FORMAT ovl_input_fmt_convert(enum DP_COLOR_ENUM fmt)
 {
 	enum OVL_INPUT_FORMAT ovl_fmt = OVL_INPUT_FORMAT_UNKNOWN;
 
@@ -156,7 +156,7 @@ static enum OVL_INPUT_FORMAT ovl_input_fmt_convert(DpColorFormat fmt)
 	return ovl_fmt;
 }
 
-static DpColorFormat ovl_input_fmt(enum OVL_INPUT_FORMAT fmt, int swap)
+static enum DP_COLOR_ENUM ovl_input_fmt(enum OVL_INPUT_FORMAT fmt, int swap)
 {
 	switch (fmt) {
 	case OVL_INPUT_FORMAT_BGR565:
@@ -334,7 +334,7 @@ static char *ovl_intput_format_name(enum OVL_INPUT_FORMAT fmt, int swap)
 	return "unknown";
 }
 
-static unsigned int ovl_index(DISP_MODULE_ENUM module)
+static unsigned int ovl_index(enum DISP_MODULE_ENUM module)
 {
 	int idx = 0;
 
@@ -352,7 +352,7 @@ static unsigned int ovl_index(DISP_MODULE_ENUM module)
 	return idx;
 }
 
-int ovl_start(DISP_MODULE_ENUM module, void *handle)
+int ovl_start(enum DISP_MODULE_ENUM module, void *handle)
 {
 	int idx = ovl_index(module);
 	int idx_offset = idx * DISP_OVL_INDEX_OFFSET;
@@ -379,7 +379,7 @@ int ovl_start(DISP_MODULE_ENUM module, void *handle)
 	return 0;
 }
 
-int ovl_stop(DISP_MODULE_ENUM module, void *handle)
+int ovl_stop(enum DISP_MODULE_ENUM module, void *handle)
 {
 	int idx = ovl_index(module);
 	int idx_offset = idx * DISP_OVL_INDEX_OFFSET;
@@ -391,7 +391,7 @@ int ovl_stop(DISP_MODULE_ENUM module, void *handle)
 	return 0;
 }
 
-int ovl_is_idle(DISP_MODULE_ENUM module)
+int ovl_is_idle(enum DISP_MODULE_ENUM module)
 {
 	int idx = ovl_index(module);
 	int idx_offset = idx * DISP_OVL_INDEX_OFFSET;
@@ -403,7 +403,7 @@ int ovl_is_idle(DISP_MODULE_ENUM module)
 		return 1;
 }
 
-int ovl_reset(DISP_MODULE_ENUM module, void *handle)
+int ovl_reset(enum DISP_MODULE_ENUM module, void *handle)
 {
 #define OVL_IDLE (0x3)
 	int ret = 0;
@@ -428,7 +428,7 @@ int ovl_reset(DISP_MODULE_ENUM module, void *handle)
 	return ret;
 }
 
-int ovl_roi(DISP_MODULE_ENUM module,
+int ovl_roi(enum DISP_MODULE_ENUM module,
 	    unsigned int bg_w, unsigned int bg_h, unsigned int bg_color, void *handle)
 {
 	int idx = ovl_index(module);
@@ -446,7 +446,7 @@ int ovl_roi(DISP_MODULE_ENUM module,
 	return 0;
 }
 
-int ovl_layer_switch(DISP_MODULE_ENUM module, unsigned layer, unsigned int en, void *handle)
+int ovl_layer_switch(enum DISP_MODULE_ENUM module, unsigned layer, unsigned int en, void *handle)
 {
 	int idx = ovl_index(module);
 	int idx_offset = idx * DISP_OVL_INDEX_OFFSET;
@@ -475,10 +475,10 @@ int ovl_layer_switch(DISP_MODULE_ENUM module, unsigned layer, unsigned int en, v
 	return 0;
 }
 
-int ovl_layer_config(DISP_MODULE_ENUM module,
+int ovl_layer_config(enum DISP_MODULE_ENUM module,
 			unsigned int layer,
 			unsigned int source,
-			DpColorFormat format,
+			enum DP_COLOR_ENUM format,
 			unsigned long addr,
 			unsigned int src_x,	/* ROI x offset */
 			unsigned int src_y,	/* ROI y offset */
@@ -613,7 +613,7 @@ int ovl_layer_config(DISP_MODULE_ENUM module,
 	return 0;
 }
 
-static void ovl_store_regs(DISP_MODULE_ENUM module)
+static void ovl_store_regs(enum DISP_MODULE_ENUM module)
 {
 	int i = 0;
 	int idx = ovl_index(module);
@@ -642,7 +642,7 @@ static void ovl_store_regs(DISP_MODULE_ENUM module)
 
 }
 
-static void ovl_restore_regs(DISP_MODULE_ENUM module, void *handle)
+static void ovl_restore_regs(enum DISP_MODULE_ENUM module, void *handle)
 {
 	int idx = ovl_index(module);
 	int i = reg_back_cnt[idx];
@@ -657,7 +657,7 @@ static void ovl_restore_regs(DISP_MODULE_ENUM module, void *handle)
 
 static unsigned int ovl_clock_cnt[2] = { 0, 0 };
 
-int ovl_clock_on(DISP_MODULE_ENUM module, void *handle)
+int ovl_clock_on(enum DISP_MODULE_ENUM module, void *handle)
 {
 	int idx = ovl_index(module);
 
@@ -676,7 +676,7 @@ int ovl_clock_on(DISP_MODULE_ENUM module, void *handle)
 	return 0;
 }
 
-int ovl_clock_off(DISP_MODULE_ENUM module, void *handle)
+int ovl_clock_off(enum DISP_MODULE_ENUM module, void *handle)
 {
 	int idx = ovl_index(module);
 
@@ -700,7 +700,7 @@ int ovl_clock_off(DISP_MODULE_ENUM module, void *handle)
 	return 0;
 }
 
-int ovl_resume(DISP_MODULE_ENUM module, void *handle)
+int ovl_resume(enum DISP_MODULE_ENUM module, void *handle)
 {
 	int idx = ovl_index(module);
 
@@ -718,7 +718,7 @@ int ovl_resume(DISP_MODULE_ENUM module, void *handle)
 	return 0;
 }
 
-int ovl_suspend(DISP_MODULE_ENUM module, void *handle)
+int ovl_suspend(enum DISP_MODULE_ENUM module, void *handle)
 {
 	int idx = ovl_index(module);
 
@@ -742,13 +742,13 @@ int ovl_suspend(DISP_MODULE_ENUM module, void *handle)
 	return 0;
 }
 
-int ovl_init(DISP_MODULE_ENUM module, void *handle)
+int ovl_init(enum DISP_MODULE_ENUM module, void *handle)
 {
 	ovl_clock_on(module, handle);
 	return 0;
 }
 
-int ovl_deinit(DISP_MODULE_ENUM module, void *handle)
+int ovl_deinit(enum DISP_MODULE_ENUM module, void *handle)
 {
 	ovl_clock_off(module, handle);
 	return 0;
@@ -781,7 +781,7 @@ unsigned int ddp_ovl_get_cur_addr(bool rdma_mode, int layerid)
 #endif
 }
 
-void ovl_get_address(DISP_MODULE_ENUM module, unsigned long *add)
+void ovl_get_address(enum DISP_MODULE_ENUM module, unsigned long *add)
 {
 	int i = 0;
 	int idx = ovl_index(module);
@@ -802,13 +802,13 @@ void ovl_get_address(DISP_MODULE_ENUM module, unsigned long *add)
 void ovl_get_info(int idx, void *data)
 {
 	int i = 0;
-	OVL_BASIC_STRUCT *pdata = (OVL_BASIC_STRUCT *) data;
+	struct OVL_BASIC_STRUCT *pdata = (struct OVL_BASIC_STRUCT *) data;
 	unsigned int idx_offset = idx * DISP_OVL_INDEX_OFFSET;
 	unsigned int layer_off = 0;
 	unsigned int src_on = DISP_REG_GET(DISP_REG_OVL_SRC_CON + idx_offset);
-	OVL_BASIC_STRUCT *p = NULL;
+	struct OVL_BASIC_STRUCT *p = NULL;
 
-	memset(pdata, 0, sizeof(OVL_BASIC_STRUCT) * OVL_LAYER_NUM);
+	memset(pdata, 0, sizeof(struct OVL_BASIC_STRUCT) * OVL_LAYER_NUM);
 
 	if (ovl_get_status() == DDP_OVL1_STATUS_SUB || ovl_get_status() == DDP_OVL1_STATUS_IDLE) { /* 4+4 mode */
 		/* idx=0; */
@@ -887,7 +887,7 @@ void ovl_get_info(int idx, void *data)
 	}
 }
 
-static int ovl_check_input_param(OVL_CONFIG_STRUCT *config)
+static int ovl_check_input_param(struct OVL_CONFIG_STRUCT *config)
 {
 	if ((config->addr == 0 && config->source == 0) || config->dst_w == 0 || config->dst_h == 0) {
 		DDPERR("ovl parameter invalidate, addr=%lx, w=%d, h=%d\n",
@@ -899,7 +899,7 @@ static int ovl_check_input_param(OVL_CONFIG_STRUCT *config)
 	return 0;
 }
 
-void ovl_reset_by_cmdq(void *handle, DISP_MODULE_ENUM module)
+void ovl_reset_by_cmdq(void *handle, enum DISP_MODULE_ENUM module)
 {
 	/* warm reset ovl every time we use it */
 	if (handle) {
@@ -915,7 +915,7 @@ void ovl_reset_by_cmdq(void *handle, DISP_MODULE_ENUM module)
 	}
 }
 
-static int ovl_config_l(DISP_MODULE_ENUM module, disp_ddp_path_config *pConfig, void *handle)
+static int ovl_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_config *pConfig, void *handle)
 {
 	int i = 0;
 	int ovl_idx = ovl_index(module);
@@ -976,7 +976,7 @@ static int ovl_config_l(DISP_MODULE_ENUM module, disp_ddp_path_config *pConfig, 
 	return 0;
 }
 
-int ovl_build_cmdq(DISP_MODULE_ENUM module, void *cmdq_trigger_handle, CMDQ_STATE state)
+int ovl_build_cmdq(enum DISP_MODULE_ENUM module, void *cmdq_trigger_handle, enum CMDQ_STATE state)
 {
 	int ret = 0;
 
@@ -1002,7 +1002,7 @@ int ovl_build_cmdq(DISP_MODULE_ENUM module, void *cmdq_trigger_handle, CMDQ_STAT
 
 /***************** ovl debug info ************/
 
-void ovl_dump_reg(DISP_MODULE_ENUM module)
+void ovl_dump_reg(enum DISP_MODULE_ENUM module)
 {
 	int idx = ovl_index(module);
 	unsigned int offset = idx * DISP_OVL_INDEX_OFFSET;
@@ -1157,7 +1157,7 @@ static void ovl_printf_status(int idx, unsigned int status)
 	DDPDUMP("ovl%d, state=0x%x, fms_state:%s\n", idx, status, ovl_get_state_name(status));
 }
 
-void ovl_dump_analysis(DISP_MODULE_ENUM module)
+void ovl_dump_analysis(enum DISP_MODULE_ENUM module)
 {
 	int i = 0;
 	unsigned int layer_offset = 0;
@@ -1212,7 +1212,7 @@ void ovl_dump_analysis(DISP_MODULE_ENUM module)
 	ovl_printf_status(index, DISP_REG_GET(DISP_REG_OVL_FLOW_CTRL_DBG + offset));
 }
 
-int ovl_dump(DISP_MODULE_ENUM module, int level)
+int ovl_dump(enum DISP_MODULE_ENUM module, int level)
 {
 	ovl_dump_analysis(module);
 	ovl_dump_reg(module);
@@ -1220,7 +1220,7 @@ int ovl_dump(DISP_MODULE_ENUM module, int level)
 	return 0;
 }
 
-static int ovl_io(DISP_MODULE_ENUM module, int msg, unsigned long arg, void *cmdq)
+static int ovl_io(enum DISP_MODULE_ENUM module, int msg, unsigned long arg, void *cmdq)
 {
 	int ret = 0;
 
@@ -1255,7 +1255,7 @@ static int ovl_io(DISP_MODULE_ENUM module, int msg, unsigned long arg, void *cmd
 }
 
 /***************** driver************/
-DDP_MODULE_DRIVER ddp_driver_ovl = {
+struct DDP_MODULE_DRIVER ddp_driver_ovl = {
 	.init = ovl_init,
 	.deinit = ovl_deinit,
 	.config = ovl_config_l,

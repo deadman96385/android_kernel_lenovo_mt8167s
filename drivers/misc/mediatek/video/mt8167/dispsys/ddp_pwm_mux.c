@@ -44,9 +44,9 @@ static void __iomem *disp_pmw_mux_base;
  *
 *****************************************************************************/
 #ifndef CONFIG_MTK_CLKMGR
-eDDP_CLK_ID disp_pwm_get_clkid(unsigned int clk_req)
+enum eDDP_CLK_ID disp_pwm_get_clkid(unsigned int clk_req)
 {
-	eDDP_CLK_ID clkid = -1;
+	enum eDDP_CLK_ID clkid = -1;
 
 	switch (clk_req) {
 	case 1:
@@ -129,7 +129,7 @@ int disp_pwm_set_pwmmux(unsigned int clk_req)
 
 #else /* Common Clock Framework */
 	int ret = 0;
-	eDDP_CLK_ID clkid = -1;
+	enum eDDP_CLK_ID clkid = -1;
 
 	clkid = disp_pwm_get_clkid(clk_req);
 	ret = disp_pwm_get_muxbase();

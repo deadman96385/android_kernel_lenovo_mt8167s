@@ -93,7 +93,7 @@ int disp_unregister_irq_callback(DDP_IRQ_CALLBACK cb)
 	return 0;
 }
 
-int disp_register_module_irq_callback(DISP_MODULE_ENUM module, DDP_IRQ_CALLBACK cb)
+int disp_register_module_irq_callback(enum DISP_MODULE_ENUM module, DDP_IRQ_CALLBACK cb)
 {
 	int i;
 
@@ -124,7 +124,7 @@ int disp_register_module_irq_callback(DISP_MODULE_ENUM module, DDP_IRQ_CALLBACK 
 	return 0;
 }
 
-int disp_unregister_module_irq_callback(DISP_MODULE_ENUM module, DDP_IRQ_CALLBACK cb)
+int disp_unregister_module_irq_callback(enum DISP_MODULE_ENUM module, DDP_IRQ_CALLBACK cb)
 {
 	int i;
 
@@ -141,7 +141,7 @@ int disp_unregister_module_irq_callback(DISP_MODULE_ENUM module, DDP_IRQ_CALLBAC
 	return 0;
 }
 
-void disp_invoke_irq_callbacks(DISP_MODULE_ENUM module, unsigned int param)
+void disp_invoke_irq_callbacks(enum DISP_MODULE_ENUM module, unsigned int param)
 {
 	int i;
 
@@ -161,14 +161,14 @@ void disp_invoke_irq_callbacks(DISP_MODULE_ENUM module, unsigned int param)
 
 /* Mark out for eliminate build warning message, because it is not used */
 #if 0
-static DISP_MODULE_ENUM find_module_by_irq(int irq)
+static enum DISP_MODULE_ENUM find_module_by_irq(int irq)
 {
 	/* should sort irq_id_to_module_table by numberic sequence */
 	int i = 0;
 #define DISP_IRQ_NUM_MAX (DISP_REG_NUM)
 	static struct irq_module_map {
 		int irq;
-		DISP_MODULE_ENUM module;
+		enum DISP_MODULE_ENUM module;
 	} irq_id_to_module_table[DISP_IRQ_NUM_MAX] = {
 		{
 		0, DISP_MODULE_OVL0}, {
@@ -289,7 +289,7 @@ void disp_dump_emi_status(void)
 
 irqreturn_t disp_irq_handler(int irq, void *dev_id)
 {
-	DISP_MODULE_ENUM module = DISP_MODULE_UNKNOWN;
+	enum DISP_MODULE_ENUM module = DISP_MODULE_UNKNOWN;
 	unsigned long reg_val = 0;
 	unsigned int index = 0;
 	unsigned int mutexID = 0;
@@ -640,7 +640,7 @@ void disp_register_dev_irq(unsigned int irq_num, char *device_name)
 		DDPERR("ddp register irq %u failed on device %s\n", irq_num, device_name);
 }
 
-int disp_is_intr_enable(DISP_REG_ENUM module)
+int disp_is_intr_enable(enum DISP_REG_ENUM module)
 {
 	switch (module) {
 	case DISP_REG_OVL0:
@@ -649,14 +649,15 @@ int disp_is_intr_enable(DISP_REG_ENUM module)
 	case DISP_REG_MUTEX:
 	case DISP_REG_DSI0:
 	case DISP_REG_AAL:
-	case DISP_REG_CONFIG:
 		return 1;
+	case DISP_REG_CONFIG:
 	case DISP_REG_COLOR:
 	case DISP_REG_CCORR:
 	case DISP_REG_GAMMA:
 	case DISP_REG_DITHER:
 	case DISP_REG_PWM:
 	case DISP_REG_DPI0:
+	case DISP_REG_DPI1:
 	case DISP_REG_SMI_LARB0:
 	case DISP_REG_SMI_COMMON:
 #if 0

@@ -180,7 +180,7 @@ static unsigned int is_reg_addr_valid(unsigned int isVa, unsigned long addr)
 
 static void process_dbg_debug(const char *opt)
 {
-	static disp_session_config config;
+	static struct disp_session_config config;
 	unsigned long int enable = 0;
 	char *p;
 	char *buf = dbg_buf + strlen(dbg_buf);
@@ -968,7 +968,7 @@ int ddp_lcd_test(void)
 	return -1;
 }
 
-char *disp_get_fmt_name(DP_COLOR_ENUM color)
+char *disp_get_fmt_name(enum DP_COLOR_ENUM color)
 {
 	switch (color) {
 	case DP_COLOR_FULLG8:

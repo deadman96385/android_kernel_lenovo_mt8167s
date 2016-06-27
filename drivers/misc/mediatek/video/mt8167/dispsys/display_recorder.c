@@ -60,11 +60,11 @@ unsigned int gCapturePriLayerNum = 8;
 
 static DEFINE_SPINLOCK(gdprec_logger_spinlock);
 
-static dprec_debug_control _control = { 0 };
+static struct dprec_debug_control _control = { 0 };
 
 /*
 *
-static reg_base_map reg_map[] = {
+static struct reg_base_map reg_map[] = {
 	{"MMSYS", (0xf4000000)},
 	{"OVL0", (0xF400c000)},
 	{"OVL1", (0xF400d000)},
@@ -95,7 +95,7 @@ static reg_base_map reg_map[] = {
 };
 */
 
-static event_string_map event_map[] = {
+static struct event_string_map event_map[] = {
 	{"Set Config Dirty", DPREC_EVENT_CMDQ_SET_DIRTY},
 	{"Wait Stream EOF", DPREC_EVENT_CMDQ_WAIT_STREAM_EOF},
 	{"Signal CMDQ Event-Stream EOF", DPREC_EVENT_CMDQ_SET_EVENT_ALLOW},
@@ -107,7 +107,7 @@ static event_string_map event_map[] = {
 
 
 
-static MMP_Event dprec_mmp_event_spy(DPREC_LOGGER_ENUM l)
+static MMP_Event dprec_mmp_event_spy(enum DPREC_LOGGER_ENUM l)
 {
 	switch (l & 0xffffff) {
 	case DPREC_LOGGER_PRIMARY_MUTEX:
@@ -156,7 +156,7 @@ static const char *_find_module_by_reg_addr(unsigned int reg)
 	unsigned int module_offset = 0x1000;
 	unsigned int base = (reg & (~(module_offset - 1)));
 
-	for (i = 0; i < sizeof(reg_map) / sizeof(reg_base_map); i++) {
+	for (i = 0; i < sizeof(reg_map) / sizeof(struct reg_base_map); i++) {
 		if (base == reg_map[i].module_reg_base)
 			return reg_map[i].module_name;
 	}
@@ -165,11 +165,11 @@ static const char *_find_module_by_reg_addr(unsigned int reg)
 }
 */
 
-static const char *_get_event_string(DPREC_EVENT event)
+static const char *_get_event_string(enum DPREC_EVENT event)
 {
 	int i = 0;
 
-	for (i = 0; i < sizeof(event_map) / sizeof(event_string_map); i++) {
+	for (i = 0; i < sizeof(event_map) / sizeof(struct event_string_map); i++) {
 		if (event == event_map[i].event)
 			return event_map[i].event_string;
 	}
@@ -194,7 +194,7 @@ static unsigned long long get_current_time_us(void)
 
 #define dprec_string_max_length 512
 static unsigned char dprec_string_buffer[dprec_string_max_length] = { 0 };
-static dprec_logger logger[DPREC_LOGGER_NUM];
+static struct dprec_logger logger[DPREC_LOGGER_NUM];
 
 #define dprec_dump_max_length (1024 * 16 * 4)
 static unsigned char dprec_string_buffer_analysize[dprec_dump_max_length] = { 0 };
@@ -207,8 +207,8 @@ unsigned int dprec_error_log_buflen = DPREC_ERROR_LOG_BUFFER_LENGTH;
 unsigned int dprec_error_log_id;
 
 char dprec_error_log_buffer[DPREC_ERROR_LOG_BUFFER_LENGTH];
-static dprec_logger_event dprec_vsync_irq_event;
-static met_log_map dprec_met_info[DISP_SESSION_MEMORY + 2] = {
+static struct dprec_logger_event dprec_vsync_irq_event;
+static struct met_log_map dprec_met_info[DISP_SESSION_MEMORY + 2] = {
 	{"UNKWON", 0, 0},
 	{"OVL0-DSI", 0, 0},
 	{"OVL1-MHL", 0, 0},
@@ -226,7 +226,7 @@ int dprec_init(void)
 	return 0;
 }
 
-void dprec_event_op(DPREC_EVENT event)
+void dprec_event_op(enum DPREC_EVENT event)
 {
 	int len = 0;
 
@@ -293,7 +293,7 @@ static unsigned long msec_low(unsigned long long nsec)
 /* #define SPLIT_MS(x) (unsigned long long)msec_high(x), (unsigned long)msec_low(x) */
 
 
-static const char *dprec_logger_spy(DPREC_LOGGER_ENUM l)
+static const char *dprec_logger_spy(enum DPREC_LOGGER_ENUM l)
 {
 	switch (l) {
 	case DPREC_LOGGER_PRIMARY_TRIGGER:
@@ -341,8 +341,8 @@ static const char *dprec_logger_spy(DPREC_LOGGER_ENUM l)
 void dprec_logger_trigger(unsigned int type_logsrc, unsigned int val1, unsigned int val2)
 {
 	unsigned long flags = 0;
-	DPREC_LOGGER_ENUM source = type_logsrc & 0xffffff;
-	dprec_logger *l;
+	enum DPREC_LOGGER_ENUM source = type_logsrc & 0xffffff;
+	struct dprec_logger *l;
 	unsigned long long time;
 
 	dprec_to_mmp(type_logsrc, MMProfileFlagPulse, val1, val2);
@@ -391,8 +391,8 @@ unsigned long long dprec_logger_get_current_hold_period(unsigned int type_logsrc
 	unsigned long long period = 0;
 	unsigned long flags = 0;
 	unsigned long long time = get_current_time_us();
-	DPREC_LOGGER_ENUM source = type_logsrc & 0xffffff;
-	dprec_logger *l;
+	enum DPREC_LOGGER_ENUM source = type_logsrc & 0xffffff;
+	struct dprec_logger *l;
 
 	spin_lock_irqsave(&gdprec_logger_spinlock, flags);
 	l = &logger[source];
@@ -410,8 +410,8 @@ unsigned long long dprec_logger_get_current_hold_period(unsigned int type_logsrc
 void dprec_logger_start(unsigned int type_logsrc, unsigned int val1, unsigned int val2)
 {
 	unsigned long flags = 0;
-	DPREC_LOGGER_ENUM source = type_logsrc & 0xffffff;
-	dprec_logger *l;
+	enum DPREC_LOGGER_ENUM source = type_logsrc & 0xffffff;
+	struct dprec_logger *l;
 	unsigned long long time;
 
 	dprec_to_mmp(type_logsrc, MMProfileFlagStart, val1, val2);
@@ -435,8 +435,8 @@ void dprec_logger_start(unsigned int type_logsrc, unsigned int val1, unsigned in
 void dprec_logger_done(unsigned int type_logsrc, unsigned int val1, unsigned int val2)
 {
 	unsigned long flags = 0;
-	DPREC_LOGGER_ENUM source = type_logsrc & 0xffffff;
-	dprec_logger *l;
+	enum DPREC_LOGGER_ENUM source = type_logsrc & 0xffffff;
+	struct dprec_logger *l;
 	unsigned long long time;
 
 	dprec_to_mmp(type_logsrc, MMProfileFlagEnd, val1, val2);
@@ -469,7 +469,7 @@ done:
 	spin_unlock_irqrestore(&gdprec_logger_spinlock, flags);
 }
 
-void dprec_logger_event_init(dprec_logger_event *p, char *name, uint32_t level,
+void dprec_logger_event_init(struct dprec_logger_event *p, char *name, uint32_t level,
 			     MMP_Event *mmp_root)
 {
 	if (p) {
@@ -576,7 +576,7 @@ void dprec_logger_frame_seq_end(unsigned int session_id, unsigned frm_sequence)
 }
 #endif
 
-void dprec_start(dprec_logger_event *event, unsigned int val1, unsigned int val2)
+void dprec_start(struct dprec_logger_event *event, unsigned int val1, unsigned int val2)
 {
 	if (event) {
 		if (event->level & DPREC_LOGGER_LEVEL_MMP)
@@ -584,7 +584,7 @@ void dprec_start(dprec_logger_event *event, unsigned int val1, unsigned int val2
 
 		if (event->level & DPREC_LOGGER_LEVEL_LOGGER) {
 			unsigned long flags = 0;
-			dprec_logger *l;
+			struct dprec_logger *l;
 			unsigned long long time;
 
 			spin_lock_irqsave(&gdprec_logger_spinlock, flags);
@@ -619,7 +619,7 @@ void dprec_start(dprec_logger_event *event, unsigned int val1, unsigned int val2
 	}
 }
 
-void dprec_done(dprec_logger_event *event, unsigned int val1, unsigned int val2)
+void dprec_done(struct dprec_logger_event *event, unsigned int val1, unsigned int val2)
 {
 	if (event) {
 		if (event->level & DPREC_LOGGER_LEVEL_MMP)
@@ -627,7 +627,7 @@ void dprec_done(dprec_logger_event *event, unsigned int val1, unsigned int val2)
 
 		if (event->level & DPREC_LOGGER_LEVEL_LOGGER) {
 			unsigned long flags = 0;
-			dprec_logger *l;
+			struct dprec_logger *l;
 			unsigned long long time;
 
 			spin_lock_irqsave(&gdprec_logger_spinlock, flags);
@@ -664,7 +664,7 @@ void dprec_done(dprec_logger_event *event, unsigned int val1, unsigned int val2)
 	}
 }
 
-void dprec_trigger(dprec_logger_event *event, unsigned int val1, unsigned int val2)
+void dprec_trigger(struct dprec_logger_event *event, unsigned int val1, unsigned int val2)
 {
 	if (event) {
 		if (event->level & DPREC_LOGGER_LEVEL_MMP)
@@ -672,7 +672,7 @@ void dprec_trigger(dprec_logger_event *event, unsigned int val1, unsigned int va
 
 		if (event->level & DPREC_LOGGER_LEVEL_LOGGER) {
 			unsigned long flags = 0;
-			dprec_logger *l;
+			struct dprec_logger *l;
 			unsigned long long time;
 
 			spin_lock_irqsave(&gdprec_logger_spinlock, flags);
@@ -722,7 +722,7 @@ void dprec_trigger(dprec_logger_event *event, unsigned int val1, unsigned int va
 }
 
 
-void dprec_submit(dprec_logger_event *event, unsigned int val1, unsigned int val2)
+void dprec_submit(struct dprec_logger_event *event, unsigned int val1, unsigned int val2)
 {
 	if (event) {
 		if (event->level & DPREC_LOGGER_LEVEL_MMP)
@@ -745,8 +745,8 @@ void dprec_logger_submit(unsigned int type_logsrc, unsigned long long period,
 			 unsigned int fence_idx)
 {
 	unsigned long flags = 0;
-	DPREC_LOGGER_ENUM source = type_logsrc & 0xffffff;
-	dprec_logger *l;
+	enum DPREC_LOGGER_ENUM source = type_logsrc & 0xffffff;
+	struct dprec_logger *l;
 
 	spin_lock_irqsave(&gdprec_logger_spinlock, flags);
 	l = &logger[source];
@@ -782,22 +782,22 @@ void dprec_logger_reset_all(void)
 	ts_dprec_reset = get_current_time_us();
 }
 
-void dprec_logger_reset(DPREC_LOGGER_ENUM source)
+void dprec_logger_reset(enum DPREC_LOGGER_ENUM source)
 {
-	dprec_logger *l = &logger[source];
+	struct dprec_logger *l = &logger[source];
 
-	memset((void *)l, 0, sizeof(dprec_logger));
+	memset((void *)l, 0, sizeof(struct dprec_logger));
 	l->period_min_frame = 10000000;
 	/* DISPMSG("count=%d, period=%llu, max=%llu,min=%llu,start=%llu,trigger=%llu\n",*/
 	/*		l->count, l->period_frame, l->period_max_frame,*/
 	/*		l->period_min_frame, l->ts_start, l->ts_trigger);*/
 }
 
-int dprec_logger_get_result_string(DPREC_LOGGER_ENUM source, char *stringbuf, int strlen)
+int dprec_logger_get_result_string(enum DPREC_LOGGER_ENUM source, char *stringbuf, int strlen)
 {
 	unsigned long flags = 0;
 	int len = 0;
-	dprec_logger *l;
+	struct dprec_logger *l;
 	unsigned long long total = 0;
 	unsigned long long avg;
 	unsigned long long count;
@@ -876,34 +876,34 @@ int dprec_logger_get_result_string_all(char *stringbuf, int strlen)
 	return n;
 }
 
-typedef enum {
+enum dprec_record_type {
 	DPREC_REG_OP = 1,
 	DPREC_CMDQ_EVENT,
 	DPREC_ERROR,
 	DPREC_FENCE
-} dprec_record_type;
+};
 
-typedef struct {
+struct dprec_reg_op_record {
 	unsigned int use_cmdq;
 	unsigned int reg;
 	unsigned int val;
 	unsigned int mask;
-} dprec_reg_op_record;
+};
 
-typedef struct {
+struct dprec_fence_record {
 	unsigned int fence_fd;
 	unsigned int buffer_idx;
 	unsigned int ion_fd;
-} dprec_fence_record;
+};
 
-typedef struct {
-	dprec_record_type type;
+struct dprec_record {
+	enum dprec_record_type type;
 	unsigned int ts;
 	union {
-		dprec_fence_record fence;
-		dprec_reg_op_record reg_op;
+		struct dprec_fence_record fence;
+		struct dprec_reg_op_record reg_op;
 	} rec;
-} dprec_record;
+};
 
 void dprec_stub_irq(unsigned int irq_bit)
 {
@@ -920,7 +920,7 @@ void dprec_stub_irq(unsigned int irq_bit)
 
 static unsigned int vsync_cnt;
 
-void dprec_stub_event(DISP_PATH_EVENT event)
+void dprec_stub_event(enum DISP_PATH_EVENT event)
 {
 	/* DISP_REG_SET(NULL,DISP_REG_CONFIG_MUTEX_INTEN,0xffffffff); */
 	if (event == DISP_PATH_EVENT_IF_VSYNC) {
@@ -965,12 +965,12 @@ unsigned int dprec_logger_get_dump_len(void)
 	return analysize_length;
 }
 
-typedef enum {
+enum DPREC_DEBUG_BIT_ENUM {
 	DPREC_DEBUG_BIT_OVERALL_SWITCH = 0,
 	DPREC_DEBUG_BIT_CMM_DUMP_SWITCH,
 	DPREC_DEBUG_BIT_CMM_DUMP_VA,
 	DPREC_DEBUG_BIT_SYSTRACE,
-} DPREC_DEBUG_BIT_ENUM;
+};
 
 int dprec_handle_option(unsigned int option)
 {
@@ -983,7 +983,7 @@ int dprec_handle_option(unsigned int option)
 	return 0;
 }
 
-int dprec_mmp_dump_ovl_layer(OVL_CONFIG_STRUCT *ovl_layer, unsigned int l,
+int dprec_mmp_dump_ovl_layer(struct OVL_CONFIG_STRUCT *ovl_layer, unsigned int l,
 			     unsigned int session /*1:primary, 2:external, 3:memory */)
 {
 	if (gCapturePriLayerEnable) {
@@ -1000,7 +1000,7 @@ int dprec_mmp_dump_ovl_layer(OVL_CONFIG_STRUCT *ovl_layer, unsigned int l,
 int dprec_mmp_dump_wdma_layer(void *wdma_layer, unsigned int wdma_num)
 {
 	if (gCaptureWdmaLayerEnable)
-		ddp_mmp_wdma_layer((WDMA_CONFIG_STRUCT *)wdma_layer, wdma_num, gCapturePriLayerDownX,
+		ddp_mmp_wdma_layer((struct WDMA_CONFIG_STRUCT *)wdma_layer, wdma_num, gCapturePriLayerDownX,
 				   gCapturePriLayerDownY);
 
 	return -1;
@@ -1009,7 +1009,7 @@ int dprec_mmp_dump_wdma_layer(void *wdma_layer, unsigned int wdma_num)
 int dprec_mmp_dump_rdma_layer(void *rdma_layer, unsigned int rdma_num)
 {
 	if (gCaptureWdmaLayerEnable)
-		ddp_mmp_rdma_layer((RDMA_CONFIG_STRUCT *)rdma_layer, rdma_num, gCapturePriLayerDownX,
+		ddp_mmp_rdma_layer((struct RDMA_CONFIG_STRUCT *)rdma_layer, rdma_num, gCapturePriLayerDownX,
 				   gCapturePriLayerDownY);
 
 	return -1;
@@ -1114,7 +1114,7 @@ int dprec_logger_pr(unsigned int type, char *fmt, ...)
 	return n;
 }
 
-static char *_logger_pr_type_spy(DPREC_LOGGER_PR_TYPE type)
+static char *_logger_pr_type_spy(enum DPREC_LOGGER_PR_TYPE type)
 {
 	switch (type) {
 	case DPREC_LOGGER_ERROR:
@@ -1147,7 +1147,7 @@ ssize_t dprec_read_from_buffer(void __user *to, size_t count, loff_t *ppos,
 	return available;
 }
 
-int dprec_logger_get_buf(DPREC_LOGGER_PR_TYPE type, char *stringbuf, int len)
+int dprec_logger_get_buf(enum DPREC_LOGGER_PR_TYPE type, char *stringbuf, int len)
 {
 	int n = 0;
 	int i;
@@ -1178,7 +1178,7 @@ unsigned int gCapturePriLayerDownX = 20;
 unsigned int gCapturePriLayerDownY = 20;
 unsigned int gCapturePriLayerNum = 8;
 
-dprec_logger logger[DPREC_LOGGER_NUM] = { { 0 } };
+struct dprec_logger logger[DPREC_LOGGER_NUM] = { { 0 } };
 
 unsigned int dprec_error_log_len;
 unsigned int dprec_error_log_buflen = DPREC_ERROR_LOG_BUFFER_LENGTH;
@@ -1189,7 +1189,7 @@ int dprec_init(void)
 	return 0;
 }
 
-void dprec_event_op(DPREC_EVENT event)
+void dprec_event_op(enum DPREC_EVENT event)
 {
 }
 
@@ -1210,7 +1210,7 @@ void dprec_logger_done(unsigned int type_logsrc, unsigned int val1, unsigned int
 {
 }
 
-void dprec_logger_event_init(dprec_logger_event *p, char *name, uint32_t level,
+void dprec_logger_event_init(struct dprec_logger_event *p, char *name, uint32_t level,
 			     MMP_Event *mmp_root)
 {
 }
@@ -1223,19 +1223,19 @@ void dprec_logger_frame_seq_end(unsigned int session_id, unsigned frm_sequence)
 {
 }
 
-void dprec_start(dprec_logger_event *event, unsigned int val1, unsigned int val2)
+void dprec_start(struct dprec_logger_event *event, unsigned int val1, unsigned int val2)
 {
 }
 
-void dprec_done(dprec_logger_event *event, unsigned int val1, unsigned int val2)
+void dprec_done(struct dprec_logger_event *event, unsigned int val1, unsigned int val2)
 {
 }
 
-void dprec_trigger(dprec_logger_event *event, unsigned int val1, unsigned int val2)
+void dprec_trigger(struct dprec_logger_event *event, unsigned int val1, unsigned int val2)
 {
 }
 
-void dprec_submit(dprec_logger_event *event, unsigned int val1, unsigned int val2)
+void dprec_submit(struct dprec_logger_event *event, unsigned int val1, unsigned int val2)
 {
 }
 
@@ -1248,11 +1248,11 @@ void dprec_logger_reset_all(void)
 {
 }
 
-void dprec_logger_reset(DPREC_LOGGER_ENUM source)
+void dprec_logger_reset(enum DPREC_LOGGER_ENUM source)
 {
 }
 
-int dprec_logger_get_result_string(DPREC_LOGGER_ENUM source, char *stringbuf, int strlen)
+int dprec_logger_get_result_string(enum DPREC_LOGGER_ENUM source, char *stringbuf, int strlen)
 {
 	return 0;
 }
@@ -1266,7 +1266,7 @@ void dprec_stub_irq(unsigned int irq_bit)
 {
 }
 
-void dprec_stub_event(DISP_PATH_EVENT event)
+void dprec_stub_event(enum DISP_PATH_EVENT event)
 {
 }
 
@@ -1302,7 +1302,7 @@ int dprec_handle_option(unsigned int option)
 	return 0;
 }
 
-int dprec_mmp_dump_ovl_layer(OVL_CONFIG_STRUCT *ovl_layer, unsigned int l,
+int dprec_mmp_dump_ovl_layer(struct OVL_CONFIG_STRUCT *ovl_layer, unsigned int l,
 			     unsigned int session /*1:primary, 2:external, 3:memory */)
 {
 	return 0;
@@ -1323,7 +1323,7 @@ int dprec_logger_pr(unsigned int type, char *fmt, ...)
 	return 0;
 }
 
-int dprec_logger_get_buf(DPREC_LOGGER_PR_TYPE type, char *stringbuf, int len)
+int dprec_logger_get_buf(enum DPREC_LOGGER_PR_TYPE type, char *stringbuf, int len)
 {
 	return 0;
 }

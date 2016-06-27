@@ -86,12 +86,12 @@
 
 #define DISP_DEVNAME "DISPSYS"
 
-typedef struct {
+struct disp_node_struct {
 	pid_t open_pid;
 	pid_t open_tgid;
 	struct list_head testList;
 	spinlock_t node_lock;
-} disp_node_struct;
+};
 
 
 static struct kobject kdispobj;
@@ -177,18 +177,18 @@ static long disp_compat_ioctl(struct file *file, unsigned int cmd, unsigned long
 
 static int disp_open(struct inode *inode, struct file *file)
 {
-	disp_node_struct *pNode = NULL;
+	struct disp_node_struct *pNode = NULL;
 
 	DDPDBG("enter disp_open() process:%s\n", current->comm);
 
 	/* Allocate and initialize private data */
-	file->private_data = kmalloc(sizeof(disp_node_struct), GFP_ATOMIC);
+	file->private_data = kmalloc(sizeof(struct disp_node_struct), GFP_ATOMIC);
 	if (file->private_data == NULL) {
 		DDPMSG("Not enough entry for DDP open operation\n");
 		return -ENOMEM;
 	}
 
-	pNode = (disp_node_struct *) file->private_data;
+	pNode = (struct disp_node_struct *) file->private_data;
 	pNode->open_pid = current->pid;
 	pNode->open_tgid = current->tgid;
 	INIT_LIST_HEAD(&(pNode->testList));
@@ -205,11 +205,11 @@ static ssize_t disp_read(struct file *file, char __user *data, size_t len, loff_
 
 static int disp_release(struct inode *inode, struct file *file)
 {
-	disp_node_struct *pNode = NULL;
+	struct disp_node_struct *pNode = NULL;
 
 	DDPDBG("enter disp_release() process:%s\n", current->comm);
 
-	pNode = (disp_node_struct *) file->private_data;
+	pNode = (struct disp_node_struct *) file->private_data;
 
 	spin_lock(&pNode->node_lock);
 
@@ -253,7 +253,7 @@ unsigned long dsi_reg_va;
 
 m4u_callback_ret_t disp_m4u_callback(int port, unsigned int mva, void *data)
 {
-	DISP_MODULE_ENUM module = DISP_MODULE_OVL0;
+	enum DISP_MODULE_ENUM module = DISP_MODULE_OVL0;
 
 	DDPERR("fault call port=%d, mva=0x%x, data=0x%p\n", port, mva, data);
 	switch (port) {
@@ -371,7 +371,7 @@ const char *disp_clk_name[MAX_DISP_CLK_CNT] = {
 	"SYSPLL4_D2",
 };
 
-int ddp_clk_prepare(eDDP_CLK_ID id)
+int ddp_clk_prepare(enum eDDP_CLK_ID id)
 {
 #ifndef CONFIG_MTK_CLKMGR
 #ifndef CONFIG_FPGA_EARLY_PORTING	/* CCF not ready */
@@ -387,7 +387,7 @@ int ddp_clk_prepare(eDDP_CLK_ID id)
 	return 0;
 }
 
-int ddp_clk_unprepare(eDDP_CLK_ID id)
+int ddp_clk_unprepare(enum eDDP_CLK_ID id)
 {
 #ifndef CONFIG_MTK_CLKMGR
 #ifndef CONFIG_FPGA_EARLY_PORTING	/* CCF not ready */
@@ -400,7 +400,7 @@ int ddp_clk_unprepare(eDDP_CLK_ID id)
 	return 0;
 }
 
-int ddp_clk_enable(eDDP_CLK_ID id)
+int ddp_clk_enable(enum eDDP_CLK_ID id)
 {
 #ifndef CONFIG_MTK_CLKMGR
 #ifndef CONFIG_FPGA_EARLY_PORTING	/* CCF not ready */
@@ -416,7 +416,7 @@ int ddp_clk_enable(eDDP_CLK_ID id)
 	return 0;
 }
 
-int ddp_clk_disable(eDDP_CLK_ID id)
+int ddp_clk_disable(enum eDDP_CLK_ID id)
 {
 #ifndef CONFIG_MTK_CLKMGR
 #ifndef CONFIG_FPGA_EARLY_PORTING	/* CCF not ready */
@@ -429,7 +429,7 @@ int ddp_clk_disable(eDDP_CLK_ID id)
 	return 0;
 }
 
-int ddp_clk_prepare_enable(eDDP_CLK_ID id)
+int ddp_clk_prepare_enable(enum eDDP_CLK_ID id)
 {
 #ifndef CONFIG_MTK_CLKMGR
 #ifndef CONFIG_FPGA_EARLY_PORTING	/* CCF not ready */
@@ -445,7 +445,7 @@ int ddp_clk_prepare_enable(eDDP_CLK_ID id)
 	return 0;
 }
 
-int ddp_clk_disable_unprepare(eDDP_CLK_ID id)
+int ddp_clk_disable_unprepare(enum eDDP_CLK_ID id)
 {
 #ifndef CONFIG_MTK_CLKMGR
 #ifndef CONFIG_FPGA_EARLY_PORTING	/* CCF not ready */
@@ -458,7 +458,7 @@ int ddp_clk_disable_unprepare(eDDP_CLK_ID id)
 	return 0;
 }
 
-int ddp_clk_set_parent(eDDP_CLK_ID id, eDDP_CLK_ID parent)
+int ddp_clk_set_parent(enum eDDP_CLK_ID id, enum eDDP_CLK_ID parent)
 {
 #ifndef CONFIG_MTK_CLKMGR
 #ifndef CONFIG_FPGA_EARLY_PORTING	/* CCF not ready */
@@ -468,7 +468,7 @@ int ddp_clk_set_parent(eDDP_CLK_ID id, eDDP_CLK_ID parent)
 	return 0;
 }
 
-int ddp_clk_set_rate(eDDP_CLK_ID id, unsigned long rate)
+int ddp_clk_set_rate(enum eDDP_CLK_ID id, unsigned long rate)
 {
 #ifndef CONFIG_MTK_CLKMGR
 #ifndef CONFIG_FPGA_EARLY_PORTING	/* CCF not ready */
@@ -479,7 +479,7 @@ int ddp_clk_set_rate(eDDP_CLK_ID id, unsigned long rate)
 }
 #endif				/* CONFIG_MTK_CLKMGR */
 
-const char *ddp_get_reg_module_name(DISP_REG_ENUM reg)
+const char *ddp_get_reg_module_name(enum DISP_REG_ENUM reg)
 {
 	switch (reg) {
 	case DISP_REG_CONFIG:

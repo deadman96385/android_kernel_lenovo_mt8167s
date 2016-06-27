@@ -23,7 +23,7 @@
 #define DISP_MUTEX_MDP_COUNT  (5)
 
 /* DISP MODULE */
-typedef enum {
+enum DISP_MODULE_ENUM {
 	DISP_MODULE_OVL0 = 0,
 	DISP_MODULE_OVL1,
 	DISP_MODULE_RDMA0,
@@ -59,9 +59,9 @@ typedef enum {
 	DISP_MODULE_SMI_COMMON,
 	DISP_MODULE_UNKNOWN,
 	DISP_MODULE_NUM
-} DISP_MODULE_ENUM;
+};
 
-typedef enum {
+enum DISP_REG_ENUM {
 	DISP_REG_OVL0,
 	DISP_REG_RDMA0,
 	DISP_REG_RDMA1,
@@ -83,15 +83,15 @@ typedef enum {
 	DISP_LVDS_ANA,
 	DISP_LVDS_TX,
 	DISP_REG_NUM
-} DISP_REG_ENUM;
+};
 
-typedef enum {
+enum MUTEX_SOF {
 	SOF_SINGLE = 0,
 	SOF_DSI0,
 	SOF_DSI1,
 	SOF_DPI0,
 	SOF_DPI1,
-} MUTEX_SOF;
+};
 
 enum OVL_LAYER_SOURCE {
 	OVL_LAYER_SOURCE_MEM = 0,
@@ -106,12 +106,12 @@ enum OVL_LAYER_SECURE_MODE {
 	OVL_LAYER_PROTECTED_BUFFER = 2
 };
 
-typedef enum {
+enum CMDQ_SWITCH {
 	CMDQ_DISABLE = 0,
 	CMDQ_ENABLE
-} CMDQ_SWITCH;
+};
 
-typedef enum {
+enum CMDQ_STATE {
 	CMDQ_BEFORE_STREAM_SOF,
 	CMDQ_WAIT_STREAM_EOF_EVENT,
 	CMDQ_CHECK_IDLE_AFTER_STREAM_EOF,
@@ -125,40 +125,40 @@ typedef enum {
 	CMDQ_DSI_LFR_MODE,
 	CMDQ_DSI_RESET,
 	CMDQ_AFTER_STREAM_SOF,
-} CMDQ_STATE;
+};
 
-typedef enum {
+enum DDP_IRQ_LEVEL {
 	DDP_IRQ_LEVEL_ALL = 0,
 	DDP_IRQ_LEVEL_NONE,
 	DDP_IRQ_LEVEL_ERROR
-} DDP_IRQ_LEVEL;
+};
 
 
-typedef struct module_map_s {
-	DISP_MODULE_ENUM module;
+struct module_map_s {
+	enum DISP_MODULE_ENUM module;
 	int bit;
-} module_map_t;
+};
 
-typedef struct {
+struct m_to_b {
 	int m;
 	int v;
-} m_to_b;
+};
 
-typedef struct mout_s {
+struct mout_t {
 	int id;
-	m_to_b out_id_bit_map[5];
+	struct m_to_b out_id_bit_map[5];
 
 	volatile unsigned long *reg;
 	unsigned int reg_val;
-} mout_t;
+};
 
-typedef struct selection_s {
+struct sel_t {
 	int id;
 	int id_bit_map[5];
 
 	volatile unsigned long *reg;
 	unsigned int reg_val;
-} sel_t;
+};
 
 
 

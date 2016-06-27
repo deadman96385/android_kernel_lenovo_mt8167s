@@ -66,6 +66,6 @@ unsigned int ddp_debug_irq_log_level(void);
 int ddp_mem_test(void);
 int ddp_lcd_test(void);
 
-char *disp_get_fmt_name(DP_COLOR_ENUM color);
+char *disp_get_fmt_name(enum DP_COLOR_ENUM color);
 
 #endif				/* __DDP_DEBUG_H__ */

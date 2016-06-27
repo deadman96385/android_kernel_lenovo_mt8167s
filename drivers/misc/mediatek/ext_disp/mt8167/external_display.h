@@ -109,12 +109,12 @@ int ext_disp_get_height(void);
 int ext_disp_is_alive(void);
 int ext_disp_is_sleepd(void);
 int ext_disp_wait_for_vsync(void *config, unsigned int session);
-int ext_disp_config_input_multiple(disp_session_input_config *input, int idx, unsigned int session);
+int ext_disp_config_input_multiple(struct disp_session_input_config *input, int idx, unsigned int session);
 int ext_disp_trigger(int blocking, void *callback, unsigned int userdata, unsigned int session);
 
 int ext_disp_is_video_mode(void);
-CMDQ_SWITCH ext_disp_cmdq_enabled(void);
-int ext_disp_switch_cmdq(CMDQ_SWITCH use_cmdq);
+enum CMDQ_SWITCH ext_disp_cmdq_enabled(void);
+int ext_disp_switch_cmdq(enum CMDQ_SWITCH use_cmdq);
 int ext_disp_diagnose(void);
 void ext_disp_get_curr_addr(unsigned long *input_curr_addr, int module);
 int ext_disp_factory_test(int mode, void *config);

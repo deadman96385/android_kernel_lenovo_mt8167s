@@ -22,11 +22,11 @@ extern "C" {
 
 #define MFC_CHECK_RET(expr)			\
 	do {					\
-		MFC_STATUS ret = (expr);	\
+		enum MFC_STATUS ret = (expr);	\
 		ASSERT(ret == MFC_STATUS_OK);	\
 	} while (0)
 
-typedef enum {
+enum MFC_STATUS {
 	MFC_STATUS_OK = 0,
 
 	MFC_STATUS_INVALID_ARGUMENT = -1,
@@ -34,13 +34,14 @@ typedef enum {
 	MFC_STATUS_OUT_OF_MEMORY = -3,
 	MFC_STATUS_LOCK_FAIL = -4,
 	MFC_STATUS_FATAL_ERROR = -5,
-} MFC_STATUS;
+};
 
-typedef void *MFC_HANDLE;
+#define MFC_HANDLE void *
+
 
 /* --------------------------------------------------------------------------- */
 
-typedef struct {
+struct MFC_CONTEXT {
 	struct semaphore sem;
 
 	uint8_t *fb_addr;
@@ -56,17 +57,17 @@ typedef struct {
 	uint32_t cursor_col;
 	uint32_t font_width;
 	uint32_t font_height;
-} MFC_CONTEXT;
+};
 
 /* MTK Framebuffer Console API */
 
-MFC_STATUS MFC_Open(MFC_HANDLE *handle,
+enum MFC_STATUS MFC_Open(MFC_HANDLE *handle,
 		    void *fb_addr,
 		    unsigned int fb_width,
 		    unsigned int fb_height,
 		    unsigned int fb_bpp, unsigned int fg_color, unsigned int bg_color);
 
-MFC_STATUS MFC_Open_Ex(MFC_HANDLE *handle,
+enum MFC_STATUS MFC_Open_Ex(MFC_HANDLE *handle,
 		       void *fb_addr,
 		       unsigned int fb_width,
 		       unsigned int fb_height,
@@ -74,18 +75,18 @@ MFC_STATUS MFC_Open_Ex(MFC_HANDLE *handle,
 		       unsigned int fb_bpp, unsigned int fg_color, unsigned int bg_color);
 
 
-MFC_STATUS MFC_Close(MFC_HANDLE handle);
+enum MFC_STATUS MFC_Close(MFC_HANDLE handle);
 
-MFC_STATUS MFC_SetColor(MFC_HANDLE handle, unsigned int fg_color, unsigned int bg_color);
+enum MFC_STATUS MFC_SetColor(MFC_HANDLE handle, unsigned int fg_color, unsigned int bg_color);
 
-MFC_STATUS MFC_ResetCursor(MFC_HANDLE handle);
+enum MFC_STATUS MFC_ResetCursor(MFC_HANDLE handle);
 
-MFC_STATUS MFC_Print(MFC_HANDLE handle, const char *str);
+enum MFC_STATUS MFC_Print(MFC_HANDLE handle, const char *str);
 
-MFC_STATUS MFC_LowMemory_Printf(MFC_HANDLE handle, const char *str, uint32_t fg_color,
+enum MFC_STATUS MFC_LowMemory_Printf(MFC_HANDLE handle, const char *str, uint32_t fg_color,
 				uint32_t bg_color);
 
-MFC_STATUS MFC_SetMem(MFC_HANDLE handle, const char *str, uint32_t color);
+enum MFC_STATUS MFC_SetMem(MFC_HANDLE handle, const char *str, uint32_t color);
 uint32_t MFC_Get_Cursor_Offset(MFC_HANDLE handle);
 
 #ifdef __cplusplus

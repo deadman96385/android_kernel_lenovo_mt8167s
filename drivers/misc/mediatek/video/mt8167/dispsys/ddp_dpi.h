@@ -51,12 +51,12 @@ extern "C" {
 
 #define DPI_CHECK_RET(expr)             \
 	do {                                \
-		DPI_STATUS ret = (expr);        \
+		enum DPI_STATUS ret = (expr);        \
 		ASSERT(ret == DPI_STATUS_OK);   \
 	} while (0)
 
 /* for legacy DPI Driver */
-	typedef enum {
+	enum LCD_IF_ID {
 		LCD_IF_PARALLEL_0 = 0,
 		LCD_IF_PARALLEL_1 = 1,
 		LCD_IF_PARALLEL_2 = 2,
@@ -64,80 +64,80 @@ extern "C" {
 		LCD_IF_SERIAL_1 = 4,
 
 		LCD_IF_ALL = 0xFF,
-	} LCD_IF_ID;
+	};
 
-	typedef struct {
+	struct LCD_REG_CMD_ADDR {
 		unsigned rsv_0:4;
 		unsigned addr:4;
 		unsigned rsv_8:24;
-	} LCD_REG_CMD_ADDR, *PLCD_REG_CMD_ADDR;
+	};
 
-	typedef struct {
+	struct LCD_REG_DAT_ADDR {
 		unsigned rsv_0:4;
 		unsigned addr:4;
 		unsigned rsv_8:24;
-	} LCD_REG_DAT_ADDR, *PLCD_REG_DAT_ADDR;
+	};
 
 
-	typedef enum {
+	enum LCD_IF_FMT_COLOR_ORDER {
 		LCD_IF_FMT_COLOR_ORDER_RGB = 0,
 		LCD_IF_FMT_COLOR_ORDER_BGR = 1,
-	} LCD_IF_FMT_COLOR_ORDER;
+	};
 
 
-	typedef enum {
+	enum LCD_IF_FMT_TRANS_SEQ {
 		LCD_IF_FMT_TRANS_SEQ_MSB_FIRST = 0,
 		LCD_IF_FMT_TRANS_SEQ_LSB_FIRST = 1,
-	} LCD_IF_FMT_TRANS_SEQ;
+	};
 
 
-	typedef enum {
+	enum LCD_IF_FMT_PADDING {
 		LCD_IF_FMT_PADDING_ON_LSB = 0,
 		LCD_IF_FMT_PADDING_ON_MSB = 1,
-	} LCD_IF_FMT_PADDING;
+	};
 
 
-	typedef enum {
+	enum LCD_IF_FORMAT {
 		LCD_IF_FORMAT_RGB332 = 0,
 		LCD_IF_FORMAT_RGB444 = 1,
 		LCD_IF_FORMAT_RGB565 = 2,
 		LCD_IF_FORMAT_RGB666 = 3,
 		LCD_IF_FORMAT_RGB888 = 4,
-	} LCD_IF_FORMAT;
+	};
 
-	typedef enum {
+	enum LCD_IF_WIDTH {
 		LCD_IF_WIDTH_8_BITS = 0,
 		LCD_IF_WIDTH_9_BITS = 2,
 		LCD_IF_WIDTH_16_BITS = 1,
 		LCD_IF_WIDTH_18_BITS = 3,
 		LCD_IF_WIDTH_24_BITS = 4,
 		LCD_IF_WIDTH_32_BITS = 5,
-	} LCD_IF_WIDTH;
+	};
 
 
-	typedef enum {
+	enum DPI_STATUS {
 		DPI_STATUS_OK = 0,
 
 		DPI_STATUS_ERROR,
-	} DPI_STATUS;
+	};
 
-	typedef enum {
+	enum DPI_POLARITY {
 		DPI_POLARITY_RISING = 0,
 		DPI_POLARITY_FALLING = 1
-	} DPI_POLARITY;
+	};
 
-	typedef enum {
+	enum DPI_RGB_ORDER {
 		DPI_RGB_ORDER_RGB = 0,
 		DPI_RGB_ORDER_BGR = 1,
-	} DPI_RGB_ORDER;
+	};
 
-	typedef enum {
+	enum DPI_CLK_FREQ {
 		DPI_CLK_480p = 27027,
 		DPI_CLK_720p = 74250,
 		DPI_CLK_1080p = 148500
-	} DPI_CLK_FREQ;
+	};
 
-	typedef enum {
+	enum DPI_VIDEO_RESOLUTION {
 		DPI_VIDEO_720x480p_60Hz = 0,	/* 0 */
 		DPI_VIDEO_720x576p_50Hz,	/* 1 */
 		DPI_VIDEO_1280x720p_60Hz,	/* 2 */
@@ -169,9 +169,9 @@ extern "C" {
 		DPI_VIDEO_2161P_24HZ,	/* 18 */
 
 		DPI_VIDEO_RESOLUTION_NUM
-	} DPI_VIDEO_RESOLUTION;
+	};
 
-	typedef enum {
+	enum COLOR_SPACE_T {
 		RGB = 0,
 		RGB_FULL,
 		YCBCR_444,
@@ -179,9 +179,9 @@ extern "C" {
 		XV_YCC,
 		YCBCR_444_FULL,
 		YCBCR_422_FULL,
-	} COLOR_SPACE_T;
+	};
 
-	typedef struct {
+	struct LCD_REG_WROI_CON {
 		unsigned RGB_ORDER:1;
 		unsigned BYTE_ORDER:1;
 		unsigned PADDING:1;
@@ -194,45 +194,45 @@ extern "C" {
 		unsigned SEND_RES_MODE:1;
 		unsigned IF_24:1;
 		unsigned rsv_6:6;
-	} LCD_REG_WROI_CON, *PLCD_REG_WROI_CON;
+	};
 
-	int ddp_dpi_stop(DISP_MODULE_ENUM module, void *cmdq_handle);
-	int ddp_dpi_power_on(DISP_MODULE_ENUM module, void *cmdq_handle);
-	int ddp_dpi_power_off(DISP_MODULE_ENUM module, void *cmdq_handle);
-	int ddp_dpi_dump(DISP_MODULE_ENUM module, int level);
-	int ddp_dpi_start(DISP_MODULE_ENUM module, void *cmdq);
-	int ddp_dpi_init(DISP_MODULE_ENUM module, void *cmdq);
-	int ddp_dpi_deinit(DISP_MODULE_ENUM module, void *cmdq_handle);
-	int ddp_dpi_config(DISP_MODULE_ENUM module, disp_ddp_path_config *config,
+	int ddp_dpi_stop(enum DISP_MODULE_ENUM module, void *cmdq_handle);
+	int ddp_dpi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle);
+	int ddp_dpi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle);
+	int ddp_dpi_dump(enum DISP_MODULE_ENUM module, int level);
+	int ddp_dpi_start(enum DISP_MODULE_ENUM module, void *cmdq);
+	int ddp_dpi_init(enum DISP_MODULE_ENUM module, void *cmdq);
+	int ddp_dpi_deinit(enum DISP_MODULE_ENUM module, void *cmdq_handle);
+	int ddp_dpi_config(enum DISP_MODULE_ENUM module, struct disp_ddp_path_config *config,
 			   void *cmdq_handle);
-	int ddp_dpi_trigger(DISP_MODULE_ENUM module, void *cmdq);
-	int ddp_dpi_ioctl(DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int ioctl_cmd,
+	int ddp_dpi_trigger(enum DISP_MODULE_ENUM module, void *cmdq);
+	int ddp_dpi_ioctl(enum DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int ioctl_cmd,
 			  unsigned long *params);
-	DPI_STATUS ddp_dpi_EnableColorBar(DISP_MODULE_ENUM module);
+	enum DPI_STATUS ddp_dpi_EnableColorBar(enum DISP_MODULE_ENUM module);
 	unsigned int ddp_dpi_get_cur_addr(bool rdma_mode, int layerid);
-	DPI_STATUS ddp_dpi_3d_ctrl(DISP_MODULE_ENUM module, struct cmdqRecStruct cmdq, bool fg3DFrame);
+	enum DPI_STATUS ddp_dpi_3d_ctrl(enum DISP_MODULE_ENUM module, struct cmdqRecStruct cmdq, bool fg3DFrame);
 
-	DPI_STATUS ddp_dpi_config_colorspace(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+	enum DPI_STATUS ddp_dpi_config_colorspace(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 					     uint8_t ColorSpace, uint8_t HDMI_Res);
-	DPI_STATUS ddp_dpi_yuv422_setting(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+	enum DPI_STATUS ddp_dpi_yuv422_setting(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 					  uint32_t uvsw);
-	DPI_STATUS ddp_dpi_clpf_setting(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+	enum DPI_STATUS ddp_dpi_clpf_setting(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 					uint8_t clpfType, bool roundingEnable, uint32_t clpfen);
-	DPI_STATUS ddp_dpi_vsync_lr_enable(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+	enum DPI_STATUS ddp_dpi_vsync_lr_enable(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 					   uint32_t vs_lo_en, uint32_t vs_le_en, uint32_t vs_ro_en,
 					   uint32_t vs_re_en);
-	DPI_STATUS ddp_dpi_ConfigVsync_LEVEN(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+	enum DPI_STATUS ddp_dpi_ConfigVsync_LEVEN(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 					     uint32_t pulseWidth, uint32_t backPorch,
 					     uint32_t frontPorch, bool fgInterlace);
-	DPI_STATUS ddp_dpi_ConfigVsync_RODD(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+	enum DPI_STATUS ddp_dpi_ConfigVsync_RODD(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 					    uint32_t pulseWidth, uint32_t backPorch,
 					    uint32_t frontPorch);
-	DPI_STATUS ddp_dpi_ConfigVsync_REVEN(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+	enum DPI_STATUS ddp_dpi_ConfigVsync_REVEN(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 					     uint32_t pulseWidth, uint32_t backPorch,
 					     uint32_t frontPorch, bool fgInterlace);
-	void ddp_dpi_lvds_config(DISP_MODULE_ENUM module, LCM_DPI_FORMAT format,
+	void ddp_dpi_lvds_config(enum DISP_MODULE_ENUM module, LCM_DPI_FORMAT format,
 				 void *cmdq_handle);
-	bool ddp_dpi_is_top_filed(DISP_MODULE_ENUM module);
+	bool ddp_dpi_is_top_filed(enum DISP_MODULE_ENUM module);
 
 #ifdef __cplusplus
 }

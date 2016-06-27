@@ -98,11 +98,11 @@
 #include "external_display.h"
 #endif
 
-typedef enum {
+enum ePREPARE_FENCE_TYPE {
 	PREPARE_INPUT_FENCE,
 	PREPARE_OUTPUT_FENCE,
 	PREPARE_PRESENT_FENCE
-} ePREPARE_FENCE_TYPE;
+};
 
 
 static dev_t mtk_disp_mgr_devno;
@@ -110,12 +110,12 @@ static struct cdev *mtk_disp_mgr_cdev;
 static struct class *mtk_disp_mgr_class;
 
 DEFINE_MUTEX(session_config_mutex);
-disp_session_input_config _session_input[2][DISP_SESSION_MEMORY];
-disp_mem_output_config _session_output[2][DISP_SESSION_MEMORY];
-disp_session_input_config *captured_session_input = _session_input[0];
-disp_session_input_config *cached_session_input = _session_input[1];
-disp_mem_output_config *captured_session_output = _session_output[0];
-disp_mem_output_config *cached_session_output = _session_output[1];
+struct disp_session_input_config _session_input[2][DISP_SESSION_MEMORY];
+struct disp_mem_output_config _session_output[2][DISP_SESSION_MEMORY];
+struct disp_session_input_config *captured_session_input = _session_input[0];
+struct disp_session_input_config *cached_session_input = _session_input[1];
+struct disp_mem_output_config *captured_session_output = _session_output[0];
+struct disp_mem_output_config *cached_session_output = _session_output[1];
 
 static int mtk_disp_mgr_open(struct inode *inode, struct file *file)
 {
@@ -184,7 +184,7 @@ int disp_get_session_number(void)
 }
 
 #ifdef OVL_CASCADE_SUPPORT
-OVL_CONFIG_STRUCT ovl2mem_in_cached_config[DDP_OVL_LAYER_MUN] = {
+struct OVL_CONFIG_STRUCT ovl2mem_in_cached_config[DDP_OVL_LAYER_MUN] = {
 	{.layer = 0, .isDirty = 1}
 	,
 	{.layer = 1, .isDirty = 1}
@@ -202,7 +202,7 @@ OVL_CONFIG_STRUCT ovl2mem_in_cached_config[DDP_OVL_LAYER_MUN] = {
 	{.layer = 7, .isDirty = 1}
 };
 #else
-OVL_CONFIG_STRUCT ovl2mem_in_cached_config[DDP_OVL_LAYER_MUN] = {
+struct OVL_CONFIG_STRUCT ovl2mem_in_cached_config[DDP_OVL_LAYER_MUN] = {
 	{.layer = 0, .isDirty = 1}
 	,
 	{.layer = 1, .isDirty = 1}
@@ -213,7 +213,7 @@ OVL_CONFIG_STRUCT ovl2mem_in_cached_config[DDP_OVL_LAYER_MUN] = {
 };
 #endif
 
-int _session_inited(disp_session_config config)
+int _session_inited(struct disp_session_config config)
 {
 	/* TODO: */
 #if 0
@@ -236,7 +236,7 @@ int _session_inited(disp_session_config config)
 #ifdef OVL_CASCADE_SUPPORT
 static int g_enable_clock;
 #endif
-int disp_create_session(disp_session_config *config)
+int disp_create_session(struct disp_session_config *config)
 {
 	int ret = 0;
 	int is_session_inited = 0;
@@ -302,9 +302,9 @@ done:
 	return ret;
 }
 
-bool release_session_buffer(DISP_SESSION_TYPE type, unsigned int layerid,
+bool release_session_buffer(enum DISP_SESSION_TYPE type, unsigned int layerid,
 			    unsigned long layer_phy_addr);
-int disp_destroy_session(disp_session_config *config)
+int disp_destroy_session(struct disp_session_config *config)
 {
 	int ret = -1;
 	unsigned int session = config->session_id;
@@ -350,7 +350,7 @@ int disp_destroy_session(disp_session_config *config)
 	return ret;
 }
 
-bool release_session_buffer(DISP_SESSION_TYPE type, unsigned int layerid,
+bool release_session_buffer(enum DISP_SESSION_TYPE type, unsigned int layerid,
 			    unsigned long layer_phy_addr)
 {
 	unsigned int session = 0;
@@ -405,7 +405,7 @@ int _ioctl_create_session(unsigned long arg)
 	int ret = 0;
 	int i, j;
 	void __user *argp = (void __user *)arg;
-	disp_session_config config;
+	struct disp_session_config config;
 
 	if (copy_from_user(&config, argp, sizeof(config))) {
 		DISPMSG("[FB]: copy_from_user failed! line:%d\n", __LINE__);
@@ -460,7 +460,7 @@ int _ioctl_destroy_session(unsigned long arg)
 {
 	int ret = 0;
 	void __user *argp = (void __user *)arg;
-	disp_session_config config;
+	struct disp_session_config config;
 
 	if (copy_from_user(&config, argp, sizeof(config))) {
 		DISPMSG("[FB]: copy_from_user failed! line:%d\n", __LINE__);
@@ -506,10 +506,10 @@ int _ioctl_trigger_session(unsigned long arg)
 {
 	int ret = 0;
 	void __user *argp = (void __user *)arg;
-	disp_session_config config;
+	struct disp_session_config config;
 	unsigned int session_id = 0;
 	unsigned long ticket = 0;
-	disp_session_sync_info *session_info;
+	struct disp_session_sync_info *session_info;
 
 	if (copy_from_user(&config, argp, sizeof(config))) {
 		DISPMSG("[FB]: copy_from_user failed! line:%d\n", __LINE__);
@@ -611,11 +611,11 @@ int _ioctl_prepare_present_fence(unsigned long arg)
 
 	void __user *argp = (void __user *)arg;
 	struct fence_data data;
-	disp_present_fence preset_fence_struct;
+	struct disp_present_fence preset_fence_struct;
 	static unsigned int fence_idx;
-	disp_sync_info *layer_info = NULL;
+	struct disp_sync_info *layer_info = NULL;
 
-	if (copy_from_user(&preset_fence_struct, (void __user *)arg, sizeof(disp_present_fence))) {
+	if (copy_from_user(&preset_fence_struct, (void __user *)arg, sizeof(struct disp_present_fence))) {
 		pr_debug("[FB Driver]: copy_from_user failed! line:%d\n", __LINE__);
 		return -EFAULT;
 	}
@@ -662,11 +662,11 @@ int _ioctl_prepare_present_fence(unsigned long arg)
 
 #endif
 
-int _ioctl_prepare_buffer(unsigned long arg, ePREPARE_FENCE_TYPE type)
+int _ioctl_prepare_buffer(unsigned long arg, enum ePREPARE_FENCE_TYPE type)
 {
 	int ret = 0;
 	void __user *argp = (void __user *)arg;
-	disp_buffer_info info;
+	struct disp_buffer_info info;
 	struct mtkfb_fence_buf_info *buf, *buf2;
 
 	if (copy_from_user(&info, (void __user *)arg, sizeof(info))) {
@@ -745,7 +745,7 @@ int _ioctl_prepare_buffer(unsigned long arg, ePREPARE_FENCE_TYPE type)
 	return ret;
 }
 
-const char *_disp_format_spy(DISP_FORMAT format)
+const char *_disp_format_spy(enum DISP_FORMAT format)
 {
 	switch (format) {
 	case DISP_FORMAT_RGB565:
@@ -783,8 +783,8 @@ const char *_disp_format_spy(DISP_FORMAT format)
 	}
 }
 
-static int _sync_convert_fb_layer_to_ovl_struct(unsigned int session_id, disp_input_config *src,
-						OVL_CONFIG_STRUCT *dst, unsigned int dst_mva)
+static int _sync_convert_fb_layer_to_ovl_struct(unsigned int session_id, struct disp_input_config *src,
+						struct OVL_CONFIG_STRUCT *dst, unsigned int dst_mva)
 {
 	unsigned int layerpitch = 0;
 	unsigned int layerbpp = 0;
@@ -956,8 +956,8 @@ static int _sync_convert_fb_layer_to_ovl_struct(unsigned int session_id, disp_in
 	return 0;
 }
 
-static int _sync_convert_fb_layer_to_disp_input(unsigned int session_id, disp_input_config *src,
-						primary_disp_input_config *dst,
+static int _sync_convert_fb_layer_to_disp_input(unsigned int session_id, struct disp_input_config *src,
+						struct primary_disp_input_config *dst,
 						unsigned int dst_mva)
 {
 	unsigned int layerpitch = 0;
@@ -1131,16 +1131,16 @@ static int _sync_convert_fb_layer_to_disp_input(unsigned int session_id, disp_in
 	return 0;
 }
 
-static int set_memory_buffer(disp_session_input_config *input)
+static int set_memory_buffer(struct disp_session_input_config *input)
 {
 	int i = 0;
 	int layer_id = 0;
 	unsigned int dst_size = 0;
 	unsigned long dst_mva = 0;
 	unsigned int session_id = input->session_id;
-	disp_session_sync_info *session_info = disp_get_session_sync_info_for_debug(session_id);
+	struct disp_session_sync_info *session_info = disp_get_session_sync_info_for_debug(session_id);
 
-	ovl2mem_in_config input_params[HW_OVERLAY_COUNT];
+	struct ovl2mem_in_config input_params[HW_OVERLAY_COUNT];
 
 	memset((void *)&input_params, 0, sizeof(input_params));
 
@@ -1196,7 +1196,7 @@ static int set_memory_buffer(disp_session_input_config *input)
 		/* /disp_sync_put_cached_layer_info(session_id, layer_id, &input->config[i], get_ovl2mem_ticket()); */
 		mtkfb_update_buf_ticket(session_id, layer_id, input->config[i].next_buff_idx, get_ovl2mem_ticket());
 		_sync_convert_fb_layer_to_disp_input(input->session_id, &(input->config[i]),
-						     (primary_disp_input_config *)&input_params[layer_id], dst_mva);
+						(struct primary_disp_input_config *)&input_params[layer_id], dst_mva);
 		input_params[layer_id].dirty = 1;
 
 		if (input->config[i].layer_enable)
@@ -1217,14 +1217,14 @@ static int set_memory_buffer(disp_session_input_config *input)
 	}
 
 #if !defined(OVL_TIME_SHARING)
-	ovl2mem_input_config((ovl2mem_in_config *)&input_params);
+	ovl2mem_input_config((struct ovl2mem_in_config *)&input_params);
 #else
 	captured_session_input[DISP_SESSION_MEMORY - 1].session_id = input->session_id;
 #endif
 
 	return 0;
 }
-static int set_external_buffer(disp_session_input_config *input)
+static int set_external_buffer(struct disp_session_input_config *input)
 {
 	int i = 0;
 	int ret = 0;
@@ -1233,7 +1233,7 @@ static int set_external_buffer(disp_session_input_config *input)
 	unsigned long int dst_mva = 0;
 	unsigned int session_id = 0;
 	unsigned long int mva_offset = 0;
-	disp_session_sync_info *session_info = NULL;
+	struct disp_session_sync_info *session_info = NULL;
 
 	session_id = input->session_id;
 	session_info = disp_get_session_sync_info_for_debug(session_id);
@@ -1299,7 +1299,7 @@ static int set_external_buffer(disp_session_input_config *input)
 					      input->config[i].frm_sequence);
 #ifdef CONFIG_MTK_HDMI_3D_SUPPORT
 			mtkfb_update_buf_info_new(input->session_id, mva_offset,
-						  (disp_input_config *) input->config);
+						  (struct disp_input_config *) input->config);
 #endif
 		}
 
@@ -1322,7 +1322,7 @@ static int set_external_buffer(disp_session_input_config *input)
 	return 0;
 }
 
-static int _remove_assert_layer(disp_session_input_config *input)
+static int _remove_assert_layer(struct disp_session_input_config *input)
 {
 	int i, assert_layer, idx = -1;
 
@@ -1347,7 +1347,7 @@ static int _remove_assert_layer(disp_session_input_config *input)
 	return 0;
 }
 
-static inline void remove_assert_layer(disp_session_input_config *input)
+static inline void remove_assert_layer(struct disp_session_input_config *input)
 {
 	if (!is_DAL_Enabled())
 		return;
@@ -1355,7 +1355,7 @@ static inline void remove_assert_layer(disp_session_input_config *input)
 		;
 }
 
-static int set_primary_buffer(disp_session_input_config *input)
+static int set_primary_buffer(struct disp_session_input_config *input)
 {
 	int i = 0;
 	int layer_id = 0;
@@ -1365,7 +1365,7 @@ static int set_primary_buffer(disp_session_input_config *input)
 	unsigned int mva_offset = 0;
 	char fence_msg_buf[512];
 	unsigned int fence_msg_len = 0;
-	disp_session_sync_info *session_info;
+	struct disp_session_sync_info *session_info;
 
 	session_id = input->session_id;
 	session_info = disp_get_session_sync_info_for_debug(session_id);
@@ -1483,42 +1483,47 @@ int _ioctl_set_input_buffer(unsigned long arg)
 	int ret = 0;
 	void __user *argp = (void __user *)arg;
 	unsigned int session_id = 0;
-	disp_session_input_config session_input;
-	disp_session_sync_info *session_info;
+	struct disp_session_input_config *session_input;
+	struct disp_session_sync_info *session_info;
 
-	if (copy_from_user(&session_input, argp, sizeof(session_input))) {
+	session_input = kmalloc(sizeof(*session_input), GFP_KERNEL);
+	if (!session_input)
+		return -ENOMEM;
+
+	if (copy_from_user(session_input, argp, sizeof(*session_input))) {
 		DISPMSG("[FB]: copy_from_user failed! line:%d\n", __LINE__);
 		return -EFAULT;
 	}
-	session_input.setter = SESSION_USER_HWC;
-	session_id = session_input.session_id;
+	session_input->setter = SESSION_USER_HWC;
+	session_id = session_input->session_id;
 	session_info = disp_get_session_sync_info_for_debug(session_id);
 
 	if (session_info)
-		dprec_start(&session_info->event_setinput, 0, session_input.config_layer_num);
+		dprec_start(&session_info->event_setinput, 0, session_input->config_layer_num);
 
 	DISPPR_FENCE("S+/%s%d/count%d\n", disp_session_mode_spy(session_id),
-		     DISP_SESSION_DEV(session_id), session_input.config_layer_num);
+		     DISP_SESSION_DEV(session_id), session_input->config_layer_num);
 
 	if (DISP_SESSION_TYPE(session_id) == DISP_SESSION_PRIMARY) {
-		ret = set_primary_buffer(&session_input);
+		ret = set_primary_buffer(session_input);
 	} else if (DISP_SESSION_TYPE(session_id) == DISP_SESSION_EXTERNAL) {
-		ret = set_external_buffer(&session_input);
+		ret = set_external_buffer(session_input);
 	} else if (DISP_SESSION_TYPE(session_id) == DISP_SESSION_MEMORY) {
-		ret = set_memory_buffer(&session_input);
+		ret = set_memory_buffer(session_input);
 	} else {
 		DISPERR("session type is wrong:0x%08x\n", session_id);
 		return -1;
 	}
 
 	if (session_info)
-		dprec_done(&session_info->event_setinput, 0, session_input.config_layer_num);
+		dprec_done(&session_info->event_setinput, 0, session_input->config_layer_num);
 
+	kfree(session_input);
 	return ret;
 }
 
-static int _sync_convert_fb_layer_to_disp_output(unsigned int session_id, disp_output_config *src,
-						 disp_mem_output_config *dst, unsigned int dst_mva)
+static int _sync_convert_fb_layer_to_disp_output(unsigned int session_id, struct disp_output_config *src,
+						 struct disp_mem_output_config *dst, unsigned int dst_mva)
 {
 	unsigned int layerpitch = 0;
 	unsigned int layerbpp = 0;
@@ -1556,10 +1561,10 @@ int _ioctl_set_output_buffer(unsigned long arg)
 {
 	int ret = 0;
 	void __user *argp = (void __user *)arg;
-	disp_session_output_config session_output;
+	struct disp_session_output_config session_output;
 	unsigned int session_id = 0;
 	unsigned long dst_mva = 0;
-	disp_session_sync_info *session_info;
+	struct disp_session_sync_info *session_info;
 
 	if (copy_from_user(&session_output, argp, sizeof(session_output))) {
 		DISPMSG("[FB]: copy_from_user failed! line:%d\n", __LINE__);
@@ -1577,7 +1582,7 @@ int _ioctl_set_output_buffer(unsigned long arg)
 	DISPMSG(" _ioctl_set_output_buffer session = 0x%x, idx %x, seq %x\n", session_id,
 		session_output.config.buff_idx, session_output.config.frm_sequence);
 	if (DISP_SESSION_TYPE(session_id) == DISP_SESSION_PRIMARY) {
-		disp_mem_output_config primary_output;
+		struct disp_mem_output_config primary_output;
 
 		memset((void *)&primary_output, 0, sizeof(primary_output));
 		if (session_output.config.pa)
@@ -1593,9 +1598,9 @@ int _ioctl_set_output_buffer(unsigned long arg)
 		/* must be mirror mode */
 		if (primary_display_is_decouple_mode()) {
 			/* xuecheng, UGLY WORKAROUND!!! should use a common struct for input/output cache info */
-			disp_input_config src;
+			struct disp_input_config src;
 
-			memset((void *)&src, 0, sizeof(disp_input_config));
+			memset((void *)&src, 0, sizeof(struct disp_input_config));
 			src.layer_id = disp_sync_get_output_interface_timeline_id();
 			src.layer_enable = 1;
 			src.next_buff_idx = session_output.config.interface_idx;
@@ -1603,7 +1608,7 @@ int _ioctl_set_output_buffer(unsigned long arg)
 			disp_sync_put_cached_layer_info(session_id, disp_sync_get_output_interface_timeline_id(),
 							&src, dst_mva);
 
-			memset((void *)&src, 0, sizeof(disp_input_config));
+			memset((void *)&src, 0, sizeof(struct disp_input_config));
 			src.layer_id = disp_sync_get_output_timeline_id();
 			src.layer_enable = 1;
 			src.next_buff_idx = session_output.config.buff_idx;
@@ -1643,7 +1648,7 @@ int _ioctl_set_output_buffer(unsigned long arg)
 			session_output.config.x, session_output.config.y, session_output.config.pitch);
 
 	} else if (DISP_SESSION_TYPE(session_id) == DISP_SESSION_MEMORY) {
-		disp_mem_output_config primary_output;
+		struct disp_mem_output_config primary_output;
 
 		memset((void *)&primary_output, 0, sizeof(primary_output));
 		if (session_output.config.pa)
@@ -1674,7 +1679,7 @@ int _ioctl_set_output_buffer(unsigned long arg)
 		mutex_unlock(&session_config_mutex);
 #else
 		if (dst_mva)
-			ovl2mem_output_config((disp_mem_output_config *)&primary_output);
+			ovl2mem_output_config((struct disp_mem_output_config *)&primary_output);
 		else
 			DISPERR("error buffer idx 0x%x\n", session_output.config.buff_idx);
 #endif
@@ -1704,7 +1709,7 @@ int _ioctl_get_info(unsigned long arg)
 {
 	int ret = 0;
 	void __user *argp = (void __user *)arg;
-	disp_session_info info;
+	struct disp_session_info info;
 	unsigned int session_id = 0;
 
 	if (copy_from_user(&info, argp, sizeof(info))) {
@@ -1755,7 +1760,7 @@ int _ioctl_get_is_driver_suspend(unsigned long arg)
 int _ioctl_get_display_caps(unsigned long arg)
 {
 	int ret = 0;
-	disp_caps_info caps_info;
+	struct disp_caps_info caps_info;
 	void __user *argp = (void __user *)arg;
 
 	if (copy_from_user(&caps_info, argp, sizeof(caps_info))) {
@@ -1800,8 +1805,8 @@ int _ioctl_wait_vsync(unsigned long arg)
 {
 	int ret = 0;
 	void __user *argp = (void __user *)arg;
-	disp_session_vsync_config vsync_config;
-	disp_session_sync_info *session_info;
+	struct disp_session_vsync_config vsync_config;
+	struct disp_session_sync_info *session_info;
 
 	if (copy_from_user(&vsync_config, argp, sizeof(vsync_config))) {
 		DISPMSG("[FB]: copy_from_user failed! line:%d\n", __LINE__);
@@ -1853,9 +1858,9 @@ int _ioctl_insert_session_buffers(unsigned long arg)
 {
 	int ret = 0;
 	void __user *argp = (void __user *)arg;
-	disp_session_buf_info session_buf_info;
+	struct disp_session_buf_info session_buf_info;
 
-	if (copy_from_user(&session_buf_info, argp, sizeof(disp_session_buf_info))) {
+	if (copy_from_user(&session_buf_info, argp, sizeof(struct disp_session_buf_info))) {
 		DISPMSG("[FB]: copy_from_user failed! line:%d\n", __LINE__);
 		return -EFAULT;
 	}
@@ -1864,9 +1869,9 @@ int _ioctl_insert_session_buffers(unsigned long arg)
 	return ret;
 }
 
-static DISP_MODE select_session_mode(disp_session_config *session_info)
+static enum DISP_MODE select_session_mode(struct disp_session_config *session_info)
 {
-	static DISP_MODE final_mode = DISP_SESSION_DIRECT_LINK_MODE;
+	static enum DISP_MODE final_mode = DISP_SESSION_DIRECT_LINK_MODE;
 	static int stayInVp;
 
 	if (session_info->user == SESSION_USER_GUIEXT) {
@@ -1924,7 +1929,7 @@ static DISP_MODE select_session_mode(disp_session_config *session_info)
 	return final_mode;
 }
 
-int set_session_mode(disp_session_config *config_info, int force)
+int set_session_mode(struct disp_session_config *config_info, int force)
 {
 	int ret = 0;
 
@@ -1940,9 +1945,9 @@ int set_session_mode(disp_session_config *config_info, int force)
 int _ioctl_set_session_mode(unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
-	disp_session_config config_info;
+	struct disp_session_config config_info;
 
-	if (copy_from_user(&config_info, argp, sizeof(disp_session_config))) {
+	if (copy_from_user(&config_info, argp, sizeof(struct disp_session_config))) {
 		DISPMSG("[FB]: copy_from_user failed! line:%d\n", __LINE__);
 		return -EFAULT;
 	}

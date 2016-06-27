@@ -124,7 +124,7 @@ static void _ext_disp_vsync_unlock(unsigned int session)
 	mutex_unlock(&(pgc->vsync_lock));
 }
 
-static DISP_MODULE_ENUM _get_dst_module_by_lcm(disp_path_handle pHandle)
+static enum DISP_MODULE_ENUM _get_dst_module_by_lcm(disp_path_handle pHandle)
 {
 	return DISP_MODULE_DPI1;
 }
@@ -297,7 +297,7 @@ static int _build_path_direct_link(void)
 {
 	int ret = 0;
 
-	DISP_MODULE_ENUM dst_module = 0;
+	enum DISP_MODULE_ENUM dst_module = 0;
 
 	EXT_DISP_FUNC();
 	pgc->mode = EXTD_DIRECT_LINK_MODE;
@@ -357,7 +357,7 @@ static int _build_path_rdma_dpi(void)
 {
 	int ret = 0;
 
-	DISP_MODULE_ENUM dst_module = 0;
+	enum DISP_MODULE_ENUM dst_module = 0;
 
 	pgc->mode = EXTD_RDMA_DPI_MODE;
 
@@ -541,7 +541,7 @@ static void _cmdq_insert_wait_frame_done_token(int clear_event)
 	/* /dprec_event_op(DPREC_EVENT_CMDQ_WAIT_STREAM_EOF); */
 }
 
-static int _convert_disp_input_to_rdma(RDMA_CONFIG_STRUCT *dst, disp_input_config *src)
+static int _convert_disp_input_to_rdma(struct RDMA_CONFIG_STRUCT *dst, struct disp_input_config *src)
 {
 	int ret = 0;
 	unsigned int Bpp = 0;
@@ -562,7 +562,7 @@ static int _convert_disp_input_to_rdma(RDMA_CONFIG_STRUCT *dst, disp_input_confi
 	return ret;
 }
 
-static int _convert_disp_input_to_ovl(OVL_CONFIG_STRUCT *dst, disp_input_config *src)
+static int _convert_disp_input_to_ovl(struct OVL_CONFIG_STRUCT *dst, struct disp_input_config *src)
 {
 	int ret;
 	unsigned int Bpp = 0;
@@ -647,7 +647,7 @@ static int _convert_disp_input_to_ovl(OVL_CONFIG_STRUCT *dst, disp_input_config 
 static int _ext_disp_trigger(int blocking, void *callback, unsigned int userdata)
 {
 	bool reg_flush = false;
-	/*disp_session_vsync_config vsync_config;*/
+	/*struct disp_session_vsync_config vsync_config;*/
 
 	EXT_DISP_FUNC();
 
@@ -732,7 +732,7 @@ void ext_disp_probe(void)
 
 int ext_disp_init(char *lcm_name, unsigned int session)
 {
-	disp_ddp_path_config *data_config;
+	struct disp_ddp_path_config *data_config;
 	enum EXT_DISP_STATUS ret;
 
 	EXT_DISP_FUNC();
@@ -785,9 +785,9 @@ int ext_disp_init(char *lcm_name, unsigned int session)
 	dpmgr_path_set_video_mode(pgc->dpmgr_handle, ext_disp_is_video_mode());
 	dpmgr_path_init(pgc->dpmgr_handle, CMDQ_DISABLE);
 
-	data_config = vmalloc(sizeof(disp_ddp_path_config));
+	data_config = vmalloc(sizeof(struct disp_ddp_path_config));
 	if (data_config) {
-		memset((void *)data_config, 0, sizeof(disp_ddp_path_config));
+		memset((void *)data_config, 0, sizeof(struct disp_ddp_path_config));
 		memcpy(&(data_config->dispif_config), &extd_lcm_params, sizeof(LCM_PARAMS));
 
 		data_config->dst_w = extd_lcm_params.dpi.width;
@@ -852,7 +852,7 @@ int ext_disp_deinit(unsigned int session)
 int ext_disp_wait_for_vsync(void *config, unsigned int session)
 {
 	int ret = 0;
-	disp_session_vsync_config *c = (disp_session_vsync_config *) config;
+	struct disp_session_vsync_config *c = (struct disp_session_vsync_config *) config;
 
 	EXT_DISP_FUNC();
 
@@ -1034,7 +1034,7 @@ int ext_disp_suspend_trigger(void *callback, unsigned int userdata, unsigned int
 	return ret;
 }
 
-int ext_disp_config_input_multiple(disp_session_input_config *input, int idx, unsigned int session)
+int ext_disp_config_input_multiple(struct disp_session_input_config *input, int idx, unsigned int session)
 {
 	int ret = 0;
 	int i = 0;
@@ -1045,7 +1045,7 @@ int ext_disp_config_input_multiple(disp_session_input_config *input, int idx, un
 
 	/* /EXT_DISP_FUNC(); */
 
-	disp_ddp_path_config *data_config;
+	struct disp_ddp_path_config *data_config;
 
 	if (pgc->state != EXTD_INIT && pgc->state != EXTD_RESUME && pgc->suspend_config != 1) {
 		EXT_DISP_LOG("config ext disp is already slept, state:%d\n", pgc->state);
@@ -1080,7 +1080,7 @@ int ext_disp_config_input_multiple(disp_session_input_config *input, int idx, un
 			pgc->need_trigger_overlay = 1;
 		}
 	} else {
-		OVL_CONFIG_STRUCT ovl_config;
+		struct OVL_CONFIG_STRUCT ovl_config;
 
 		_convert_disp_input_to_ovl(&ovl_config, &(input->config[i]));
 		dprec_mmp_dump_ovl_layer(&ovl_config, input->config[i].layer_id, 2);
@@ -1189,12 +1189,12 @@ int ext_disp_diagnose(void)
 	return ret;
 }
 
-CMDQ_SWITCH ext_disp_cmdq_enabled(void)
+enum CMDQ_SWITCH ext_disp_cmdq_enabled(void)
 {
 	return ext_disp_use_cmdq;
 }
 
-int ext_disp_switch_cmdq(CMDQ_SWITCH use_cmdq)
+int ext_disp_switch_cmdq(enum CMDQ_SWITCH use_cmdq)
 {
 	_ext_disp_path_lock();
 

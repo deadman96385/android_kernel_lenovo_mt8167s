@@ -14,7 +14,7 @@
 #ifndef _DISP_HELPER_H_
 #define _DISP_HELPER_H_
 
-typedef enum {
+enum DISP_HELPER_OPTION {
 	DISP_HELPER_OPTION_USE_CMDQ = 0,
 	DISP_HELPER_OPTION_USE_M4U,
 	DISP_HELPER_OPTION_USE_CLKMGR,
@@ -32,20 +32,20 @@ typedef enum {
 	DISP_HELPER_OPTION_TWO_PIPE_INTERFACE_PATH,
 	DISP_HELPER_OPTION_NO_LCM_FOR_LOW_POWER_MEASUREMENT,
 	DISP_HELPER_OPTION_NUM
-} DISP_HELPER_OPTION;
+};
 
-typedef enum {
+enum DISP_HELPER_STAGE {
 	DISP_HELPER_STAGE_EARLY_PORTING,
 	DISP_HELPER_STAGE_BRING_UP,
 	DISP_HELPER_STAGE_NORMAL
-} DISP_HELPER_STAGE;
+};
 
 void disp_helper_option_init(void);
-int disp_helper_get_option(DISP_HELPER_OPTION option);
-void disp_helper_set_option(DISP_HELPER_OPTION option, int value);
+int disp_helper_get_option(enum DISP_HELPER_OPTION option);
+void disp_helper_set_option(enum DISP_HELPER_OPTION option, int value);
 int disp_helper_get_option_list(char *stringbuf, int buf_len);
 
-DISP_HELPER_STAGE disp_helper_get_stage(void);
+enum DISP_HELPER_STAGE disp_helper_get_stage(void);
 const char *disp_helper_stage_spy(void);
 
 void enable_screen_idle_switch_decouple(void);

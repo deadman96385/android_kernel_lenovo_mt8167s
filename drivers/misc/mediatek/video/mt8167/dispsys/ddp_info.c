@@ -24,7 +24,7 @@
 #include "ddp_wdma.h"
 #include "ddp_wdma_ex.h"
 
-char *ddp_get_module_name(DISP_MODULE_ENUM module)
+char *ddp_get_module_name(enum DISP_MODULE_ENUM module)
 {
 	switch (module) {
 	case DISP_MODULE_UFOE:
@@ -95,7 +95,7 @@ char *ddp_get_module_name(DISP_MODULE_ENUM module)
 	}
 }
 
-int ddp_get_module_max_irq_bit(DISP_MODULE_ENUM module)
+int ddp_get_module_max_irq_bit(enum DISP_MODULE_ENUM module)
 {
 	switch (module) {
 	case DISP_MODULE_UFOE:
@@ -205,7 +205,7 @@ unsigned int ddp_module_to_idx(int module)
 	return id;
 }
 
-DDP_MODULE_DRIVER *ddp_modules_driver[DISP_MODULE_NUM] = {
+struct DDP_MODULE_DRIVER *ddp_modules_driver[DISP_MODULE_NUM] = {
 	&ddp_driver_ovl,	/* DISP_MODULE_OVL0  , */
 	&ddp_driver_ovl,	/* DISP_MODULE_OVL1  , */
 	&ddp_driver_rdma,	/* DISP_MODULE_RDMA0 , */

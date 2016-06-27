@@ -20,12 +20,12 @@
 #include "disp_lcm.h"
 #include "disp_session.h"
 
-typedef enum {
+enum DISP_PRIMARY_PATH_MODE {
 	DIRECT_LINK_MODE,
 	DECOUPLE_MODE,
 	SINGLE_LAYER_MODE,
 	DEBUG_RDMA1_DSI0_MODE
-} DISP_PRIMARY_PATH_MODE;
+};
 
 #define ASSERT_LAYER    (DDP_OVL_LAYER_MUN-1)
 extern unsigned int FB_LAYER;	/* default LCD layer */
@@ -39,7 +39,7 @@ extern unsigned int is_hwc_enabled;
 extern  unsigned int g_suspend_flag;
 #endif
 
-typedef struct {
+struct DISP_LAYER_INFO {
 	unsigned int id;
 	unsigned int curr_en;
 	unsigned int next_en;
@@ -53,53 +53,53 @@ typedef struct {
 	int curr_conn_type;
 	int next_conn_type;
 	int hw_conn_type;
-} DISP_LAYER_INFO;
+};
 
-typedef enum {
+enum DISP_STATUS {
 	DISP_STATUS_OK = 0,
 
 	DISP_STATUS_NOT_IMPLEMENTED,
 	DISP_STATUS_ALREADY_SET,
 	DISP_STATUS_ERROR,
-} DISP_STATUS;
+};
 
 
-typedef enum {
+enum DISP_STATE {
 	DISP_STATE_IDLE = 0,
 	DISP_STATE_BUSY,
-} DISP_STATE;
+};
 
-typedef enum {
+enum DISP_OP_STATE {
 	DISP_OP_PRE = 0,
 	DISP_OP_NORMAL,
 	DISP_OP_POST,
-} DISP_OP_STATE;
+};
 
-typedef enum {
+enum DISP_POWER_STATE {
 	DISP_ALIVE = 0xf0,
 	DISP_SLEPT
-} DISP_POWER_STATE;
+};
 
-typedef enum {
+enum DISP_FRM_SEQ_STATE {
 	FRM_CONFIG = 0,
 	FRM_TRIGGER,
 	FRM_START,
 	FRM_END
-} DISP_FRM_SEQ_STATE;
+};
 
 
-typedef enum {
+enum DISPLAY_HAL_IOCTL {
 	DISPLAY_HAL_IOCTL_SET_CMDQ = 0xff00,
 	DISPLAY_HAL_IOCTL_ENABLE_CMDQ,
 	DISPLAY_HAL_IOCTL_DUMP,
 	DISPLAY_HAL_IOCTL_PATTERN,
-} DISPLAY_HAL_IOCTL;
+};
 
 #ifdef CONFIG_OF
 extern unsigned int islcmconnected;
 #endif
 
-typedef struct {
+struct primary_disp_input_config {
 	unsigned int layer;
 	unsigned int layer_en;
 	unsigned int buff_source;
@@ -133,12 +133,12 @@ typedef struct {
 	unsigned int buff_idx;
 	unsigned int identity;
 	unsigned int connected_type;
-	DISP_BUFFER_TYPE security;
+	enum DISP_BUFFER_TYPE security;
 	unsigned int dirty;
 	unsigned int yuv_range;
-} primary_disp_input_config;
+};
 
-typedef struct {
+struct disp_mem_output_config {
 	unsigned int fmt;
 	unsigned long addr;
 	unsigned long addr_sub_u;
@@ -153,12 +153,12 @@ typedef struct {
 
 	unsigned int buff_idx;
 	unsigned int interface_idx;
-	DISP_BUFFER_TYPE security;
+	enum DISP_BUFFER_TYPE security;
 	unsigned int dirty;
 	int mode;
-} disp_mem_output_config;
+};
 
-typedef struct {
+struct disp_internal_buffer_info {
 	struct list_head list;
 	struct ion_handle *handle;
 	struct sync_fence *pfence;
@@ -170,24 +170,24 @@ typedef struct {
 	uint32_t interface_fence_id;
 	unsigned long long timestamp;
 	struct ion_client *client;
-} disp_internal_buffer_info;
+};
 
-typedef struct {
+struct disp_frm_seq_info {
 	unsigned int mva;
 	unsigned int max_offset;
 	unsigned int seq;
-	DISP_FRM_SEQ_STATE state;
-} disp_frm_seq_info;
+	enum DISP_FRM_SEQ_STATE state;
+};
 
 
-typedef struct {
-	DISP_POWER_STATE state;
+struct display_primary_path_context {
+	enum DISP_POWER_STATE state;
 	unsigned int lcm_fps;
 	int max_layer;
 	int need_trigger_overlay;
 	int need_trigger_ovl1to2;
 	int need_trigger_dcMirror_out;
-	DISP_PRIMARY_PATH_MODE mode;
+	enum DISP_PRIMARY_PATH_MODE mode;
 	int session_mode;
 	unsigned int session_id;
 	unsigned int last_vsync_tick;
@@ -200,7 +200,7 @@ typedef struct {
 	struct mutex switch_dst_lock;
 #endif
 	struct mutex cmd_lock;
-	disp_lcm_handle *plcm;
+	struct disp_lcm_handle *plcm;
 	struct cmdqRecStruct *cmdq_handle_config_esd;
 
 	struct cmdqRecStruct *cmdq_handle_trigger;
@@ -235,9 +235,9 @@ typedef struct {
 	cmdqBackupSlotHandle event_status;
 #endif
 
-	DISP_DC_TYPE dc_type;
+	enum DISP_DC_TYPE dc_type;
 	unsigned int force_on_wdma_path;
-} display_primary_path_context;
+};
 
 struct sec_session_node {
 	struct list_head link;
@@ -265,19 +265,19 @@ int primary_display_get_bpp(void);
 int primary_display_get_dc_bpp(void);
 int primary_display_get_pages(void);
 
-int primary_display_set_overlay_layer(primary_disp_input_config *input);
+int primary_display_set_overlay_layer(struct primary_disp_input_config *input);
 int primary_display_is_alive(void);
 int primary_display_is_sleepd(void);
 int primary_display_is_sleepd_nolock(void);
 int primary_display_wait_for_vsync(void *config);
 unsigned int primary_display_get_ticket(void);
-int primary_display_config_input(primary_disp_input_config *input);
+int primary_display_config_input(struct primary_disp_input_config *input);
 int primary_display_user_cmd(unsigned int cmd, unsigned long arg);
 int primary_display_trigger(int blocking, void *callback, unsigned int userdata);
 int primary_display_ext_trigger(int blocking, void *callback, unsigned int userdata);
 int primary_display_memory_trigger(int blocking, void *callback, unsigned int userdata);
-int primary_display_merge_session_cmd(disp_session_config *config);
-int primary_display_config_output(disp_mem_output_config *output, unsigned int session_id);
+int primary_display_merge_session_cmd(struct disp_session_config *config);
+int primary_display_config_output(struct disp_mem_output_config *output, unsigned int session_id);
 int primary_display_mem_out_trigger(int blocking, void *callback, unsigned int userdata);
 int primary_display_switch_mode(int sess_mode, unsigned int session, int force);
 int primary_display_diagnose(void);
@@ -301,8 +301,8 @@ int primary_display_is_decouple_mode(void);
 int primary_display_is_mirror_mode(void);
 int primary_display_is_ovl1to2_handle(struct cmdqRecStruct *handle);
 unsigned int primary_display_get_option(const char *option);
-CMDQ_SWITCH primary_display_cmdq_enabled(void);
-int primary_display_switch_cmdq_cpu(CMDQ_SWITCH use_cmdq);
+enum CMDQ_SWITCH primary_display_cmdq_enabled(void);
+int primary_display_switch_cmdq_cpu(enum CMDQ_SWITCH use_cmdq);
 int primary_display_check_path(char *stringbuf, int buf_len);
 int primary_display_manual_lock(void);
 int primary_display_manual_unlock(void);
@@ -316,13 +316,13 @@ void primary_display_esd_check_enable(int enable);
 LCM_PARAMS *DISP_GetLcmPara(void);
 LCM_DRIVER *DISP_GetLcmDrv(void);
 int Panel_Master_dsi_config_entry(const char *name, void *config_value);
-int primary_display_config_input_multiple(disp_session_input_config *session_input);
-int primary_display_config_interface_input(primary_disp_input_config *input);
+int primary_display_config_input_multiple(struct disp_session_input_config *session_input);
+int primary_display_config_interface_input(struct primary_disp_input_config *input);
 int primary_display_force_set_vsync_fps(unsigned int fps);
 unsigned int primary_display_get_fps(void);
 int primary_display_get_original_width(void);
 int primary_display_get_original_height(void);
-int primary_display_insert_session_buf(disp_session_buf_info *session_buf_info);
+int primary_display_insert_session_buf(struct disp_session_buf_info *session_buf_info);
 int primary_display_enable_path_cg(int enable);
 int primary_display_lcm_ATA(void);
 int primary_display_setbacklight(unsigned int level);
@@ -331,11 +331,11 @@ int primary_display_pause(PRIMARY_DISPLAY_CALLBACK callback, unsigned int user_d
 int primary_display_switch_dst_mode(int mode);
 int primary_display_get_lcm_index(void);
 int primary_display_set_cmd(int *lcm_cmd, unsigned int cmd_num);
-int disp_fmt_to_hw_fmt(DISP_FORMAT src_fmt, unsigned int *hw_fmt,
+int disp_fmt_to_hw_fmt(enum DISP_FORMAT src_fmt, unsigned int *hw_fmt,
 		       unsigned int *Bpp, unsigned int *bpp);
 void disp_update_trigger_time(void);
 
-display_primary_path_context *primary_display_path_lock(const char *caller);
+struct display_primary_path_context *primary_display_path_lock(const char *caller);
 void primary_display_path_unlock(const char *caller);
 int primary_display_switch_wdma_dump(int on);
 void _cmdq_insert_wait_frame_done_token_mira(void *handle);
@@ -365,7 +365,7 @@ extern unsigned int _need_do_esd_check(void);
 extern void disp_exit_idle_ex(const char *caller);
 
 
-int primary_display_set_secondary_display(int add, DISP_SESSION_TYPE type);
+int primary_display_set_secondary_display(int add, enum DISP_SESSION_TYPE type);
 int init_ext_decouple_buffers(void);
 int deinit_ext_decouple_buffers(void);
 int primary_display_get_session_mode(void);

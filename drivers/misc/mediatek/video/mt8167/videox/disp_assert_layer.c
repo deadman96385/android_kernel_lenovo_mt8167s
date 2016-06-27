@@ -65,8 +65,8 @@ static unsigned int dal_bg_color = RGB888_To_RGB565(DAL_COLOR_RED);
 /* extern struct mutex OverlaySettingMutex; */
 /* extern atomic_t OverlaySettingDirtyFlag; */
 /* extern atomic_t OverlaySettingApplied; */
-/* extern OVL_CONFIG_STRUCT cached_layer_config[DDP_OVL_LAYER_MUN]; */
-/* extern disp_session_input_config *captured_session_input; */
+/* extern struct OVL_CONFIG_STRUCT cached_layer_config[DDP_OVL_LAYER_MUN]; */
+/* extern struct disp_session_input_config *captured_session_input; */
 
 /* DECLARE_MUTEX(dal_sem); */
 DEFINE_SEMAPHORE(dal_sem);
@@ -82,20 +82,20 @@ uint32_t DAL_GetLayerSize(void)
 	return DAL_WIDTH * DAL_HEIGHT * DAL_BPP + 4096;
 }
 
-DAL_STATUS DAL_SetScreenColor(DAL_COLOR color)
+enum DAL_STATUS DAL_SetScreenColor(enum DAL_COLOR color)
 {
 #if 1
 	uint32_t i;
 	uint32_t size;
 	uint32_t BG_COLOR;
-	MFC_CONTEXT *ctxt = NULL;
+	struct MFC_CONTEXT *ctxt = NULL;
 	uint32_t offset;
 	unsigned int *addr;
 
 	color = RGB888_To_RGB565(color);
 	BG_COLOR = MAKE_TWO_RGB565_COLOR(color, color);
 
-	ctxt = (MFC_CONTEXT *) mfc_handle;
+	ctxt = (struct MFC_CONTEXT *) mfc_handle;
 	if (!ctxt)
 		return DAL_STATUS_FATAL_ERROR;
 	if (ctxt->screen_color == color)
@@ -113,9 +113,9 @@ DAL_STATUS DAL_SetScreenColor(DAL_COLOR color)
 }
 EXPORT_SYMBOL(DAL_SetScreenColor);
 
-DAL_STATUS DAL_Init(unsigned long layerVA, unsigned long layerPA)
+enum DAL_STATUS DAL_Init(unsigned long layerVA, unsigned long layerPA)
 {
-	MFC_STATUS ret;
+	enum MFC_STATUS ret;
 
 	pr_debug("%s, layerVA=0x%lx, layerPA=0x%lx\n", __func__, layerVA, layerPA);
 
@@ -136,9 +136,9 @@ DAL_STATUS DAL_Init(unsigned long layerVA, unsigned long layerPA)
 }
 
 
-DAL_STATUS DAL_SetColor(unsigned int fgColor, unsigned int bgColor)
+enum DAL_STATUS DAL_SetColor(unsigned int fgColor, unsigned int bgColor)
 {
-	MFC_STATUS ret;
+	enum MFC_STATUS ret;
 
 	if (mfc_handle == NULL)
 		return DAL_STATUS_NOT_READY;
@@ -164,7 +164,7 @@ DAL_STATUS DAL_SetColor(unsigned int fgColor, unsigned int bgColor)
 }
 EXPORT_SYMBOL(DAL_SetColor);
 
-DAL_STATUS DAL_Dynamic_Change_FB_Layer(unsigned int isAEEEnabled)
+enum DAL_STATUS DAL_Dynamic_Change_FB_Layer(unsigned int isAEEEnabled)
 {
 #if 0
 	static int ui_layer_tdshp;
@@ -180,7 +180,7 @@ DAL_STATUS DAL_Dynamic_Change_FB_Layer(unsigned int isAEEEnabled)
 		/* change ui layer from DISP_DEFAULT_UI_LAYER_ID to DISP_CHANGED_UI_LAYER_ID */
 		memcpy((void *)(&cached_layer_config[DISP_CHANGED_UI_LAYER_ID]),
 		       (void *)(&cached_layer_config[DISP_DEFAULT_UI_LAYER_ID]),
-		       sizeof(OVL_CONFIG_STRUCT));
+		       sizeof(struct OVL_CONFIG_STRUCT));
 		ui_layer_tdshp = cached_layer_config[DISP_DEFAULT_UI_LAYER_ID].isTdshp;
 		cached_layer_config[DISP_DEFAULT_UI_LAYER_ID].isTdshp = 0;
 		/* change global variable value, else error-check will find layer 2, 3 enable tdshp together */
@@ -189,11 +189,11 @@ DAL_STATUS DAL_Dynamic_Change_FB_Layer(unsigned int isAEEEnabled)
 	} else {
 		memcpy((void *)(&cached_layer_config[DISP_DEFAULT_UI_LAYER_ID]),
 		       (void *)(&cached_layer_config[DISP_CHANGED_UI_LAYER_ID]),
-		       sizeof(OVL_CONFIG_STRUCT));
+		       sizeof(struct OVL_CONFIG_STRUCT));
 		cached_layer_config[DISP_DEFAULT_UI_LAYER_ID].isTdshp = ui_layer_tdshp;
 		FB_LAYER = DISP_DEFAULT_UI_LAYER_ID;
 		memset((void *)(&cached_layer_config[DISP_CHANGED_UI_LAYER_ID]), 0,
-		       sizeof(OVL_CONFIG_STRUCT));
+		       sizeof(struct OVL_CONFIG_STRUCT));
 	}
 
 	/* no matter memcpy or memset, layer ID should not be changed */
@@ -205,13 +205,13 @@ DAL_STATUS DAL_Dynamic_Change_FB_Layer(unsigned int isAEEEnabled)
 	return DAL_STATUS_OK;
 }
 
-DAL_STATUS DAL_Clean(void)
+enum DAL_STATUS DAL_Clean(void)
 {
-	DAL_STATUS ret = DAL_STATUS_OK;
-	MFC_STATUS r;
+	enum DAL_STATUS ret = DAL_STATUS_OK;
+	enum MFC_STATUS r;
 
 	static int dal_clean_cnt;
-	MFC_CONTEXT *ctxt = (MFC_CONTEXT *) mfc_handle;
+	struct MFC_CONTEXT *ctxt = (struct MFC_CONTEXT *) mfc_handle;
 
 	DISPFUNC();
 	if (mfc_handle == NULL)
@@ -236,8 +236,8 @@ DAL_STATUS DAL_Clean(void)
 
 	/* TODO: if dal_shown=false, and 3D enabled, mtkfb may disable UI layer, please modify 3D driver */
 	if (isAEEEnabled == 1) {
-		disp_session_input_config *session_input;
-		disp_input_config input;
+		struct disp_session_input_config *session_input;
+		struct disp_input_config input;
 		int layer_id;
 
 		session_input = &captured_session_input[DISP_SESSION_PRIMARY - 1];
@@ -303,15 +303,15 @@ unsigned long get_Assert_Layer_PA(void)
 	return dal_fb_pa;
 }
 
-DAL_STATUS DAL_Printf(const char *fmt, ...)
+enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 {
 	va_list args;
 	uint i;
-	DAL_STATUS ret = DAL_STATUS_OK;
-	disp_session_input_config *session_input;
-	disp_input_config input;
+	enum DAL_STATUS ret = DAL_STATUS_OK;
+	struct disp_session_input_config *session_input;
+	struct disp_input_config input;
 	int layer_id;
-	MFC_STATUS r;
+	enum MFC_STATUS r;
 
 	DISPFUNC();
 
@@ -329,7 +329,7 @@ DAL_STATUS DAL_Printf(const char *fmt, ...)
 	}
 
 	if (isAEEEnabled == 0) {
-		MFC_STATUS r;
+		enum MFC_STATUS r;
 
 		pr_warn("[DDP] isAEEEnabled from 0 to 1, ASSERT_LAYER=%d, dal_fb_pa %lx\n",
 			primary_display_get_option("ASSERT_LAYER"), dal_fb_pa);
@@ -405,7 +405,7 @@ DAL_STATUS DAL_Printf(const char *fmt, ...)
 EXPORT_SYMBOL(DAL_Printf);
 
 
-DAL_STATUS DAL_OnDispPowerOn(void)
+enum DAL_STATUS DAL_OnDispPowerOn(void)
 {
 	return DAL_STATUS_OK;
 }
@@ -423,7 +423,7 @@ uint32_t DAL_GetLayerSize(void)
 	return DAL_WIDTH * DAL_HEIGHT * DAL_BPP + 4096;
 }
 
-DAL_STATUS DAL_Init(uint32_t layerVA, uint32_t layerPA)
+enum DAL_STATUS DAL_Init(uint32_t layerVA, uint32_t layerPA)
 {
 	NOT_REFERENCED(layerVA);
 	NOT_REFERENCED(layerPA);
@@ -431,7 +431,7 @@ DAL_STATUS DAL_Init(uint32_t layerVA, uint32_t layerPA)
 	return DAL_STATUS_OK;
 }
 
-DAL_STATUS DAL_SetColor(unsigned int fgColor, unsigned int bgColor)
+enum DAL_STATUS DAL_SetColor(unsigned int fgColor, unsigned int bgColor)
 {
 	NOT_REFERENCED(fgColor);
 	NOT_REFERENCED(bgColor);
@@ -440,14 +440,14 @@ DAL_STATUS DAL_SetColor(unsigned int fgColor, unsigned int bgColor)
 }
 EXPORT_SYMBOL(DAL_SetColor);
 
-DAL_STATUS DAL_Clean(void)
+enum DAL_STATUS DAL_Clean(void)
 {
 	pr_debug("[MTKFB_DAL] DAL_Clean is not implemented\n");
 	return DAL_STATUS_OK;
 }
 EXPORT_SYMBOL(DAL_Clean);
 
-DAL_STATUS DAL_Printf(const char *fmt, ...)
+enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 {
 	NOT_REFERENCED(fmt);
 	pr_debug("[MTKFB_DAL] DAL_Printf is not implemented\n");
@@ -455,12 +455,12 @@ DAL_STATUS DAL_Printf(const char *fmt, ...)
 }
 EXPORT_SYMBOL(DAL_Printf);
 
-DAL_STATUS DAL_OnDispPowerOn(void)
+enum DAL_STATUS DAL_OnDispPowerOn(void)
 {
 	return DAL_STATUS_OK;
 }
 
-DAL_STATUS DAL_SetScreenColor(DAL_COLOR color)
+enum DAL_STATUS DAL_SetScreenColor(enum DAL_COLOR color)
 {
 	return DAL_STATUS_OK;
 }

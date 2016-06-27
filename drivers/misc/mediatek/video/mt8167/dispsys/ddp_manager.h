@@ -19,19 +19,19 @@
 #include "disp_event.h"
 #include "ddp_path.h"
 #include "cmdq_record.h"
-typedef enum {
+enum ENGINE_DUMP {
 	ENGINE_UFOE = DISP_MODULE_UFOE,	/* add wdma0 after UFOE */
 	ENGINE_OVL0 = DISP_MODULE_OVL0,	/* add wdma0 after OVL0 */
 	ENGINE_OVL1 = DISP_MODULE_OVL1,	/* add wdma1 after OVL1 */
 	ENGINE_DITHER = DISP_MODULE_DITHER,	/* add wdma0 after OD */
-} ENGINE_DUMP;
+};
 
 #define MAKE_DDP_IRQ_BIT(module, shift)	  ((module<<24)|(0x1<<shift))
 #define IRQBIT_MODULE(irqbit)             (irqbit >> 24)
 #define IRQBIT_BIT(irqbit)                (irqbit & 0xffffff)
 
 /* IRQ and module are combined to consist DDP IRQ */
-typedef enum {
+enum DDP_IRQ_BIT {
 	DDP_IRQ_OVL0_FRAME_COMPLETE = MAKE_DDP_IRQ_BIT(DISP_MODULE_OVL0, 1),
 	DDP_IRQ_AAL_OUT_END_FRAME = MAKE_DDP_IRQ_BIT(DISP_MODULE_AAL, 1),
 
@@ -66,10 +66,10 @@ typedef enum {
 
 	DDP_IRQ_UNKNOWN = MAKE_DDP_IRQ_BIT(DISP_MODULE_UNKNOWN, 0),
 
-} DDP_IRQ_BIT;
+};
 
 /* dpmgr_ioctl cmd definition */
-typedef enum {
+enum DDP_IOCTL_NAME {
 /* DSI operation */
 	DDP_SWITCH_DSI_MODE = 0,
 	DDP_STOP_VIDEO_MODE = 1,
@@ -79,7 +79,7 @@ typedef enum {
 	DDP_DSI_IDLE_CLK_CLOSED = 5,
 	DDP_DSI_IDLE_CLK_OPEN = 6,
 	DDP_DSI_VFP_LP = 7,
-} DDP_IOCTL_NAME;
+};
 
 /* path handle */
 typedef void *disp_path_handle;
@@ -99,7 +99,7 @@ int dpmgr_init(void);
  *  cmdq_handle :  will save current config cmdqhandle, and if cmdq is enable , will
 			    use cmdq to write regitsers.
 */
-disp_path_handle dpmgr_create_path(DDP_SCENARIO_ENUM scenario, struct cmdqRecStruct *cmdq_handle);
+disp_path_handle dpmgr_create_path(enum DDP_SCENARIO_ENUM scenario, struct cmdqRecStruct *cmdq_handle);
 
 
 int dpmgr_get_scenario(disp_path_handle dp_handle);
@@ -114,11 +114,11 @@ NOTES: modify path should call API like this :
 	dpmgr_modify_path_power_off_old_modules();
 */
 int dpmgr_modify_path_power_on_new_modules(disp_path_handle dp_handle,
-					   DDP_SCENARIO_ENUM new_scenario, int sw_only);
-int dpmgr_modify_path(disp_path_handle dp_handle, DDP_SCENARIO_ENUM new_scenario,
-							struct cmdqRecStruct *cmdq_handle, DDP_MODE isvdomode);
-int dpmgr_modify_path_power_off_old_modules(DDP_SCENARIO_ENUM old_scenario,
-					    DDP_SCENARIO_ENUM new_scenario, int sw_only);
+					   enum DDP_SCENARIO_ENUM new_scenario, int sw_only);
+int dpmgr_modify_path(disp_path_handle dp_handle, enum DDP_SCENARIO_ENUM new_scenario,
+							struct cmdqRecStruct *cmdq_handle, enum DDP_MODE isvdomode);
+int dpmgr_modify_path_power_off_old_modules(enum DDP_SCENARIO_ENUM old_scenario,
+					    enum DDP_SCENARIO_ENUM new_scenario, int sw_only);
 
 /* destroy path, it will release mutex to pool, and disconnect path,
   * clear  mapping between handle and modules.
@@ -134,7 +134,7 @@ int dpmgr_destroy_path(disp_path_handle dp_handle, struct cmdqRecStruct *cmdq_ha
 
 int dpmgr_path_memout_clock(disp_path_handle dp_handle, int clock_switch);
 
-int dpmgr_path_add_memout(disp_path_handle dp_handle, ENGINE_DUMP engine, void *cmdq_handle);
+int dpmgr_path_add_memout(disp_path_handle dp_handle, enum ENGINE_DUMP engine, void *cmdq_handle);
 
 /* remove dump to path. should match between  add dump and remove dump.
  * return 0 if success or -1 if fail.
@@ -155,7 +155,7 @@ int dpmgr_path_get_mutex(disp_path_handle dp_handle);
  * return module enum.
  * dp_handle: disp path handle.
 */
-DISP_MODULE_ENUM dpmgr_path_get_dst_module(disp_path_handle dp_handle);
+enum DISP_MODULE_ENUM dpmgr_path_get_dst_module(disp_path_handle dp_handle);
 
 
 /* set dst module, the default dst module maybe not right, so set real dst module on this path.
@@ -168,7 +168,7 @@ DISP_MODULE_ENUM dpmgr_path_get_dst_module(disp_path_handle dp_handle);
  *        DISP_MODULE_DPI0
  *        DISP_MODULE_DPI1
 */
-int dpmgr_path_set_dst_module(disp_path_handle dp_handle, DISP_MODULE_ENUM dst_module);
+int dpmgr_path_set_dst_module(disp_path_handle dp_handle, enum DISP_MODULE_ENUM dst_module);
 
 /* set mode type(sof source): cmd or video mode.
  * return 0.
@@ -245,7 +245,7 @@ int dpmgr_path_reset(disp_path_handle dp_handle, int encmdq);
  * dp_handle: disp path handle.
  * encmdq: 1 use command queue, 0 not.
 */
-int dpmgr_path_config(disp_path_handle dp_handle, disp_ddp_path_config *config, void *cmdq_handle);
+int dpmgr_path_config(disp_path_handle dp_handle, struct disp_ddp_path_config *config, void *cmdq_handle);
 
 
 /* path flush, this will enable mutex
@@ -280,7 +280,7 @@ void dpmgr_debug_path_status(int mutex_id);
 	CMDQ_CHECK_IDLE_AFTER_STREAM_EOF    // check sof
 	CMDQ_AFTER_STREAM_EOF                        // after sof
 */
-int dpmgr_path_build_cmdq(disp_path_handle dp_handle, void *trigger_loop_handle, CMDQ_STATE state);
+int dpmgr_path_build_cmdq(disp_path_handle dp_handle, void *trigger_loop_handle, enum CMDQ_STATE state);
 
 
 /* this will trigger this path. it will trigger each module and enable mutex.
@@ -296,7 +296,7 @@ int dpmgr_path_trigger(disp_path_handle dp_handle, void *trigger_loop_handle, in
  * dp_handle:   disp path handle.
  * event: path event.
 */
-int dpmgr_signal_event(disp_path_handle dp_handle, DISP_PATH_EVENT event);
+int dpmgr_signal_event(disp_path_handle dp_handle, enum DISP_PATH_EVENT event);
 
 
 /* enable init will initialize wakequeue.
@@ -304,7 +304,7 @@ int dpmgr_signal_event(disp_path_handle dp_handle, DISP_PATH_EVENT event);
  * dp_handle:   disp path handle.
  * event: path event.
 */
-int dpmgr_enable_event(disp_path_handle dp_handle, DISP_PATH_EVENT event);
+int dpmgr_enable_event(disp_path_handle dp_handle, enum DISP_PATH_EVENT event);
 
 
 /* disable event, related irq will not be received.
@@ -312,7 +312,7 @@ int dpmgr_enable_event(disp_path_handle dp_handle, DISP_PATH_EVENT event);
  * dp_handle:   disp path handle.
  * event: path event.
 */
-int dpmgr_disable_event(disp_path_handle dp_handle, DISP_PATH_EVENT event);
+int dpmgr_disable_event(disp_path_handle dp_handle, enum DISP_PATH_EVENT event);
 
 /* map event to irq can change mappling between path event and irq .
  * return 0.
@@ -320,7 +320,7 @@ int dpmgr_disable_event(disp_path_handle dp_handle, DISP_PATH_EVENT event);
  * event: path event.
  * irq_bit
 */
-int dpmgr_map_event_to_irq(disp_path_handle dp_handle, DISP_PATH_EVENT event, DDP_IRQ_BIT irq_bit);
+int dpmgr_map_event_to_irq(disp_path_handle dp_handle, enum DISP_PATH_EVENT event, enum DDP_IRQ_BIT irq_bit);
 
 
 /* wait event, timeout (ms).
@@ -331,7 +331,7 @@ int dpmgr_map_event_to_irq(disp_path_handle dp_handle, DISP_PATH_EVENT event, DD
  * event : disp event.
  * timeout :(ms).
 */
-int dpmgr_wait_event_timeout(disp_path_handle dp_handle, DISP_PATH_EVENT event, int timeout);
+int dpmgr_wait_event_timeout(disp_path_handle dp_handle, enum DISP_PATH_EVENT event, int timeout);
 
 
 /* wait event
@@ -341,7 +341,7 @@ int dpmgr_wait_event_timeout(disp_path_handle dp_handle, DISP_PATH_EVENT event, 
  * event : disp event.
  * timeout :(ms).
 */
-int dpmgr_wait_event(disp_path_handle dp_handle, DISP_PATH_EVENT event);
+int dpmgr_wait_event(disp_path_handle dp_handle, enum DISP_PATH_EVENT event);
 
 
 /* power on, turn on each modules clk.
@@ -349,28 +349,28 @@ int dpmgr_wait_event(disp_path_handle dp_handle, DISP_PATH_EVENT event);
 * dp_handle: disp path handle.
 * encmdq: 1 use command queue, 0 not.
 */
-int dpmgr_path_power_on(disp_path_handle dp_handle, CMDQ_SWITCH encmdq);
+int dpmgr_path_power_on(disp_path_handle dp_handle, enum CMDQ_SWITCH encmdq);
 
 /* power 0ff,  turn off each modules clk, if all hande are closed. top clock will be off.
  * return 0.
 * dp_handle: disp path handle.
 * encmdq: 1 use command queue, 0 not.
 */
-int dpmgr_path_power_off(disp_path_handle dp_handle, CMDQ_SWITCH encmdq);
+int dpmgr_path_power_off(disp_path_handle dp_handle, enum CMDQ_SWITCH encmdq);
 
 /* DSI power on, turn on each modules clk.
  * return 0.
 * dp_handle: disp path handle.
 * encmdq: 1 use command queue, 0 not.
 */
-int dpmgr_path_dsi_power_on(disp_path_handle dp_handle, CMDQ_SWITCH encmdq);
+int dpmgr_path_dsi_power_on(disp_path_handle dp_handle, enum CMDQ_SWITCH encmdq);
 
 /* DSI power 0ff,  turn off each modules clk, if all hande are closed. top clock will be off.
  * return 0.
 * dp_handle: disp path handle.
 * encmdq: 1 use command queue, 0 not.
 */
-int dpmgr_path_dsi_power_off(disp_path_handle dp_handle, CMDQ_SWITCH encmdq);
+int dpmgr_path_dsi_power_off(disp_path_handle dp_handle, enum CMDQ_SWITCH encmdq);
 
 /* wdma path power on,  turn on each modules clk on wdma path.
  * return 0.
@@ -430,15 +430,15 @@ int dpmgr_path_get_parameter(disp_path_handle dp_handle, int io_evnet, void *dat
  * ioctl_cmd: ioctl cmd
  * params: ioctl parameters
 */
-int dpmgr_path_ioctl(disp_path_handle dp_handle, void *cmdq_handle, DDP_IOCTL_NAME ioctl_cmd,
+int dpmgr_path_ioctl(disp_path_handle dp_handle, void *cmdq_handle, enum DDP_IOCTL_NAME ioctl_cmd,
 		     unsigned long *params);
 
-int dpmgr_path_enable_irq(disp_path_handle dp_handle, void *cmdq_handle, DDP_IRQ_LEVEL irq_level);
+int dpmgr_path_enable_irq(disp_path_handle dp_handle, void *cmdq_handle, enum DDP_IRQ_LEVEL irq_level);
 /* get last config parameter of path
  * return  pointer to last config
  * dp_handle: disp path handle.
 */
-disp_ddp_path_config *dpmgr_path_get_last_config(disp_path_handle dp_handle);
+struct disp_ddp_path_config *dpmgr_path_get_last_config(disp_path_handle dp_handle);
 
 void dpmgr_get_input_address(disp_path_handle dp_handle, unsigned long *addr);
 
@@ -479,12 +479,12 @@ int dpmgr_path_dsi_on(disp_path_handle dp_handle, void *cmdq_handle, unsigned in
 
 int dpmgr_path_dsi_off(disp_path_handle dp_handle, void *cmdq_handle, unsigned int level);
 
-int dpmgr_module_notify(DISP_MODULE_ENUM module, DISP_PATH_EVENT event);
+int dpmgr_module_notify(enum DISP_MODULE_ENUM module, enum DISP_PATH_EVENT event);
 #ifdef CONFIG_SINGLE_PANEL_OUTPUT
 /*dpmgr_reset_module_handle, reset moudle path handle for single panel*/
 int dpmgr_reset_module_handle(disp_path_handle dp_handle);
 #endif
 
-/* disp_session_input_config *captured_session_input; */
+/* struct disp_session_input_config *captured_session_input; */
 
 #endif

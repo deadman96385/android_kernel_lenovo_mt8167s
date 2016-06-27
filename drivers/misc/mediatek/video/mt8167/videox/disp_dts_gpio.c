@@ -68,7 +68,7 @@ exit:
 	return ret;
 }
 
-long disp_dts_gpio_select_state(DTS_GPIO_STATE s)
+long disp_dts_gpio_select_state(enum DTS_GPIO_STATE s)
 {
 	WARN_ON(!((unsigned int)(s) < (unsigned int)(DTS_GPIO_STATE_MAX)));
 	return _set_state(this_state_name[s]);
