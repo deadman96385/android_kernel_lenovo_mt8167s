@@ -1208,23 +1208,6 @@ int dpmgr_path_reset(disp_path_handle dp_handle, int encmdq)
 	return error > 0 ? -1 : 0;
 }
 
-#ifdef OVL_CASCADE_SUPPORT
-static int dpmgr_layer_num(struct disp_ddp_path_config *config)
-{
-	int i = 0;
-	int max_layer = 0;
-
-	for (i = 0; i < OVL_LAYER_NUM; i++) {
-		if (config->ovl_config[i].layer_en != 0) {
-
-			if (config->ovl_config[i].layer + 1 > max_layer)
-				max_layer = config->ovl_config[i].layer + 1;
-		}
-	}
-	return max_layer;
-}
-#endif
-
 static unsigned int dpmgr_is_PQ(enum DISP_MODULE_ENUM module)
 {
 	unsigned int isPQ = 0;
@@ -1253,9 +1236,6 @@ int dpmgr_path_config(disp_path_handle dp_handle, struct disp_ddp_path_config *c
 	struct ddp_path_handle *handle;
 	int *modules;
 	int module_num;
-#ifdef OVL_CASCADE_SUPPORT
-	int ret = 0;
-#endif
 
 	ASSERT(dp_handle != NULL);
 	handle = (struct ddp_path_handle *)dp_handle;
