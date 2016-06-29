@@ -14,33 +14,22 @@
 #ifndef MT_POWERTHROTTLE_H
 #define MT_POWERTHROTTLE_H
 
-#define mt_cpu_dvfs_NO_NEED	0
-
-
 struct mt_cpu_freq_info {
 	unsigned int cpufreq_khz;
 	unsigned int cpufreq_volt;  /* mv * 1000 */
-#if mt_cpu_dvfs_NO_NEED
 	const unsigned int cpufreq_volt_org;    /* mv * 1000 */
-#endif
 };
 
-#if mt_cpu_dvfs_NO_NEED
 #define OP(khz, volt) {            \
 	.cpufreq_khz = khz,             \
 	.cpufreq_volt = volt,           \
 	.cpufreq_volt_org = volt,       \
 }
-#else
-#define OP(khz, volt) {            \
-	.cpufreq_khz = khz,             \
-	.cpufreq_volt = volt,           \
-}
-#endif
 
 extern struct mt_cpu_freq_info opp_tbl_default[];
 extern int setup_power_table_tk(void);
 extern void dump_power_table(void);
-
+extern void mt_cpufreq_thermal_protect(unsigned int limited_power);
+extern void dump_power_table(void);
 #endif
 

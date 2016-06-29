@@ -317,5 +317,7 @@ int get_immediate_ts5_wrap(void);
 void mt_ptp_lock(unsigned long *x);
 void mt_ptp_unlock(unsigned long *x);
 
+extern int mtktscpu_debug_log;
+
 #endif
 

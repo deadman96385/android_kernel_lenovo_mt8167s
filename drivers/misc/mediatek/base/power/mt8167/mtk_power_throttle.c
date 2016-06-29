@@ -16,6 +16,12 @@
 #include "mtk_static_power.h"	/* static power */
 #include <linux/cpufreq.h>
 #include "mtk_power_throttle.h"
+#include "mt_hotplug_strategy.h"
+#include "inc/mtk_thermal.h"
+
+static unsigned long clipped_freq;
+static unsigned int limited_max_ncpu;
+static unsigned int limited_max_freq;
 
 #define NR_MAX_OPP_TBL  8
 #define NR_MAX_CPU      4
@@ -27,29 +33,24 @@ struct mt_cpu_power_info {
 };
 
 struct mt_cpu_dvfs {
-#if mt_cpu_dvfs_NO_NEED
 	const char *name;
 	unsigned int cpu_id;	                /* for cpufreq */
 	unsigned int cpu_level;
 	struct mt_cpu_dvfs_ops *ops;
-#endif
 
 	/* opp (freq) table */
 	struct mt_cpu_freq_info *opp_tbl;       /* OPP table */
 	int nr_opp_tbl;                         /* size for OPP table */
-#if mt_cpu_dvfs_NO_NEED
 	int idx_opp_tbl;                        /* current OPP idx */
 	int idx_normal_max_opp;                 /* idx for normal max OPP */
 	int idx_opp_tbl_for_late_resume;	/* keep the setting for late resume */
 
 	struct cpufreq_frequency_table *freq_tbl_for_cpufreq; /* freq table for cpufreq */
 
-#endif
 	/* power table */
 	struct mt_cpu_power_info *power_tbl;
 	unsigned int nr_power_tbl;
 
-#if mt_cpu_dvfs_NO_NEED
 	/* enable/disable DVFS function */
 	int dvfs_disable_count;
 	bool dvfs_disable_by_ptpod;
@@ -103,7 +104,6 @@ struct mt_cpu_dvfs {
 	int idx_pwr_thro_max_opp;               /* idx for power throttle max OPP */
 	unsigned int pwr_thro_mode;
 #endif
-#endif
 };
 
 struct mt_cpu_dvfs cpu_dvfs;
@@ -117,16 +117,6 @@ struct mt_cpu_freq_info opp_tbl_default[] = {
 	OP(0, 0),
 	OP(0, 0),
 	OP(0, 0),
-#if 0
-	OP(1500000, 1300000),
-	OP(1350000, 1250000),
-	OP(1200000, 1200000),
-	OP(1050000, 1150000),
-	OP(871000,  1110000),
-	OP(741000,  1080000),
-	OP(624000,  1060000),
-	OP(600000,  1050000),
-#endif
 };
 
 static void _power_calculation(struct mt_cpu_dvfs *p, int oppidx, int ncpu)
@@ -186,7 +176,8 @@ void dump_power_table(void)
 
 	/* dump power table */
 	for (i = 0; i < cpu_dvfs.nr_opp_tbl * NR_MAX_CPU; i++) {
-		pr_info("[%d] = { .cpufreq_khz = %d,\t.cpufreq_ncpu = %d,\t.cpufreq_power = %d }\n",
+		pr_info("%s[%d] = { .cpufreq_khz = %d,\t.cpufreq_ncpu = %d,\t.cpufreq_power = %d }\n",
+		__func__,
 		i,
 		cpu_dvfs.power_tbl[i].cpufreq_khz,
 		cpu_dvfs.power_tbl[i].cpufreq_ncpu,
@@ -254,6 +245,61 @@ out:
 	return ret;
 }
 
+/**
+ * cpufreq_thermal_notifier - notifier callback for cpufreq policy change.
+ * @nb:	struct notifier_block * with callback info.
+ * @event: value showing cpufreq event for which this function invoked.
+ * @data: callback-specific data
+ *
+ * Callback to hijack the notification on cpufreq policy transition.
+ * Every time there is a change in policy, we will intercept and
+ * update the cpufreq policy with thermal constraints.
+ *
+ * Return: 0 (success)
+ */
+
+static int mtk_cpufreq_thermal_notifier(struct notifier_block *nb,
+				    unsigned long event, void *data)
+{
+	struct cpufreq_policy *policy = data;
+
+	pr_debug("%s %ld\n", __func__, event);
+
+	if (event != CPUFREQ_ADJUST)
+		return NOTIFY_DONE;
+
+	/*
+	 * policy->max is the maximum allowed frequency defined by user
+	 * and clipped_freq is the maximum that thermal constraints
+	 * allow.
+	 *
+	 * If clipped_freq is lower than policy->max, then we need to
+	 * readjust policy->max.
+	 *
+	 * But, if clipped_freq is greater than policy->max, we don't
+	 * need to do anything.
+	 */
+
+	if (mtktscpu_debug_log)
+		pr_err("%s clipped_freq = %ld, policy->max=%d, policy->min=%d\n",
+				__func__, clipped_freq, policy->max, policy->min);
+
+	/* Since thermal throttling could hogplug CPU, less cpufreq might cause
+	 * a performance issue.
+	 * Only DVFS TLP feature enable, we can keep the max freq by CPUFREQ
+	 * GOVERNOR or Pref service.
+	 */
+	if ((policy->max != clipped_freq) && (clipped_freq >= policy->min))
+		cpufreq_verify_within_limits(policy, 0, clipped_freq);
+
+	return NOTIFY_OK;
+}
+
+/* Notifier for cpufreq policy change */
+static struct notifier_block thermal_cpufreq_notifier_block = {
+	.notifier_call = mtk_cpufreq_thermal_notifier,
+};
+
 int setup_power_table_tk(void)
 {
 	init_mt_cpu_dvfs(&cpu_dvfs);
@@ -261,12 +307,13 @@ int setup_power_table_tk(void)
 	if (cpu_dvfs.opp_tbl[0].cpufreq_khz == 0)
 		return 0;
 
+	cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
+					  CPUFREQ_POLICY_NOTIFIER);
+
 	return setup_power_table(&cpu_dvfs);
 }
 
-unsigned int limited_max_ncpu;
-unsigned int limited_max_freq;
-void mt_thermal_protect(unsigned int limited_power)
+void mt_cpufreq_thermal_protect(unsigned int limited_power)
 {
 	struct mt_cpu_dvfs *p;
 	int possible_cpu;
@@ -283,7 +330,7 @@ void mt_thermal_protect(unsigned int limited_power)
 	/* no limited */
 	if (limited_power == 0) {
 		limited_max_ncpu = possible_cpu;
-		limited_max_freq = (p->opp_tbl[0].cpufreq_khz); /* cpu_dvfs_get_max_freq(p); */
+		limited_max_freq = cpu_dvfs.power_tbl[0].cpufreq_khz;
 	} else {
 		for (ncpu = possible_cpu; ncpu > 0; ncpu--) {
 			for (i = 0; i < p->nr_opp_tbl * possible_cpu; i++) {
@@ -305,11 +352,19 @@ void mt_thermal_protect(unsigned int limited_power)
 		}
 	}
 
-#if mt_cpu_dvfs_NO_NEED
-	hps_set_cpu_num_limit(LIMIT_THERMAL, limited_max_ncpu, 0);
-	/* correct opp idx will be calcualted in _thermal_limited_verify() */
-	_mt_cpufreq_set(MT_CPU_DVFS_LITTLE, -1);
+	clipped_freq = limited_max_freq;
 
-#endif
+	if (mtktscpu_debug_log) {
+		pr_err("%s found = %d, limited_power = %u\n",
+			__func__, found, limited_power);
+		pr_err("%s possible_cpu = %d, power_tbl[0].cpufreq_khz =%u\n",
+			__func__, possible_cpu, cpu_dvfs.power_tbl[0].cpufreq_khz);
+		pr_err("%s limited_max_ncpu = %u, limited_max_freq = %u\n",
+			__func__, limited_max_ncpu, limited_max_freq);
+	}
+
+	hps_set_cpu_num_limit(LIMIT_THERMAL, limited_max_ncpu, 0);
+	/* update cpufreq policy */
+	cpufreq_update_policy(0);
 }
 
