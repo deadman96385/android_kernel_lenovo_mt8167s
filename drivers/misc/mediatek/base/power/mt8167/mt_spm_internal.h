@@ -326,6 +326,13 @@ extern wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
 
 extern void __spm_dbgout_md_ddr_en(bool enable);
 
+enum pmic_wrap_phase_id {
+	PMIC_WRAP_PHASE_DEEPIDLE,
+	PMIC_WRAP_PHASE_SODI,
+	NR_PMIC_WRAP_PHASE,
+};
+extern void __spm_set_pmic_phase(enum pmic_wrap_phase_id phase);
+
 extern int spm_fs_init(void);
 #ifndef CONFIG_MTK_FPGA
 extern int is_ext_buck_exist(void);

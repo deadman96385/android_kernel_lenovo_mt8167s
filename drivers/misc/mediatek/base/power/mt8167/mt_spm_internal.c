@@ -17,6 +17,7 @@
 #include <linux/delay.h>
 #include <linux/atomic.h>
 #include <linux/string.h>
+#include <linux/of_address.h>
 #include <linux/of_fdt.h>
 #include <uapi/asm/setup.h>
 /* TODO: wait upmu porting */
@@ -381,6 +382,168 @@ wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
 		  wakesta->isr);
 
 	return wr;
+}
+
+/* Pwrap API */
+enum {
+	IDX_DI_VPROC_CA7_NORMAL,		/* 0 *//* PMIC_WRAP_PHASE_DEEPIDLE */
+	IDX_DI_VPROC_CA7_SLEEP,			/* 1 */
+	IDX_DI_VSRAM_CA7_FAST_TRSN_EN,	/* 2 */
+	IDX_DI_VSRAM_CA7_FAST_TRSN_DIS,	/* 3 */
+	IDX_DI_VCORE_NORMAL,			/* 4 */
+	IDX_DI_VCORE_SLEEP,				/* 5 */
+	IDX_DI_VCORE_PDN_NORMAL,		/* 6 */
+	IDX_DI_VCORE_PDN_SLEEP,			/* 7 */
+	NR_IDX_DI,
+};
+enum {
+	IDX_SO_VSRAM_CA15L_NORMAL,		/* 0 *//* PMIC_WRAP_PHASE_SODI */
+	IDX_SO_VSRAM_CA15L_SLEEP,		/* 1 */
+	IDX_SO_VPROC_CA7_NORMAL,		/* 2 */
+	IDX_SO_VPROC_CA7_SLEEP,			/* 3 */
+	IDX_SO_VCORE_NORMAL,			/* 4 */
+	IDX_SO_VCORE_SLEEP,				/* 5 */
+	IDX_SO_VSRAM_CA7_FAST_TRSN_EN,	/* 6 */
+	IDX_SO_VSRAM_CA7_FAST_TRSN_DIS,	/* 7 */
+	NR_IDX_SO,
+};
+
+static void __iomem *pwrap_base;
+#define PMIC_WRAP_DVFS_ADR0     (unsigned long)(pwrap_base + 0x0E8)
+#define PMIC_WRAP_DVFS_WDATA0   (unsigned long)(pwrap_base + 0x0EC)
+#define PMIC_WRAP_DVFS_ADR1     (unsigned long)(pwrap_base + 0x0F0)
+#define PMIC_WRAP_DVFS_WDATA1   (unsigned long)(pwrap_base + 0x0F4)
+#define PMIC_WRAP_DVFS_ADR2     (unsigned long)(pwrap_base + 0x0F8)
+#define PMIC_WRAP_DVFS_WDATA2   (unsigned long)(pwrap_base + 0x0FC)
+#define PMIC_WRAP_DVFS_ADR3     (unsigned long)(pwrap_base + 0x100)
+#define PMIC_WRAP_DVFS_WDATA3   (unsigned long)(pwrap_base + 0x104)
+#define PMIC_WRAP_DVFS_ADR4     (unsigned long)(pwrap_base + 0x108)
+#define PMIC_WRAP_DVFS_WDATA4   (unsigned long)(pwrap_base + 0x10C)
+#define PMIC_WRAP_DVFS_ADR5     (unsigned long)(pwrap_base + 0x110)
+#define PMIC_WRAP_DVFS_WDATA5   (unsigned long)(pwrap_base + 0x114)
+#define PMIC_WRAP_DVFS_ADR6     (unsigned long)(pwrap_base + 0x118)
+#define PMIC_WRAP_DVFS_WDATA6   (unsigned long)(pwrap_base + 0x11C)
+#define PMIC_WRAP_DVFS_ADR7     (unsigned long)(pwrap_base + 0x120)
+#define PMIC_WRAP_DVFS_WDATA7   (unsigned long)(pwrap_base + 0x124)
+
+#define NR_PMIC_WRAP_CMD 8
+
+#define PMIC_ADDR_VPROC_CA53_VOSEL_ON	0x0228	/* [6:0] */
+#define PMIC_ADDR_VCORE_VOSEL_ON		0x027A	/* [6:0] */
+
+struct pmic_wrap_cmd {
+	unsigned long cmd_addr;
+	unsigned long cmd_wdata;
+};
+
+struct pmic_wrap_setting {
+	enum pmic_wrap_phase_id phase;
+	struct pmic_wrap_cmd addr[NR_PMIC_WRAP_CMD];
+	struct {
+		struct {
+			unsigned long cmd_addr;
+			unsigned long cmd_wdata;
+		} _[NR_PMIC_WRAP_CMD];
+		const int nr_idx;
+	} set[NR_PMIC_WRAP_PHASE];
+};
+
+#define VOLT_TO_PMIC_VAL(volt)  ((((volt) - 700) * 100 + 625 - 1) / 625)
+
+static struct pmic_wrap_setting pw = {
+	.phase = NR_PMIC_WRAP_PHASE,	/* invalid setting for init */
+
+	.addr = { {0, 0} },
+
+	/* Barry Chang firmware won't work, index 2, 3, 6, 7 are dummy setting */
+	.set[PMIC_WRAP_PHASE_DEEPIDLE] = {
+		._[IDX_DI_VPROC_CA7_NORMAL] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(1000),},
+		._[IDX_DI_VPROC_CA7_SLEEP] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(800),},
+		._[IDX_DI_VSRAM_CA7_FAST_TRSN_EN] = {PMIC_ADDR_VCORE_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(1125),},
+		._[IDX_DI_VSRAM_CA7_FAST_TRSN_DIS] = {PMIC_ADDR_VCORE_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(900),},
+		._[IDX_DI_VCORE_NORMAL] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(1000),},
+		._[IDX_DI_VCORE_SLEEP] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(800),},
+		._[IDX_DI_VCORE_PDN_NORMAL] = {PMIC_ADDR_VCORE_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(1125),},
+		._[IDX_DI_VCORE_PDN_SLEEP] = {PMIC_ADDR_VCORE_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(900),},
+		.nr_idx = NR_IDX_DI,
+	},
+
+	/* power off: index 7,3. power on: index 2,6 */
+	.set[PMIC_WRAP_PHASE_SODI] = {
+		._[IDX_SO_VSRAM_CA15L_NORMAL] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(1000),},
+		._[IDX_SO_VSRAM_CA15L_SLEEP] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(800),},
+		._[IDX_SO_VPROC_CA7_NORMAL] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(1125),},
+		._[IDX_SO_VPROC_CA7_SLEEP] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(700),},
+		._[IDX_SO_VCORE_NORMAL] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(1000),},
+		._[IDX_SO_VCORE_SLEEP] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(800),},
+		._[IDX_SO_VSRAM_CA7_FAST_TRSN_EN] = {PMIC_ADDR_VCORE_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(1125),},
+		._[IDX_SO_VSRAM_CA7_FAST_TRSN_DIS] = {PMIC_ADDR_VCORE_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(1125),},
+		.nr_idx = NR_IDX_SO,
+	},
+};
+
+static void spm_get_pwrap_base(void)
+{
+	struct device_node *node;
+
+	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-pwrap");
+	if (!node)
+		spm_warn("find pwrap node failed\n");
+	pwrap_base = of_iomap(node, 0);
+	if (!pwrap_base)
+		spm_warn("get pwrap_base failed\n");
+}
+
+static void spm_pmic_table_init(void)
+{
+	struct pmic_wrap_cmd pwrap_cmd_default[NR_PMIC_WRAP_CMD] = {
+		{PMIC_WRAP_DVFS_ADR0, PMIC_WRAP_DVFS_WDATA0,},
+		{PMIC_WRAP_DVFS_ADR1, PMIC_WRAP_DVFS_WDATA1,},
+		{PMIC_WRAP_DVFS_ADR2, PMIC_WRAP_DVFS_WDATA2,},
+		{PMIC_WRAP_DVFS_ADR3, PMIC_WRAP_DVFS_WDATA3,},
+		{PMIC_WRAP_DVFS_ADR4, PMIC_WRAP_DVFS_WDATA4,},
+		{PMIC_WRAP_DVFS_ADR5, PMIC_WRAP_DVFS_WDATA5,},
+		{PMIC_WRAP_DVFS_ADR6, PMIC_WRAP_DVFS_WDATA6,},
+		{PMIC_WRAP_DVFS_ADR7, PMIC_WRAP_DVFS_WDATA7,},
+	};
+
+	memcpy(pw.addr, pwrap_cmd_default, sizeof(pwrap_cmd_default));
+}
+
+void __spm_set_pmic_phase(enum pmic_wrap_phase_id phase)
+{
+	int i;
+
+	WARN_ON(phase >= NR_PMIC_WRAP_PHASE);
+
+	if (pw.addr[0].cmd_addr == 0) {
+		spm_warn("pmic table not initialized\n");
+		spm_get_pwrap_base();
+		spm_pmic_table_init();
+	}
+
+	pw.phase = phase;
+
+	for (i = 0; i < pw.set[phase].nr_idx; i++) {
+		spm_write(pw.addr[i].cmd_addr, pw.set[phase]._[i].cmd_addr);
+		spm_write(pw.addr[i].cmd_wdata, pw.set[phase]._[i].cmd_wdata);
+	}
 }
 
 MODULE_DESCRIPTION("SPM-Internal Driver v0.1");

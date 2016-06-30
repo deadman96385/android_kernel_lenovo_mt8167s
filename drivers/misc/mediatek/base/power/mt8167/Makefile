@@ -21,6 +21,7 @@ obj-$(CONFIG_MACH_MT8167) += mt_spm_internal.o
 obj-$(CONFIG_MACH_MT8167) += mt_sleep.o
 obj-$(CONFIG_MACH_MT8167) += mt_spm_sleep.o
 obj-$(CONFIG_MACH_MT8167) += mt_spm_dpidle.o
+obj-$(CONFIG_MACH_MT8167) += mt_spm_sodi.o
 obj-$(CONFIG_MACH_MT8167) += mt_spm_fs.o
 
 

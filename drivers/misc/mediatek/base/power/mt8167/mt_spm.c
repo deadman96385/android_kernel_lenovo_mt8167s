@@ -261,7 +261,7 @@ int spm_module_init(void)
 	}
 #endif
 
-	/* spm_sodi_init(); */
+	spm_sodi_init();
 	/* spm_mcdi_init(); */
 
 #if 0
