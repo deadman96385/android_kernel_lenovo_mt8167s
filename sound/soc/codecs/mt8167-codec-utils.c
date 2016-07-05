@@ -246,7 +246,10 @@ static int mt8167_codec_setup_cali_path(struct snd_soc_codec *codec,
 	struct snd_dma_buffer *buf)
 {
 	/* enable power */
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON01, BIT(20), BIT(20));
 	/* enable clock */
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON03, BIT(30), BIT(30));
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON04, BIT(15), BIT(15));
 	/* allocate buffer */
 	buf->area = dma_zalloc_coherent(codec->dev, AFIFO_SIZE,
 		&buf->addr, GFP_KERNEL);
@@ -279,8 +282,11 @@ static int mt8167_codec_cleanup_cali_path(struct snd_soc_codec *codec,
 	/* free buffer */
 	dma_free_coherent(codec->dev, AFIFO_SIZE, buf->area,
 		buf->addr);
-	/* disable power */
 	/* disable clock */
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON04, BIT(15), 0x0);
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON03, BIT(30), 0x0);
+	/* disable power */
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON01, BIT(20), 0x0);
 
 	return ret;
 }
@@ -550,6 +556,21 @@ static const struct reg_setting mt8167_codec_headset_amic_enable_regs[] = {
 };
 
 static const struct reg_setting mt8167_codec_amic_enable_regs[] = {
+	{ /* CLKLDO power on */
+		.reg = AUDIO_CODEC_CON01,
+		.mask = BIT(20),
+		.val = BIT(20),
+	},
+	{ /* Audio Codec CLK on */
+		.reg = AUDIO_CODEC_CON03,
+		.mask = BIT(30),
+		.val = BIT(30),
+	},
+	{ /* UL CLK on */
+		.reg = AUDIO_CODEC_CON03,
+		.mask = BIT(21),
+		.val = BIT(21),
+	},
 	{ /* vcm14 */
 		.reg = AUDIO_CODEC_CON00,
 		.mask = AUDIO_CODEC_CON00_AUDULL_VCM14_EN,
@@ -663,6 +684,21 @@ static const struct reg_setting mt8167_codec_amic_disable_regs[] = {
 		.mask = AUDIO_CODEC_CON00_AUDULR_VCM14_EN,
 		.val = 0x0,
 	},
+	{ /* UL CLK off */
+		.reg = AUDIO_CODEC_CON03,
+		.mask = BIT(21),
+		.val = 0x0,
+	},
+	{ /* Audio Codec CLK off */
+		.reg = AUDIO_CODEC_CON03,
+		.mask = BIT(30),
+		.val = 0x0,
+	},
+	{ /* CLKLDO power off */
+		.reg = AUDIO_CODEC_CON01,
+		.mask = BIT(20),
+		.val = 0x0,
+	},
 };
 
 static const struct reg_setting mt8167_codec_dmic_enable_regs[] = {
@@ -732,6 +768,11 @@ static const struct reg_setting mt8167_codec_dmic_disable_regs[] = {
 };
 
 static const struct reg_setting mt8167_codec_spk_enable_regs[] = {
+	{ /* DL CLK on */
+		.reg = AUDIO_CODEC_CON04,
+		.mask = BIT(15),
+		.val = BIT(15),
+	},
 	{ /* dl_vef24 */
 		.reg = AUDIO_CODEC_CON02,
 		.mask = BIT(16),
@@ -805,9 +846,19 @@ static const struct reg_setting mt8167_codec_spk_disable_regs[] = {
 		.mask = BIT(16),
 		.val = 0x0,
 	},
+	{ /* DL CLK off */
+		.reg = AUDIO_CODEC_CON04,
+		.mask = BIT(15),
+		.val = 0x0,
+	},
 };
 
 static const struct reg_setting mt8167_codec_hp_enable_regs[] = {
+	{ /* DL CLK on */
+		.reg = AUDIO_CODEC_CON04,
+		.mask = BIT(15),
+		.val = BIT(15),
+	},
 	{ /* dl_vef24 */
 		.reg = AUDIO_CODEC_CON02,
 		.mask = BIT(16),
@@ -899,6 +950,11 @@ static const struct reg_setting mt8167_codec_hp_disable_regs[] = {
 	{ /* dl_vef24 */
 		.reg = AUDIO_CODEC_CON02,
 		.mask = BIT(16),
+		.val = 0x0,
+	},
+	{ /* DL CLK off */
+		.reg = AUDIO_CODEC_CON04,
+		.mask = BIT(15),
 		.val = 0x0,
 	},
 };
