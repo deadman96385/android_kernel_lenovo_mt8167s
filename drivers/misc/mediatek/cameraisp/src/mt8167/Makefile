@@ -11,15 +11,18 @@
 # GNU General Public License for more details.
 #
 
-obj-y := cameraisp_dummy.o
+#
+# Makefile for misc devices that really don't fit anywhere else.
+#
 
-ifeq ($(CONFIG_MACH_MT6757),y)
-  obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
-endif
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/m4u/$(MTK_PLATFORM)/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v2/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v2/$(MTK_PLATFORM)/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/smi/variant/
 
-ifeq ($(CONFIG_MACH_MT8167),y)
-  obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
-endif
 
-#this moment do not have other folder
-#obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
+obj-y += cameraisp_dummy2.o
+obj-y += camera_isp.o
+obj-y += camera_sysram.o
+obj-y += camera_pipe_mgr.o
+
