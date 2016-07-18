@@ -318,15 +318,16 @@
 			reg = <0 0x1000cf00 0 0x100>;
 		};
 
-		pwrap: pwrap@0x1000f000 {
+		pwrap: pwrap@1000f000 {
 			compatible = "mediatek,mt8167-pwrap";
 			reg = <0 0x1000f000 0 0x1000>;
-			reg-names = "pwrap-base";
+			reg-names = "pwrap";
 			interrupts = <GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&topckgen CLK_TOP_PMICSPI_SEL>,
 				 <&infracfg CLK_INFRA_PMIC_AP>;
 			clock-names = "spi",
-				      "pwrap";
+				      "wrap";
+			status = "disabled";
 		};
 
 		devapc_ao@10010000 {
