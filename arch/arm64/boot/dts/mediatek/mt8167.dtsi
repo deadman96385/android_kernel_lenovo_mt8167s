@@ -16,6 +16,7 @@
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/reset-controller/mt8167-resets.h>
+#include <dt-bindings/memory/mt8167-larb-port.h>
 #include "mt8167-pinfunc.h"
 
 / {
@@ -477,11 +478,13 @@
 			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
-		m4u@10203000 {
+		iommu: m4u@10203000 {
 			cell-index = <0>;
 			compatible = "mediatek,mt8167-m4u";
 			reg = <0 0x10203000 0 0x1000>;
+			mediatek,larbs = <&larb0 &larb1 &larb2>;
 			interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_LOW>;
+			#iommu-cells = <1>;
 		};
 
 		sys_cirq: sys_cirq@10202000 {
@@ -1314,7 +1317,7 @@
 		};
 
 		smi_common: smi@14017000 {
-			compatible = "mediatek,mt8167-smi";
+			compatible = "mediatek,mt8167-smi-common";
 			reg = <0 0x14017000 0 0x1000>;
 			clocks = <&mmsys CLK_MM_SMI_COMMON>,
 				 <&mmsys CLK_MM_SMI_COMMON>;
@@ -1647,6 +1650,55 @@
 		mtgpufreq {
 			compatible = "mediatek,mt8167-gpufreq";
 			reg-vgpu-supply = <&mt6392_vcore_reg>;
+		};
+
+		pseudo-m4u {
+			compatible = "mediatek,mt8167-pseudo-m4u";
+			iommus = <&iommu M4U_PORT_DISP_RDMA0>;
+		};
+
+		pseudo-m4u-larb0 {
+			compatible = "mediatek,mt8167-pseudo-port-m4u";
+			mediatek,larbid = <0>;
+			iommus = <&iommu M4U_PORT_DISP_OVL0>,
+				 <&iommu M4U_PORT_DISP_RDMA0>,
+				 <&iommu M4U_PORT_DISP_WDMA0>,
+				 <&iommu M4U_PORT_DISP_RDMA1>,
+				 <&iommu M4U_PORT_MDP_RDMA>,
+				 <&iommu M4U_PORT_MDP_WDMA>,
+				 <&iommu M4U_PORT_MDP_WDMA>,
+				 <&iommu M4U_PORT_MDP_WROT>,
+				 <&iommu M4U_PORT_DISP_FAKE>;
+		};
+
+		pseudo-m4u-larb1 {
+			compatible = "mediatek,mt8167-pseudo-port-m4u";
+			mediatek,larbid = <1>;
+			iommus = <&iommu M4U_PORT_CAM_IMGO>,
+				 <&iommu M4U_PORT_CAM_IMG2O>,
+				 <&iommu M4U_PORT_CAM_LSCI>,
+				 <&iommu M4U_PORT_CAM_ESFKO>,
+				 <&iommu M4U_PORT_CAM_AAO>,
+				 <&iommu M4U_PORT_VENC_REC>,
+				 <&iommu M4U_PORT_VENC_BSDMA>,
+				 <&iommu M4U_PORT_VENC_RD_COMV>,
+				 <&iommu M4U_PORT_CAM_IMGI>,
+				 <&iommu M4U_PORT_VENC_CUR_LUMA>,
+				 <&iommu M4U_PORT_VENC_CUR_CHROMA>,
+				 <&iommu M4U_PORT_VENC_REF_LUMA>,
+				 <&iommu M4U_PORT_VENC_REF_CHROMA>;
+		};
+
+		pseudo-m4u-larb2 {
+			compatible = "mediatek,mt8167-pseudo-port-m4u";
+			mediatek,larbid = <2>;
+			iommus = <&iommu M4U_PORT_HW_VDEC_MC_EXT>,
+				 <&iommu M4U_PORT_HW_VDEC_PP_EXT>,
+				 <&iommu M4U_PORT_HW_VDEC_VLD_EXT>,
+				 <&iommu M4U_PORT_HW_VDEC_AVC_MV_EXT>,
+				 <&iommu M4U_PORT_HW_VDEC_PRED_RD_EXT>,
+				 <&iommu M4U_PORT_HW_VDEC_PRED_WR_EXT>,
+				 <&iommu M4U_PORT_HW_VDEC_PPWRAP_EXT>;
 		};
 	};
 
