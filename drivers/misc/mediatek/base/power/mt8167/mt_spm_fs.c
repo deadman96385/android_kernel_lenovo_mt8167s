@@ -117,7 +117,6 @@ static ssize_t show_pwr_ctrl(const struct pwr_ctrl *pwrctrl, char *buf)
 	p += sprintf(p, "timer_val_cust = 0x%x\n", pwrctrl->timer_val_cust);
 	p += sprintf(p, "wake_src = 0x%x\n", pwrctrl->wake_src);
 	p += sprintf(p, "wake_src_cust = 0x%x\n", pwrctrl->wake_src_cust);
-	p += sprintf(p, "wake_src_md32 = 0x%x\n", pwrctrl->wake_src_md32);
 	p += sprintf(p, "r0_ctrl_en = %u\n", pwrctrl->r0_ctrl_en);
 	p += sprintf(p, "r7_ctrl_en = %u\n", pwrctrl->r7_ctrl_en);
 	p += sprintf(p, "infra_dcm_lock = %u\n", pwrctrl->infra_dcm_lock);
@@ -137,18 +136,7 @@ static ssize_t show_pwr_ctrl(const struct pwr_ctrl *pwrctrl, char *buf)
 	p += sprintf(p, "ca7_wfi2_en = %u\n", pwrctrl->ca7_wfi2_en);
 	p += sprintf(p, "ca7_wfi3_en = %u\n", pwrctrl->ca7_wfi3_en);
 
-	p += sprintf(p, "md1_req_mask = %u\n", pwrctrl->md1_req_mask);
-	p += sprintf(p, "md2_req_mask = %u\n", pwrctrl->md2_req_mask);
-	p += sprintf(p, "md_apsrc_sel = %u\n", pwrctrl->md_apsrc_sel);
-	p += sprintf(p, "md2_apsrc_sel = %u\n", pwrctrl->md2_apsrc_sel);
 	p += sprintf(p, "gce_req_mask = %u\n", pwrctrl->gce_req_mask);
-	p += sprintf(p, "ccif0_to_ap_mask = %u\n", pwrctrl->ccif0_to_ap_mask);
-	p += sprintf(p, "ccif0_to_md_mask = %u\n", pwrctrl->ccif0_to_md_mask);
-	p += sprintf(p, "ccif1_to_ap_mask = %u\n", pwrctrl->ccif1_to_ap_mask);
-	p += sprintf(p, "ccif1_to_md_mask = %u\n", pwrctrl->ccif1_to_md_mask);
-	p += sprintf(p, "lte_mask = %u\n", pwrctrl->lte_mask);
-	p += sprintf(p, "ccifmd_md1_event_mask = %u\n", pwrctrl->ccifmd_md1_event_mask);
-	p += sprintf(p, "ccifmd_md2_event_mask = %u\n", pwrctrl->ccifmd_md2_event_mask);
 
 	p += sprintf(p, "conn_mask = %u\n", pwrctrl->conn_mask);
 
@@ -160,7 +148,6 @@ static ssize_t show_pwr_ctrl(const struct pwr_ctrl *pwrctrl, char *buf)
 	p += sprintf(p, "isp0_ddr_en_mask = %u\n", pwrctrl->isp0_ddr_en_mask);
 	p += sprintf(p, "isp1_ddr_en_mask = %u\n", pwrctrl->isp1_ddr_en_mask);
 
-	p += sprintf(p, "md32_req_mask = %u\n", pwrctrl->md32_req_mask);
 	p += sprintf(p, "syspwreq_mask = %u\n", pwrctrl->syspwreq_mask);
 	p += sprintf(p, "srclkenai_mask = %u\n", pwrctrl->srclkenai_mask);
 
@@ -231,8 +218,6 @@ static ssize_t store_pwr_ctrl(struct pwr_ctrl *pwrctrl, const char *buf, size_t 
 		pwrctrl->wake_src = val;
 	else if (!strcmp(cmd, "wake_src_cust"))
 		pwrctrl->wake_src_cust = val;
-	else if (!strcmp(cmd, "wake_src_md32"))
-		pwrctrl->wake_src_md32 = val;
 	else if (!strcmp(cmd, "r0_ctrl_en"))
 		pwrctrl->r0_ctrl_en = val;
 	else if (!strcmp(cmd, "r7_ctrl_en"))
@@ -269,30 +254,8 @@ static ssize_t store_pwr_ctrl(struct pwr_ctrl *pwrctrl, const char *buf, size_t 
 	else if (!strcmp(cmd, "ca7_wfi3_en"))
 		pwrctrl->ca7_wfi3_en = val;
 
-	else if (!strcmp(cmd, "md1_req_mask"))
-		pwrctrl->md1_req_mask = val;
-	else if (!strcmp(cmd, "md2_req_mask"))
-		pwrctrl->md2_req_mask = val;
-	else if (!strcmp(cmd, "md_apsrc_sel"))
-		pwrctrl->md_apsrc_sel = val;
-	else if (!strcmp(cmd, "md2_apsrc_sel"))
-		pwrctrl->md2_apsrc_sel = val;
 	else if (!strcmp(cmd, "gce_req_mask"))
 		pwrctrl->gce_req_mask = val;
-	else if (!strcmp(cmd, "ccif0_to_ap_mask"))
-		pwrctrl->ccif0_to_ap_mask = val;
-	else if (!strcmp(cmd, "ccif0_to_md_mask"))
-		pwrctrl->ccif0_to_md_mask = val;
-	else if (!strcmp(cmd, "ccif1_to_ap_mask"))
-		pwrctrl->ccif1_to_ap_mask = val;
-	else if (!strcmp(cmd, "ccif1_to_md_mask"))
-		pwrctrl->ccif1_to_md_mask = val;
-	else if (!strcmp(cmd, "lte_mask"))
-		pwrctrl->lte_mask = val;
-	else if (!strcmp(cmd, "ccifmd_md1_event_mask"))
-		pwrctrl->ccifmd_md1_event_mask = val;
-	else if (!strcmp(cmd, "ccifmd_md2_event_mask"))
-		pwrctrl->ccifmd_md2_event_mask = val;
 
 	else if (!strcmp(cmd, "conn_mask"))
 		pwrctrl->conn_mask = val;
@@ -312,8 +275,6 @@ static ssize_t store_pwr_ctrl(struct pwr_ctrl *pwrctrl, const char *buf, size_t 
 	else if (!strcmp(cmd, "isp1_ddr_en_mask"))
 		pwrctrl->isp1_ddr_en_mask = val;
 
-	else if (!strcmp(cmd, "md32_req_mask"))
-		pwrctrl->md32_req_mask = val;
 	else if (!strcmp(cmd, "syspwreq_mask"))
 		pwrctrl->syspwreq_mask = val;
 	else if (!strcmp(cmd, "srclkenai_mask"))

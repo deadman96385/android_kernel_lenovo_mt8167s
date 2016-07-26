@@ -59,7 +59,6 @@
 #define CON1_SPM_SRAM_ISO_B	(1U << 11)
 #define CON1_EVENT_LOCK_EN	(1U << 12)
 #define CON1_SRCCLKEN_FAST_RESP	  (1U << 13)
-#define CON1_MD32_APB_INTERNAL_EN (1U << 14)
 #define CON1_CFG_KEY		(SPM_PROJECT_CODE << 16)
 
 #define PCM_PWRIO_EN_R0		(1U << 0)
@@ -69,21 +68,10 @@
 #define PCM_RF_SYNC_R6		(1U << 22)
 #define PCM_RF_SYNC_R7		(1U << 23)
 
-#define R7_AP_MDSRC_REQ		(1U << 17)
-
 #define R13_EXT_SRCLKENA_0	(1U << 0)
 #define R13_EXT_SRCLKENA_1	(1U << 1)
 #define R13_EXT_SRCLKENA_2	(1U << 2)
-#define R13_MD1_SRCLKENA	(1U << 3)
-#define R13_MD1_APSRC_REQ	(1U << 4)
-#define R13_AP_MD1SRC_ACK	(1U << 5)
-#define R13_MD2_SRCLKENA	(1U << 6)
-#define R13_MD2_APSRC_REQ	(1U << 7)
-#define R13_AP_MD2SRC_ACK	(1U << 8)
-#define R13_MD1_STATE    (1U << 9)
-#define R13_MD2_STATE    (1U << 10)
 #define R13_MM_STATE	(1U << 11)
-#define R13_MD_DDR_EN		(1U << 12)
 #define R13_CONN_STATE		(1U << 13)
 #define R13_CONN_SRCLKENA	(1U << 14)
 #define R13_CONN_APSRC_REQ	(1U << 15)
@@ -107,22 +95,16 @@
 #define CC_SYSSETTLE_SEL	(1U << 4)
 #define CC_LOCK_INFRA_DCM	(1U << 5)
 #define CC_SRCLKENA_MASK_0	(1U << 6)
-#define CC_CXO32K_RM_EN_MD1	(1U << 9)
-#define CC_CXO32K_RM_EN_MD2	(1U << 10)
 #define CC_CLKSQ0_SEL		(1U << 11)
 #define CC_CLKSQ1_SEL		(1U << 12)
 #define CC_SRCLKEN0_EN	(1U << 13)
 #define CC_SRCLKEN1_EN	(1U << 14)
 #define CC_CXO32K_RM_EN_CONN	(1U << 15)
-/* #define CC_MD32_DCM_EN               (1U << 18) */
 
-#define ASC_MD_DDR_EN_SEL	(1U << 22)
 #define ASC_SRCCLKENI_MASK      (1U << 25)
 
 #define WFI_OP_AND		1
 #define WFI_OP_OR		0
-#define SEL_MD_DDR_EN		1
-#define SEL_MD_APSRC_REQ	0
 
 #define TWAM_CON_EN		(1U << 0)
 #define TWAM_CON_SPEED_EN	(1U << 1)
@@ -132,7 +114,6 @@
 #define TWAM_MON_TYPE_HIGH 2
 #define TWAM_MON_TYPE_LOW 3
 
-#define PCM_MD32_IRQ_SEL	(1U << 4)
 
 #define ISRM_TWAM		(1U << 2)
 #define ISRM_PCM_RETURN		(1U << 3)
@@ -166,10 +147,6 @@
 
 #define SR_PCM_APSRC_REQ	(1U << 0)
 #define SR_PCM_F26M_REQ	        (1U << 1)
-#define SR_CCIF0_TO_MD_MASK_B	(1U << 2)
-#define SR_CCIF0_TO_AP_MASK_B	(1U << 3)
-#define SR_CCIF1_TO_MD_MASK_B	(1U << 4)
-#define SR_CCIF1_TO_AP_MASK_B	(1U << 5)
 
 #define PCM_ASYNC_REQ		(1U << 1)
 
@@ -199,7 +176,6 @@ struct pwr_ctrl {
 	u32 timer_val_cust;	/* @ 1T 32K, can override timer_val */
 	u32 wake_src;
 	u32 wake_src_cust;	/* can override wake_src */
-	u32 wake_src_md32;
 	u8 r0_ctrl_en;
 	u8 r7_ctrl_en;
 	u8 infra_dcm_lock;
@@ -220,20 +196,6 @@ struct pwr_ctrl {
 	u8 ca7_wfi2_en;
 	u8 ca7_wfi3_en;
 
-	/* for MD */
-	u8 md1_req_mask;
-	u8 md2_req_mask;
-	u8 md_apsrc_sel;	/* 1:SEL_MD_DDR_EN, 0:SEL_MD_APSRC_REQ */
-	u8 md2_apsrc_sel;	/* 1:SEL_MD2_DDR_EN, 0:SEL_MD2_APSRC_REQ */
-	u8 ccif0_to_ap_mask;
-	u8 ccif0_to_md_mask;
-	u8 ccif1_to_ap_mask;
-	u8 ccif1_to_md_mask;
-	u8 lte_mask;
-	u8 ccifmd_md1_event_mask;
-	u8 ccifmd_md2_event_mask;
-	u8 md_vrf18_req_mask_b;
-
 	/* for CONN */
 	u8 conn_mask;
 
@@ -248,7 +210,6 @@ struct pwr_ctrl {
 	u8 isp1_ddr_en_mask;	/* E2 */
 
 	/* for other SYS */
-	u8 md32_req_mask;
 	u8 syspwreq_mask;	/* make 26M off when attach ICE */
 	u8 srclkenai_mask;
 
@@ -323,8 +284,6 @@ extern void __spm_get_wakeup_status(struct wake_status *wakesta);
 extern void __spm_clean_after_wakeup(void);
 extern wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
 						   const struct pcm_desc *pcmdesc, bool suspend);
-
-extern void __spm_dbgout_md_ddr_en(bool enable);
 
 enum pmic_wrap_phase_id {
 	PMIC_WRAP_PHASE_DEEPIDLE,

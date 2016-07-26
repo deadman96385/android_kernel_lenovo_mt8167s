@@ -60,7 +60,6 @@ static const char *wakesrc_str[32] = {
 	[5] = "EINT",
 	[6] = "CONN_WDT",
 	[7] = "GCE",
-	[8] = "CCIF0_MD",
 	[9] = "LOW_BAT",
 	[10] = "CONN2AP",
 	[11] = "F26M_WAKE",
@@ -68,8 +67,6 @@ static const char *wakesrc_str[32] = {
 	[13] = "PCM_WDT",
 	[14] = "USB_CD ",
 	[15] = "USB_PDN",
-	[16] = "MD1_VRF18_WAKE",
-	[17] = "MD1_VRF18_SLEEP",
 	[18] = "DBGSYS",
 	[19] = "UART0",
 	[20] = "AFE",
@@ -77,7 +74,6 @@ static const char *wakesrc_str[32] = {
 	[22] = "CIRQ",
 	[23] = "SEJ",
 	[24] = "SYSPWREQ",
-	[25] = "MD1_WDT",
 	[26] = "CPU0_IRQ",
 	[27] = "CPU1_IRQ",
 	[28] = "CPU2_IRQ",
@@ -134,7 +130,7 @@ void __spm_reset_and_init_pcm(const struct pcm_desc *pcmdesc)
 	spm_write(SPM_PCM_CON1, con1 | CON1_CFG_KEY | CON1_EVENT_LOCK_EN |
 		  CON1_SPM_SRAM_ISO_B | CON1_SPM_SRAM_SLP_B |
 		  (pcmdesc->replace ? 0 : CON1_IM_NONRP_EN) |
-		  CON1_MIF_APBEN | CON1_MD32_APB_INTERNAL_EN);
+		  CON1_MIF_APBEN);
 }
 
 void __spm_kick_im_to_fetch(const struct pcm_desc *pcmdesc)
@@ -188,28 +184,16 @@ void __spm_init_event_vector(const struct pcm_desc *pcmdesc)
 void __spm_set_power_control(const struct pwr_ctrl *pwrctrl)
 {
 	/* set other SYS request mask */
-	spm_write(SPM_AP_STANBY_CON, (!pwrctrl->md_vrf18_req_mask_b << 29) |
-		  (!pwrctrl->lte_mask << 26) |
-		  (!pwrctrl->srclkenai_mask << 25) |
-		  (!!pwrctrl->md2_apsrc_sel << 24) |
+	spm_write(SPM_AP_STANBY_CON, (!pwrctrl->srclkenai_mask << 25) |
 		  (!pwrctrl->conn_mask << 23) |
-		  (!!pwrctrl->md_apsrc_sel << 22) |
-		  (!pwrctrl->md32_req_mask << 21) |
-		  (!pwrctrl->md2_req_mask << 20) |
-		  (!pwrctrl->md1_req_mask << 19) |
 		  (!pwrctrl->gce_req_mask << 18) |
 		  (!pwrctrl->mfg_req_mask << 17) |
 		  (!pwrctrl->disp_req_mask << 16) |
 		  (!!pwrctrl->mcusys_idle_mask << 7) |
 		  (!!pwrctrl->ca15top_idle_mask << 6) |
 		  (!!pwrctrl->ca7top_idle_mask << 5) | (!!pwrctrl->wfi_op << 4));
-	spm_write(SPM_PCM_SRC_REQ, (!pwrctrl->ccifmd_md2_event_mask << 8) |
-		  (!pwrctrl->ccifmd_md1_event_mask << 7) |
-		  (!pwrctrl->ccif1_to_ap_mask << 5) |
-		  (!pwrctrl->ccif1_to_md_mask << 4) |
-		  (!pwrctrl->ccif0_to_ap_mask << 3) |
-		  (!pwrctrl->ccif0_to_md_mask << 2) |
-		  (!!pwrctrl->pcm_f26m_req << 1) | (!!pwrctrl->pcm_apsrc_req << 0));
+	spm_write(SPM_PCM_SRC_REQ, (!!pwrctrl->pcm_f26m_req << 1) |
+		  (!!pwrctrl->pcm_apsrc_req << 0));
 	spm_write(SPM_PCM_PASR_DPD_2, (!pwrctrl->isp1_ddr_en_mask << 4) |
 		  (!pwrctrl->isp0_ddr_en_mask << 3) |
 		  (!pwrctrl->dpi_ddr_en_mask << 2) |
