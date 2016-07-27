@@ -1024,7 +1024,7 @@ int ddp_check_engine_status(int mutexID)
 int ddp_path_top_clock_on(void)
 {
 #ifdef CONFIG_MTK_IOMMU
-		struct mtkfb_device *fbdev;
+	struct dispsys_device *dispsysdev;
 #endif
 
 #ifdef ENABLE_CLK_MGR
@@ -1037,8 +1037,8 @@ int ddp_path_top_clock_on(void)
 
 	if (need_enable) {
 #ifdef CONFIG_MTK_IOMMU
-		fbdev = (struct mtkfb_device *)dev_get_drvdata(&mtkfb_fbdev->dev);
-		mtk_smi_larb_get(&fbdev->larb_pdev[0]->dev);
+		dispsysdev = (struct dispsys_device *) dev_get_drvdata(disp_get_device());
+		mtk_smi_larb_get(&dispsysdev->larb_pdev[0]->dev);
 #else
 		mtk_smi_larb_clock_on(0, true);
 #endif
@@ -1058,8 +1058,9 @@ int ddp_path_top_clock_on(void)
 int ddp_path_top_clock_off(void)
 {
 #ifdef CONFIG_MTK_IOMMU
-		struct mtkfb_device *fbdev;
+	struct dispsys_device *dispsysdev;
 #endif
+
 #ifdef ENABLE_CLK_MGR
 	DDPMSG("ddp path top clock off\n");
 #ifdef CONFIG_MTK_CLKMGR
@@ -1073,10 +1074,10 @@ int ddp_path_top_clock_off(void)
 	disable_clock(MT_CG_DISP0_SMI_COMMON, "DDP");
 #else
 #ifdef CONFIG_MTK_IOMMU
-		fbdev = (struct mtkfb_device *)dev_get_drvdata(&mtkfb_fbdev->dev);
-		mtk_smi_larb_put(&fbdev->larb_pdev[0]->dev);
+	dispsysdev = (struct dispsys_device *) dev_get_drvdata(disp_get_device());
+	mtk_smi_larb_put(&dispsysdev->larb_pdev[0]->dev);
 #else
-		mtk_smi_larb_clock_off(0, true);
+	mtk_smi_larb_clock_off(0, true);
 #endif
 	/*ddp_clk_disable_unprepare(DISP0_MUTEX_32K);*/
 	/*ddp_clk_disable_unprepare(DISP0_SMI_LARB0);*/

@@ -375,6 +375,8 @@ static int _build_path_rdma_dpi(void)
 
 	{
 #ifdef MTK_FB_RDMA1_SUPPORT
+#ifdef CONFIG_MTK_M4U
+
 		M4U_PORT_STRUCT sPort;
 
 		sPort.ePortID = M4U_PORT_DISP_RDMA1;
@@ -391,6 +393,7 @@ static int _build_path_rdma_dpi(void)
 				ext_disp_use_m4u ? "virtual" : "physical", ret);
 			return -1;
 		}
+#endif /* CONFIG_MTK_M4U */
 #endif
 	}
 
@@ -1040,7 +1043,9 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 	int i = 0;
 	int config_layer_id = 0;
 #ifdef MTK_FB_RDMA1_SUPPORT
+#ifdef CONFIG_MTK_M4U
 	M4U_PORT_STRUCT sPort;
+#endif
 #endif
 
 	/* /EXT_DISP_FUNC(); */
@@ -1094,6 +1099,7 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 		if (pgc->ovl_req_state == EXTD_OVL_REMOVE_REQ) {
 			EXT_DISP_LOG("config M4U Port DISP_MODULE_RDMA1\n");
 #ifdef MTK_FB_RDMA1_SUPPORT
+#ifdef CONFIG_MTK_M4U
 			sPort.ePortID = M4U_PORT_DISP_RDMA1;
 			sPort.Virtuality = 1;
 			sPort.Security = 0;
@@ -1102,6 +1108,7 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 			ret = m4u_config_port(&sPort);
 			if (ret != 0)
 				EXT_DISP_LOG("config M4U Port DISP_MODULE_RDMA1 FAIL\n");
+#endif /* CONFIG_MTK_M4U */
 #endif
 			pgc->ovl_req_state = EXTD_OVL_REMOVING;
 		}

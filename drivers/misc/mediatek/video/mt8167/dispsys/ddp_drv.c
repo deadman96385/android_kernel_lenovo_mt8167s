@@ -47,6 +47,7 @@
 #include <linux/vmalloc.h>
 #include <linux/dma-mapping.h>
 #include <linux/of.h>
+#include <linux/of_platform.h>
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
 #include <linux/io.h>
@@ -233,16 +234,6 @@ static int disp_mmap(struct file *file, struct vm_area_struct *a_pstVMArea)
 	return 0;
 }
 
-struct dispsys_device {
-	void __iomem *regs[DISP_REG_NUM];
-	struct device *dev;
-	int irq[DISP_REG_NUM];
-
-#ifndef CONFIG_MTK_CLKMGR
-	struct clk *disp_clk[MAX_DISP_CLK_CNT];
-#endif
-};
-
 static int nr_dispsys_dev;
 static struct dispsys_device *dispsys_dev;
 unsigned int dispsys_irq[DISP_REG_NUM] = { 0 };
@@ -251,6 +242,7 @@ unsigned long dispsys_reg[DISP_REG_NUM] = { 0 };
 unsigned long mipi_tx_reg;
 unsigned long dsi_reg_va;
 
+#ifdef CONFIG_MTK_M4U
 m4u_callback_ret_t disp_m4u_callback(int port, unsigned int mva, void *data)
 {
 	enum DISP_MODULE_ENUM module = DISP_MODULE_OVL0;
@@ -294,7 +286,9 @@ m4u_callback_ret_t disp_m4u_callback(int port, unsigned int mva, void *data)
 
 	return 0;
 }
+#endif
 
+#ifdef CONFIG_MTK_M4U
 void disp_m4u_tf_disable(void)
 {
 	/* m4u_enable_tf(M4U_PORT_DISP_OVL0, 0); */
@@ -302,6 +296,7 @@ void disp_m4u_tf_disable(void)
 	m4u_enable_tf(M4U_PORT_DISP_OVL1, 0);
 #endif
 }
+#endif
 
 
 struct device *disp_get_device(void)
@@ -541,6 +536,10 @@ static int disp_probe(struct platform_device *pdev)
 	static unsigned int disp_probe_cnt;
 	struct device_node *np;
 	unsigned int reg_value, irq_value;
+#ifdef CONFIG_MTK_IOMMU
+	struct device_node *larb_node[1];
+	struct platform_device *larb_pdev[1];
+#endif
 
 	DDPMSG("real disp_probe\n");
 
@@ -561,6 +560,19 @@ static int disp_probe(struct platform_device *pdev)
 #endif
 #endif
 
+#ifdef CONFIG_MTK_IOMMU
+	larb_node[0] = of_parse_phandle(pdev->dev.of_node, "mediatek,larb", 0);
+	if (!larb_node[0])
+		return -EINVAL;
+
+	larb_pdev[0] = of_find_device_by_node(larb_node[0]);
+	of_node_put(larb_node[0]);
+	if ((!larb_pdev[0]) || (!larb_pdev[0]->dev.driver)) {
+		pr_err("disp_probe is earlier than SMI\n");
+		return -EPROBE_DEFER;
+	}
+#endif
+
 	new_count = nr_dispsys_dev + 1;
 	/*dispsys_dev = krealloc(dispsys_dev, sizeof(struct dispsys_device) * new_count, GFP_KERNEL);*/
 	dispsys_dev = kcalloc(new_count, sizeof(*dispsys_dev), GFP_KERNEL);
@@ -571,6 +583,10 @@ static int disp_probe(struct platform_device *pdev)
 
 	dispsys_dev = &(dispsys_dev[nr_dispsys_dev]);
 	dispsys_dev->dev = &pdev->dev;
+#ifdef CONFIG_MTK_IOMMU
+	dispsys_dev->larb_pdev[0] = larb_pdev[0];
+	dev_set_drvdata(&pdev->dev, dispsys_dev);
+#endif
 
 #ifndef CONFIG_MTK_CLKMGR
 #ifndef CONFIG_FPGA_EARLY_PORTING
@@ -661,9 +677,11 @@ static int disp_probe(struct platform_device *pdev)
 
 	/* init M4U callback */
 	/* DDPMSG("register m4u callback\n"); */
+#ifdef CONFIG_MTK_M4U
 	m4u_register_fault_callback(M4U_PORT_DISP_OVL0, disp_m4u_callback, 0);
 	m4u_register_fault_callback(M4U_PORT_DISP_RDMA0, disp_m4u_callback, 0);
 	m4u_register_fault_callback(M4U_PORT_DISP_WDMA0, disp_m4u_callback, 0);
+#endif
 
 	/* sysfs */
 	DDPMSG("sysfs disp +");

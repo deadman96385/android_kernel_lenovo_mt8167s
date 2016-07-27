@@ -22,7 +22,7 @@
 #ifdef CONFIG_MTK_IOMMU
 #include <soc/mediatek/smi.h>
 #include <linux/dma-iommu.h>
-#include <dt-bindings/memory/mt8173-larb-port.h>
+#include <dt-bindings/memory/mt8167-larb-port.h>
 #else
 #include "m4u.h"
 #endif

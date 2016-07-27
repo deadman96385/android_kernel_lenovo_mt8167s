@@ -1106,6 +1106,7 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg
 
 	case MTKFB_CAPTURE_FRAMEBUFFER:
 	{
+	#ifdef CONFIG_MTK_M4U
 		unsigned long dst_pbuf = 0;
 		unsigned long *src_pbuf = 0;
 		unsigned int pixel_bpp = info->var.bits_per_pixel / 8;
@@ -1130,12 +1131,16 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg
 				vfree(src_pbuf);
 			}
 		}
-
+	#else
+		pr_warn("[FB]: do not support capture framebuffer with iommu, line:%d\n", __LINE__);
+		r = -EFAULT;
+	#endif
 		return r;
 	}
 
 	case MTKFB_SLT_AUTO_CAPTURE:
 	{
+	#ifdef CONFIG_MTK_M4U
 		struct fb_slt_catpure capConfig;
 		char *dst_buffer;
 		unsigned int fb_size;
@@ -1183,6 +1188,10 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg
 				vfree((char *)capConfig.outputBuffer);
 			}
 		}
+	#else
+		pr_warn("[FB]: do not support capture framebuffer with iommu, line:%d\n", __LINE__);
+		r = -EFAULT;
+	#endif
 
 		return r;
 	}
@@ -1497,6 +1506,7 @@ static int mtkfb_compat_ioctl(struct fb_info *info, unsigned int cmd, unsigned l
 	}
 	case COMPAT_MTKFB_CAPTURE_FRAMEBUFFER:
 	{
+	#ifdef CONFIG_MTK_M4U
 		compat_ulong_t __user *data32;
 		unsigned long *pbuf;
 		unsigned int pixel_bpp = info->var.bits_per_pixel / 8;
@@ -1519,6 +1529,10 @@ static int mtkfb_compat_ioctl(struct fb_info *info, unsigned int cmd, unsigned l
 				ret  = -EFAULT;
 			}
 		}
+	#else
+		pr_warn("[FB]: do not support capture framebuffer with iommu, line:%d\n", __LINE__);
+		ret  = -EFAULT;
+	#endif
 		break;
 	}
 	case COMPAT_MTKFB_TRIG_OVERLAY_OUT:
@@ -2204,37 +2218,13 @@ static int mtkfb_probe(struct platform_device *pdev)
 	struct fb_info *fbi;
 	int init_state;
 	int r = 0;
-#ifdef CONFIG_MTK_IOMMU
-	struct device_node *np;
-	struct dma_iommu_mapping *dma_mapping;
-	struct platform_device *pimmdev;
-#if HDMI_MAIN_PATH
-#else
-	struct device_node *larb_node[2];
-	struct platform_device *larb_pdev[2];
-#endif
-#endif
 #ifdef DISP_GPIO_DTS
 	long dts_gpio_state = 0;
 #endif
 
 	DISPPRINT("mtkfb_probe name [%s]  = [%s][%p]\n",
 		pdev->name, pdev->dev.init_name, (void *)&pdev->dev);
-#ifdef CONFIG_MTK_IOMMU
-#if HDMI_MAIN_PATH
-#else
-	larb_node[0] = of_parse_phandle(pdev->dev.of_node, "mediatek,larb", 0);
-	if (!larb_node[0])
-		return -EINVAL;
-
-	larb_pdev[0] = of_find_device_by_node(larb_node[0]);
-	of_node_put(larb_node[0]);
-	if ((!larb_pdev[0]) || (!larb_pdev[0]->dev.driver)) {
-		MTKFB_ERR("mtkfb_probe is earlier than SMI\n");
-		return -EPROBE_DEFER;
-	}
-#endif
-#else
+#ifndef CONFIG_MTK_IOMMU
 	if (!mtk_smi_larb_get_base(0))
 		return -EPROBE_DEFER;
 #endif
@@ -2280,9 +2270,6 @@ static int mtkfb_probe(struct platform_device *pdev)
 	fbdev = (struct mtkfb_device *)fbi->par;
 	fbdev->fb_info = fbi;
 	fbdev->dev = &(pdev->dev);
-#ifdef CONFIG_MTK_IOMMU
-	fbdev->larb_pdev[0] = larb_pdev[0];
-#endif
 	dev_set_drvdata(&(pdev->dev), fbdev);
 
 	{
