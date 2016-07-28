@@ -42,6 +42,15 @@
 /* #define M4U_PROFILE */
 
 #ifndef M4U_PROFILE
+#ifdef MMProfileLogEx
+#undef MMProfileLogEx
+#endif
+#ifdef MMProfileEnable
+#undef MMProfileEnable
+#endif
+#ifdef MMProfileStart
+#undef MMProfileStart
+#endif
 #define MMProfileLogEx(...)
 #define MMProfileEnable(...)
 #define MMProfileStart(...)
