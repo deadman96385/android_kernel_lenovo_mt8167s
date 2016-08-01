@@ -88,8 +88,8 @@ typedef void MVOID;
 #define MyTag "[Camera-ISP]"
 
 #define	LOG_VRB(format,	args...)    pr_info(MyTag "[%s]" format "\n", __func__, ##args)
-#define LOG_DBG(format, args...)    pr_info(MyTag "[%s]" format "\n", __func__, ##args)
-#define LOG_INF(format, args...)    pr_info(MyTag "[%s]" format "\n", __func__, ##args)
+#define LOG_DBG(format, args...)    pr_err(MyTag "[%s]" format "\n", __func__, ##args)
+#define LOG_INF(format, args...)    pr_err(MyTag "[%s]" format "\n", __func__, ##args)
 #define LOG_NOTICE(format, args...) pr_notice(MyTag "[%s]" format "\n", __func__, ##args)
 #define LOG_WRN(format, args...)    pr_warn(MyTag "[%s, line%05d]Warning:" format "\n", __func__, __LINE__, ##args)
 #define LOG_ERR(format, args...)    pr_err(MyTag "[%s, line%05d]ERROR:" format "\n", __func__, __LINE__, ##args)
@@ -132,7 +132,6 @@ typedef enum {
 	ISP_BASE_ADDR = 0,
 	ISP_IMGSYS_CONFIG_BASE_ADDR,
 	ISP_MIPI_ANA_BASE_ADDR,
-	ISP_GPIO_BASE_ADDR,
 	ISP_CAM_BASEADDR_NUM
 } ISP_CAM_BASEADDR_ENUM;
 
