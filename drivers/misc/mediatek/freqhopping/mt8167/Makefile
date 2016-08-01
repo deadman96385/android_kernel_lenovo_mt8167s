@@ -12,5 +12,5 @@
 #
 
 
-obj-y := mt_freqhopping.o
+obj-y := mtk_freqhopping.o
 
