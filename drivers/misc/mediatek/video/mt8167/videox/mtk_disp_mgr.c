@@ -534,7 +534,7 @@ int _ioctl_trigger_session(unsigned long arg)
 		/* only primary display update present fence, external display has no present fence mechanism */
 		if (config.present_fence_idx != -1) {
 			primary_display_update_present_fence(config.present_fence_idx);
-			MMProfileLogEx(ddp_mmp_get_events()->present_fence_set, MMProfileFlagPulse,
+			mmprofile_log_ex(ddp_mmp_get_events()->present_fence_set, MMPROFILE_FLAG_PULSE,
 				       config.present_fence_idx, 0);
 		}
 		primary_display_merge_session_cmd(&config);
@@ -650,7 +650,7 @@ int _ioctl_prepare_present_fence(unsigned long arg)
 		pr_debug("[FB Driver]: copy_to_user failed! line:%d\n", __LINE__);
 		ret = -EFAULT;
 	}
-	MMProfileLogEx(ddp_mmp_get_events()->present_fence_get, MMProfileFlagPulse,
+	mmprofile_log_ex(ddp_mmp_get_events()->present_fence_get, MMPROFILE_FLAG_PULSE,
 		       preset_fence_struct.present_fence_fd,
 		       preset_fence_struct.present_fence_index);
 

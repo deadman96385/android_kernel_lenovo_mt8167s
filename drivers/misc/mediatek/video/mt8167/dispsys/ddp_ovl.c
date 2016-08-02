@@ -104,7 +104,7 @@ void ovl_set_status(enum DISP_OVL1_STATUS status)
 {
 	DDPMSG("cascade, set_ovl1 from %s to %s!\n", ovl_get_status_name(ovl1_status),
 	       ovl_get_status_name(status));
-	MMProfileLogEx(ddp_mmp_get_events()->ovl1_status, MMProfileFlagPulse, ovl1_status, status);
+	mmprofile_log_ex(ddp_mmp_get_events()->ovl1_status, MMPROFILE_FLAG_PULSE, ovl1_status, status);
 	ovl1_status = status;	/* atomic operation */
 }
 
