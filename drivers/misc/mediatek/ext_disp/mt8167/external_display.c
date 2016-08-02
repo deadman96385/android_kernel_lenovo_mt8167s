@@ -660,7 +660,7 @@ static int _ext_disp_trigger(int blocking, void *callback, unsigned int userdata
 	if (_should_start_path()) {
 		reg_flush = true;
 		dpmgr_path_start(pgc->dpmgr_handle, ext_disp_cmdq_enabled());
-		MMProfileLogEx(ddp_mmp_get_events()->Extd_State, MMProfileFlagPulse, Trigger, 1);
+		mmprofile_log_ex(ddp_mmp_get_events()->Extd_State, MMPROFILE_FLAG_PULSE, Trigger, 1);
 	}
 
 	if (_should_trigger_path()) {
@@ -673,7 +673,7 @@ static int _ext_disp_trigger(int blocking, void *callback, unsigned int userdata
 
 	if (_should_flush_cmdq_config_handle()) {
 		if (reg_flush)
-			MMProfileLogEx(ddp_mmp_get_events()->Extd_State, MMProfileFlagPulse, Trigger, 2);
+			mmprofile_log_ex(ddp_mmp_get_events()->Extd_State, MMPROFILE_FLAG_PULSE, Trigger, 2);
 
 		_cmdq_flush_config_handle(blocking, callback, userdata);
 	}
@@ -696,7 +696,7 @@ static int _ext_disp_trigger_EPD(int blocking, void *callback, unsigned int user
 
 	if (_should_start_path()) {
 		dpmgr_path_start(pgc->dpmgr_handle, ext_disp_cmdq_enabled());
-		MMProfileLogEx(ddp_mmp_get_events()->Extd_State, MMProfileFlagPulse, Trigger, 1);
+		mmprofile_log_ex(ddp_mmp_get_events()->Extd_State, MMPROFILE_FLAG_PULSE, Trigger, 1);
 	}
 
 	if (_should_trigger_path()) {
@@ -955,7 +955,7 @@ int ext_disp_resume(unsigned int session)
  done:
 	_ext_disp_path_unlock();
 	EXT_DISP_LOG("ext_disp_resume done\n");
-	MMProfileLogEx(ddp_mmp_get_events()->Extd_State, MMProfileFlagPulse, Resume, 1);
+	mmprofile_log_ex(ddp_mmp_get_events()->Extd_State, MMPROFILE_FLAG_PULSE, Resume, 1);
 	return ret;
 }
 
@@ -967,7 +967,7 @@ int ext_disp_trigger(int blocking, void *callback, unsigned int userdata, unsign
 
 	if (pgc->state == EXTD_DEINIT || pgc->state == EXTD_SUSPEND || pgc->need_trigger_overlay < 1) {
 		EXT_DISP_LOG("trigger ext display is already slept\n");
-		MMProfileLogEx(ddp_mmp_get_events()->Extd_ErrorInfo, MMProfileFlagPulse, Trigger, 0);
+		mmprofile_log_ex(ddp_mmp_get_events()->Extd_ErrorInfo, MMPROFILE_FLAG_PULSE, Trigger, 0);
 		return -1;
 	}
 
@@ -997,11 +997,11 @@ int ext_disp_suspend_trigger(void *callback, unsigned int userdata, unsigned int
 
 	if (pgc->state != EXTD_RESUME) {
 		EXT_DISP_LOG("trigger ext display is already slept\n");
-		MMProfileLogEx(ddp_mmp_get_events()->Extd_ErrorInfo, MMProfileFlagPulse, Trigger, 0);
+		mmprofile_log_ex(ddp_mmp_get_events()->Extd_ErrorInfo, MMPROFILE_FLAG_PULSE, Trigger, 0);
 		return -1;
 	}
 
-	MMProfileLogEx(ddp_mmp_get_events()->Extd_State, MMProfileFlagPulse, Suspend, 0);
+	mmprofile_log_ex(ddp_mmp_get_events()->Extd_State, MMPROFILE_FLAG_PULSE, Suspend, 0);
 
 	_ext_disp_path_lock();
 
@@ -1033,7 +1033,7 @@ int ext_disp_suspend_trigger(void *callback, unsigned int userdata, unsigned int
 
 	_ext_disp_path_unlock();
 
-	MMProfileLogEx(ddp_mmp_get_events()->Extd_State, MMProfileFlagPulse, Suspend, 1);
+	mmprofile_log_ex(ddp_mmp_get_events()->Extd_State, MMPROFILE_FLAG_PULSE, Suspend, 1);
 	return ret;
 }
 
@@ -1054,7 +1054,7 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 
 	if (pgc->state != EXTD_INIT && pgc->state != EXTD_RESUME && pgc->suspend_config != 1) {
 		EXT_DISP_LOG("config ext disp is already slept, state:%d\n", pgc->state);
-		MMProfileLogEx(ddp_mmp_get_events()->Extd_ErrorInfo, MMProfileFlagPulse, Config, idx);
+		mmprofile_log_ex(ddp_mmp_get_events()->Extd_ErrorInfo, MMPROFILE_FLAG_PULSE, Config, idx);
 		return -2;
 	}
 
