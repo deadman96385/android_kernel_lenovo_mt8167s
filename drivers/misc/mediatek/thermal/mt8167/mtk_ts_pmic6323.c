@@ -29,7 +29,7 @@
 /*#include <mach/system.h>*/
 #include "mt-plat/mtk_thermal_monitor.h"
 #include "mtk_thermal_typedefs.h"
-#include "inc/mt_thermal.h"
+#include "inc/mtk_thermal.h"
 
 /* #include <mach/pmic_mt6329_hw_bank1.h> */
 /* #include <mach/pmic_mt6329_sw_bank1.h> */

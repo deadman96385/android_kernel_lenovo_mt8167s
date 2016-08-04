@@ -22,8 +22,8 @@
 #include <linux/err.h>
 #include <linux/syscalls.h>
 #include "mt-plat/mtk_thermal_monitor.h"
-#include <charging.h>
-#include <tmp_battery.h>
+#include <inc/charging.h>
+#include <inc/tmp_battery.h>
 #include <linux/uidgid.h>
 #include <linux/notifier.h>
 #include <linux/fb.h>

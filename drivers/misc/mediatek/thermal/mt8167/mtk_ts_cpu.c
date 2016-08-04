@@ -30,7 +30,7 @@
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include "mtk_thermal_typedefs.h"
-#include "inc/mt_thermal.h"
+#include "inc/mtk_thermal.h"
 
 #include <linux/time.h>
 #include <linux/uidgid.h>
