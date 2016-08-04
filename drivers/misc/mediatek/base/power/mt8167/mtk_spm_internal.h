@@ -20,7 +20,7 @@
 #include <linux/io.h>
 #include <mt-plat/aee.h>
 
-#include "mt_spm.h"
+#include "mtk_spm.h"
 /*#include <mt-plat/mt_lpae.h>*/
 /*#include <mt-plat/mt_gpio.h>*/
 
@@ -219,27 +219,6 @@ struct pwr_ctrl {
 	u32 param3;
 };
 
-#define PCM_FIRMWARE_SIZE   0x1000
-#define DYNA_LOAD_PCM_PATH_SIZE 64
-#define PCM_FIRMWARE_VERSION_SIZE 64
-
-enum dyna_load_pcm_index {
-	DYNA_LOAD_PCM_SUSPEND = 0,
-	DYNA_LOAD_PCM_SODI,
-	DYNA_LOAD_PCM_DEEPIDLE,
-	DYNA_LOAD_PCM_MAX,
-};
-
-struct dyna_load_pcm_t {
-	char path[DYNA_LOAD_PCM_PATH_SIZE];
-	char version[PCM_FIRMWARE_VERSION_SIZE];
-	char buf[PCM_FIRMWARE_SIZE];
-	struct pcm_desc desc;
-	int ready;
-};
-
-extern struct dyna_load_pcm_t dyna_load_pcm[DYNA_LOAD_PCM_MAX];
-
 struct wake_status {
 	u32 assert_pc;		/* PCM_REG_DATA_INI */
 	u32 r12;		/* PCM_REG12_DATA */
@@ -335,7 +314,7 @@ do {					\
 #define wfi_with_sync()					\
 do {							\
 	isb();						\
-	mb(); /* sync before wfi */			\
+	mb(); /* sync before wfi  */			\
 	__asm__ __volatile__("wfi" : : : "memory");	\
 } while (0)
 

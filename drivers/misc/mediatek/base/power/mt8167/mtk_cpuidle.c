@@ -30,11 +30,9 @@
 #if defined(CONFIG_MTK_RAM_CONSOLE) || defined(CONFIG_TRUSTONIC_TEE_SUPPORT)
 /* #include <mt_secure_api.h> */
 #endif
-/* #include <mt_clkmgr.h> */
 
-#include "mt_cpuidle.h"
-#include "mt_spm.h"
-/* #include "mt_spm_misc.h" */
+#include "mtk_cpuidle.h"
+#include "mtk_spm.h"
 
 #define TAG "[MTK_CPUIDLE] "
 
@@ -335,7 +333,7 @@ static int mt_dormant_dts_map(void)
 	return 0;
 }
 
-int mt_cpu_dormant_init(void)
+static int __init mt_cpu_dormant_init(void)
 {
 	int i, k;
 
@@ -364,3 +362,5 @@ int mt_cpu_dormant_init(void)
 
 	return 0;
 }
+postcore_initcall(mt_cpu_dormant_init);
+

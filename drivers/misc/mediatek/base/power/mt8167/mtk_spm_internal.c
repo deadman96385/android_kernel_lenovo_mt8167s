@@ -20,10 +20,8 @@
 #include <linux/of_address.h>
 #include <linux/of_fdt.h>
 #include <uapi/asm/setup.h>
-/* TODO: wait upmu porting */
-/* #include <mt-plat/upmu_common.h> */
 
-#include "mt_spm_internal.h"
+#include "mtk_spm_internal.h"
 
 void __weak aee_sram_printk(const char *fmt, ...)
 {

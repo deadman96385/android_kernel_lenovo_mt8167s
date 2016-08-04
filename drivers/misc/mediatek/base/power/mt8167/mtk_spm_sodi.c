@@ -27,10 +27,9 @@
 #endif
 
 #include <mt-plat/mtk_cirq.h>
-#include "mt_cpuidle.h"
-#include "mt_spm_idle.h"
-#include "mt_spm_internal.h"
-
+#include "mtk_cpuidle.h"
+#include "mtk_spm_idle.h"
+#include "mtk_spm_internal.h"
 
 /**************************************
  * only for internal debug

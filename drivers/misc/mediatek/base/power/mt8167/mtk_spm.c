@@ -18,15 +18,13 @@
 #include <linux/smp.h>
 #include <linux/delay.h>
 #include <linux/atomic.h>
-/* #include <linux/irqchip/mt-gic.h> */
 #include <mt-plat/aee.h>
-/* #include <mt-plat/mt_chip.h> */
 
-#include "mt_spm_idle.h"
+#include "mtk_spm_idle.h"
 
 /* #include <mach/wd_api.h> */
 
-#include "mt_spm_internal.h"
+#include "mtk_spm_internal.h"
 
 #include <linux/of.h>
 #include <linux/of_irq.h>
@@ -226,7 +224,7 @@ static void spm_register_init(void)
 	spin_unlock_irqrestore(&__spm_lock, flags);
 }
 
-int spm_module_init(void)
+static int __init spm_module_init(void)
 {
 	int r = 0;
 	/* This following setting is moved to LK by WDT init, because of DTS init level issue */
@@ -270,6 +268,7 @@ int spm_module_init(void)
 
 	return r;
 }
+postcore_initcall(spm_module_init);
 
 /*
  * PLL Request API

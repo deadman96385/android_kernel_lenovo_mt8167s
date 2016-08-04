@@ -17,15 +17,14 @@ obj-$(CONFIG_MACH_MT8167) += mt8167-cpufreq.o
 obj-$(CONFIG_MACH_MT8167) += mtk_static_power.o
 obj-$(CONFIG_MACH_MT8167) += mtk_power_throttle.o
 obj-$(CONFIG_MACH_MT8167) += mt_ptp.o
-obj-$(CONFIG_MACH_MT8167) += mt_spm.o
-obj-$(CONFIG_MACH_MT8167) += mt_spm_internal.o
-obj-$(CONFIG_MACH_MT8167) += mt_sleep.o
-obj-$(CONFIG_MACH_MT8167) += mt_spm_sleep.o
-obj-$(CONFIG_MACH_MT8167) += mt_spm_dpidle.o
-obj-$(CONFIG_MACH_MT8167) += mt_spm_sodi.o
-obj-$(CONFIG_MACH_MT8167) += mt_spm_fs.o
+obj-$(CONFIG_MACH_MT8167) += mtk_spm.o
+obj-$(CONFIG_MACH_MT8167) += mtk_spm_internal.o
+obj-$(CONFIG_MACH_MT8167) += mtk_sleep.o
+obj-$(CONFIG_MACH_MT8167) += mtk_spm_sleep.o
+obj-$(CONFIG_MACH_MT8167) += mtk_spm_dpidle.o
+obj-$(CONFIG_MACH_MT8167) += mtk_spm_sodi.o
+obj-$(CONFIG_MACH_MT8167) += mtk_spm_fs.o
 
-
-obj-y += mt_cpuidle.o
+obj-y += mtk_cpuidle.o
 
 obj-y += cpu_dormant.o

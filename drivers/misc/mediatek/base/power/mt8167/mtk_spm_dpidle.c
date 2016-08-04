@@ -27,15 +27,12 @@
 
 /* TODO: re-enable wdt later */
 /* #include <mach/wd_api.h> */
-/* #include <mt-plat/upmu_common.h> */
-/* #include <mt-plat/mt_cirq.h> */
-/* #include <mt-plat/mt_ccci_common.h> */
+#include <mt-plat/mtk_cirq.h>
 
-#include "mt_spm_idle.h"
-/* #include "mt_cpufreq.h" */
-#include "mt_cpuidle.h"
+#include "mtk_spm_idle.h"
+#include "mtk_cpuidle.h"
 
-#include "mt_spm_internal.h"
+#include "mtk_spm_internal.h"
 
 /*
  * only for internal debug
@@ -381,13 +378,13 @@ static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct 
 static void spm_dpidle_pre_process(void)
 {
 	/* set PMIC WRAP table for deepidle power control */
-/*	mt_cpufreq_set_pmic_phase(PMIC_WRAP_PHASE_DEEPIDLE); */
+	__spm_set_pmic_phase(PMIC_WRAP_PHASE_DEEPIDLE);
 }
 
 static void spm_dpidle_post_process(void)
 {
 	/* set PMIC WRAP table for normal power control */
-/*	mt_cpufreq_set_pmic_phase(PMIC_WRAP_PHASE_NORMAL); */
+/*	__spm_set_pmic_phase(PMIC_WRAP_PHASE_NORMAL); */
 }
 
 wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
@@ -474,6 +471,7 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 
 	mt_cirq_flush();
 	mt_cirq_disable();
+
 	mt_irq_mask_restore(&mask);
 
 	spin_unlock_irqrestore(&__spm_lock, flags);

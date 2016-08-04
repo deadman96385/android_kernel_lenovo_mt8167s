@@ -27,11 +27,10 @@
 #include <linux/kthread.h>
 
 #include <mt-plat/sync_write.h>
-#include "mt_sleep.h"
-#include "mt_spm.h"
-#include "mt_spm_sleep.h"
-#include "mt_spm_idle.h"
-/* #include "mt_clkmgr.h" */
+#include "mtk_sleep.h"
+#include "mtk_spm.h"
+#include "mtk_spm_sleep.h"
+#include "mtk_spm_idle.h"
 
 /* #include <mt-plat/mt_gpio.h> */
 #if 0
@@ -414,7 +413,7 @@ void slp_dpd_en(bool en)
 	}
 }
 
-void slp_module_init(void)
+static int __init slp_module_init(void)
 {
 	spm_output_sleep_option();
 
@@ -432,20 +431,10 @@ void slp_module_init(void)
 #ifdef ENABLE_AUTO_SUSPEND_TEST
 	wake_lock_init(&spm_suspend_lock, WAKE_LOCK_SUSPEND, "spm_wakelock");
 #endif
-}
-
-#ifdef CONFIG_MTK_FPGA
-static int __init spm_fpga_module_init(void)
-{
-	spm_module_init();
-	slp_module_init();
-
 	return 0;
 }
-arch_initcall(spm_fpga_module_init);
-#else
-/* arch_initcall(slp_module_init); */
-#endif
+
+arch_initcall(slp_module_init);
 
 #ifdef ENABLE_AUTO_SUSPEND_TEST
 void slp_start_auto_suspend_resume_timer(u32 sec)
