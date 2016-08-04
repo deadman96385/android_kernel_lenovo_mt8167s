@@ -217,8 +217,11 @@
 		ranges;
 
 		chipid: chipid@08000000 {
-			compatible = "mediatek,mt8167-chipid";
-			reg = <0 0x08000000 0 0x0010>;
+			compatible = "mediatek,chipid";
+			reg = <0 0x08000000 0 0x0004>,
+			      <0 0x08000004 0 0x0004>,
+			      <0 0x08000008 0 0x0004>,
+			      <0 0x0800000c 0 0x0004>;
 		};
 
 		topckgen: topckgen@10000000 {
