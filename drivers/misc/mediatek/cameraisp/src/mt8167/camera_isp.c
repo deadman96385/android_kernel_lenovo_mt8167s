@@ -209,7 +209,7 @@ struct device *g_pmdev_disp;
 	Move MM scpsys power/clock controls to SMI driver,
 	in order to make sure suspend/resume works correctly.
 */
-#include "mt_smi.h"
+#include "mtk_smi.h"
 #endif
 
 #endif
