@@ -347,6 +347,8 @@ int primary_display_switch_mode_nolock(int sess_mode, unsigned int session, int 
 int primary_display_release_fence_fake(void);
 
 int primary_display_check_test(void);
+void _primary_path_switch_dst_lock(void);
+void _primary_path_switch_dst_unlock(void);
 
 int primary_display_cmdq_set_reg(unsigned int addr, unsigned int val);
 
