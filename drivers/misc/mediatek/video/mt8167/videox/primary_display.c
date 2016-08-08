@@ -996,20 +996,20 @@ static unsigned int release_started_frm_seq(unsigned int addr, enum DISP_FRM_SEQ
 #endif
 
 
-#ifdef DISP_SWITCH_DST_MODE
-unsigned long long last_primary_trigger_time;
-bool is_switched_dst_mode;
-static struct task_struct *primary_display_switch_dst_mode_task;
-
-static void _primary_path_switch_dst_lock(void)
+void _primary_path_switch_dst_lock(void)
 {
 	mutex_lock(&(pgc->switch_dst_lock));
 }
 
-static void _primary_path_switch_dst_unlock(void)
+void _primary_path_switch_dst_unlock(void)
 {
 	mutex_unlock(&(pgc->switch_dst_lock));
 }
+
+#ifdef DISP_SWITCH_DST_MODE
+unsigned long long last_primary_trigger_time;
+bool is_switched_dst_mode;
+static struct task_struct *primary_display_switch_dst_mode_task;
 
 static int _disp_primary_path_switch_dst_mode_thread(void *data)
 {
@@ -5130,9 +5130,9 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 #ifdef MTK_DISP_IDLE_LP
 	mutex_init(&idle_lock);
 #endif
-#ifdef DISP_SWITCH_DST_MODE
+/* #ifdef DISP_SWITCH_DST_MODE */
 	mutex_init(&(pgc->switch_dst_lock));
-#endif
+/* #endif */
 	_primary_path_lock(__func__);
 
 	pgc->plcm = disp_lcm_probe(lcm_name, LCM_INTERFACE_NOTDEFINED);
