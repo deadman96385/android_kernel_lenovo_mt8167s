@@ -44,14 +44,14 @@ struct CONSYS_BASE_ADDRESS {
 #define CONSYS_TOP_CLKCG_SET_OFFSET	0x00000054
 #define CONSYS_WD_SYS_RST_OFFSET		0x00000018
 #define CONSYS_AP2CONN_OSC_EN_OFFSET	0x00001f00
-#define CONSYS_EMI_MAPPING_OFFSET		0x00001380
+#define CONSYS_EMI_MAPPING_OFFSET		0x00001320
 /*AP_RGU_BASE*/
 #define CONSYS_CPU_SW_RST_OFFSET		0x00000018
 /*SPM_BASE*/
 #define CONSYS_PWRON_CONFG_EN_OFFSET	0x00000000
-#define CONSYS_TOP1_PWR_CTRL_OFFSET	0x0000032c
-#define CONSYS_PWR_CONN_ACK_OFFSET		0x00000180
-#define CONSYS_PWR_CONN_ACK_S_OFFSET	0x00000184
+#define CONSYS_TOP1_PWR_CTRL_OFFSET	0x00000280
+#define CONSYS_PWR_CONN_ACK_OFFSET		0x0000060c
+#define CONSYS_PWR_CONN_ACK_S_OFFSET	0x00000610
 /*CONN_MCU_CONFIG_BASE*/
 #define CONSYS_CHIP_ID_OFFSET			0x00000008
 #define CONSYS_ROM_RAM_DELSEL_OFFSET	0x00000114
@@ -76,13 +76,14 @@ struct CONSYS_BASE_ADDRESS {
 
 #define CONSYS_BT_WIFI_SHARE_V33 0
 
-#define CONSYS_PMIC_CTRL_ENABLE 0
+#define CONSYS_PMIC_CTRL_ENABLE 1
 #define CONSYS_EMI_MPU_SETTING 0
 #define CONSYS_AHB_CLK_MAGEMENT 1
 #define CONSYS_USE_PLATFORM_WRITE 1
 #define CONSYS_PWR_ON_OFF_API_AVAILABLE 1
 #define CONSYS_CLOCK_BUF_CTRL           0
-#define CONSYS_AFE_REG_SETTING          1
+#define CONSYS_AFE_REG_SETTING          0
+#define CONFIG_RESET_CONTROL            1
 /*tag end*/
 
 #define CONSYS_SET_BIT(REG, BITVAL) (*((volatile UINT32 *)(REG)) |= ((UINT32)(BITVAL)))
@@ -106,7 +107,7 @@ struct CONSYS_BASE_ADDRESS {
 #define SPM_BASE				0xF0006000
 #define CONN_MCU_CONFIG_BASE	0xF8070000
 /*GIC Interrupt ID*/
-#define MT_CONN2AP_BTIF_WAKEUP_IRQ_ID 270
+#define MT_CONN2AP_BTIF_WAKEUP_IRQ_ID 195
 /*tag end*/
 
 /*connsys register offset define(hard code mode)*/
@@ -123,9 +124,9 @@ struct CONSYS_BASE_ADDRESS {
 #endif
 
 #define CONSYS_CPU_SW_RST_REG				(AP_RGU_BASE + 0x00000018)
-#define CONSYS_TOP1_PWR_CTRL_REG			(SPM_BASE + 0x0000032c)
-#define CONSYS_PWR_CONN_ACK_REG			(SPM_BASE + 0x00000180)
-#define CONSYS_PWR_CONN_ACK_S_REG			(SPM_BASE + 0x00000184)
+#define CONSYS_TOP1_PWR_CTRL_REG			(SPM_BASE + 0x00000280)
+#define CONSYS_PWR_CONN_ACK_REG			(SPM_BASE + 0x0000060c)
+#define CONSYS_PWR_CONN_ACK_S_REG			(SPM_BASE + 0x00000610)
 
 #define CONSYS_WD_SYS_RST_REG				(TOPCKGEN_BASE + 0x00000018)
 #define CONSYS_CHIP_ID_REG					(CONN_MCU_CONFIG_BASE + 0x00000008)
@@ -146,7 +147,7 @@ struct CONSYS_BASE_ADDRESS {
 
 #define CONSYS_TOPAXI_PROT_EN				(TOPCKGEN_BASE + 0x1220)
 #define CONSYS_TOPAXI_PROT_STA1				(TOPCKGEN_BASE + 0x1228)
-#define CONSYS_PROT_MASK				((0x1<<13) | (0x1<<14))	/* bit 13, 14 */
+#define CONSYS_PROT_MASK				((0x1<<8) | (0x1<<9))	/* bit 8, 9 */
 /*CONSYS_CPU_SW_RST_REG*/
 #define CONSYS_CPU_SW_RST_BIT				(0x1 << 12)
 #define CONSYS_CPU_SW_RST_CTRL_KEY			(0x88 << 24)
@@ -295,7 +296,6 @@ extern INT32 mtk_wcn_consys_hw_pwr_on(UINT32 co_clock_en);
 extern INT32 mtk_wcn_consys_hw_rst(UINT32 co_clock_en);
 extern INT32 mtk_wcn_consys_hw_bt_paldo_ctrl(UINT32 enable);
 extern INT32 mtk_wcn_consys_hw_wifi_paldo_ctrl(UINT32 enable);
-extern INT32 mtk_wcn_consys_hw_vcn28_ctrl(UINT32 enable);
 extern INT32 mtk_wcn_consys_hw_state_show(VOID);
 extern UINT8 *mtk_wcn_consys_emi_virt_addr_get(UINT32 ctrl_state_offset);
 #if CONSYS_ENALBE_SET_JTAG
@@ -305,7 +305,6 @@ extern UINT32 mtk_wcn_consys_soc_chipid(VOID);
 #if !defined(CONFIG_MTK_LEGACY)
 extern struct pinctrl *mtk_wcn_consys_get_pinctrl(VOID);
 #endif
-extern INT32 mtk_wcn_consys_co_clock_type(VOID);
 extern INT32 mtk_wcn_consys_set_dbg_mode(UINT32 flag);
 extern INT32 mtk_wcn_consys_set_dynamic_dump(PUINT32 buf);
 #endif /* _MTK_WCN_CMB_HW_H_ */

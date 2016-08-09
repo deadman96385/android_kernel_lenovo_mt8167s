@@ -324,7 +324,6 @@ INT32 wmt_plat_soc_init(UINT32 co_clock_type)
 	CMB_STUB_CB stub_cb;
 	INT32 iret;
 	/*init wmt function ctrl wakelock if wake lock is supported by host platform */
-	co_clock_type = mtk_wcn_consys_co_clock_type();
 	wmt_plat_soc_co_clock_flag_set(co_clock_type);
 
 	stub_cb.aif_ctrl_cb = wmt_plat_audio_ctrl;
@@ -887,7 +886,6 @@ INT32 wmt_plat_soc_paldo_ctrl(ENUM_PALDO_TYPE ePt, ENUM_PALDO_OP ePo)
 		break;
 	case FM_PALDO:
 	case GPS_PALDO:
-		iRet = mtk_wcn_consys_hw_vcn28_ctrl(ePo);
 		break;
 	default:
 		WMT_PLAT_WARN_FUNC("WMT-PLAT:Warnning, invalid type(%d) in palod_ctrl\n", ePt);
