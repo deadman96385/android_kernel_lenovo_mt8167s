@@ -1047,7 +1047,7 @@
 		/* We need add another node to contrl DISP power in ISP driver */
 		isp_display: isp_display {
 			compatible = "mediatek,mt8167-isp_display";
-			power-domains = <&scpsys MT8167_POWER_DOMAIN_DISP>;
+			/*power-domains = <&scpsys MT8167_POWER_DOMAIN_DISP>;*/
 		};
 
 		ispsys: ispsys@15000000 {
@@ -1076,7 +1076,7 @@
 				      "MM_SMI_COMMON";
 
 			/* Power domains */
-			power-domains = <&scpsys MT8167_POWER_DOMAIN_ISP>;
+			/*power-domains = <&scpsys MT8167_POWER_DOMAIN_ISP>;*/
 		};
 
 		larb1: larb@15001000 {
