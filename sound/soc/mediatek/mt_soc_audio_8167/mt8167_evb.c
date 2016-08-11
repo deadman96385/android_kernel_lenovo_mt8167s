@@ -300,6 +300,21 @@ static struct snd_soc_dai_link mt8167_evb_dais[] = {
 		.dynamic = 1,
 		.dpcm_capture = 1,
 	},
+#if 0 /* not tested */
+	{
+		.name = "TDM Capture",
+		.stream_name = "TDM_Capture",
+		.cpu_dai_name = "TDM_IN",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.trigger = {
+			SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST
+		},
+		.dynamic = 1,
+		.dpcm_capture = 1,
+	},
+#endif
 #ifdef CONFIG_MTK_BTCVSD_ALSA
 	{
 		.name = "BTCVSD_RX",
@@ -384,6 +399,16 @@ static struct snd_soc_dai_link mt8167_evb_dais[] = {
 		.dpcm_playback = 1,
 		.dpcm_capture = 1,
 	},
+#if 0 /* not tested */
+	{
+		.name = "TDM IN BE",
+		.cpu_dai_name = "TDM_IN_IO",
+		.no_pcm = 1,
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.dpcm_capture = 1,
+	},
+#endif
 };
 
 static struct snd_soc_card mt8167_evb_card = {
