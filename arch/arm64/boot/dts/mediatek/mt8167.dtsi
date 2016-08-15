@@ -948,18 +948,23 @@
 
 		mipi_tx0: mipi_dphy@14018000 {
 			compatible = "mediatek,mt8167-disp_mipi_tx";
-			reg = <0 0x14018000 0 0x100>;
+			reg = <0 0x14018000 0 0x90>;
 		};
 
 		disp_lvds_ana: disp_lvds_ana@14018800 {
 			compatible = "mediatek,mt8167-disp_lvds_ana";
-			reg = <0 0x14018800 0 0x100>;
+			reg = <0 0x14018800 0 0x1c>;
 		};
 
 		disp_dpi1: disp_dpi1@14019000 {
 			compatible = "mediatek,mt8167-disp_dpi1";
 			reg = <0 0x14019000 0 0x1000>;
 			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_LOW>;
+		};
+
+		disp_lvds_tx: disp_lvds_tx@1401a200 {
+			compatible = "mediatek,mt8167-disp_lvds_tx";
+			reg = <0 0x1401a200 0 0x64>;
 		};
 
 		hdmi0: hdmi@1401b000 {
@@ -1031,11 +1036,6 @@
 				      "vdec-larb1",
 				      "img-larb2",
 				      "venc-larb3";
-		};
-
-		disp_lvds_tx: disp_lvds_tx@1401a200 {
-			compatible = "mediatek,mt8167-disp_lvds_tx";
-			reg = <0 0x1401a200 0 0x100>;
 		};
 
 		imgsys: imgsys@15000000 {
