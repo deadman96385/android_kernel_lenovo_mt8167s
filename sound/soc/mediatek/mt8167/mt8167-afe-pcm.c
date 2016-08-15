@@ -20,11 +20,11 @@
 #include <linux/pm_runtime.h>
 #include <sound/soc.h>
 #include <sound/pcm_params.h>
-#include "mtk-afe-common.h"
-#include "mtk-afe-regs.h"
-#include "mtk-afe-util.h"
-#include "mtk-afe-controls.h"
-#include "mtk-afe-debug.h"
+#include "mt8167-afe-common.h"
+#include "mt8167-afe-regs.h"
+#include "mt8167-afe-util.h"
+#include "mt8167-afe-controls.h"
+#include "mt8167-afe-debug.h"
 
 
 static const unsigned int mtk_afe_backup_list[] = {

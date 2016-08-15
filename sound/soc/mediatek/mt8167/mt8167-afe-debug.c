@@ -14,10 +14,10 @@
  */
 
 
-#include "mtk-afe-debug.h"
-#include "mtk-afe-regs.h"
-#include "mtk-afe-util.h"
-#include "mtk-afe-common.h"
+#include "mt8167-afe-debug.h"
+#include "mt8167-afe-regs.h"
+#include "mt8167-afe-util.h"
+#include "mt8167-afe-common.h"
 #include <linux/slab.h>
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
