@@ -27,7 +27,7 @@
 #include "mt8167-afe-debug.h"
 
 
-static const unsigned int mtk_afe_backup_list[] = {
+static const unsigned int mt8167_afe_backup_list[] = {
 	AUDIO_TOP_CON0,
 	AFE_CONN0,
 	AFE_CONN1,
@@ -53,7 +53,7 @@ static const unsigned int mtk_afe_backup_list[] = {
 	AFE_HDMI_IN_2CH_END,
 };
 
-static const struct snd_pcm_hardware mtk_afe_hardware = {
+static const struct snd_pcm_hardware mt8167_afe_hardware = {
 	.info = SNDRV_PCM_INFO_MMAP |
 		SNDRV_PCM_INFO_INTERLEAVED |
 		SNDRV_PCM_INFO_MMAP_VALID,
@@ -75,12 +75,12 @@ static struct snd_pcm_hw_constraint_list constraints_channels_tdm_in = {
 	.mask = 0,
 };
 
-static snd_pcm_uframes_t mtk_afe_pcm_pointer
+static snd_pcm_uframes_t mt8167_afe_pcm_pointer
 			 (struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-	struct mtk_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+	struct mt8167_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
 	unsigned int hw_ptr;
 	int ret;
 
@@ -98,17 +98,17 @@ static snd_pcm_uframes_t mtk_afe_pcm_pointer
 }
 
 
-static const struct snd_pcm_ops mtk_afe_pcm_ops = {
+static const struct snd_pcm_ops mt8167_afe_pcm_ops = {
 	.ioctl = snd_pcm_lib_ioctl,
-	.pointer = mtk_afe_pcm_pointer,
+	.pointer = mt8167_afe_pcm_pointer,
 };
 
-static int mtk_afe_pcm_probe(struct snd_soc_platform *platform)
+static int mt8167_afe_pcm_probe(struct snd_soc_platform *platform)
 {
-	return mtk_afe_add_controls(platform);
+	return mt8167_afe_add_controls(platform);
 }
 
-static int mtk_afe_pcm_new(struct snd_soc_pcm_runtime *rtd)
+static int mt8167_afe_pcm_new(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_card *card = rtd->card->snd_card;
 	struct snd_pcm *pcm = rtd->pcm;
@@ -137,24 +137,24 @@ static int mtk_afe_pcm_new(struct snd_soc_pcm_runtime *rtd)
 	return 0;
 }
 
-static void mtk_afe_pcm_free(struct snd_pcm *pcm)
+static void mt8167_afe_pcm_free(struct snd_pcm *pcm)
 {
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
-static const struct snd_soc_platform_driver mtk_afe_pcm_platform = {
-	.probe = mtk_afe_pcm_probe,
-	.pcm_new = mtk_afe_pcm_new,
-	.pcm_free = mtk_afe_pcm_free,
-	.ops = &mtk_afe_pcm_ops,
+static const struct snd_soc_platform_driver mt8167_afe_pcm_platform = {
+	.probe = mt8167_afe_pcm_probe,
+	.pcm_new = mt8167_afe_pcm_new,
+	.pcm_free = mt8167_afe_pcm_free,
+	.ops = &mt8167_afe_pcm_ops,
 };
 
-struct mtk_afe_rate {
+struct mt8167_afe_rate {
 	unsigned int rate;
 	unsigned int regvalue;
 };
 
-static const struct mtk_afe_rate mtk_afe_i2s_rates[] = {
+static const struct mt8167_afe_rate mt8167_afe_i2s_rates[] = {
 	{ .rate = 8000, .regvalue = 0 },
 	{ .rate = 11025, .regvalue = 1 },
 	{ .rate = 12000, .regvalue = 2 },
@@ -170,22 +170,22 @@ static const struct mtk_afe_rate mtk_afe_i2s_rates[] = {
 	{ .rate = 192000, .regvalue = 14 },
 };
 
-static int mtk_afe_i2s_fs(unsigned int sample_rate)
+static int mt8167_afe_i2s_fs(unsigned int sample_rate)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(mtk_afe_i2s_rates); i++)
-		if (mtk_afe_i2s_rates[i].rate == sample_rate)
-			return mtk_afe_i2s_rates[i].regvalue;
+	for (i = 0; i < ARRAY_SIZE(mt8167_afe_i2s_rates); i++)
+		if (mt8167_afe_i2s_rates[i].rate == sample_rate)
+			return mt8167_afe_i2s_rates[i].regvalue;
 
 	return -EINVAL;
 }
 
-static int mtk_afe_set_i2s_out(struct mtk_afe *afe, unsigned int rate,
+static int mt8167_afe_set_i2s_out(struct mtk_afe *afe, unsigned int rate,
 	int bit_width)
 {
 	unsigned int val;
-	int fs = mtk_afe_i2s_fs(rate);
+	int fs = mt8167_afe_i2s_fs(rate);
 
 	if (fs < 0)
 		return -EINVAL;
@@ -203,11 +203,11 @@ static int mtk_afe_set_i2s_out(struct mtk_afe *afe, unsigned int rate,
 	return 0;
 }
 
-static int mtk_afe_set_2nd_i2s_out(struct mtk_afe *afe, unsigned int rate,
+static int mt8167_afe_set_2nd_i2s_out(struct mtk_afe *afe, unsigned int rate,
 	int bit_width)
 {
 	unsigned int val;
-	int fs = mtk_afe_i2s_fs(rate);
+	int fs = mt8167_afe_i2s_fs(rate);
 
 	if (fs < 0)
 		return -EINVAL;
@@ -224,11 +224,11 @@ static int mtk_afe_set_2nd_i2s_out(struct mtk_afe *afe, unsigned int rate,
 	return 0;
 }
 
-static int mtk_afe_set_i2s_in(struct mtk_afe *afe, unsigned int rate,
+static int mt8167_afe_set_i2s_in(struct mtk_afe *afe, unsigned int rate,
 	int bit_width)
 {
 	unsigned int val;
-	int fs = mtk_afe_i2s_fs(rate);
+	int fs = mt8167_afe_i2s_fs(rate);
 
 	if (fs < 0)
 		return -EINVAL;
@@ -247,11 +247,11 @@ static int mtk_afe_set_i2s_in(struct mtk_afe *afe, unsigned int rate,
 	return 0;
 }
 
-static int mtk_afe_set_2nd_i2s_in(struct mtk_afe *afe, unsigned int rate,
+static int mt8167_afe_set_2nd_i2s_in(struct mtk_afe *afe, unsigned int rate,
 	int bit_width)
 {
 	unsigned int val;
-	int fs = mtk_afe_i2s_fs(rate);
+	int fs = mt8167_afe_i2s_fs(rate);
 
 	if (fs < 0)
 		return -EINVAL;
@@ -271,7 +271,7 @@ static int mtk_afe_set_2nd_i2s_in(struct mtk_afe *afe, unsigned int rate,
 	return 0;
 }
 
-static void mtk_afe_set_i2s_out_enable(struct mtk_afe *afe, bool enable)
+static void mt8167_afe_set_i2s_out_enable(struct mtk_afe *afe, bool enable)
 {
 	unsigned long flags;
 
@@ -292,22 +292,22 @@ static void mtk_afe_set_i2s_out_enable(struct mtk_afe *afe, bool enable)
 	spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
 }
 
-static void mtk_afe_set_2nd_i2s_out_enable(struct mtk_afe *afe, bool enable)
+static void mt8167_afe_set_2nd_i2s_out_enable(struct mtk_afe *afe, bool enable)
 {
 	regmap_update_bits(afe->regmap, AFE_I2S_CON3, 0x1, enable);
 }
 
-static void mtk_afe_set_i2s_in_enable(struct mtk_afe *afe, bool enable)
+static void mt8167_afe_set_i2s_in_enable(struct mtk_afe *afe, bool enable)
 {
 	regmap_update_bits(afe->regmap, AFE_I2S_CON2, 0x1, enable);
 }
 
-static void mtk_afe_set_2nd_i2s_in_enable(struct mtk_afe *afe, bool enable)
+static void mt8167_afe_set_2nd_i2s_in_enable(struct mtk_afe *afe, bool enable)
 {
 	regmap_update_bits(afe->regmap, AFE_I2S_CON, 0x1, enable);
 }
 
-static int mtk_afe_enable_adda_on(struct mtk_afe *afe)
+static int mt8167_afe_enable_adda_on(struct mtk_afe *afe)
 {
 	unsigned long flags;
 
@@ -322,7 +322,7 @@ static int mtk_afe_enable_adda_on(struct mtk_afe *afe)
 	return 0;
 }
 
-static int mtk_afe_disable_adda_on(struct mtk_afe *afe)
+static int mt8167_afe_disable_adda_on(struct mtk_afe *afe)
 {
 	unsigned long flags;
 
@@ -339,7 +339,7 @@ static int mtk_afe_disable_adda_on(struct mtk_afe *afe)
 	return 0;
 }
 
-static int mtk_afe_set_adda_out(struct mtk_afe *afe, unsigned int rate)
+static int mt8167_afe_set_adda_out(struct mtk_afe *afe, unsigned int rate)
 {
 	unsigned int val = 0;
 
@@ -387,7 +387,7 @@ static int mtk_afe_set_adda_out(struct mtk_afe *afe, unsigned int rate)
 	return 0;
 }
 
-static int mtk_afe_set_adda_in(struct mtk_afe *afe, unsigned int rate)
+static int mt8167_afe_set_adda_in(struct mtk_afe *afe, unsigned int rate)
 {
 	unsigned int val = 0;
 	unsigned int val2 = 0;
@@ -422,27 +422,27 @@ static int mtk_afe_set_adda_in(struct mtk_afe *afe, unsigned int rate)
 	return 0;
 }
 
-static void mtk_afe_set_adda_out_enable(struct mtk_afe *afe, bool enable)
+static void mt8167_afe_set_adda_out_enable(struct mtk_afe *afe, bool enable)
 {
 	regmap_update_bits(afe->regmap, AFE_ADDA_DL_SRC2_CON0, 0x1, enable);
 
 	if (enable)
-		mtk_afe_enable_adda_on(afe);
+		mt8167_afe_enable_adda_on(afe);
 	else
-		mtk_afe_disable_adda_on(afe);
+		mt8167_afe_disable_adda_on(afe);
 }
 
-static void mtk_afe_set_adda_in_enable(struct mtk_afe *afe, bool enable)
+static void mt8167_afe_set_adda_in_enable(struct mtk_afe *afe, bool enable)
 {
 	regmap_update_bits(afe->regmap, AFE_ADDA_UL_SRC_CON0, 0x1, enable);
 
 	if (enable)
-		mtk_afe_enable_adda_on(afe);
+		mt8167_afe_enable_adda_on(afe);
 	else
-		mtk_afe_disable_adda_on(afe);
+		mt8167_afe_disable_adda_on(afe);
 }
 
-static int mtk_afe_set_mrg(struct mtk_afe *afe, unsigned int rate)
+static int mt8167_afe_set_mrg(struct mtk_afe *afe, unsigned int rate)
 {
 	unsigned int val = 0;
 
@@ -466,7 +466,7 @@ static int mtk_afe_set_mrg(struct mtk_afe *afe, unsigned int rate)
 	return 0;
 }
 
-static void mtk_afe_enable_mrg(struct mtk_afe *afe)
+static void mt8167_afe_enable_mrg(struct mtk_afe *afe)
 {
 	unsigned long flags;
 
@@ -485,7 +485,7 @@ static void mtk_afe_enable_mrg(struct mtk_afe *afe)
 	regmap_update_bits(afe->regmap, AFE_DAIBT_CON0, 0x3, 0x3);
 }
 
-static void mtk_afe_disable_mrg(struct mtk_afe *afe)
+static void mt8167_afe_disable_mrg(struct mtk_afe *afe)
 {
 	unsigned long flags;
 
@@ -506,7 +506,7 @@ static void mtk_afe_disable_mrg(struct mtk_afe *afe)
 	regmap_update_bits(afe->regmap, AFE_MRGIF_CON, 0x1, 0x0);
 }
 
-static int mtk_afe_set_pcm0(struct mtk_afe *afe, unsigned int rate)
+static int mt8167_afe_set_pcm0(struct mtk_afe *afe, unsigned int rate)
 {
 	unsigned int val = 0;
 
@@ -528,7 +528,7 @@ static int mtk_afe_set_pcm0(struct mtk_afe *afe, unsigned int rate)
 	return 0;
 }
 
-static void mtk_afe_enable_pcm0(struct mtk_afe *afe)
+static void mt8167_afe_enable_pcm0(struct mtk_afe *afe)
 {
 	unsigned long flags;
 
@@ -542,7 +542,7 @@ static void mtk_afe_enable_pcm0(struct mtk_afe *afe)
 	regmap_update_bits(afe->regmap, AFE_DAIBT_CON0, 0x3, 0x3);
 }
 
-static void mtk_afe_disable_pcm0(struct mtk_afe *afe)
+static void mt8167_afe_disable_pcm0(struct mtk_afe *afe)
 {
 	unsigned long flags;
 
@@ -558,7 +558,7 @@ static void mtk_afe_disable_pcm0(struct mtk_afe *afe)
 	regmap_update_bits(afe->regmap, AFE_DAIBT_CON0, 0x3, 0x0);
 }
 
-static int mtk_afe_enable_irq(struct mtk_afe *afe, struct mtk_afe_memif *memif)
+static int mt8167_afe_enable_irq(struct mtk_afe *afe, struct mt8167_afe_memif *memif)
 {
 	int irq_mode = memif->data->irq_mode;
 	unsigned long flags;
@@ -572,19 +572,19 @@ static int mtk_afe_enable_irq(struct mtk_afe *afe, struct mtk_afe_memif *memif)
 	}
 
 	switch (irq_mode) {
-	case MTK_AFE_IRQ_1:
+	case MT8167_AFE_IRQ_1:
 		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 0, 1 << 0);
 		break;
-	case MTK_AFE_IRQ_2:
+	case MT8167_AFE_IRQ_2:
 		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 1, 1 << 1);
 		break;
-	case MTK_AFE_IRQ_5:
+	case MT8167_AFE_IRQ_5:
 		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 3, 1 << 3);
 		break;
-	case MTK_AFE_IRQ_7:
+	case MT8167_AFE_IRQ_7:
 		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 14, 1 << 14);
 		break;
-	case MTK_AFE_IRQ_10:
+	case MT8167_AFE_IRQ_10:
 		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 4, 1 << 4);
 		break;
 	default:
@@ -596,7 +596,7 @@ static int mtk_afe_enable_irq(struct mtk_afe *afe, struct mtk_afe_memif *memif)
 	return 0;
 }
 
-static int mtk_afe_disable_irq(struct mtk_afe *afe, struct mtk_afe_memif *memif)
+static int mt8167_afe_disable_irq(struct mtk_afe *afe, struct mt8167_afe_memif *memif)
 {
 	int irq_mode = memif->data->irq_mode;
 	unsigned long flags;
@@ -614,23 +614,23 @@ static int mtk_afe_disable_irq(struct mtk_afe *afe, struct mtk_afe_memif *memif)
 	}
 
 	switch (irq_mode) {
-	case MTK_AFE_IRQ_1:
+	case MT8167_AFE_IRQ_1:
 		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 0, 0 << 0);
 		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 0);
 		break;
-	case MTK_AFE_IRQ_2:
+	case MT8167_AFE_IRQ_2:
 		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 1, 0 << 1);
 		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 1);
 		break;
-	case MTK_AFE_IRQ_5:
+	case MT8167_AFE_IRQ_5:
 		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 3, 0 << 3);
 		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 4);
 		break;
-	case MTK_AFE_IRQ_7:
+	case MT8167_AFE_IRQ_7:
 		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 14, 0 << 14);
 		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 6);
 		break;
-	case MTK_AFE_IRQ_10:
+	case MT8167_AFE_IRQ_10:
 		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 4, 0 << 4);
 		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 9);
 		break;
@@ -643,7 +643,7 @@ static int mtk_afe_disable_irq(struct mtk_afe *afe, struct mtk_afe_memif *memif)
 	return 0;
 }
 
-static int mtk_afe_dais_enable_clks(struct mtk_afe *afe,
+static int mt8167_afe_dais_enable_clks(struct mtk_afe *afe,
 				    struct clk *m_ck, struct clk *b_ck)
 {
 #ifdef COMMON_CLOCK_FRAMEWORK_API
@@ -668,7 +668,7 @@ static int mtk_afe_dais_enable_clks(struct mtk_afe *afe,
 	return 0;
 }
 
-static int mtk_afe_dais_set_clks(struct mtk_afe *afe,
+static int mt8167_afe_dais_set_clks(struct mtk_afe *afe,
 				 struct clk *m_ck, unsigned int mck_rate,
 				 struct clk *b_ck, unsigned int bck_rate)
 {
@@ -694,7 +694,7 @@ static int mtk_afe_dais_set_clks(struct mtk_afe *afe,
 	return 0;
 }
 
-static void mtk_afe_dais_disable_clks(struct mtk_afe *afe,
+static void mt8167_afe_dais_disable_clks(struct mtk_afe *afe,
 				      struct clk *m_ck, struct clk *b_ck)
 {
 #ifdef COMMON_CLOCK_FRAMEWORK_API
@@ -705,7 +705,7 @@ static void mtk_afe_dais_disable_clks(struct mtk_afe *afe,
 #endif
 }
 
-static int mtk_afe_i2s_startup(struct snd_pcm_substream *substream,
+static int mt8167_afe_i2s_startup(struct snd_pcm_substream *substream,
 			       struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -714,22 +714,22 @@ static int mtk_afe_i2s_startup(struct snd_pcm_substream *substream,
 	dev_dbg(afe->dev, "%s '%s'\n",
 		__func__, snd_pcm_stream_str(substream));
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
+		mt8167_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
 	else
-		mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S2_M], NULL);
+		mt8167_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S2_M], NULL);
 
 	return 0;
 }
 
-static void mtk_afe_i2s_shutdown(struct snd_pcm_substream *substream,
+static void mt8167_afe_i2s_shutdown(struct snd_pcm_substream *substream,
 				 struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-	struct mtk_afe_be_dai_data *be = &afe->be_data[dai->id - MTK_AFE_BACKEND_BASE];
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = substream->runtime->rate;
 	const unsigned int stream = substream->stream;
 
@@ -738,27 +738,27 @@ static void mtk_afe_i2s_shutdown(struct snd_pcm_substream *substream,
 
 	if (be->prepared[stream]) {
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-			mtk_afe_set_i2s_out_enable(afe, false);
+			mt8167_afe_set_i2s_out_enable(afe, false);
 		else
-			mtk_afe_set_i2s_in_enable(afe, false);
+			mt8167_afe_set_i2s_in_enable(afe, false);
 
 		if (rate % 8000)
-			mtk_afe_disable_top_cg(afe, MTK_AFE_CG_22M);
+			mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_22M);
 		else
-			mtk_afe_disable_top_cg(afe, MTK_AFE_CG_24M);
+			mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_24M);
 
 		be->prepared[stream] = false;
 	}
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-		mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
+		mt8167_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
 	else
-		mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S2_M], NULL);
+		mt8167_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S2_M], NULL);
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 }
 
-static int mtk_afe_i2s_hw_params(struct snd_pcm_substream *substream,
+static int mt8167_afe_i2s_hw_params(struct snd_pcm_substream *substream,
 			  struct snd_pcm_hw_params *params,
 			  struct snd_soc_dai *dai)
 {
@@ -774,12 +774,12 @@ static int mtk_afe_i2s_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int mtk_afe_i2s_prepare(struct snd_pcm_substream *substream,
+static int mt8167_afe_i2s_prepare(struct snd_pcm_substream *substream,
 			       struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-	struct mtk_afe_be_dai_data *be = &afe->be_data[dai->id - MTK_AFE_BACKEND_BASE];
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = substream->runtime->rate;
 	const int bit_width = snd_pcm_format_width(substream->runtime->format);
 	const unsigned int stream = substream->stream;
@@ -792,9 +792,9 @@ static int mtk_afe_i2s_prepare(struct snd_pcm_substream *substream,
 	}
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-		ret = mtk_afe_set_i2s_out(afe, rate, bit_width);
+		ret = mt8167_afe_set_i2s_out(afe, rate, bit_width);
 	else
-		ret = mtk_afe_set_i2s_in(afe, rate, bit_width);
+		ret = mt8167_afe_set_i2s_in(afe, rate, bit_width);
 
 	if (ret)
 		return ret;
@@ -802,20 +802,20 @@ static int mtk_afe_i2s_prepare(struct snd_pcm_substream *substream,
 	/* TODO: add apll control */
 
 	if (rate % 8000)
-		mtk_afe_enable_top_cg(afe, MTK_AFE_CG_22M);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_22M);
 	else
-		mtk_afe_enable_top_cg(afe, MTK_AFE_CG_24M);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_24M);
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		mtk_afe_dais_set_clks(afe, afe->clocks[MTK_CLK_I2S1_M],
+		mt8167_afe_dais_set_clks(afe, afe->clocks[MTK_CLK_I2S1_M],
 				rate * 256, NULL, 0);
 
-		mtk_afe_set_i2s_out_enable(afe, true);
+		mt8167_afe_set_i2s_out_enable(afe, true);
 	} else {
-		mtk_afe_dais_set_clks(afe, afe->clocks[MTK_CLK_I2S2_M],
+		mt8167_afe_dais_set_clks(afe, afe->clocks[MTK_CLK_I2S2_M],
 				rate * 256, NULL, 0);
 
-		mtk_afe_set_i2s_in_enable(afe, true);
+		mt8167_afe_set_i2s_in_enable(afe, true);
 	}
 
 	be->prepared[stream] = true;
@@ -823,7 +823,7 @@ static int mtk_afe_i2s_prepare(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int mtk_afe_2nd_i2s_startup(struct snd_pcm_substream *substream,
+static int mt8167_afe_2nd_i2s_startup(struct snd_pcm_substream *substream,
 			       struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -832,22 +832,22 @@ static int mtk_afe_2nd_i2s_startup(struct snd_pcm_substream *substream,
 	dev_dbg(afe->dev, "%s '%s'\n",
 		__func__, snd_pcm_stream_str(substream));
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S3_M], NULL);
+		mt8167_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S3_M], NULL);
 	else
-		mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S0_M], NULL);
+		mt8167_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S0_M], NULL);
 
 	return 0;
 }
 
-static void mtk_afe_2nd_i2s_shutdown(struct snd_pcm_substream *substream,
+static void mt8167_afe_2nd_i2s_shutdown(struct snd_pcm_substream *substream,
 				 struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-	struct mtk_afe_be_dai_data *be = &afe->be_data[dai->id - MTK_AFE_BACKEND_BASE];
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = substream->runtime->rate;
 	const unsigned int stream = substream->stream;
 
@@ -856,27 +856,27 @@ static void mtk_afe_2nd_i2s_shutdown(struct snd_pcm_substream *substream,
 
 	if (be->prepared[stream]) {
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-			mtk_afe_set_2nd_i2s_out_enable(afe, false);
+			mt8167_afe_set_2nd_i2s_out_enable(afe, false);
 		else
-			mtk_afe_set_2nd_i2s_in_enable(afe, false);
+			mt8167_afe_set_2nd_i2s_in_enable(afe, false);
 
 		if (rate % 8000)
-			mtk_afe_disable_top_cg(afe, MTK_AFE_CG_22M);
+			mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_22M);
 		else
-			mtk_afe_disable_top_cg(afe, MTK_AFE_CG_24M);
+			mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_24M);
 
 		be->prepared[stream] = false;
 	}
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-		mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S3_M], NULL);
+		mt8167_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S3_M], NULL);
 	else
-		mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S0_M], NULL);
+		mt8167_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S0_M], NULL);
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 }
 
-static int mtk_afe_2nd_i2s_hw_params(struct snd_pcm_substream *substream,
+static int mt8167_afe_2nd_i2s_hw_params(struct snd_pcm_substream *substream,
 			  struct snd_pcm_hw_params *params,
 			  struct snd_soc_dai *dai)
 {
@@ -892,12 +892,12 @@ static int mtk_afe_2nd_i2s_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int mtk_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
+static int mt8167_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 			       struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-	struct mtk_afe_be_dai_data *be = &afe->be_data[dai->id - MTK_AFE_BACKEND_BASE];
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = substream->runtime->rate;
 	const int bit_width = snd_pcm_format_width(substream->runtime->format);
 	const unsigned int stream = substream->stream;
@@ -910,9 +910,9 @@ static int mtk_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 	}
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-		ret = mtk_afe_set_2nd_i2s_out(afe, rate, bit_width);
+		ret = mt8167_afe_set_2nd_i2s_out(afe, rate, bit_width);
 	else
-		ret = mtk_afe_set_2nd_i2s_in(afe, rate, bit_width);
+		ret = mt8167_afe_set_2nd_i2s_in(afe, rate, bit_width);
 
 	if (ret)
 		return ret;
@@ -920,20 +920,20 @@ static int mtk_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 	/* TODO: add apll control */
 
 	if (rate % 8000)
-		mtk_afe_enable_top_cg(afe, MTK_AFE_CG_22M);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_22M);
 	else
-		mtk_afe_enable_top_cg(afe, MTK_AFE_CG_24M);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_24M);
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		mtk_afe_dais_set_clks(afe, afe->clocks[MTK_CLK_I2S3_M],
+		mt8167_afe_dais_set_clks(afe, afe->clocks[MTK_CLK_I2S3_M],
 				rate * 256, NULL, 0);
 
-		mtk_afe_set_2nd_i2s_out_enable(afe, true);
+		mt8167_afe_set_2nd_i2s_out_enable(afe, true);
 	} else {
-		mtk_afe_dais_set_clks(afe, afe->clocks[MTK_CLK_I2S0_M],
+		mt8167_afe_dais_set_clks(afe, afe->clocks[MTK_CLK_I2S0_M],
 				rate * 256, NULL, 0);
 
-		mtk_afe_set_2nd_i2s_in_enable(afe, true);
+		mt8167_afe_set_2nd_i2s_in_enable(afe, true);
 	}
 
 	be->prepared[stream] = true;
@@ -941,30 +941,30 @@ static int mtk_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int mtk_afe_int_adda_startup(struct snd_pcm_substream *substream,
+static int mt8167_afe_int_adda_startup(struct snd_pcm_substream *substream,
 			       struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		mtk_afe_enable_top_cg(afe, MTK_AFE_CG_DAC);
-		mtk_afe_enable_top_cg(afe, MTK_AFE_CG_DAC_PREDIS);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
 	} else {
-		mtk_afe_enable_top_cg(afe, MTK_AFE_CG_ADC);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_ADC);
 	}
 
 	return 0;
 }
 
-static void mtk_afe_int_adda_shutdown(struct snd_pcm_substream *substream,
+static void mt8167_afe_int_adda_shutdown(struct snd_pcm_substream *substream,
 				 struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-	struct mtk_afe_be_dai_data *be = &afe->be_data[dai->id - MTK_AFE_BACKEND_BASE];
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int stream = substream->stream;
 
 	dev_dbg(afe->dev, "%s '%s'\n", __func__,
@@ -972,26 +972,26 @@ static void mtk_afe_int_adda_shutdown(struct snd_pcm_substream *substream,
 
 	if (be->prepared[stream]) {
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			mtk_afe_set_adda_out_enable(afe, false);
-			mtk_afe_set_i2s_out_enable(afe, false);
+			mt8167_afe_set_adda_out_enable(afe, false);
+			mt8167_afe_set_i2s_out_enable(afe, false);
 		} else {
-			mtk_afe_set_adda_in_enable(afe, false);
+			mt8167_afe_set_adda_in_enable(afe, false);
 		}
 
 		be->prepared[stream] = false;
 	}
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		mtk_afe_disable_top_cg(afe, MTK_AFE_CG_DAC);
-		mtk_afe_disable_top_cg(afe, MTK_AFE_CG_DAC_PREDIS);
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC);
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
 	} else {
-		mtk_afe_disable_top_cg(afe, MTK_AFE_CG_ADC);
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_ADC);
 	}
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 }
 
-static int mtk_afe_int_adda_hw_params(struct snd_pcm_substream *substream,
+static int mt8167_afe_int_adda_hw_params(struct snd_pcm_substream *substream,
 			  struct snd_pcm_hw_params *params,
 			  struct snd_soc_dai *dai)
 {
@@ -1009,12 +1009,12 @@ static int mtk_afe_int_adda_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int mtk_afe_int_adda_prepare(struct snd_pcm_substream *substream,
+static int mt8167_afe_int_adda_prepare(struct snd_pcm_substream *substream,
 			       struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-	struct mtk_afe_be_dai_data *be = &afe->be_data[dai->id - MTK_AFE_BACKEND_BASE];
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = substream->runtime->rate;
 	const unsigned int stream = substream->stream;
 	const int bit_width = snd_pcm_format_width(substream->runtime->format);
@@ -1030,22 +1030,22 @@ static int mtk_afe_int_adda_prepare(struct snd_pcm_substream *substream,
 	}
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		ret = mtk_afe_set_adda_out(afe, rate);
+		ret = mt8167_afe_set_adda_out(afe, rate);
 		if (ret)
 			return ret;
 
-		ret = mtk_afe_set_i2s_out(afe, rate, bit_width);
+		ret = mt8167_afe_set_i2s_out(afe, rate, bit_width);
 		if (ret)
 			return ret;
 
-		mtk_afe_set_adda_out_enable(afe, true);
-		mtk_afe_set_i2s_out_enable(afe, true);
+		mt8167_afe_set_adda_out_enable(afe, true);
+		mt8167_afe_set_i2s_out_enable(afe, true);
 	} else {
-		ret = mtk_afe_set_adda_in(afe, rate);
+		ret = mt8167_afe_set_adda_in(afe, rate);
 		if (ret)
 			return ret;
 
-		mtk_afe_set_adda_in_enable(afe, true);
+		mt8167_afe_set_adda_in_enable(afe, true);
 	}
 
 	be->prepared[stream] = true;
@@ -1053,27 +1053,27 @@ static int mtk_afe_int_adda_prepare(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int mtk_afe_mrg_bt_startup(struct snd_pcm_substream *substream,
+static int mt8167_afe_mrg_bt_startup(struct snd_pcm_substream *substream,
 			       struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	return 0;
 }
 
-static void mtk_afe_mrg_bt_shutdown(struct snd_pcm_substream *substream,
+static void mt8167_afe_mrg_bt_shutdown(struct snd_pcm_substream *substream,
 				 struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 }
 
-static int mtk_afe_mrg_bt_hw_params(struct snd_pcm_substream *substream,
+static int mt8167_afe_mrg_bt_hw_params(struct snd_pcm_substream *substream,
 			  struct snd_pcm_hw_params *params,
 			  struct snd_soc_dai *dai)
 {
@@ -1084,14 +1084,14 @@ static int mtk_afe_mrg_bt_hw_params(struct snd_pcm_substream *substream,
 	dev_dbg(afe->dev, "%s '%s' rate = %u\n", __func__,
 		snd_pcm_stream_str(substream), params_rate(params));
 
-	ret = mtk_afe_set_mrg(afe, params_rate(params));
+	ret = mt8167_afe_set_mrg(afe, params_rate(params));
 	if (ret)
 		return ret;
 
 	return 0;
 }
 
-static int mtk_afe_mrg_bt_trigger(struct snd_pcm_substream *substream, int cmd,
+static int mt8167_afe_mrg_bt_trigger(struct snd_pcm_substream *substream, int cmd,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -1103,38 +1103,38 @@ static int mtk_afe_mrg_bt_trigger(struct snd_pcm_substream *substream, int cmd,
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
-		mtk_afe_enable_mrg(afe);
+		mt8167_afe_enable_mrg(afe);
 		return 0;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
-		mtk_afe_disable_mrg(afe);
+		mt8167_afe_disable_mrg(afe);
 		return 0;
 	default:
 		return -EINVAL;
 	}
 }
 
-static int mtk_afe_pcm0_startup(struct snd_pcm_substream *substream,
+static int mt8167_afe_pcm0_startup(struct snd_pcm_substream *substream,
 			       struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	return 0;
 }
 
-static void mtk_afe_pcm0_shutdown(struct snd_pcm_substream *substream,
+static void mt8167_afe_pcm0_shutdown(struct snd_pcm_substream *substream,
 				 struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 }
 
-static int mtk_afe_pcm0_hw_params(struct snd_pcm_substream *substream,
+static int mt8167_afe_pcm0_hw_params(struct snd_pcm_substream *substream,
 			  struct snd_pcm_hw_params *params,
 			  struct snd_soc_dai *dai)
 {
@@ -1145,14 +1145,14 @@ static int mtk_afe_pcm0_hw_params(struct snd_pcm_substream *substream,
 	dev_dbg(afe->dev, "%s '%s' rate = %u\n", __func__,
 		snd_pcm_stream_str(substream), params_rate(params));
 
-	ret = mtk_afe_set_pcm0(afe, params_rate(params));
+	ret = mt8167_afe_set_pcm0(afe, params_rate(params));
 	if (ret)
 		return ret;
 
 	return 0;
 }
 
-static int mtk_afe_pcm0_trigger(struct snd_pcm_substream *substream, int cmd,
+static int mt8167_afe_pcm0_trigger(struct snd_pcm_substream *substream, int cmd,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -1164,45 +1164,45 @@ static int mtk_afe_pcm0_trigger(struct snd_pcm_substream *substream, int cmd,
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
-		mtk_afe_enable_pcm0(afe);
+		mt8167_afe_enable_pcm0(afe);
 		return 0;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
-		mtk_afe_disable_pcm0(afe);
+		mt8167_afe_disable_pcm0(afe);
 		return 0;
 	default:
 		return -EINVAL;
 	}
 }
 
-static int mtk_afe_hdmi_startup(struct snd_pcm_substream *substream,
+static int mt8167_afe_hdmi_startup(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	/* TODO: change to I2S4_M */
-	mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S3_M],
+	mt8167_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S3_M],
 				 afe->clocks[MTK_CLK_I2S3_B]);
 	return 0;
 }
 
-static void mtk_afe_hdmi_shutdown(struct snd_pcm_substream *substream,
+static void mt8167_afe_hdmi_shutdown(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 
 	/* TODO: change to I2S4_M */
-	mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S3_M],
+	mt8167_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S3_M],
 				  afe->clocks[MTK_CLK_I2S3_B]);
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 }
 
-static int mtk_afe_hdmi_prepare(struct snd_pcm_substream *substream,
+static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -1211,7 +1211,7 @@ static int mtk_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	unsigned int val;
 
 	/* TODO: change to I2S4_M */
-	mtk_afe_dais_set_clks(afe,
+	mt8167_afe_dais_set_clks(afe,
 			      afe->clocks[MTK_CLK_I2S3_M], runtime->rate * 128,
 			      afe->clocks[MTK_CLK_I2S3_B],
 			      runtime->rate * runtime->channels * 32);
@@ -1221,7 +1221,7 @@ static int mtk_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	      AFE_TDM_CON1_MSB_ALIGNED;
 
 	/* bit width related */
-	if ((afe->tdm_out_mode == MTK_AFE_TDM_OUT_HDMI) ||
+	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) ||
 	    (snd_pcm_format_width(runtime->format) > 16)) {
 		val |= AFE_TDM_CON1_WLEN_32BIT |
 		       AFE_TDM_CON1_32_BCK_CYCLES |
@@ -1233,9 +1233,9 @@ static int mtk_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	}
 
 	/* channel per sdata */
-	if ((afe->tdm_out_mode == MTK_AFE_TDM_OUT_TDM) && (runtime->channels > 4))
+	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) && (runtime->channels > 4))
 		val |= AFE_TDM_CON1_8CH_PER_SDATA;
-	else if ((afe->tdm_out_mode == MTK_AFE_TDM_OUT_TDM) && (runtime->channels > 2))
+	else if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) && (runtime->channels > 2))
 		val |= AFE_TDM_CON1_4CH_PER_SDATA;
 	else
 		val |= AFE_TDM_CON1_2CH_PER_SDATA;
@@ -1243,8 +1243,8 @@ static int mtk_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	regmap_update_bits(afe->regmap, AFE_TDM_CON1, ~(u32)AFE_TDM_CON1_EN, val);
 
 	/* set tdm2 config */
-	if ((afe->tdm_out_mode == MTK_AFE_TDM_OUT_HDMI) ||
-	    (afe->tdm_out_mode == MTK_AFE_TDM_OUT_I2S)) {
+	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) ||
+	    (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S)) {
 		switch (runtime->channels) {
 		case 1:
 		case 2:
@@ -1278,7 +1278,7 @@ static int mtk_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 			val = 0;
 		}
 	} else {
-		/* MTK_AFE_TDM_OUT_TDM */
+		/* MT8167_AFE_TDM_OUT_TDM */
 		val = AFE_TDM_CH_START_O28_O29;
 		val |= (AFE_TDM_CH_ZERO << 4);
 		val |= (AFE_TDM_CH_ZERO << 8);
@@ -1293,7 +1293,7 @@ static int mtk_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int mtk_afe_hdmi_trigger(struct snd_pcm_substream *substream, int cmd,
+static int mt8167_afe_hdmi_trigger(struct snd_pcm_substream *substream, int cmd,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -1310,7 +1310,7 @@ static int mtk_afe_hdmi_trigger(struct snd_pcm_substream *substream, int cmd,
 
 		/* TODO: align the connection logic with HDMI Tx */
 		/* set connections:  O28~O35: L/R/LFE/C/LS/RS/CH7/CH8 */
-		if (afe->tdm_out_mode == MTK_AFE_TDM_OUT_HDMI)
+		if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI)
 			regmap_write(afe->regmap, AFE_HDMI_CONN0,
 			     AFE_HDMI_CONN0_O28_I28 | AFE_HDMI_CONN0_O29_I29 |
 			     AFE_HDMI_CONN0_O30_I31 | AFE_HDMI_CONN0_O31_I30 |
@@ -1348,7 +1348,7 @@ static int mtk_afe_hdmi_trigger(struct snd_pcm_substream *substream, int cmd,
 	}
 }
 
-static int mtk_afe_tdm_in_startup(struct snd_pcm_substream *substream,
+static int mt8167_afe_tdm_in_startup(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -1359,13 +1359,13 @@ static int mtk_afe_tdm_in_startup(struct snd_pcm_substream *substream,
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
 				   &constraints_channels_tdm_in);
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	/* TODO: enable tdm in clock */
 	return 0;
 }
 
-static void mtk_afe_tdm_in_shutdown(struct snd_pcm_substream *substream,
+static void mt8167_afe_tdm_in_shutdown(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -1373,10 +1373,10 @@ static void mtk_afe_tdm_in_shutdown(struct snd_pcm_substream *substream,
 
 	/* TODO: disable tdm in clock */
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 }
 
-static int mtk_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
+static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -1423,7 +1423,7 @@ static int mtk_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int mtk_afe_tdm_in_trigger(struct snd_pcm_substream *substream, int cmd,
+static int mt8167_afe_tdm_in_trigger(struct snd_pcm_substream *substream, int cmd,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -1455,18 +1455,18 @@ static int mtk_afe_tdm_in_trigger(struct snd_pcm_substream *substream, int cmd,
 	return 0;
 }
 
-static int mtk_afe_dais_startup(struct snd_pcm_substream *substream,
+static int mt8167_afe_dais_startup(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct mtk_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+	struct mt8167_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
 	int ret;
 
 	dev_dbg(afe->dev, "%s %s\n", __func__, memif->data->name);
 
-	snd_soc_set_runtime_hwparams(substream, &mtk_afe_hardware);
+	snd_soc_set_runtime_hwparams(substream, &mt8167_afe_hardware);
 
 	ret = snd_pcm_hw_constraint_integer(runtime,
 					    SNDRV_PCM_HW_PARAM_PERIODS);
@@ -1477,38 +1477,38 @@ static int mtk_afe_dais_startup(struct snd_pcm_substream *substream,
 
 	memif->substream = substream;
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	return 0;
 }
 
-static void mtk_afe_dais_shutdown(struct snd_pcm_substream *substream,
+static void mt8167_afe_dais_shutdown(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-	struct mtk_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+	struct mt8167_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
 
 	dev_dbg(afe->dev, "%s %s\n", __func__, memif->data->name);
 
 	if (memif->prepared) {
-		mtk_afe_disable_afe_on(afe);
+		mt8167_afe_disable_afe_on(afe);
 		memif->prepared = false;
 	}
 
 	memif->substream = NULL;
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 }
 
-static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
+static int mt8167_afe_dais_hw_params(struct snd_pcm_substream *substream,
 				  struct snd_pcm_hw_params *params,
 				  struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-	struct mtk_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
-	const struct mtk_afe_memif_data *data = memif->data;
+	struct mt8167_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+	const struct mt8167_afe_memif_data *data = memif->data;
 	const size_t request_size = params_buffer_bytes(params);
 	int ret;
 
@@ -1528,7 +1528,7 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
 
 		memif->use_sram = false;
 
-		mtk_afe_emi_clk_on(afe);
+		mt8167_afe_emi_clk_on(afe);
 	} else {
 		struct snd_dma_buffer *dma_buf = &substream->dma_buffer;
 
@@ -1601,8 +1601,8 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
 	if (data->fs_shift < 0)
 		return 0;
 
-	if (data->id == MTK_AFE_MEMIF_DAI ||
-	    data->id == MTK_AFE_MEMIF_MOD_DAI) {
+	if (data->id == MT8167_AFE_MEMIF_DAI ||
+	    data->id == MT8167_AFE_MEMIF_MOD_DAI) {
 		unsigned int val;
 
 		switch (params_rate(params)) {
@@ -1621,7 +1621,7 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
 			return -EINVAL;
 		}
 
-		if (data->id == MTK_AFE_MEMIF_DAI)
+		if (data->id == MT8167_AFE_MEMIF_DAI)
 			regmap_update_bits(afe->regmap, AFE_DAC_CON0,
 					   0x3 << data->fs_shift,
 					   val << data->fs_shift);
@@ -1630,7 +1630,7 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
 					   0x3 << data->fs_shift,
 					   val << data->fs_shift);
 	} else {
-		int fs = mtk_afe_i2s_fs(params_rate(params));
+		int fs = mt8167_afe_i2s_fs(params_rate(params));
 
 		if (fs < 0)
 			return -EINVAL;
@@ -1643,12 +1643,12 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int mtk_afe_dais_hw_free(struct snd_pcm_substream *substream,
+static int mt8167_afe_dais_hw_free(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-	struct mtk_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+	struct mt8167_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
 	int ret = 0;
 
 	dev_dbg(afe->dev, "%s %s\n", __func__, memif->data->name);
@@ -1658,34 +1658,34 @@ static int mtk_afe_dais_hw_free(struct snd_pcm_substream *substream,
 	} else {
 		ret = snd_pcm_lib_free_pages(substream);
 
-		mtk_afe_emi_clk_off(afe);
+		mt8167_afe_emi_clk_off(afe);
 	}
 
 	return ret;
 }
 
-static int mtk_afe_dais_prepare(struct snd_pcm_substream *substream,
+static int mt8167_afe_dais_prepare(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-	struct mtk_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+	struct mt8167_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
 
 	if (!memif->prepared) {
-		mtk_afe_enable_afe_on(afe);
+		mt8167_afe_enable_afe_on(afe);
 		memif->prepared = true;
 	}
 
 	return 0;
 }
 
-static int mtk_afe_dais_trigger(struct snd_pcm_substream *substream, int cmd,
+static int mt8167_afe_dais_trigger(struct snd_pcm_substream *substream, int cmd,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_pcm_runtime * const runtime = substream->runtime;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-	struct mtk_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+	struct mt8167_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
 	unsigned int counter = runtime->period_size;
 
 	dev_info(afe->dev, "%s %s cmd = %d\n", __func__,
@@ -1707,7 +1707,7 @@ static int mtk_afe_dais_trigger(struct snd_pcm_substream *substream, int cmd,
 
 		/* set irq fs */
 		if (memif->data->irq_fs_shift >= 0) {
-			int fs = mtk_afe_i2s_fs(runtime->rate);
+			int fs = mt8167_afe_i2s_fs(runtime->rate);
 
 			if (fs < 0)
 				return -EINVAL;
@@ -1718,7 +1718,7 @@ static int mtk_afe_dais_trigger(struct snd_pcm_substream *substream, int cmd,
 					   fs << memif->data->irq_fs_shift);
 		}
 
-		mtk_afe_enable_irq(afe, memif);
+		mt8167_afe_enable_irq(afe, memif);
 		return 0;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
@@ -1726,7 +1726,7 @@ static int mtk_afe_dais_trigger(struct snd_pcm_substream *substream, int cmd,
 			regmap_update_bits(afe->regmap, AFE_DAC_CON0,
 					   1 << memif->data->enable_shift, 0);
 
-		mtk_afe_disable_irq(afe, memif);
+		mt8167_afe_disable_irq(afe, memif);
 		return 0;
 	default:
 		return -EINVAL;
@@ -1734,69 +1734,69 @@ static int mtk_afe_dais_trigger(struct snd_pcm_substream *substream, int cmd,
 }
 
 /* FE DAIs */
-static const struct snd_soc_dai_ops mtk_afe_dai_ops = {
-	.startup	= mtk_afe_dais_startup,
-	.shutdown	= mtk_afe_dais_shutdown,
-	.hw_params	= mtk_afe_dais_hw_params,
-	.hw_free	= mtk_afe_dais_hw_free,
-	.prepare	= mtk_afe_dais_prepare,
-	.trigger	= mtk_afe_dais_trigger,
+static const struct snd_soc_dai_ops mt8167_afe_dai_ops = {
+	.startup	= mt8167_afe_dais_startup,
+	.shutdown	= mt8167_afe_dais_shutdown,
+	.hw_params	= mt8167_afe_dais_hw_params,
+	.hw_free	= mt8167_afe_dais_hw_free,
+	.prepare	= mt8167_afe_dais_prepare,
+	.trigger	= mt8167_afe_dais_trigger,
 };
 
 /* BE DAIs */
-static const struct snd_soc_dai_ops mtk_afe_i2s_ops = {
-	.startup	= mtk_afe_i2s_startup,
-	.shutdown	= mtk_afe_i2s_shutdown,
-	.hw_params	= mtk_afe_i2s_hw_params,
-	.prepare	= mtk_afe_i2s_prepare,
+static const struct snd_soc_dai_ops mt8167_afe_i2s_ops = {
+	.startup	= mt8167_afe_i2s_startup,
+	.shutdown	= mt8167_afe_i2s_shutdown,
+	.hw_params	= mt8167_afe_i2s_hw_params,
+	.prepare	= mt8167_afe_i2s_prepare,
 };
 
-static const struct snd_soc_dai_ops mtk_afe_2nd_i2s_ops = {
-	.startup	= mtk_afe_2nd_i2s_startup,
-	.shutdown	= mtk_afe_2nd_i2s_shutdown,
-	.hw_params	= mtk_afe_2nd_i2s_hw_params,
-	.prepare	= mtk_afe_2nd_i2s_prepare,
+static const struct snd_soc_dai_ops mt8167_afe_2nd_i2s_ops = {
+	.startup	= mt8167_afe_2nd_i2s_startup,
+	.shutdown	= mt8167_afe_2nd_i2s_shutdown,
+	.hw_params	= mt8167_afe_2nd_i2s_hw_params,
+	.prepare	= mt8167_afe_2nd_i2s_prepare,
 };
 
-static const struct snd_soc_dai_ops mtk_afe_int_adda_ops = {
-	.startup	= mtk_afe_int_adda_startup,
-	.shutdown	= mtk_afe_int_adda_shutdown,
-	.hw_params	= mtk_afe_int_adda_hw_params,
-	.prepare	= mtk_afe_int_adda_prepare,
+static const struct snd_soc_dai_ops mt8167_afe_int_adda_ops = {
+	.startup	= mt8167_afe_int_adda_startup,
+	.shutdown	= mt8167_afe_int_adda_shutdown,
+	.hw_params	= mt8167_afe_int_adda_hw_params,
+	.prepare	= mt8167_afe_int_adda_prepare,
 };
 
-static const struct snd_soc_dai_ops mtk_afe_mrg_bt_ops = {
-	.startup	= mtk_afe_mrg_bt_startup,
-	.shutdown	= mtk_afe_mrg_bt_shutdown,
-	.hw_params	= mtk_afe_mrg_bt_hw_params,
-	.trigger	= mtk_afe_mrg_bt_trigger,
+static const struct snd_soc_dai_ops mt8167_afe_mrg_bt_ops = {
+	.startup	= mt8167_afe_mrg_bt_startup,
+	.shutdown	= mt8167_afe_mrg_bt_shutdown,
+	.hw_params	= mt8167_afe_mrg_bt_hw_params,
+	.trigger	= mt8167_afe_mrg_bt_trigger,
 };
 
-static const struct snd_soc_dai_ops mtk_afe_pcm0_ops = {
-	.startup	= mtk_afe_pcm0_startup,
-	.shutdown	= mtk_afe_pcm0_shutdown,
-	.hw_params	= mtk_afe_pcm0_hw_params,
-	.trigger	= mtk_afe_pcm0_trigger,
+static const struct snd_soc_dai_ops mt8167_afe_pcm0_ops = {
+	.startup	= mt8167_afe_pcm0_startup,
+	.shutdown	= mt8167_afe_pcm0_shutdown,
+	.hw_params	= mt8167_afe_pcm0_hw_params,
+	.trigger	= mt8167_afe_pcm0_trigger,
 };
 
-static const struct snd_soc_dai_ops mtk_afe_hdmi_ops = {
-	.startup	= mtk_afe_hdmi_startup,
-	.shutdown	= mtk_afe_hdmi_shutdown,
-	.prepare	= mtk_afe_hdmi_prepare,
-	.trigger	= mtk_afe_hdmi_trigger,
+static const struct snd_soc_dai_ops mt8167_afe_hdmi_ops = {
+	.startup	= mt8167_afe_hdmi_startup,
+	.shutdown	= mt8167_afe_hdmi_shutdown,
+	.prepare	= mt8167_afe_hdmi_prepare,
+	.trigger	= mt8167_afe_hdmi_trigger,
 };
 
-static const struct snd_soc_dai_ops mtk_afe_tdm_in_ops = {
-	.startup	= mtk_afe_tdm_in_startup,
-	.shutdown	= mtk_afe_tdm_in_shutdown,
-	.prepare	= mtk_afe_tdm_in_prepare,
-	.trigger	= mtk_afe_tdm_in_trigger,
+static const struct snd_soc_dai_ops mt8167_afe_tdm_in_ops = {
+	.startup	= mt8167_afe_tdm_in_startup,
+	.shutdown	= mt8167_afe_tdm_in_shutdown,
+	.prepare	= mt8167_afe_tdm_in_prepare,
+	.trigger	= mt8167_afe_tdm_in_trigger,
 };
 
-static int mtk_afe_runtime_suspend(struct device *dev);
-static int mtk_afe_runtime_resume(struct device *dev);
+static int mt8167_afe_runtime_suspend(struct device *dev);
+static int mt8167_afe_runtime_resume(struct device *dev);
 
-static int mtk_afe_dai_suspend(struct snd_soc_dai *dai)
+static int mt8167_afe_dai_suspend(struct snd_soc_dai *dai)
 {
 	struct mtk_afe *afe = snd_soc_dai_get_drvdata(dai);
 	int i;
@@ -1808,20 +1808,20 @@ static int mtk_afe_dai_suspend(struct snd_soc_dai *dai)
 	if (pm_runtime_status_suspended(afe->dev) || afe->suspended)
 		return 0;
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
-	for (i = 0; i < ARRAY_SIZE(mtk_afe_backup_list); i++)
-		regmap_read(afe->regmap, mtk_afe_backup_list[i],
+	for (i = 0; i < ARRAY_SIZE(mt8167_afe_backup_list); i++)
+		regmap_read(afe->regmap, mt8167_afe_backup_list[i],
 			    &afe->backup_regs[i]);
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 
 	afe->suspended = true;
-	mtk_afe_runtime_suspend(afe->dev);
+	mt8167_afe_runtime_suspend(afe->dev);
 	return 0;
 }
 
-static int mtk_afe_dai_resume(struct snd_soc_dai *dai)
+static int mt8167_afe_dai_resume(struct snd_soc_dai *dai)
 {
 	struct mtk_afe *afe = snd_soc_dai_get_drvdata(dai);
 	int i = 0;
@@ -1833,27 +1833,27 @@ static int mtk_afe_dai_resume(struct snd_soc_dai *dai)
 	if (pm_runtime_status_suspended(afe->dev) || !afe->suspended)
 		return 0;
 
-	mtk_afe_runtime_resume(afe->dev);
+	mt8167_afe_runtime_resume(afe->dev);
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
-	for (i = 0; i < ARRAY_SIZE(mtk_afe_backup_list); i++)
-		regmap_write(afe->regmap, mtk_afe_backup_list[i],
+	for (i = 0; i < ARRAY_SIZE(mt8167_afe_backup_list); i++)
+		regmap_write(afe->regmap, mt8167_afe_backup_list[i],
 			     afe->backup_regs[i]);
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 
 	afe->suspended = false;
 	return 0;
 }
 
-static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
+static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 	/* FE DAIs: memory intefaces to CPU */
 	{
 		.name = "DL1", /* downlink 1 */
-		.id = MTK_AFE_MEMIF_DL1,
-		.suspend = mtk_afe_dai_suspend,
-		.resume = mtk_afe_dai_resume,
+		.id = MT8167_AFE_MEMIF_DL1,
+		.suspend = mt8167_afe_dai_suspend,
+		.resume = mt8167_afe_dai_resume,
 		.playback = {
 			.stream_name = "DL1",
 			.channels_min = 1,
@@ -1862,12 +1862,12 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
 				   SNDRV_PCM_FMTBIT_S24_LE,
 		},
-		.ops = &mtk_afe_dai_ops,
+		.ops = &mt8167_afe_dai_ops,
 	}, {
 		.name = "VUL", /* voice uplink */
-		.id = MTK_AFE_MEMIF_VUL,
-		.suspend = mtk_afe_dai_suspend,
-		.resume = mtk_afe_dai_resume,
+		.id = MT8167_AFE_MEMIF_VUL,
+		.suspend = mt8167_afe_dai_suspend,
+		.resume = mt8167_afe_dai_resume,
 		.capture = {
 			.stream_name = "VUL",
 			.channels_min = 1,
@@ -1875,12 +1875,12 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 			.rates = SNDRV_PCM_RATE_8000_48000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE,
 		},
-		.ops = &mtk_afe_dai_ops,
+		.ops = &mt8167_afe_dai_ops,
 	}, {
 		.name = "DL2", /* downlink 2 */
-		.id = MTK_AFE_MEMIF_DL2,
-		.suspend = mtk_afe_dai_suspend,
-		.resume = mtk_afe_dai_resume,
+		.id = MT8167_AFE_MEMIF_DL2,
+		.suspend = mt8167_afe_dai_suspend,
+		.resume = mt8167_afe_dai_resume,
 		.playback = {
 			.stream_name = "DL2",
 			.channels_min = 1,
@@ -1889,12 +1889,12 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
 				   SNDRV_PCM_FMTBIT_S24_LE,
 		},
-		.ops = &mtk_afe_dai_ops,
+		.ops = &mt8167_afe_dai_ops,
 	}, {
 		.name = "AWB",
-		.id = MTK_AFE_MEMIF_AWB,
-		.suspend = mtk_afe_dai_suspend,
-		.resume = mtk_afe_dai_resume,
+		.id = MT8167_AFE_MEMIF_AWB,
+		.suspend = mt8167_afe_dai_suspend,
+		.resume = mt8167_afe_dai_resume,
 		.capture = {
 			.stream_name = "AWB",
 			.channels_min = 1,
@@ -1902,12 +1902,12 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 			.rates = SNDRV_PCM_RATE_8000_192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE,
 		},
-		.ops = &mtk_afe_dai_ops,
+		.ops = &mt8167_afe_dai_ops,
 	}, {
 		.name = "DAI",
-		.id = MTK_AFE_MEMIF_DAI,
-		.suspend = mtk_afe_dai_suspend,
-		.resume = mtk_afe_dai_resume,
+		.id = MT8167_AFE_MEMIF_DAI,
+		.suspend = mt8167_afe_dai_suspend,
+		.resume = mt8167_afe_dai_resume,
 		.capture = {
 			.stream_name = "DAI",
 			.channels_min = 1,
@@ -1917,12 +1917,12 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 				 SNDRV_PCM_RATE_32000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE,
 		},
-		.ops = &mtk_afe_dai_ops,
+		.ops = &mt8167_afe_dai_ops,
 	}, {
 		.name = "HDMI",
-		.id = MTK_AFE_MEMIF_HDMI,
-		.suspend = mtk_afe_dai_suspend,
-		.resume = mtk_afe_dai_resume,
+		.id = MT8167_AFE_MEMIF_HDMI,
+		.suspend = mt8167_afe_dai_suspend,
+		.resume = mt8167_afe_dai_resume,
 		.playback = {
 			.stream_name = "HDMI",
 			.channels_min = 2,
@@ -1937,12 +1937,12 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
 				   SNDRV_PCM_FMTBIT_S24_LE,
 		},
-		.ops = &mtk_afe_dai_ops,
+		.ops = &mt8167_afe_dai_ops,
 	}, {
 		.name = "TDM_IN",
-		.id = MTK_AFE_MEMIF_TDM_IN,
-		.suspend = mtk_afe_dai_suspend,
-		.resume = mtk_afe_dai_resume,
+		.id = MT8167_AFE_MEMIF_TDM_IN,
+		.suspend = mt8167_afe_dai_suspend,
+		.resume = mt8167_afe_dai_resume,
 		.capture = {
 			.stream_name = "TDM_IN",
 			.channels_min = 2,
@@ -1952,11 +1952,11 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 				   SNDRV_PCM_FMTBIT_S24_LE |
 				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
-		.ops = &mtk_afe_dai_ops,
+		.ops = &mt8167_afe_dai_ops,
 	}, {
 	/* BE DAIs */
 		.name = "I2S",
-		.id = MTK_AFE_IO_I2S,
+		.id = MT8167_AFE_IO_I2S,
 		.playback = {
 			.stream_name = "I2S Playback",
 			.channels_min = 1,
@@ -1973,10 +1973,10 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
 				   SNDRV_PCM_FMTBIT_S24_LE,
 		},
-		.ops = &mtk_afe_i2s_ops,
+		.ops = &mt8167_afe_i2s_ops,
 	}, {
 		.name = "2ND I2S",
-		.id = MTK_AFE_IO_2ND_I2S,
+		.id = MT8167_AFE_IO_2ND_I2S,
 		.playback = {
 			.stream_name = "2ND I2S Playback",
 			.channels_min = 1,
@@ -1993,11 +1993,11 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
 				   SNDRV_PCM_FMTBIT_S24_LE,
 		},
-		.ops = &mtk_afe_2nd_i2s_ops,
+		.ops = &mt8167_afe_2nd_i2s_ops,
 	}, {
 	/* BE DAIs */
 		.name = "INT ADDA",
-		.id = MTK_AFE_IO_INT_ADDA,
+		.id = MT8167_AFE_IO_INT_ADDA,
 		.playback = {
 			.stream_name = "INT ADDA Playback",
 			.channels_min = 1,
@@ -2016,11 +2016,11 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 				 SNDRV_PCM_RATE_48000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE,
 		},
-		.ops = &mtk_afe_int_adda_ops,
+		.ops = &mt8167_afe_int_adda_ops,
 	}, {
 	/* BE DAIs */
 		.name = "MRG BT",
-		.id = MTK_AFE_IO_MRG_BT,
+		.id = MT8167_AFE_IO_MRG_BT,
 		.playback = {
 			.stream_name = "MRG BT Playback",
 			.channels_min = 1,
@@ -2037,12 +2037,12 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 				 SNDRV_PCM_RATE_16000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE,
 		},
-		.ops = &mtk_afe_mrg_bt_ops,
+		.ops = &mt8167_afe_mrg_bt_ops,
 		.symmetric_rates = 1,
 	}, {
 	/* BE DAIs */
 		.name = "PCM0",
-		.id = MTK_AFE_IO_PCM_BT,
+		.id = MT8167_AFE_IO_PCM_BT,
 		.playback = {
 			.stream_name = "PCM0 Playback",
 			.channels_min = 1,
@@ -2059,12 +2059,12 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 				 SNDRV_PCM_RATE_16000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE,
 		},
-		.ops = &mtk_afe_pcm0_ops,
+		.ops = &mt8167_afe_pcm0_ops,
 		.symmetric_rates = 1,
 	}, {
 	/* BE DAIs */
 		.name = "DL Input",
-		.id = MTK_AFE_IO_DL_BE,
+		.id = MT8167_AFE_IO_DL_BE,
 		.capture = {
 			.stream_name = "DL Capture",
 			.channels_min = 1,
@@ -2075,7 +2075,7 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 	}, {
 	/* BE DAIs */
 		.name = "HDMIO",
-		.id = MTK_AFE_IO_HDMI,
+		.id = MT8167_AFE_IO_HDMI,
 		.playback = {
 			.stream_name = "HDMIO Playback",
 			.channels_min = 2,
@@ -2090,11 +2090,11 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
 				   SNDRV_PCM_FMTBIT_S24_LE,
 		},
-		.ops = &mtk_afe_hdmi_ops,
+		.ops = &mt8167_afe_hdmi_ops,
 	},  {
 	/* BE DAIs */
 		.name = "TDM_IN_IO",
-		.id = MTK_AFE_IO_TDM_IN,
+		.id = MT8167_AFE_IO_TDM_IN,
 		.capture = {
 			.stream_name = "TDM IN Capture",
 			.channels_min = 2,
@@ -2104,58 +2104,58 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
 				   SNDRV_PCM_FMTBIT_S24_LE |
 				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
-		.ops = &mtk_afe_tdm_in_ops,
+		.ops = &mt8167_afe_tdm_in_ops,
 	},
 };
 
-static const struct snd_kcontrol_new mtk_afe_o00_mix[] = {
+static const struct snd_kcontrol_new mt8167_afe_o00_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I05 Switch", AFE_CONN0, 5, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I07 Switch", AFE_CONN0, 7, 1, 0),
 };
 
-static const struct snd_kcontrol_new mtk_afe_o01_mix[] = {
+static const struct snd_kcontrol_new mt8167_afe_o01_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I06 Switch", AFE_CONN0, 22, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I08 Switch", AFE_CONN0, 24, 1, 0),
 };
 
-static const struct snd_kcontrol_new mtk_afe_o02_mix[] = {
+static const struct snd_kcontrol_new mt8167_afe_o02_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I05 Switch", AFE_CONN1, 5, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I06 Switch", AFE_CONN1, 6, 1, 0),
 };
 
-static const struct snd_kcontrol_new mtk_afe_o03_mix[] = {
+static const struct snd_kcontrol_new mt8167_afe_o03_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I05 Switch", AFE_CONN1, 21, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I07 Switch", AFE_CONN1, 23, 1, 0),
 };
 
-static const struct snd_kcontrol_new mtk_afe_o04_mix[] = {
+static const struct snd_kcontrol_new mt8167_afe_o04_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I06 Switch", AFE_CONN2, 6, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I08 Switch", AFE_CONN2, 8, 1, 0),
 };
 
-static const struct snd_kcontrol_new mtk_afe_o05_mix[] = {
+static const struct snd_kcontrol_new mt8167_afe_o05_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I00 Switch", AFE_CONN2, 16, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I05 Switch", AFE_CONN2, 19, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I07 Switch", AFE_CONN2, 20, 1, 0),
 };
 
-static const struct snd_kcontrol_new mtk_afe_o06_mix[] = {
+static const struct snd_kcontrol_new mt8167_afe_o06_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I01 Switch", AFE_CONN2, 22, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I06 Switch", AFE_CONN2, 24, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I08 Switch", AFE_CONN2, 25, 1, 0),
 };
 
-static const struct snd_kcontrol_new mtk_afe_o09_mix[] = {
+static const struct snd_kcontrol_new mt8167_afe_o09_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I00 Switch", AFE_CONN5, 8, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I03 Switch", AFE_CONN3, 0, 1, 0),
 };
 
-static const struct snd_kcontrol_new mtk_afe_o10_mix[] = {
+static const struct snd_kcontrol_new mt8167_afe_o10_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I01 Switch", AFE_CONN5, 13, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I04 Switch", AFE_CONN3, 3, 1, 0),
 };
 
-static const struct snd_kcontrol_new mtk_afe_o11_mix[] = {
+static const struct snd_kcontrol_new mt8167_afe_o11_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I02 Switch", AFE_CONN3, 6, 1, 0),
 };
 
@@ -2187,7 +2187,7 @@ static const struct snd_kcontrol_new mrg_bt_o02_enable_ctl =
 static const struct snd_kcontrol_new pcm0_o02_enable_ctl =
 	SOC_DAPM_SINGLE_VIRT("Switch", 1);
 
-static const struct snd_soc_dapm_widget mtk_afe_pcm_widgets[] = {
+static const struct snd_soc_dapm_widget mt8167_afe_pcm_widgets[] = {
 	/* inter-connections */
 	SND_SOC_DAPM_MIXER("I00", SND_SOC_NOPM, 0, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("I01", SND_SOC_NOPM, 0, 0, NULL, 0),
@@ -2204,25 +2204,25 @@ static const struct snd_soc_dapm_widget mtk_afe_pcm_widgets[] = {
 	SND_SOC_DAPM_MIXER("I08L", SND_SOC_NOPM, 0, 0, NULL, 0),
 
 	SND_SOC_DAPM_MIXER("O00", SND_SOC_NOPM, 0, 0,
-			   mtk_afe_o00_mix, ARRAY_SIZE(mtk_afe_o00_mix)),
+			   mt8167_afe_o00_mix, ARRAY_SIZE(mt8167_afe_o00_mix)),
 	SND_SOC_DAPM_MIXER("O01", SND_SOC_NOPM, 0, 0,
-			   mtk_afe_o01_mix, ARRAY_SIZE(mtk_afe_o01_mix)),
+			   mt8167_afe_o01_mix, ARRAY_SIZE(mt8167_afe_o01_mix)),
 	SND_SOC_DAPM_MIXER("O02", SND_SOC_NOPM, 0, 0,
-			   mtk_afe_o02_mix, ARRAY_SIZE(mtk_afe_o02_mix)),
+			   mt8167_afe_o02_mix, ARRAY_SIZE(mt8167_afe_o02_mix)),
 	SND_SOC_DAPM_MIXER("O03", SND_SOC_NOPM, 0, 0,
-			   mtk_afe_o03_mix, ARRAY_SIZE(mtk_afe_o03_mix)),
+			   mt8167_afe_o03_mix, ARRAY_SIZE(mt8167_afe_o03_mix)),
 	SND_SOC_DAPM_MIXER("O04", SND_SOC_NOPM, 0, 0,
-			   mtk_afe_o04_mix, ARRAY_SIZE(mtk_afe_o04_mix)),
+			   mt8167_afe_o04_mix, ARRAY_SIZE(mt8167_afe_o04_mix)),
 	SND_SOC_DAPM_MIXER("O05", SND_SOC_NOPM, 0, 0,
-			   mtk_afe_o05_mix, ARRAY_SIZE(mtk_afe_o05_mix)),
+			   mt8167_afe_o05_mix, ARRAY_SIZE(mt8167_afe_o05_mix)),
 	SND_SOC_DAPM_MIXER("O06", SND_SOC_NOPM, 0, 0,
-			   mtk_afe_o06_mix, ARRAY_SIZE(mtk_afe_o06_mix)),
+			   mt8167_afe_o06_mix, ARRAY_SIZE(mt8167_afe_o06_mix)),
 	SND_SOC_DAPM_MIXER("O09", SND_SOC_NOPM, 0, 0,
-			   mtk_afe_o09_mix, ARRAY_SIZE(mtk_afe_o09_mix)),
+			   mt8167_afe_o09_mix, ARRAY_SIZE(mt8167_afe_o09_mix)),
 	SND_SOC_DAPM_MIXER("O10", SND_SOC_NOPM, 0, 0,
-			   mtk_afe_o10_mix, ARRAY_SIZE(mtk_afe_o10_mix)),
+			   mt8167_afe_o10_mix, ARRAY_SIZE(mt8167_afe_o10_mix)),
 	SND_SOC_DAPM_MIXER("O11", SND_SOC_NOPM, 0, 0,
-			   mtk_afe_o11_mix, ARRAY_SIZE(mtk_afe_o11_mix)),
+			   mt8167_afe_o11_mix, ARRAY_SIZE(mt8167_afe_o11_mix)),
 
 	SND_SOC_DAPM_MUX("AIN Mux", SND_SOC_NOPM, 0, 0, &ain_mux),
 	SND_SOC_DAPM_MUX("DAIBT Mux", SND_SOC_NOPM, 0, 0, &daibt_mux),
@@ -2244,7 +2244,7 @@ static const struct snd_soc_dapm_widget mtk_afe_pcm_widgets[] = {
 	SND_SOC_DAPM_INPUT("PCM0 In"),
 };
 
-static const struct snd_soc_dapm_route mtk_afe_pcm_routes[] = {
+static const struct snd_soc_dapm_route mt8167_afe_pcm_routes[] = {
 	/* downlink */
 	{"I05", NULL, "DL1"},
 	{"I06", NULL, "DL1"},
@@ -2317,12 +2317,12 @@ static const struct snd_soc_dapm_route mtk_afe_pcm_routes[] = {
 	{"TDM_IN", NULL, "TDM Capture"},
 };
 
-static const struct snd_soc_component_driver mtk_afe_pcm_dai_component = {
+static const struct snd_soc_component_driver mt8167_afe_pcm_dai_component = {
 	.name = "mtk-afe-pcm-dai",
-	.dapm_widgets = mtk_afe_pcm_widgets,
-	.num_dapm_widgets = ARRAY_SIZE(mtk_afe_pcm_widgets),
-	.dapm_routes = mtk_afe_pcm_routes,
-	.num_dapm_routes = ARRAY_SIZE(mtk_afe_pcm_routes),
+	.dapm_widgets = mt8167_afe_pcm_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(mt8167_afe_pcm_widgets),
+	.dapm_routes = mt8167_afe_pcm_routes,
+	.num_dapm_routes = ARRAY_SIZE(mt8167_afe_pcm_routes),
 };
 
 
@@ -2341,10 +2341,10 @@ static const char *aud_clks[MTK_CLK_NUM] = {
 };
 #endif
 
-static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
+static const struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
 	{
 		.name = "DL1",
-		.id = MTK_AFE_MEMIF_DL1,
+		.id = MT8167_AFE_MEMIF_DL1,
 		.reg_ofs_base = AFE_DL1_BASE,
 		.reg_ofs_end = AFE_DL1_END,
 		.reg_ofs_cur = AFE_DL1_CUR,
@@ -2353,7 +2353,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.enable_shift = 1,
 		.irq_reg_cnt = AFE_IRQ_CNT1,
 		.irq_cnt_shift = 0,
-		.irq_mode = MTK_AFE_IRQ_1,
+		.irq_mode = MT8167_AFE_IRQ_1,
 		.irq_fs_reg = AFE_IRQ_MCU_CON,
 		.irq_fs_shift = 4,
 		.irq_clr_shift = 0,
@@ -2365,7 +2365,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.prealloc_size = 128 * 1024,
 	}, {
 		.name = "DL2",
-		.id = MTK_AFE_MEMIF_DL2,
+		.id = MT8167_AFE_MEMIF_DL2,
 		.reg_ofs_base = AFE_DL2_BASE,
 		.reg_ofs_end = AFE_DL2_END,
 		.reg_ofs_cur = AFE_DL2_CUR,
@@ -2374,7 +2374,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.enable_shift = 2,
 		.irq_reg_cnt = AFE_IRQ_CNT7,
 		.irq_cnt_shift = 0,
-		.irq_mode = MTK_AFE_IRQ_7,
+		.irq_mode = MT8167_AFE_IRQ_7,
 		.irq_fs_reg = AFE_IRQ_MCU_CON,
 		.irq_fs_shift = 24,
 		.irq_clr_shift = 6,
@@ -2386,7 +2386,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.prealloc_size = 128 * 1024,
 	}, {
 		.name = "VUL",
-		.id = MTK_AFE_MEMIF_VUL,
+		.id = MT8167_AFE_MEMIF_VUL,
 		.reg_ofs_base = AFE_VUL_BASE,
 		.reg_ofs_end = AFE_VUL_END,
 		.reg_ofs_cur = AFE_VUL_CUR,
@@ -2395,7 +2395,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.enable_shift = 3,
 		.irq_reg_cnt = AFE_IRQ_CNT2,
 		.irq_cnt_shift = 0,
-		.irq_mode = MTK_AFE_IRQ_2,
+		.irq_mode = MT8167_AFE_IRQ_2,
 		.irq_fs_reg = AFE_IRQ_MCU_CON,
 		.irq_fs_shift = 8,
 		.irq_clr_shift = 1,
@@ -2407,7 +2407,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.prealloc_size = 32 * 1024,
 	}, {
 		.name = "DAI",
-		.id = MTK_AFE_MEMIF_DAI,
+		.id = MT8167_AFE_MEMIF_DAI,
 		.reg_ofs_base = AFE_DAI_BASE,
 		.reg_ofs_end = AFE_DAI_END,
 		.reg_ofs_cur = AFE_DAI_CUR,
@@ -2416,7 +2416,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.enable_shift = 4,
 		.irq_reg_cnt = AFE_IRQ_CNT2,
 		.irq_cnt_shift = 0,
-		.irq_mode = MTK_AFE_IRQ_2,
+		.irq_mode = MT8167_AFE_IRQ_2,
 		.irq_fs_reg = AFE_IRQ_MCU_CON,
 		.irq_fs_shift = 8,
 		.irq_clr_shift = 1,
@@ -2428,7 +2428,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.prealloc_size = 16 * 1024,
 	}, {
 		.name = "AWB",
-		.id = MTK_AFE_MEMIF_AWB,
+		.id = MT8167_AFE_MEMIF_AWB,
 		.reg_ofs_base = AFE_AWB_BASE,
 		.reg_ofs_end = AFE_AWB_END,
 		.reg_ofs_cur = AFE_AWB_CUR,
@@ -2437,7 +2437,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.enable_shift = 6,
 		.irq_reg_cnt = AFE_IRQ_CNT2,
 		.irq_cnt_shift = 0,
-		.irq_mode = MTK_AFE_IRQ_2,
+		.irq_mode = MT8167_AFE_IRQ_2,
 		.irq_fs_reg = AFE_IRQ_MCU_CON,
 		.irq_fs_shift = 8,
 		.irq_clr_shift = 1,
@@ -2449,7 +2449,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.prealloc_size = 0,
 	}, {
 		.name = "MOD_DAI",
-		.id = MTK_AFE_MEMIF_MOD_DAI,
+		.id = MT8167_AFE_MEMIF_MOD_DAI,
 		.reg_ofs_base = AFE_MOD_PCM_BASE,
 		.reg_ofs_end = AFE_MOD_PCM_END,
 		.reg_ofs_cur = AFE_MOD_PCM_CUR,
@@ -2458,7 +2458,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.enable_shift = 7,
 		.irq_reg_cnt = AFE_IRQ_CNT2,
 		.irq_cnt_shift = 0,
-		.irq_mode = MTK_AFE_IRQ_2,
+		.irq_mode = MT8167_AFE_IRQ_2,
 		.irq_fs_reg = AFE_IRQ_MCU_CON,
 		.irq_fs_shift = 8,
 		.irq_clr_shift = 1,
@@ -2470,7 +2470,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.prealloc_size = 0,
 	}, {
 		.name = "HDMI",
-		.id = MTK_AFE_MEMIF_HDMI,
+		.id = MT8167_AFE_MEMIF_HDMI,
 		.reg_ofs_base = AFE_HDMI_OUT_BASE,
 		.reg_ofs_end = AFE_HDMI_OUT_END,
 		.reg_ofs_cur = AFE_HDMI_OUT_CUR,
@@ -2479,7 +2479,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.enable_shift = -1,
 		.irq_reg_cnt = AFE_IRQ_CNT5,
 		.irq_cnt_shift = 0,
-		.irq_mode = MTK_AFE_IRQ_5,
+		.irq_mode = MT8167_AFE_IRQ_5,
 		.irq_fs_reg = -1,
 		.irq_fs_shift = -1,
 		.irq_clr_shift = 4,
@@ -2491,7 +2491,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.prealloc_size = 0,
 	}, {
 		.name = "TDM_IN",
-		.id = MTK_AFE_MEMIF_TDM_IN,
+		.id = MT8167_AFE_MEMIF_TDM_IN,
 		.reg_ofs_base = AFE_HDMI_IN_2CH_BASE,
 		.reg_ofs_end = AFE_HDMI_IN_2CH_END,
 		.reg_ofs_cur = AFE_HDMI_IN_2CH_CUR,
@@ -2500,7 +2500,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 		.enable_shift = -1,
 		.irq_reg_cnt = AFE_IRQ_CNT10,
 		.irq_cnt_shift = 0,
-		.irq_mode = MTK_AFE_IRQ_10,
+		.irq_mode = MT8167_AFE_IRQ_10,
 		.irq_fs_reg = -1,
 		.irq_fs_shift = -1,
 		.irq_clr_shift = 9,
@@ -2513,7 +2513,7 @@ static const struct mtk_afe_memif_data memif_data[MTK_AFE_MEMIF_NUM] = {
 	},
 };
 
-static const struct regmap_config mtk_afe_regmap_config = {
+static const struct regmap_config mt8167_afe_regmap_config = {
 	.reg_bits = 32,
 	.reg_stride = 4,
 	.val_bits = 32,
@@ -2521,7 +2521,7 @@ static const struct regmap_config mtk_afe_regmap_config = {
 	.cache_type = REGCACHE_NONE,
 };
 
-static irqreturn_t mtk_afe_irq_handler(int irq, void *dev_id)
+static irqreturn_t mt8167_afe_irq_handler(int irq, void *dev_id)
 {
 	struct mtk_afe *afe = dev_id;
 	unsigned int reg_value;
@@ -2542,8 +2542,8 @@ static irqreturn_t mtk_afe_irq_handler(int irq, void *dev_id)
 		goto err_irq;
 	}
 
-	for (i = 0; i < MTK_AFE_MEMIF_NUM; i++) {
-		struct mtk_afe_memif *memif = &afe->memif[i];
+	for (i = 0; i < MT8167_AFE_MEMIF_NUM; i++) {
+		struct mt8167_afe_memif *memif = &afe->memif[i];
 		struct snd_pcm_substream *substream = memif->substream;
 
 		if (!substream || !(reg_value & (1 << memif->data->irq_clr_shift)))
@@ -2563,32 +2563,32 @@ err_irq:
 	return IRQ_HANDLED;
 }
 
-static int mtk_afe_runtime_suspend(struct device *dev)
+static int mt8167_afe_runtime_suspend(struct device *dev)
 {
 	dev_info(dev, "%s\n", __func__);
 
 	return 0;
 }
 
-static int mtk_afe_runtime_resume(struct device *dev)
+static int mt8167_afe_runtime_resume(struct device *dev)
 {
 	struct mtk_afe *afe = dev_get_drvdata(dev);
 
 	dev_info(dev, "%s >>\n", __func__);
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	/* unmask all IRQs */
 	regmap_update_bits(afe->regmap, AFE_IRQ_MCU_EN, 0xff, 0xff);
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 
 	dev_info(dev, "%s <<\n", __func__);
 
 	return 0;
 }
 
-static int mtk_afe_init_audio_clk(struct mtk_afe *afe)
+static int mt8167_afe_init_audio_clk(struct mtk_afe *afe)
 {
 #ifdef COMMON_CLOCK_FRAMEWORK_API
 	size_t i;
@@ -2607,7 +2607,7 @@ static int mtk_afe_init_audio_clk(struct mtk_afe *afe)
 	return 0;
 }
 
-static int mtk_afe_pcm_dev_probe(struct platform_device *pdev)
+static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 {
 	int ret, i;
 	unsigned int irq_id;
@@ -2618,7 +2618,7 @@ static int mtk_afe_pcm_dev_probe(struct platform_device *pdev)
 	if (!afe)
 		return -ENOMEM;
 
-	afe->backup_regs = kzalloc(ARRAY_SIZE(mtk_afe_backup_list) *
+	afe->backup_regs = kzalloc(ARRAY_SIZE(mt8167_afe_backup_list) *
 				   sizeof(unsigned int), GFP_KERNEL);
 	if (!afe->backup_regs)
 		return -ENOMEM;
@@ -2636,7 +2636,7 @@ static int mtk_afe_pcm_dev_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
-	ret = devm_request_irq(afe->dev, irq_id, mtk_afe_irq_handler,
+	ret = devm_request_irq(afe->dev, irq_id, mt8167_afe_irq_handler,
 			       0, "Afe_ISR_Handle", (void *)afe);
 	if (ret) {
 		dev_err(afe->dev, "could not request_irq\n");
@@ -2649,7 +2649,7 @@ static int mtk_afe_pcm_dev_probe(struct platform_device *pdev)
 		return PTR_ERR(afe->base_addr);
 
 	afe->regmap = devm_regmap_init_mmio(&pdev->dev, afe->base_addr,
-		&mtk_afe_regmap_config);
+		&mt8167_afe_regmap_config);
 	if (IS_ERR(afe->regmap))
 		return PTR_ERR(afe->regmap);
 
@@ -2661,13 +2661,13 @@ static int mtk_afe_pcm_dev_probe(struct platform_device *pdev)
 	}
 
 	/* initial audio related clock */
-	ret = mtk_afe_init_audio_clk(afe);
+	ret = mt8167_afe_init_audio_clk(afe);
 	if (ret) {
-		dev_err(afe->dev, "%s mtk_afe_init_audio_clk fail\n", __func__);
+		dev_err(afe->dev, "%s mt8167_afe_init_audio_clk fail\n", __func__);
 		return ret;
 	}
 
-	for (i = 0; i < MTK_AFE_MEMIF_NUM; i++)
+	for (i = 0; i < MT8167_AFE_MEMIF_NUM; i++)
 		afe->memif[i].data = &memif_data[i];
 
 	platform_set_drvdata(pdev, afe);
@@ -2677,26 +2677,26 @@ static int mtk_afe_pcm_dev_probe(struct platform_device *pdev)
 	pm_runtime_enable(&pdev->dev);
 	if (!pm_runtime_enabled(&pdev->dev)) {
 		dev_warn(afe->dev, "%s power not enabled\n", __func__);
-		ret = mtk_afe_runtime_resume(&pdev->dev);
+		ret = mt8167_afe_runtime_resume(&pdev->dev);
 		if (ret)
 			goto err_pm_disable;
 	}
 
-	ret = snd_soc_register_platform(&pdev->dev, &mtk_afe_pcm_platform);
+	ret = snd_soc_register_platform(&pdev->dev, &mt8167_afe_pcm_platform);
 	if (ret)
 		goto err_pm_disable;
 
 	ret = snd_soc_register_component(&pdev->dev,
-					 &mtk_afe_pcm_dai_component,
-					 mtk_afe_pcm_dais,
-					 ARRAY_SIZE(mtk_afe_pcm_dais));
+					 &mt8167_afe_pcm_dai_component,
+					 mt8167_afe_pcm_dais,
+					 ARRAY_SIZE(mt8167_afe_pcm_dais));
 	if (ret)
 		goto err_platform;
 
-	mtk_afe_init_debugfs(afe);
+	mt8167_afe_init_debugfs(afe);
 
 	/* TODO: parse tdm out mode from dts */
-	afe->tdm_out_mode = MTK_AFE_TDM_OUT_HDMI;
+	afe->tdm_out_mode = MT8167_AFE_TDM_OUT_HDMI;
 
 	dev_info(&pdev->dev, "MTK AFE driver initialized.\n");
 	return 0;
@@ -2708,46 +2708,46 @@ err_pm_disable:
 	return ret;
 }
 
-static int mtk_afe_pcm_dev_remove(struct platform_device *pdev)
+static int mt8167_afe_pcm_dev_remove(struct platform_device *pdev)
 {
 	struct mtk_afe *afe = platform_get_drvdata(pdev);
 
-	mtk_afe_cleanup_debugfs(afe);
+	mt8167_afe_cleanup_debugfs(afe);
 
 	if (afe && afe->backup_regs)
 		kfree(afe->backup_regs);
 
 	pm_runtime_disable(&pdev->dev);
 	if (!pm_runtime_status_suspended(&pdev->dev))
-		mtk_afe_runtime_suspend(&pdev->dev);
+		mt8167_afe_runtime_suspend(&pdev->dev);
 
 	snd_soc_unregister_component(&pdev->dev);
 	snd_soc_unregister_platform(&pdev->dev);
 	return 0;
 }
 
-static const struct of_device_id mtk_afe_pcm_dt_match[] = {
+static const struct of_device_id mt8167_afe_pcm_dt_match[] = {
 	{ .compatible = "mediatek,mt8167-afe-pcm", },
 	{ }
 };
-MODULE_DEVICE_TABLE(of, mtk_afe_pcm_dt_match);
+MODULE_DEVICE_TABLE(of, mt8167_afe_pcm_dt_match);
 
-static const struct dev_pm_ops mtk_afe_pm_ops = {
-	SET_RUNTIME_PM_OPS(mtk_afe_runtime_suspend, mtk_afe_runtime_resume,
+static const struct dev_pm_ops mt8167_afe_pm_ops = {
+	SET_RUNTIME_PM_OPS(mt8167_afe_runtime_suspend, mt8167_afe_runtime_resume,
 			   NULL)
 };
 
-static struct platform_driver mtk_afe_pcm_driver = {
+static struct platform_driver mt8167_afe_pcm_driver = {
 	.driver = {
 		   .name = "mtk-afe-pcm",
-		   .of_match_table = mtk_afe_pcm_dt_match,
-		   .pm = &mtk_afe_pm_ops,
+		   .of_match_table = mt8167_afe_pcm_dt_match,
+		   .pm = &mt8167_afe_pm_ops,
 	},
-	.probe = mtk_afe_pcm_dev_probe,
-	.remove = mtk_afe_pcm_dev_remove,
+	.probe = mt8167_afe_pcm_dev_probe,
+	.remove = mt8167_afe_pcm_dev_remove,
 };
 
-module_platform_driver(mtk_afe_pcm_driver);
+module_platform_driver(mt8167_afe_pcm_driver);
 
 MODULE_DESCRIPTION("Mediatek ALSA SoC AFE platform driver");
 MODULE_LICENSE("GPL v2");

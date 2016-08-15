@@ -142,28 +142,28 @@ static const char *const ap_loopback_func[] = {
 	ENUM_TO_STR(AP_LOOPBACK_HEADSET_MIC_TO_HP),
 };
 
-static int mtk_afe_sgen_get(struct snd_kcontrol *kcontrol,
+static int mt8167_afe_sgen_get(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
-	struct mtk_afe_control_data *data = &afe->ctrl_data;
+	struct mt8167_afe_control_data *data = &afe->ctrl_data;
 
 	ucontrol->value.integer.value[0] = data->sinegen_type;
 	return 0;
 }
 
-static int mtk_afe_sgen_put(struct snd_kcontrol *kcontrol,
+static int mt8167_afe_sgen_put(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
-	struct mtk_afe_control_data *data = &afe->ctrl_data;
+	struct mt8167_afe_control_data *data = &afe->ctrl_data;
 
 	if (data->sinegen_type == ucontrol->value.integer.value[0])
 		return 0;
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	if (data->sinegen_type != AFE_SGEN_OFF)
 		regmap_update_bits(afe->regmap, AFE_SGEN_CON0, 0xffffffff, 0xf0000000);
@@ -245,32 +245,32 @@ static int mtk_afe_sgen_put(struct snd_kcontrol *kcontrol,
 		break;
 	}
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 
 	data->sinegen_type = ucontrol->value.integer.value[0];
 
 	return 0;
 }
 
-static int mtk_afe_sgen_fs_get(struct snd_kcontrol *kcontrol,
+static int mt8167_afe_sgen_fs_get(struct snd_kcontrol *kcontrol,
 				       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
-	struct mtk_afe_control_data *data = &afe->ctrl_data;
+	struct mt8167_afe_control_data *data = &afe->ctrl_data;
 
 	ucontrol->value.integer.value[0] = data->sinegen_fs;
 	return 0;
 }
 
-static int mtk_afe_sgen_fs_put(struct snd_kcontrol *kcontrol,
+static int mt8167_afe_sgen_fs_put(struct snd_kcontrol *kcontrol,
 				       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
-	struct mtk_afe_control_data *data = &afe->ctrl_data;
+	struct mt8167_afe_control_data *data = &afe->ctrl_data;
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	switch (ucontrol->value.integer.value[0]) {
 	case AFE_SGEN_8K:
@@ -304,31 +304,31 @@ static int mtk_afe_sgen_fs_put(struct snd_kcontrol *kcontrol,
 		break;
 	}
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 
 	data->sinegen_fs = ucontrol->value.integer.value[0];
 
 	return 0;
 }
 
-static int mtk_afe_ap_loopback_get(struct snd_kcontrol *kcontrol,
+static int mt8167_afe_ap_loopback_get(struct snd_kcontrol *kcontrol,
 					     struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
-	struct mtk_afe_control_data *data = &afe->ctrl_data;
+	struct mt8167_afe_control_data *data = &afe->ctrl_data;
 
 	ucontrol->value.integer.value[0] = data->loopback_type;
 
 	return 0;
 }
 
-static int mtk_afe_ap_loopback_put(struct snd_kcontrol *kcontrol,
+static int mt8167_afe_ap_loopback_put(struct snd_kcontrol *kcontrol,
 					     struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
-	struct mtk_afe_control_data *data = &afe->ctrl_data;
+	struct mt8167_afe_control_data *data = &afe->ctrl_data;
 	uint32_t sample_rate = 48000;
 	long val = ucontrol->value.integer.value[0];
 
@@ -346,12 +346,12 @@ static int mtk_afe_ap_loopback_put(struct snd_kcontrol *kcontrol,
 		regmap_update_bits(afe->regmap, AFE_ADDA_UL_SRC_CON0, 0x1, 0x0);
 		regmap_update_bits(afe->regmap, AFE_I2S_CON1, 0x1, 0x0);
 
-		mtk_afe_disable_afe_on(afe);
+		mt8167_afe_disable_afe_on(afe);
 
-		mtk_afe_disable_top_cg(afe, MTK_AFE_CG_DAC);
-		mtk_afe_disable_top_cg(afe, MTK_AFE_CG_DAC_PREDIS);
-		mtk_afe_disable_top_cg(afe, MTK_AFE_CG_ADC);
-		mtk_afe_disable_main_clk(afe);
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC);
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_ADC);
+		mt8167_afe_disable_main_clk(afe);
 
 		pm_runtime_put(afe->dev);
 	}
@@ -364,11 +364,11 @@ static int mtk_afe_ap_loopback_put(struct snd_kcontrol *kcontrol,
 			sample_rate = 32000;
 		}
 
-		mtk_afe_enable_main_clk(afe);
+		mt8167_afe_enable_main_clk(afe);
 
-		mtk_afe_enable_top_cg(afe, MTK_AFE_CG_DAC);
-		mtk_afe_enable_top_cg(afe, MTK_AFE_CG_DAC_PREDIS);
-		mtk_afe_enable_top_cg(afe, MTK_AFE_CG_ADC);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_ADC);
 
 		/* IO3 connect with O03 */
 		regmap_update_bits(afe->regmap, AFE_CONN1, 1 << 19, 1 << 19);
@@ -414,7 +414,7 @@ static int mtk_afe_ap_loopback_put(struct snd_kcontrol *kcontrol,
 		regmap_update_bits(afe->regmap, AFE_ADDA_UL_DL_CON0, 0x1, 0x1);
 		regmap_update_bits(afe->regmap, AFE_I2S_CON1, 0x1, 0x1);
 
-		mtk_afe_enable_afe_on(afe);
+		mt8167_afe_enable_afe_on(afe);
 	}
 
 	data->loopback_type = ucontrol->value.integer.value[0];
@@ -422,31 +422,31 @@ static int mtk_afe_ap_loopback_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int mtk_afe_hdmi_force_clk_get(struct snd_kcontrol *kcontrol,
+static int mt8167_afe_hdmi_force_clk_get(struct snd_kcontrol *kcontrol,
 				     struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
-	struct mtk_afe_control_data *data = &afe->ctrl_data;
+	struct mt8167_afe_control_data *data = &afe->ctrl_data;
 
 	ucontrol->value.integer.value[0] = data->hdmi_force_clk;
 
 	return 0;
 }
 
-static int mtk_afe_hdmi_force_clk_put(struct snd_kcontrol *kcontrol,
+static int mt8167_afe_hdmi_force_clk_put(struct snd_kcontrol *kcontrol,
 				     struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
-	struct mtk_afe_control_data *data = &afe->ctrl_data;
+	struct mt8167_afe_control_data *data = &afe->ctrl_data;
 
 	data->hdmi_force_clk = ucontrol->value.integer.value[0];
 
 	return 0;
 }
 
-static const struct soc_enum mtk_afe_soc_enums[] = {
+static const struct soc_enum mt8167_afe_soc_enums[] = {
 	[CTRL_SGEN_EN] = SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(sgen_func),
 				sgen_func),
 	[CTRL_SGEN_FS] = SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(sgen_fs_func),
@@ -455,29 +455,29 @@ static const struct soc_enum mtk_afe_soc_enums[] = {
 				ap_loopback_func),
 };
 
-static const struct snd_kcontrol_new mtk_afe_controls[] = {
+static const struct snd_kcontrol_new mt8167_afe_controls[] = {
 	SOC_ENUM_EXT("Audio_SideGen_Switch",
-		     mtk_afe_soc_enums[CTRL_SGEN_EN],
-		     mtk_afe_sgen_get,
-		     mtk_afe_sgen_put),
+		     mt8167_afe_soc_enums[CTRL_SGEN_EN],
+		     mt8167_afe_sgen_get,
+		     mt8167_afe_sgen_put),
 	SOC_ENUM_EXT("Audio_SideGen_SampleRate",
-		     mtk_afe_soc_enums[CTRL_SGEN_FS],
-		     mtk_afe_sgen_fs_get,
-		     mtk_afe_sgen_fs_put),
+		     mt8167_afe_soc_enums[CTRL_SGEN_FS],
+		     mt8167_afe_sgen_fs_get,
+		     mt8167_afe_sgen_fs_put),
 	SOC_ENUM_EXT("AP_Loopback_Select",
-		     mtk_afe_soc_enums[CTRL_AP_LOOPBACK],
-		     mtk_afe_ap_loopback_get,
-		     mtk_afe_ap_loopback_put),
+		     mt8167_afe_soc_enums[CTRL_AP_LOOPBACK],
+		     mt8167_afe_ap_loopback_get,
+		     mt8167_afe_ap_loopback_put),
 	SOC_SINGLE_BOOL_EXT("HDMI_Force_Clk_Switch",
 			    0,
-			    mtk_afe_hdmi_force_clk_get,
-			    mtk_afe_hdmi_force_clk_put),
+			    mt8167_afe_hdmi_force_clk_get,
+			    mt8167_afe_hdmi_force_clk_put),
 };
 
 
-int mtk_afe_add_controls(struct snd_soc_platform *platform)
+int mt8167_afe_add_controls(struct snd_soc_platform *platform)
 {
-	return snd_soc_add_platform_controls(platform, mtk_afe_controls,
-					     ARRAY_SIZE(mtk_afe_controls));
+	return snd_soc_add_platform_controls(platform, mt8167_afe_controls,
+					     ARRAY_SIZE(mt8167_afe_controls));
 }
 
