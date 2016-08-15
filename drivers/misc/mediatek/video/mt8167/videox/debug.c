@@ -134,7 +134,7 @@ unsigned int g_mobilelog;
 void init_mtkfb_mmp_events(void)
 {
 	if (MTKFB_MMP_Events.MTKFB == 0) {
-		MTKFB_MMP_Events.MTKFB = mmprofile_register_event(MMP_RootEvent, "MTKFB");
+		MTKFB_MMP_Events.MTKFB = mmprofile_register_event(MMP_ROOT_EVENT, "MTKFB");
 		MTKFB_MMP_Events.PanDisplay =
 		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "PanDisplay");
 		MTKFB_MMP_Events.CreateSyncTimeline =
