@@ -147,7 +147,6 @@ static const unsigned int ddp_irq_num[DISP_REG_NUM] = {
 	0	/*DISP_LVDS_TX*/
 };
 
-
 struct MIPITX_DSI_CON_REG {
 	unsigned RG_DSI0_LDOCORE_EN:1;
 	unsigned RG_DSI0_CKG_LDOOUT_EN:1;
@@ -157,9 +156,9 @@ struct MIPITX_DSI_CON_REG {
 	unsigned RG_DSI0_PHYCLK_SEL:2;
 	unsigned RG_DSI0_DSICLK_FREQ_SEL:1;
 	unsigned RG_DSI0_LPTX_CLMP_EN:1;
-	unsigned rsv_12:20;
+	unsigned RG_DSI0_LPRXCD_SEL:3;
+	unsigned rsv_15:17;
 };
-
 
 struct MIPITX_DSI_CLOCK_LANE_REG {
 	unsigned RG_DSI0_LNTC_LDOOUT_EN:1;
@@ -170,9 +169,9 @@ struct MIPITX_DSI_CLOCK_LANE_REG {
 	unsigned RG_DSI0_LNTC_PHI_SEL:1;
 	unsigned rsv_6:2;
 	unsigned RG_DSI0_LNTC_RT_CODE:4;
-	unsigned rsv_12:20;
+	unsigned RG_DSI0_LNTC_CKLANE_EN:1;
+	unsigned rsv_13:19;
 };
-
 
 struct MIPITX_DSI_DATA_LANE0_REG {
 	unsigned RG_DSI0_LNT0_LDOOUT_EN:1;
@@ -183,9 +182,9 @@ struct MIPITX_DSI_DATA_LANE0_REG {
 	unsigned RG_DSI0_LNT0_LPCD_IPLUS:1;
 	unsigned RG_DSI0_LNT0_LPCD_IMINUS:1;
 	unsigned RG_DSI0_LNT0_RT_CODE:4;
-	unsigned rsv_11:21;
+	unsigned RG_DSI0_LNT0_CKLANE_EN:1;
+	unsigned rsv_12:20;
 };
-
 
 struct MIPITX_DSI_DATA_LANE1_REG {
 	unsigned RG_DSI0_LNT1_LDOOUT_EN:1;
@@ -194,9 +193,9 @@ struct MIPITX_DSI_DATA_LANE1_REG {
 	unsigned RG_DSI0_LNT1_LPTX_IPLUS2:1;
 	unsigned RG_DSI0_LNT1_LPTX_IMINUS:1;
 	unsigned RG_DSI0_LNT1_RT_CODE:4;
-	unsigned rsv_9:23;
+	unsigned RG_DSI0_LNT1_CKLANE_EN:1;
+	unsigned rsv_10:22;
 };
-
 
 struct MIPITX_DSI_DATA_LANE2_REG {
 	unsigned RG_DSI0_LNT2_LDOOUT_EN:1;
@@ -205,7 +204,8 @@ struct MIPITX_DSI_DATA_LANE2_REG {
 	unsigned RG_DSI0_LNT2_LPTX_IPLUS2:1;
 	unsigned RG_DSI0_LNT2_LPTX_IMINUS:1;
 	unsigned RG_DSI0_LNT2_RT_CODE:4;
-	unsigned rsv_9:23;
+	unsigned RG_DSI0_LNT2_CKLANE_EN:1;
+	unsigned rsv_10:22;
 };
 
 struct MIPITX_DSI_DATA_LANE3_REG {
@@ -215,7 +215,8 @@ struct MIPITX_DSI_DATA_LANE3_REG {
 	unsigned RG_DSI0_LNT3_LPTX_IPLUS2:1;
 	unsigned RG_DSI0_LNT3_LPTX_IMINUS:1;
 	unsigned RG_DSI0_LNT3_RT_CODE:4;
-	unsigned rsv_9:23;
+	unsigned RG_DSI0_LNT3_CKLANE_EN:1;
+	unsigned rsv_10:22;
 };
 
 struct MIPITX_DSI_TOP_CON_REG {
@@ -230,7 +231,6 @@ struct MIPITX_DSI_TOP_CON_REG {
 	unsigned RG_DSI_PRESERVE:3;
 	unsigned rsv_16:16;
 };
-
 
 struct MIPITX_DSI_BG_CON_REG {
 	unsigned RG_DSI_BG_CORE_EN:1;
@@ -248,7 +248,6 @@ struct MIPITX_DSI_BG_CON_REG {
 	unsigned RG_DSI_BG_R2_TRIM:4;
 };
 
-
 struct MIPITX_DSI_PLL_CON0_REG {
 	unsigned RG_DSI0_MPPLL_PLL_EN:1;
 	unsigned RG_DSI0_MPPLL_PREDIV:2;
@@ -260,7 +259,6 @@ struct MIPITX_DSI_PLL_CON0_REG {
 	unsigned RG_DSI0_MPPLL_VDO_EN:1;
 	unsigned rsv_13:19;
 };
-
 
 struct MIPITX_DSI_PLL_CON1_REG {
 	unsigned RG_DSI0_MPPLL_SDM_FRA_EN:1;
@@ -278,18 +276,15 @@ struct MIPITX_DSI_PLL_CON2_REG {
 	unsigned rsv_31:1;
 };
 
-
 struct MIPITX_DSI_PLL_CON3_REG {
 	unsigned RG_DSI0_MPPLL_SDM_SSC_DELTA1:16;
 	unsigned RG_DSI0_MPPLL_SDM_SSC_DELTA:16;
 };
 
-
 struct MIPITX_DSI_PLL_CHG_REG {
 	unsigned RG_DSI0_MPPLL_SDM_PCW_CHG:1;
 	unsigned rsv_1:31;
 };
-
 
 struct MIPITX_DSI_PLL_TOP_REG {
 	unsigned RG_MPPLL_TST_EN:1;
@@ -300,7 +295,6 @@ struct MIPITX_DSI_PLL_TOP_REG {
 	unsigned RG_MPPLL_PRESERVE_H:6;
 	unsigned rsv_16:16;
 };
-
 
 struct MIPITX_DSI_PLL_PWR_REG {
 	unsigned DA_DSI0_MPPLL_SDM_PWR_ON:1;
@@ -315,7 +309,6 @@ struct MIPITX_DSI_RGS_REG {
 	unsigned rsv_1:31;
 };
 
-
 struct MIPITX_DSI_GPIO_EN_REG {
 	unsigned RG_DSI0_GPI0_EN:1;
 	unsigned RG_DSI0_GPI1_EN:1;
@@ -325,10 +318,13 @@ struct MIPITX_DSI_GPIO_EN_REG {
 	unsigned RG_DSI0_GPI5_EN:1;
 	unsigned RG_DSI0_GPI6_EN:1;
 	unsigned RG_DSI0_GPI7_EN:1;
+	unsigned RG_DSI0_GPI8_EN:1;
+	unsigned RG_DSI0_GPI9_EN:1;
 	unsigned RG_DSI0_GPI_SMT_EN:1;
 	unsigned RG_DSI0_GPI_DRIVE_EN:1;
-	unsigned rsv_10:22;
+	unsigned rsv_12:20;
 };
+
 struct MIPITX_DSI_GPIO_OUT_REG {
 	unsigned AD_DSI0_GPI0_OUT:1;
 	unsigned AD_DSI0_GPI1_OUT:1;
@@ -340,33 +336,6 @@ struct MIPITX_DSI_GPIO_OUT_REG {
 	unsigned AD_DSI0_GPI7_OUT:1;
 	unsigned rsv_8:24;
 };
-/*
-*
-struct MIPITX_DSI_GPI_PULL_REG {
-	unsigned RG_DSI0_GPI0_PD:1;
-	unsigned RG_DSI0_GPI1_PD:1;
-	unsigned RG_DSI0_GPI2_PD:1;
-	unsigned RG_DSI0_GPI3_PD:1;
-	unsigned RG_DSI0_GPI4_PD:1;
-	unsigned RG_DSI0_GPI5_PD:1;
-	unsigned RG_DSI0_GPI6_PD:1;
-	unsigned RG_DSI0_GPI7_PD:1;
-	unsigned RG_DSI0_GPI8_PD:1;
-	unsigned RG_DSI0_GPI9_PD:1;
-	unsigned rsv_10:6;
-	unsigned RG_DSI0_GPI0_PU:1;
-	unsigned RG_DSI0_GPI1_PU:1;
-	unsigned RG_DSI0_GPI2_PU:1;
-	unsigned RG_DSI0_GPI3_PU:1;
-	unsigned RG_DSI0_GPI4_PU:1;
-	unsigned RG_DSI0_GPI5_PU:1;
-	unsigned RG_DSI0_GPI6_PU:1;
-	unsigned RG_DSI0_GPI7_PU:1;
-	unsigned RG_DSI0_GPI8_PU:1;
-	unsigned RG_DSI0_GPI9_PU:1;
-	unsigned rsv_26:6;
-};
-
 
 struct MIPITX_DSI_PHY_SEL_REG {
 	unsigned MIPI_TX_PHY0_SEL:3;
@@ -382,13 +351,11 @@ struct MIPITX_DSI_PHY_SEL_REG {
 	unsigned MIPI_TX_LPRX_SEL:3;
 	unsigned rsv_23:9;
 };
-*/
 
 struct MIPITX_DSI_SW_CTRL_REG {
 	unsigned SW_CTRL_EN:1;
 	unsigned rsv_1:31;
 };
-
 
 struct MIPITX_DSI_SW_CTRL_CON0_REG {
 	unsigned SW_LNTC_LPTX_PRE_OE:1;
@@ -397,13 +364,20 @@ struct MIPITX_DSI_SW_CTRL_CON0_REG {
 	unsigned SW_LNTC_LPTX_N:1;
 	unsigned SW_LNTC_HSTX_PRE_OE:1;
 	unsigned SW_LNTC_HSTX_OE:1;
-	unsigned SW_LNTC_HSTX_ZEROCLK:1;
+	unsigned SW_LNTC_HSTX_RDY:1;
+	unsigned SW_LNT0_LPRX_EN:1;
+	unsigned SW_LNT0_HSTX_DATA:8;
+	unsigned rsv_16:16;
+};
+
+struct MIPITX_DSI_SW_CTRL_CON1_REG {
 	unsigned SW_LNT0_LPTX_PRE_OE:1;
 	unsigned SW_LNT0_LPTX_OE:1;
 	unsigned SW_LNT0_LPTX_P:1;
 	unsigned SW_LNT0_LPTX_N:1;
 	unsigned SW_LNT0_HSTX_PRE_OE:1;
 	unsigned SW_LNT0_HSTX_OE:1;
+	unsigned SW_LNT0_HSTX_RDY:1;
 	unsigned SW_LNT0_LPRX_EN:1;
 	unsigned SW_LNT1_LPTX_PRE_OE:1;
 	unsigned SW_LNT1_LPTX_OE:1;
@@ -411,48 +385,36 @@ struct MIPITX_DSI_SW_CTRL_CON0_REG {
 	unsigned SW_LNT1_LPTX_N:1;
 	unsigned SW_LNT1_HSTX_PRE_OE:1;
 	unsigned SW_LNT1_HSTX_OE:1;
+	unsigned SW_LNT1_HSTX_RDY:1;
+	unsigned SW_LNT1_LPRX_EN:1;
 	unsigned SW_LNT2_LPTX_PRE_OE:1;
 	unsigned SW_LNT2_LPTX_OE:1;
 	unsigned SW_LNT2_LPTX_P:1;
 	unsigned SW_LNT2_LPTX_N:1;
 	unsigned SW_LNT2_HSTX_PRE_OE:1;
 	unsigned SW_LNT2_HSTX_OE:1;
+	unsigned SW_LNT2_HSTX_RDY:1;
+	unsigned SW_LNT2_LPRX_EN:1;
 	unsigned SW_LNT3_LPTX_PRE_OE:1;
 	unsigned SW_LNT3_LPTX_OE:1;
 	unsigned SW_LNT3_LPTX_P:1;
 	unsigned SW_LNT3_LPTX_N:1;
 	unsigned SW_LNT3_HSTX_PRE_OE:1;
 	unsigned SW_LNT3_HSTX_OE:1;
+	unsigned SW_LNT3_HSTX_RDY:1;
+	unsigned SW_LNT3_LPRX_EN:1;
 };
 
-
-struct MIPITX_DSI_SW_CTRL_CON1_REG {
-	unsigned SW_LNT_HSTX_DATA:8;
-	unsigned SW_LNT_HSTX_DRDY:1;
-	unsigned rsv_9:23;
-};
-
-/*
-*
 struct MIPITX_DSI_SW_CTRL_CON2_REG {
 	unsigned SW_LNT_HSTX_DATA:8;
 	unsigned rsv_8:24;
 };
-*/
 
 struct MIPITX_DSI_DBG_CON_REG {
-	unsigned MIPI_TX_DBG_SEL:3;
+	unsigned MIPI_TX_DBG_SEL:2;
 	unsigned MIPI_TX_DBG_OUT_EN:1;
-	unsigned rsv_4:28;
+	unsigned rsv_3:29;
 };
-/*
-*
-struct MIPITX_DSI_APB_ASYNC_STA_REG {
-	unsigned MIPI_TX_APB_ASYNC_ERR:1;
-	unsigned MIPI_TX_APB_ASYNC_ERR_ADDR:10;
-	unsigned rsv_11:21;
-};
-*/
 
 struct DSI_START_REG {
 	unsigned DSI_START:1;
@@ -462,7 +424,6 @@ struct DSI_START_REG {
 	unsigned VM_CMD_START:1;
 	unsigned rsv_17:15;
 };
-
 
 struct DSI_STATUS_REG {
 	unsigned rsv_0:1;
@@ -475,7 +436,6 @@ struct DSI_STATUS_REG {
 	unsigned rsv_8:24;
 };
 
-
 struct DSI_INT_ENABLE_REG {
 	unsigned RD_RDY:1;
 	unsigned CMD_DONE:1;
@@ -486,7 +446,6 @@ struct DSI_INT_ENABLE_REG {
 	unsigned SLEEPOUT_DONE:1;
 	unsigned rsv_7:25;
 };
-
 
 struct DSI_INT_STATUS_REG {
 	unsigned RD_RDY:1;
@@ -500,13 +459,13 @@ struct DSI_INT_STATUS_REG {
 	unsigned BUSY:1;
 };
 
-
 struct DSI_COM_CTRL_REG {
 	unsigned DSI_RESET:1;
 	unsigned DSI_EN:1;
-	unsigned rsv_2:30;
+	unsigned rsv_2:2;
+	unsigned DSI_DUAL_EN:1;
+	unsigned rsv_5:27;
 };
-
 
 enum DSI_MODE_CTRL {
 	DSI_CMD_MODE = 0,
@@ -514,7 +473,6 @@ enum DSI_MODE_CTRL {
 	DSI_SYNC_EVENT_VDO_MODE = 2,
 	DSI_BURST_VDO_MODE = 3
 };
-
 
 struct DSI_MODE_CTRL_REG {
 	unsigned MODE:2;
@@ -524,15 +482,14 @@ struct DSI_MODE_CTRL_REG {
 	unsigned V2C_SWITCH_ON:1;
 	unsigned C2V_SWITCH_ON:1;
 	unsigned SLEEP_MODE:1;
-	unsigned rsv_21:11;
+	unsigned SLEEP_VM_STOP:1;
+	unsigned rsv_22:10;
 };
-
 
 enum DSI_LANE_NUM {
 	ONE_LANE = 1,
 	TWO_LANE = 2
 };
-
 
 struct DSI_TXRX_CTRL_REG {
 	unsigned VC_NUM:2;
@@ -548,14 +505,12 @@ struct DSI_TXRX_CTRL_REG {
 	unsigned rsv_17:15;
 };
 
-
 enum DSI_PS_TYPE {
 	PACKED_PS_16BIT_RGB565 = 0,
 	LOOSELY_PS_18BIT_RGB666 = 1,
 	PACKED_PS_24BIT_RGB888 = 2,
 	PACKED_PS_18BIT_RGB666 = 3
 };
-
 
 struct DSI_PSCTRL_REG {
 	unsigned DSI_PS_WC:14;
@@ -564,24 +519,20 @@ struct DSI_PSCTRL_REG {
 	unsigned rsv_18:14;
 };
 
-
 struct DSI_VSA_NL_REG {
 	unsigned VSA_NL:7;
 	unsigned rsv_7:25;
 };
-
 
 struct DSI_VBP_NL_REG {
 	unsigned VBP_NL:7;
 	unsigned rsv_7:25;
 };
 
-
 struct DSI_VFP_NL_REG {
 	unsigned VFP_NL:7;
 	unsigned rsv_7:25;
 };
-
 
 struct DSI_VACT_NL_REG {
 	unsigned VACT_NL:12;
@@ -613,6 +564,12 @@ struct DSI_CMDQ_CTRL_REG {
 	unsigned rsv_6:26;
 };
 
+struct DSI_HSTX_CKL_WC_REG {
+	unsigned rsv_0:2;
+	unsigned HSTX_CKL_WC:14;
+	unsigned rsv_16:16;
+};
+
 struct DSI_RX_DATA_REG {
 	unsigned char byte0;
 	unsigned char byte1;
@@ -620,13 +577,11 @@ struct DSI_RX_DATA_REG {
 	unsigned char byte3;
 };
 
-
 struct DSI_RACK_REG {
 	unsigned DSI_RACK:1;
 	unsigned DSI_RACK_BYPASS:1;
 	unsigned rsv2:30;
 };
-
 
 struct DSI_TRIG_STA_REG {
 	unsigned TRIG0:1;	/* remote rst */
@@ -638,18 +593,15 @@ struct DSI_TRIG_STA_REG {
 	unsigned rsv6:26;
 };
 
-
 struct DSI_MEM_CONTI_REG {
 	unsigned RWMEM_CONTI:16;
 	unsigned rsv16:16;
 };
 
-
 struct DSI_FRM_BC_REG {
 	unsigned FRM_BC:21;
 	unsigned rsv21:11;
 };
-
 
 struct DSI_PHY_CON_REG {
 	unsigned PHY_RST:1;
@@ -660,6 +612,11 @@ struct DSI_PHY_CON_REG {
 	unsigned rsv8:24;
 };
 
+struct DSI_PHY_LCPAT_REG {
+	unsigned LC_HSTX_CK_PAT:8;
+	unsigned rsv3:24;
+};
+typedef struct DSI_PHY_LCPAT_REG *PDSI_PHY_LCPAT_REG;
 
 struct DSI_PHY_LCCON_REG {
 	unsigned LC_HS_TX_EN:1;
@@ -668,14 +625,13 @@ struct DSI_PHY_LCCON_REG {
 	unsigned rsv3:29;
 };
 
-
 struct DSI_PHY_LD0CON_REG {
 	unsigned L0_HS_TX_EN:1;
 	unsigned L0_ULPM_EN:1;
 	unsigned L0_WAKEUP_EN:1;
-	unsigned rsv3:29;
+	unsigned Lx_ULPM_AS_Lo:1;
+	unsigned rsv3:28;
 };
-
 
 struct DSI_PHY_TIMCON0_REG {
 	unsigned char LPX;
@@ -684,14 +640,12 @@ struct DSI_PHY_TIMCON0_REG {
 	unsigned char HS_TRAIL;
 };
 
-
 struct DSI_PHY_TIMCON1_REG {
 	unsigned char TA_GO;
 	unsigned char TA_SURE;
 	unsigned char TA_GET;
 	unsigned char DA_HS_EXIT;
 };
-
 
 struct DSI_PHY_TIMCON2_REG {
 	unsigned char CONT_DET;
@@ -700,7 +654,6 @@ struct DSI_PHY_TIMCON2_REG {
 	unsigned char CLK_TRAIL;
 };
 
-
 struct DSI_PHY_TIMCON3_REG {
 	unsigned char CLK_HS_PRPR;
 	unsigned char CLK_HS_POST;
@@ -708,12 +661,10 @@ struct DSI_PHY_TIMCON3_REG {
 	unsigned rsv24:8;
 };
 
-
 struct DSI_PHY_TIMCON4_REG {
 	unsigned ULPS_WAKEUP:20;
 	unsigned rsv20:12;
 };
-
 
 struct DSI_PHY_TIMCON_REG {
 	struct DSI_PHY_TIMCON0_REG CTRL0;
@@ -722,12 +673,10 @@ struct DSI_PHY_TIMCON_REG {
 	struct DSI_PHY_TIMCON3_REG CTRL3;
 };
 
-
 struct DSI_CKSM_OUT_REG {
 	unsigned CHECK_SUM:16;
 	unsigned rsv16:16;
 };
-
 
 struct DSI_STATE_DBG0_REG {
 	unsigned DPHY_CTL_STATE_C:9;
@@ -735,7 +684,6 @@ struct DSI_STATE_DBG0_REG {
 	unsigned DPHY_HS_TX_STATE_C:5;
 	unsigned rsv21:11;
 };
-
 
 struct DSI_STATE_DBG1_REG {
 	unsigned CTL_STATE_C:15;
@@ -745,7 +693,6 @@ struct DSI_STATE_DBG1_REG {
 	unsigned ESC_STATE_0:8;
 };
 
-
 struct DSI_STATE_DBG2_REG {
 	unsigned RX_ESC_STATE:10;
 	unsigned rsv10:6;
@@ -754,7 +701,6 @@ struct DSI_STATE_DBG2_REG {
 	unsigned TA_R2T_STATE:5;
 	unsigned rsv29:3;
 };
-
 
 struct DSI_STATE_DBG3_REG {
 	unsigned CTL_STATE_1:5;
@@ -767,7 +713,6 @@ struct DSI_STATE_DBG3_REG {
 	unsigned rsv29:3;
 };
 
-
 struct DSI_STATE_DBG4_REG {
 	unsigned CTL_STATE_3:5;
 	unsigned rsv5:3;
@@ -775,13 +720,11 @@ struct DSI_STATE_DBG4_REG {
 	unsigned rsv13:19;
 };
 
-
 struct DSI_STATE_DBG5_REG {
 	unsigned WAKEUP_CNT:20;
 	unsigned rsv20:8;
 	unsigned WAKEUP_STATE:4;
 };
-
 
 struct DSI_STATE_DBG6_REG {
 	unsigned CMTRL_STATE:14;
@@ -789,7 +732,6 @@ struct DSI_STATE_DBG6_REG {
 	unsigned CMDQ_STATE:6;
 	unsigned rsv22:10;
 };
-
 
 struct DSI_STATE_DBG7_REG {
 	unsigned VMCTL_STATE:11;
@@ -801,24 +743,20 @@ struct DSI_STATE_DBG7_REG {
 	unsigned rsv16:16;
 };
 
-
 struct DSI_STATE_DBG8_REG {
 	unsigned WORD_COUNTER:14;
 	unsigned rsv14:18;
 };
-
 
 struct DSI_STATE_DBG9_REG {
 	unsigned LINE_COUNTER:22;
 	unsigned rsv22:10;
 };
 
-
 struct DSI_DEBUG_SEL_REG {
 	unsigned DEBUG_OUT_SEL:5;
 	unsigned rsv5:27;
 };
-
 
 struct DSI_BIST_CON_REG {
 	unsigned BIST_MODE:1;
@@ -826,11 +764,12 @@ struct DSI_BIST_CON_REG {
 	unsigned BIST_FIX_PATTERN:1;
 	unsigned BIST_SPC_PATTERN:1;
 	unsigned BIST_HS_FREE:1;
-	unsigned SW_CTL_EN:1;
+	unsigned rsv5:1;
 	unsigned PLL_CK_MON:1;
-	unsigned rsv7:1;
+	unsigned SELF_PAT_MODE:1;
 	unsigned BIST_LANE_NUM:4;
-	unsigned rsv12:4;
+	unsigned rsv12:3;
+	unsigned VSYNC_INV:1;
 	unsigned BIST_TIMING:8;
 	unsigned rsv24:8;
 };
@@ -847,27 +786,6 @@ struct DSI_VM_CMD_CON_REG {
 	unsigned CM_DATA_0:8;
 	unsigned CM_DATA_1:8;
 };
-/*
-*
-struct DSI_3D_CON_REG {
-	unsigned _3D_MODE:2;
-	unsigned _3D_FMT:2;
-	unsigned _3D_VSYNC:1;
-	unsigned _3D_LR:1;
-	unsigned _3D_EN:1;
-	unsigned rsv08:25;
-};
-
-struct DSI_TIME_CON0_REG {
-	unsigned UPLS_WAKEUP_PRD:16;
-	unsigned SKEWCALL_PRD:16;
-};
-
-struct DSI_TIME_CON1_REG {
-	unsigned UPLS_WAKEUP_PRD:16;
-	unsigned rsv16:16;
-};
-*/
 
 struct DSI_REGS {
 	struct DSI_START_REG DSI_START;	/* 0000 */
@@ -882,15 +800,14 @@ struct DSI_REGS {
 	struct DSI_VBP_NL_REG DSI_VBP_NL;	/* 0024 */
 	struct DSI_VFP_NL_REG DSI_VFP_NL;	/* 0028 */
 	struct DSI_VACT_NL_REG DSI_VACT_NL;	/* 002C */
-	uint32_t rsv_38[8];	/* 0030..004C */
+	uint32_t rsv_30[8];	/* 0030..004C */
 	struct DSI_HSA_WC_REG DSI_HSA_WC;	/* 0050 */
 	struct DSI_HBP_WC_REG DSI_HBP_WC;	/* 0054 */
 	struct DSI_HFP_WC_REG DSI_HFP_WC;	/* 0058 */
 	struct DSI_BLLP_WC_REG DSI_BLLP_WC;	/* 005C */
-
 	struct DSI_CMDQ_CTRL_REG DSI_CMDQ_SIZE;	/* 0060 */
-	uint32_t DSI_HSTX_CKL_WC;	/* 0064 */
-	uint32_t rsv_006C[3];	/* 0068..0070 */
+	struct DSI_HSTX_CKL_WC_REG DSI_HSTX_CKL_WC;	/* 0064 */
+	uint32_t rsv_0068[3];	/* 0068..0070 */
 	struct DSI_RX_DATA_REG DSI_RX_DATA0;	/* 0074 */
 	struct DSI_RX_DATA_REG DSI_RX_DATA1;	/* 0078 */
 	struct DSI_RX_DATA_REG DSI_RX_DATA2;	/* 007c */
@@ -900,7 +817,8 @@ struct DSI_REGS {
 	uint32_t rsv_008C;	/* 008C */
 	struct DSI_MEM_CONTI_REG DSI_MEM_CONTI;	/* 0090 */
 	struct DSI_FRM_BC_REG DSI_FRM_BC;	/* 0094 */
-	uint32_t rsv_0098[27];	/* 0098..00100 */
+	uint32_t rsv_0098[26];	/* 0098..00ff */
+	struct DSI_PHY_LCPAT_REG DSI_PHY_LCPAT;	/* 0100 */
 	struct DSI_PHY_LCCON_REG DSI_PHY_LCCON;	/* 0104 */
 	struct DSI_PHY_LD0CON_REG DSI_PHY_LD0CON;	/* 0108 */
 	uint32_t rsv_010C;	/* 010C */
@@ -931,7 +849,6 @@ struct DSI_REGS {
 	uint32_t DSI_BIST_PATTERN;	/* 0178 */
 	struct DSI_BIST_CON_REG DSI_BIST_CON;	/* 017C */
 };
-
 
 struct DSI_CMDQ {
 	unsigned char byte0;
@@ -987,7 +904,6 @@ struct DSI_PHY_REGS {
 
 #ifndef BUILD_LK
 /*
-*
 STATIC_ASSERT(0x0050 == offsetof(struct DSI_PHY_REGS, MIPITX_DSI_PLL_CON0));
 STATIC_ASSERT(0x0070 == offsetof(struct DSI_PHY_REGS, MIPITX_DSI_RGS));
 STATIC_ASSERT(0x0080 == offsetof(struct DSI_PHY_REGS, MIPITX_DSI_SW_CTRL_EN));

@@ -44,8 +44,8 @@ extern "C" {
 		unsigned TDFP_EN:1;
 		unsigned CLPF_EN:1;
 		unsigned YUV422_EN:1;
-		unsigned RGB2YUV_EN:1;
-		unsigned R601_SEL:1;
+		unsigned MAXTRIX_EN:1;
+		unsigned rsv_7:1;
 		unsigned EMBSYNC_EN:1;
 		unsigned rsv_9:3;
 		unsigned PIXREP:4;	/* new */
@@ -243,7 +243,6 @@ extern "C" {
 		unsigned rsv_28:4;
 	};
 
-
 	struct DPI_REG_ESAV_FTIM {
 		unsigned ESAV_FOFST_ODD:12;
 		unsigned rsv_12:4;
@@ -312,6 +311,81 @@ extern "C" {
 		unsigned ESAV_CODE3_MSB:1;
 		unsigned rsv_17:15;
 	};
+
+struct DPI_REG_BLANK_CODE_SET {
+	unsigned BLANK_R:8;
+	unsigned BLANK_G:8;
+	unsigned BLANK_B:8;
+	unsigned BLANK_CODE_EN:1;
+	unsigned BLANK_PAD_OPT:1;
+	unsigned rsv_26:6;
+};
+
+struct DPI_REG_MATRIX_SET {
+	unsigned INT_MATRIX_SEL:5;
+	unsigned rsv_5:3;
+	unsigned MATRIX_BIT:2;
+	unsigned rsv_10:2;
+	unsigned EXT_MATRIX_EN:1;
+	unsigned rsv_13:19;
+};
+
+struct DPI_REG_MATRIX_COEF_00 {
+	unsigned MATRIX_COEF_00:13;
+	unsigned rsv_13:3;
+	unsigned MATRIX_COEF_01:13;
+	unsigned rsv_29:3;
+};
+
+struct DPI_REG_MATRIX_COEF_02 {
+	unsigned MATRIX_COEF_02:13;
+	unsigned rsv_13:3;
+	unsigned MATRIX_COEF_10:13;
+	unsigned rsv_29:3;
+};
+
+struct DPI_REG_MATRIX_COEF_11 {
+	unsigned MATRIX_COEF_11:13;
+	unsigned rsv_13:3;
+	unsigned MATRIX_COEF_12:13;
+	unsigned rsv_29:3;
+};
+
+struct DPI_REG_MATRIX_COEF_20 {
+	unsigned MATRIX_COEF_20:13;
+	unsigned rsv_13:3;
+	unsigned MATRIX_COEF_21:13;
+	unsigned rsv_29:3;
+};
+
+struct DPI_REG_MATRIX_COEF_22 {
+	unsigned MATRIX_COEF_22:13;
+	unsigned rsv_13:19;
+};
+
+struct DPI_REG_MATRIX_IN_OFFSET_0 {
+	unsigned MATRIX_IN_OFFSET_0:9;
+	unsigned rsv_9:7;
+	unsigned MATRIX_IN_OFFSET_1:9;
+	unsigned rsv_25:7;
+};
+
+struct DPI_REG_MATRIX_IN_OFFSET_2 {
+	unsigned MATRIX_IN_OFFSET_2:9;
+	unsigned rsv_9:23;
+};
+
+struct DPI_REG_MATRIX_OUT_OFFSET_0 {
+	unsigned MATRIX_OUT_OFFSET_0:9;
+	unsigned rsv_9:7;
+	unsigned MATRIX_OUT_OFFSET_1:9;
+	unsigned rsv_25:7;
+};
+
+struct DPI_REG_MATRIX_OUT_OFFSET_2 {
+	unsigned MATRIX_IN_OFFSET_2:9;
+	unsigned rsv_9:23;
+};
 
 	struct DPI_REG_PATTERN {
 		unsigned PAT_EN:1;
@@ -452,7 +526,18 @@ extern "C" {
 		struct DPI_REG_EMBSYNC_SETTING EMBSYNC_SETTING;	/* 00A4 */
 		struct DPI_REG_ESAV_CODE_SET0 ESAV_CODE_SET0;	/* 00A8 */
 		struct DPI_REG_ESAV_CODE_SET1 ESAV_CODE_SET1;	/* 00AC */
-		uint32_t rsv_b0[12];
+		struct DPI_REG_BLANK_CODE_SET BLANK_CODE_SET;	/* 00b0*/
+		struct DPI_REG_MATRIX_SET MATRIX_SET;	/* 00b4*/
+		struct DPI_REG_MATRIX_COEF_00 MATRIX_COEF_00;	/* 00b8*/
+		struct DPI_REG_MATRIX_COEF_02 MATRIX_COEF_02;	/* 00bc*/
+		struct DPI_REG_MATRIX_COEF_11 MATRIX_COEF_11;	/* 00c0*/
+		struct DPI_REG_MATRIX_COEF_20 MATRIX_COEF_20;	/* 00c4*/
+		struct DPI_REG_MATRIX_COEF_22 MATRIX_COEF_22;	/* 00c8*/
+		struct DPI_REG_MATRIX_IN_OFFSET_0 MATRIX_IN_OFFSET_0;	/* 00cc*/
+		struct DPI_REG_MATRIX_IN_OFFSET_2 MATRIX_IN_OFFSET_2;	/* 00d0*/
+		struct DPI_REG_MATRIX_OUT_OFFSET_0 MATRIX_OUT_OFFSET_0;	/* 00d4*/
+		struct DPI_REG_MATRIX_OUT_OFFSET_2 MATRIX_OUT_OFFSET_2;	/* 00d8*/
+		uint32_t rsv_dc;
 		struct DPI_REG_CLKCNTL DPI_CLKCON;	/* 00E0 */
 	};
 
@@ -465,7 +550,6 @@ extern "C" {
 		unsigned DATA_FMT:3;
 		unsigned rsv_7:25;
 	};
-
 
 	struct LVDS_REG_DATA_SRC {
 		unsigned R_SEL:2;
@@ -484,10 +568,8 @@ extern "C" {
 		unsigned SRC_FOR_HSYNC:1;
 		unsigned SRC_FOR_VSYNC:1;
 		unsigned SRC_FOR_DE:1;
-		unsigned rsv_7:23;
+		unsigned rsv_9:23;
 	};
-
-
 
 	struct LVDS_REG_R_SEL {
 		unsigned R0_SEL:3;
@@ -513,7 +595,6 @@ extern "C" {
 		unsigned rsv_24:8;
 	};
 
-
 	struct LVDS_REG_B_SEL {
 		unsigned B0_SEL:3;
 		unsigned B1_SEL:3;
@@ -526,7 +607,6 @@ extern "C" {
 		unsigned rsv_24:8;
 	};
 
-
 	struct LVDS_REG_OUT_CTRL {
 		unsigned LVDS_EN:1;
 		unsigned LVDS_OUT_FIFO_EN:1;
@@ -534,7 +614,6 @@ extern "C" {
 		unsigned rsv_4:28;
 		unsigned LVDSRX_FIFO_EN:1;
 	};
-
 
 	struct LVDS_REG_CH_SWAP {
 		unsigned CH0_SEL:3;
@@ -549,7 +628,6 @@ extern "C" {
 		unsigned rsv_29:2;
 		unsigned BIT_SWAP:1;
 	};
-
 
 	struct LVDS_REG_CLK_CTRL {
 		unsigned TX_CK_EN:1;
@@ -639,7 +717,7 @@ extern "C" {
 		unsigned RG_TST_PATN_EN:1;
 		unsigned rsv_1:7;
 		unsigned RG_TST_PATN_TYPE:8;
-		unsigned RG_PTGEN_CLOR_BAR_TH:8;
+		unsigned RG_PTGEN_CLOR_BAR_TH:12;
 		unsigned rsv_28:4;
 	};
 
@@ -709,7 +787,6 @@ extern "C" {
 		unsigned rsv_27:5;
 	};
 
-
 	struct LVDS_ANA_REG_CTL3 {
 		unsigned LVDSTX_ANA_IMP_TEST_EN:5;
 		unsigned LVDSTX_ANA_EXT_EN:5;
@@ -721,8 +798,6 @@ extern "C" {
 		unsigned LVDSTX_ANA_SER_DIN:10;
 		unsigned rsv_30:2;
 	};
-
-
 
 	struct LVDS_VPLL_REG_CTL1 {
 		unsigned LVDS_VPLL_RESERVE:2;
@@ -742,7 +817,6 @@ extern "C" {
 		unsigned LVDS_VPLL_BR:1;
 		unsigned rsv_28:4;
 	};
-
 
 	struct LVDS_VPLL_REG_CTL2 {
 		unsigned LVDS_VPLL_DIVEN:3;
@@ -765,16 +839,13 @@ extern "C" {
 		unsigned rsv_24:8;
 	};
 
-	struct LVDS_TVE_REG_CTL0 {
-		unsigned LVDS_TVE_BGREF_PWD:1;
-		unsigned LVDS_TVE_TRIM_VAL:5;
-		unsigned rsv_6:2;
-		unsigned LVDS_TVE_VDAC_REV:8;
-		unsigned LVDS_TVE_VDAC_PWD:1;
-		unsigned LVDS_TVE_PBS_TST_EN:1;
-		unsigned LVDS_TVE_VDAC_TST_EN:1;
-		unsigned rsv_19:13;
-	};
+struct LVDS_VPLL_REG_CTL3 {
+	unsigned LVDS_TX_21EDG	: 1;
+	unsigned LVDS_TX_21LEV	: 1;
+	unsigned LVDS_TX_51EDG	: 1;
+	unsigned LVDS_TX_51LEV	: 1;
+	unsigned rsv_4: 28;
+};
 
 	struct LVDS_ANA_REGS {
 		uint32_t LVDSTX_ANA_CTL1;	/* 0000 */
@@ -784,7 +855,7 @@ extern "C" {
 		uint32_t LVDSTX_ANA_CTL5;	/* 0010 */
 		struct LVDS_VPLL_REG_CTL1 LVDS_VPLL_CTL1;	/* 0014 */
 		struct LVDS_VPLL_REG_CTL2 LVDS_VPLL_CTL2;	/* 0018 */
-		struct LVDS_TVE_REG_CTL0 LVDS_TVE_CTL0;
+		struct LVDS_VPLL_REG_CTL3 VPLL_REG_CTL3;
 	};
 
 

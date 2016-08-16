@@ -505,9 +505,9 @@ enum DPI_STATUS ddp_dpi_ConfigHDMI(enum DISP_MODULE_ENUM module, struct cmdqRecS
 	struct DPI_REG_CNTL ctrl = DPI_REG[DPI_IDX(module)]->CNTL;
 
 	ctrl.YUV422_EN = yuv422en;
-	ctrl.RGB2YUV_EN = rgb2yuven;
+/*	ctrl.RGB2YUV_EN = rgb2yuven; */
 	ctrl.TDFP_EN = ydfpen;
-	ctrl.R601_SEL = r601sel;
+/*	ctrl.R601_SEL = r601sel; */
 	ctrl.CLPF_EN = clpfen;
 
 	DPI_OUTREG32(cmdq, &DPI_REG[DPI_IDX(module)]->CNTL, AS_UINT32(&ctrl));
