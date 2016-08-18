@@ -1800,55 +1800,34 @@ static const struct snd_soc_dai_ops mt8167_afe_tdm_in_ops = {
 
 static int mt8167_afe_runtime_suspend(struct device *dev);
 static int mt8167_afe_runtime_resume(struct device *dev);
+static int mt8167_afe_suspend(struct device *dev);
+static int mt8167_afe_resume(struct device *dev);
 
 static int mt8167_afe_dai_suspend(struct snd_soc_dai *dai)
 {
 	struct mtk_afe *afe = snd_soc_dai_get_drvdata(dai);
-	int i;
 
-	dev_dbg(afe->dev, "%s id %d suspended %d runtime suspended %d\n",
-		__func__, dai->id, afe->suspended,
-		pm_runtime_status_suspended(afe->dev));
+	dev_dbg(afe->dev, "%s id %d suspended %d\n",
+		__func__, dai->id, afe->suspended);
 
-	if (pm_runtime_status_suspended(afe->dev) || afe->suspended)
+	if (afe->suspended)
 		return 0;
 
-	mt8167_afe_enable_main_clk(afe);
-
-	for (i = 0; i < ARRAY_SIZE(mt8167_afe_backup_list); i++)
-		regmap_read(afe->regmap, mt8167_afe_backup_list[i],
-			    &afe->backup_regs[i]);
-
-	mt8167_afe_disable_main_clk(afe);
-
-	afe->suspended = true;
-	mt8167_afe_runtime_suspend(afe->dev);
-	return 0;
+	return mt8167_afe_suspend(afe->dev);
 }
 
 static int mt8167_afe_dai_resume(struct snd_soc_dai *dai)
 {
 	struct mtk_afe *afe = snd_soc_dai_get_drvdata(dai);
-	int i = 0;
 
-	dev_dbg(afe->dev, "%s id %d suspended %d runtime suspended %d\n",
-		__func__, dai->id, afe->suspended,
-		pm_runtime_status_suspended(afe->dev));
+	dev_dbg(afe->dev, "%s id %d suspended %d\n",
+		__func__, dai->id, afe->suspended);
 
-	if (pm_runtime_status_suspended(afe->dev) || !afe->suspended)
+	if (!afe->suspended)
 		return 0;
 
-	mt8167_afe_runtime_resume(afe->dev);
+	mt8167_afe_resume(afe->dev);
 
-	mt8167_afe_enable_main_clk(afe);
-
-	for (i = 0; i < ARRAY_SIZE(mt8167_afe_backup_list); i++)
-		regmap_write(afe->regmap, mt8167_afe_backup_list[i],
-			     afe->backup_regs[i]);
-
-	mt8167_afe_disable_main_clk(afe);
-
-	afe->suspended = false;
 	return 0;
 }
 
@@ -2570,14 +2549,46 @@ err_irq:
 
 static int mt8167_afe_runtime_suspend(struct device *dev)
 {
+	/* TODO: check if runtime suspend get exexuted without PM domain attached */
 	dev_info(dev, "%s\n", __func__);
 
-	return 0;
+	return mt8167_afe_suspend(dev);
 }
 
 static int mt8167_afe_runtime_resume(struct device *dev)
 {
+	/* TODO: check if runtime resume get exexuted without PM domain attached */
+	dev_info(dev, "%s\n", __func__);
+
+	return mt8167_afe_resume(dev);
+}
+
+static int mt8167_afe_suspend(struct device *dev)
+{
 	struct mtk_afe *afe = dev_get_drvdata(dev);
+	int i;
+
+	dev_info(dev, "%s >>\n", __func__);
+
+	mt8167_afe_enable_main_clk(afe);
+
+	for (i = 0; i < ARRAY_SIZE(mt8167_afe_backup_list); i++)
+		regmap_read(afe->regmap, mt8167_afe_backup_list[i],
+			    &afe->backup_regs[i]);
+
+	mt8167_afe_disable_main_clk(afe);
+
+	afe->suspended = true;
+
+	dev_info(dev, "%s <<\n", __func__);
+
+	return 0;
+}
+
+static int mt8167_afe_resume(struct device *dev)
+{
+	struct mtk_afe *afe = dev_get_drvdata(dev);
+	int i;
 
 	dev_info(dev, "%s >>\n", __func__);
 
@@ -2586,7 +2597,13 @@ static int mt8167_afe_runtime_resume(struct device *dev)
 	/* unmask all IRQs */
 	regmap_update_bits(afe->regmap, AFE_IRQ_MCU_EN, 0xff, 0xff);
 
+	for (i = 0; i < ARRAY_SIZE(mt8167_afe_backup_list); i++)
+		regmap_write(afe->regmap, mt8167_afe_backup_list[i],
+			     afe->backup_regs[i]);
+
 	mt8167_afe_disable_main_clk(afe);
+
+	afe->suspended = false;
 
 	dev_info(dev, "%s <<\n", __func__);
 
@@ -2677,26 +2694,16 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, afe);
 
-	/* TODO: check if pm_runtime_* operation is necessary */
-	/* since 8167 has no individual power domain */
-	pm_runtime_enable(&pdev->dev);
-	if (!pm_runtime_enabled(&pdev->dev)) {
-		dev_warn(afe->dev, "%s power not enabled\n", __func__);
-		ret = mt8167_afe_runtime_resume(&pdev->dev);
-		if (ret)
-			goto err_pm_disable;
-	}
-
 	ret = snd_soc_register_platform(&pdev->dev, &mt8167_afe_pcm_platform);
 	if (ret)
-		goto err_pm_disable;
+		goto err_platform;
 
 	ret = snd_soc_register_component(&pdev->dev,
 					 &mt8167_afe_pcm_dai_component,
 					 mt8167_afe_pcm_dais,
 					 ARRAY_SIZE(mt8167_afe_pcm_dais));
 	if (ret)
-		goto err_platform;
+		goto err_component;
 
 	mt8167_afe_init_debugfs(afe);
 
@@ -2706,10 +2713,9 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "MTK AFE driver initialized.\n");
 	return 0;
 
-err_platform:
+err_component:
 	snd_soc_unregister_platform(&pdev->dev);
-err_pm_disable:
-	pm_runtime_disable(&pdev->dev);
+err_platform:
 	return ret;
 }
 
@@ -2721,10 +2727,6 @@ static int mt8167_afe_pcm_dev_remove(struct platform_device *pdev)
 
 	if (afe && afe->backup_regs)
 		kfree(afe->backup_regs);
-
-	pm_runtime_disable(&pdev->dev);
-	if (!pm_runtime_status_suspended(&pdev->dev))
-		mt8167_afe_runtime_suspend(&pdev->dev);
 
 	snd_soc_unregister_component(&pdev->dev);
 	snd_soc_unregister_platform(&pdev->dev);
