@@ -22,6 +22,7 @@
 
 /* #define COMMON_CLOCK_FRAMEWORK_API */
 /* #define IDLE_TASK_DRIVER_API */
+/* #define ENABLE_AFE_APLL_TUNER */
 
 
 enum {
@@ -53,17 +54,20 @@ enum {
 };
 
 enum {
-	MTK_CLK_INFRASYS_AUD,
-	MTK_CLK_TOP_PDN_AUD,
-	MTK_CLK_TOP_PDN_AUD_BUS,
-	MTK_CLK_I2S0_M,
-	MTK_CLK_I2S1_M,
-	MTK_CLK_I2S2_M,
-	MTK_CLK_I2S3_M,
-	MTK_CLK_I2S3_B,
-	MTK_CLK_BCK0,
-	MTK_CLK_BCK1,
-	MTK_CLK_NUM
+	MT8167_CLK_TOP_PDN_AUD,
+	MT8167_CLK_APLL12_DIV0,
+	MT8167_CLK_APLL12_DIV1,
+	MT8167_CLK_APLL12_DIV2,
+	MT8167_CLK_APLL12_DIV3,
+	MT8167_CLK_APLL12_DIV4,
+	MT8167_CLK_APLL12_DIV4B,
+	MT8167_CLK_APLL12_DIV5,
+	MT8167_CLK_APLL12_DIV5B,
+	MT8167_CLK_APLL12_DIV6,
+	MT8167_CLK_SPDIF_IN,
+	MT8167_CLK_ENGEN1,
+	MT8167_CLK_ENGEN2,
+	MT8167_CLK_NUM
 };
 
 enum mt8167_afe_tdm_ch_start {
@@ -174,7 +178,7 @@ struct mtk_afe {
 	struct mt8167_afe_memif memif[MT8167_AFE_MEMIF_NUM];
 	struct mt8167_afe_be_dai_data be_data[MT8167_AFE_BACKEND_NUM];
 	struct mt8167_afe_control_data ctrl_data;
-	struct clk *clocks[MTK_CLK_NUM];
+	struct clk *clocks[MT8167_CLK_NUM];
 	unsigned int *backup_regs;
 	bool suspended;
 	int afe_on_ref_cnt;

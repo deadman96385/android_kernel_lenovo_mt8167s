@@ -717,9 +717,9 @@ static int mt8167_afe_i2s_startup(struct snd_pcm_substream *substream,
 	mt8167_afe_enable_main_clk(afe);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		mt8167_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
+		mt8167_afe_dais_enable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV1], NULL);
 	else
-		mt8167_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S2_M], NULL);
+		mt8167_afe_dais_enable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV2], NULL);
 
 	return 0;
 }
@@ -743,17 +743,17 @@ static void mt8167_afe_i2s_shutdown(struct snd_pcm_substream *substream,
 			mt8167_afe_set_i2s_in_enable(afe, false);
 
 		if (rate % 8000)
-			mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_22M);
+			mt8167_afe_disable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
 		else
-			mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_24M);
+			mt8167_afe_disable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
 
 		be->prepared[stream] = false;
 	}
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-		mt8167_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
+		mt8167_afe_dais_disable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV1], NULL);
 	else
-		mt8167_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S2_M], NULL);
+		mt8167_afe_dais_disable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV2], NULL);
 
 	mt8167_afe_disable_main_clk(afe);
 }
@@ -799,20 +799,18 @@ static int mt8167_afe_i2s_prepare(struct snd_pcm_substream *substream,
 	if (ret)
 		return ret;
 
-	/* TODO: add apll control */
-
 	if (rate % 8000)
-		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_22M);
+		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
 	else
-		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_24M);
+		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		mt8167_afe_dais_set_clks(afe, afe->clocks[MTK_CLK_I2S1_M],
+		mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV1],
 				rate * 256, NULL, 0);
 
 		mt8167_afe_set_i2s_out_enable(afe, true);
 	} else {
-		mt8167_afe_dais_set_clks(afe, afe->clocks[MTK_CLK_I2S2_M],
+		mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV2],
 				rate * 256, NULL, 0);
 
 		mt8167_afe_set_i2s_in_enable(afe, true);
@@ -835,9 +833,9 @@ static int mt8167_afe_2nd_i2s_startup(struct snd_pcm_substream *substream,
 	mt8167_afe_enable_main_clk(afe);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		mt8167_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S3_M], NULL);
+		mt8167_afe_dais_enable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV3], NULL);
 	else
-		mt8167_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S0_M], NULL);
+		mt8167_afe_dais_enable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV0], NULL);
 
 	return 0;
 }
@@ -861,17 +859,17 @@ static void mt8167_afe_2nd_i2s_shutdown(struct snd_pcm_substream *substream,
 			mt8167_afe_set_2nd_i2s_in_enable(afe, false);
 
 		if (rate % 8000)
-			mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_22M);
+			mt8167_afe_disable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
 		else
-			mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_24M);
+			mt8167_afe_disable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
 
 		be->prepared[stream] = false;
 	}
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-		mt8167_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S3_M], NULL);
+		mt8167_afe_dais_disable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV3], NULL);
 	else
-		mt8167_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S0_M], NULL);
+		mt8167_afe_dais_disable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV0], NULL);
 
 	mt8167_afe_disable_main_clk(afe);
 }
@@ -917,20 +915,18 @@ static int mt8167_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 	if (ret)
 		return ret;
 
-	/* TODO: add apll control */
-
 	if (rate % 8000)
-		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_22M);
+		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
 	else
-		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_24M);
+		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		mt8167_afe_dais_set_clks(afe, afe->clocks[MTK_CLK_I2S3_M],
+		mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV3],
 				rate * 256, NULL, 0);
 
 		mt8167_afe_set_2nd_i2s_out_enable(afe, true);
 	} else {
-		mt8167_afe_dais_set_clks(afe, afe->clocks[MTK_CLK_I2S0_M],
+		mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV0],
 				rate * 256, NULL, 0);
 
 		mt8167_afe_set_2nd_i2s_in_enable(afe, true);
@@ -1183,9 +1179,8 @@ static int mt8167_afe_hdmi_startup(struct snd_pcm_substream *substream,
 
 	mt8167_afe_enable_main_clk(afe);
 
-	/* TODO: change to I2S4_M */
-	mt8167_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S3_M],
-				 afe->clocks[MTK_CLK_I2S3_B]);
+	mt8167_afe_dais_enable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV4],
+				 afe->clocks[MT8167_CLK_APLL12_DIV4B]);
 	return 0;
 }
 
@@ -1194,10 +1189,21 @@ static void mt8167_afe_hdmi_shutdown(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
+	const unsigned int rate = substream->runtime->rate;
+	const unsigned int stream = substream->stream;
 
-	/* TODO: change to I2S4_M */
-	mt8167_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S3_M],
-				  afe->clocks[MTK_CLK_I2S3_B]);
+	if (be->prepared[stream]) {
+		if (rate % 8000)
+			mt8167_afe_disable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
+		else
+			mt8167_afe_disable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
+
+		be->prepared[stream] = false;
+	}
+
+	mt8167_afe_dais_disable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV4],
+				  afe->clocks[MT8167_CLK_APLL12_DIV4B]);
 
 	mt8167_afe_disable_main_clk(afe);
 }
@@ -1208,33 +1214,45 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_pcm_runtime * const runtime = substream->runtime;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
+	const unsigned int rate = runtime->rate;
+	const unsigned int channels = runtime->channels;
+	const int bit_width = snd_pcm_format_width(runtime->format);
+	const unsigned int stream = substream->stream;
 	unsigned int val;
 
-	/* TODO: change to I2S4_M */
+	if (be->prepared[stream]) {
+		dev_info(afe->dev, "%s prepared already\n", __func__);
+		return 0;
+	}
+
+	if (rate % 8000)
+		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
+	else
+		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
+
 	if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI)
 		mt8167_afe_dais_set_clks(afe,
-			      afe->clocks[MTK_CLK_I2S3_M], runtime->rate * 64,
-			      afe->clocks[MTK_CLK_I2S3_B],
-			      runtime->rate * 2 * 32);
+			      afe->clocks[MT8167_CLK_APLL12_DIV4], rate * 64,
+			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
+			      rate * 2 * 32);
 	else if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S)
 		mt8167_afe_dais_set_clks(afe,
-			      afe->clocks[MTK_CLK_I2S3_M], runtime->rate * 128,
-			      afe->clocks[MTK_CLK_I2S3_B],
-			      runtime->rate * 2 * snd_pcm_format_width(runtime->format));
+			      afe->clocks[MT8167_CLK_APLL12_DIV4], rate * 128,
+			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
+			      rate * 2 * bit_width);
 	else
 		mt8167_afe_dais_set_clks(afe,
-			      afe->clocks[MTK_CLK_I2S3_M], runtime->rate * 128,
-			      afe->clocks[MTK_CLK_I2S3_B],
-			      runtime->rate * runtime->channels *
-			      snd_pcm_format_width(runtime->format));
+			      afe->clocks[MT8167_CLK_APLL12_DIV4], rate * 128,
+			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
+			      rate * channels * bit_width);
 
 	val = AFE_TDM_CON1_BCK_INV |
 	      AFE_TDM_CON1_1_BCK_DELAY |
 	      AFE_TDM_CON1_MSB_ALIGNED;
 
 	/* bit width related */
-	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) ||
-	    (snd_pcm_format_width(runtime->format) > 16)) {
+	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) || (bit_width > 16)) {
 		val |= AFE_TDM_CON1_WLEN_32BIT |
 		       AFE_TDM_CON1_32_BCK_CYCLES |
 		       AFE_TDM_CON1_LRCK_WIDTH(32);
@@ -1245,9 +1263,9 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	}
 
 	/* channel per sdata */
-	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) && (runtime->channels > 4))
+	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) && (channels > 4))
 		val |= AFE_TDM_CON1_8CH_PER_SDATA;
-	else if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) && (runtime->channels > 2))
+	else if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) && (channels > 2))
 		val |= AFE_TDM_CON1_4CH_PER_SDATA;
 	else
 		val |= AFE_TDM_CON1_2CH_PER_SDATA;
@@ -1257,7 +1275,7 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	/* set tdm2 config */
 	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) ||
 	    (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S)) {
-		switch (runtime->channels) {
+		switch (channels) {
 		case 1:
 		case 2:
 			val = AFE_TDM_CH_START_O28_O29;
@@ -1301,7 +1319,7 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 			   AFE_TDM_CON2_SOUT_MASK, val);
 
 	regmap_update_bits(afe->regmap, AFE_HDMI_OUT_CON0,
-			   AFE_HDMI_OUT_CON0_CH_MASK, runtime->channels << 4);
+			   AFE_HDMI_OUT_CON0_CH_MASK, channels << 4);
 
 	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S) ||
 	    (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM))
@@ -1378,7 +1396,8 @@ static int mt8167_afe_tdm_in_startup(struct snd_pcm_substream *substream,
 
 	mt8167_afe_enable_main_clk(afe);
 
-	/* TODO: enable tdm in clock */
+	mt8167_afe_dais_enable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV5],
+				 afe->clocks[MT8167_CLK_APLL12_DIV5B]);
 	return 0;
 }
 
@@ -1387,8 +1406,21 @@ static void mt8167_afe_tdm_in_shutdown(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
+	const unsigned int rate = substream->runtime->rate;
+	const unsigned int stream = substream->stream;
 
-	/* TODO: disable tdm in clock */
+	if (be->prepared[stream]) {
+		if (rate % 8000)
+			mt8167_afe_disable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
+		else
+			mt8167_afe_disable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
+
+		be->prepared[stream] = false;
+	}
+
+	mt8167_afe_dais_disable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV5],
+				  afe->clocks[MT8167_CLK_APLL12_DIV5B]);
 
 	mt8167_afe_disable_main_clk(afe);
 }
@@ -1399,14 +1431,30 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_pcm_runtime * const runtime = substream->runtime;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
+	const unsigned int rate = runtime->rate;
+	const unsigned int channels = runtime->channels;
+	const int bit_width = snd_pcm_format_width(runtime->format);
+	const unsigned int stream = substream->stream;
 	unsigned int val;
 
-	/* TODO: configure tdm in clock rate */
+	if (be->prepared[stream]) {
+		dev_info(afe->dev, "%s prepared already\n", __func__);
+		return 0;
+	}
+
+	if (rate % 8000)
+		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
+	else
+		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
+
+	mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV5], rate * 128,
+		afe->clocks[MT8167_CLK_APLL12_DIV5B], rate * channels * bit_width);
 
 	val = AFE_TDM_IN_CON1_I2S;
 
 	/* bit width related */
-	if (snd_pcm_format_width(runtime->format) > 16) {
+	if (bit_width > 16) {
 		val |= AFE_TDM_IN_CON1_WLEN_32BIT |
 		       AFE_TDM_IN_CON1_FAST_LRCK_CYCLE_32BCK |
 		       AFE_TDM_IN_CON1_LRCK_WIDTH(32);
@@ -1416,7 +1464,7 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 		       AFE_TDM_IN_CON1_LRCK_WIDTH(16);
 	}
 
-	switch (runtime->channels) {
+	switch (channels) {
 	case 2:
 		val |= AFE_TDM_IN_CON1_2CH_PER_SDATA;
 		break;
@@ -2323,17 +2371,20 @@ static const struct snd_soc_component_driver mt8167_afe_pcm_dai_component = {
 
 
 #ifdef COMMON_CLOCK_FRAMEWORK_API
-static const char *aud_clks[MTK_CLK_NUM] = {
-	[MTK_CLK_INFRASYS_AUD] = "infra_sys_audio_clk",
-	[MTK_CLK_TOP_PDN_AUD] = "top_pdn_audio",
-	[MTK_CLK_TOP_PDN_AUD_BUS] = "top_pdn_aud_intbus",
-	[MTK_CLK_I2S0_M] =  "i2s0_m",
-	[MTK_CLK_I2S1_M] =  "i2s1_m",
-	[MTK_CLK_I2S2_M] =  "i2s2_m",
-	[MTK_CLK_I2S3_M] =  "i2s3_m",
-	[MTK_CLK_I2S3_B] =  "i2s3_b",
-	[MTK_CLK_BCK0] =  "bck0",
-	[MTK_CLK_BCK1] =  "bck1",
+static const char *aud_clks[MT8167_CLK_NUM] = {
+	[MT8167_CLK_TOP_PDN_AUD] = "top_pdn_audio",
+	[MT8167_CLK_APLL12_DIV0] =  "apll12_div0",
+	[MT8167_CLK_APLL12_DIV1] =  "apll12_div1",
+	[MT8167_CLK_APLL12_DIV2] =  "apll12_div2",
+	[MT8167_CLK_APLL12_DIV3] =  "apll12_div3",
+	[MT8167_CLK_APLL12_DIV4] =  "apll12_div4",
+	[MT8167_CLK_APLL12_DIV4B] =  "apll12_div4b",
+	[MT8167_CLK_APLL12_DIV5] =  "apll12_div5",
+	[MT8167_CLK_APLL12_DIV5B] =  "apll12_div5b",
+	[MT8167_CLK_APLL12_DIV6] =  "apll12_div6",
+	[MT8167_CLK_SPDIF_IN] =  "spdif_in",
+	[MT8167_CLK_ENGEN1] =  "engen1",
+	[MT8167_CLK_ENGEN2] =  "engen2",
 };
 #endif
 
@@ -2635,8 +2686,6 @@ static int mt8167_afe_init_audio_clk(struct mtk_afe *afe)
 			return PTR_ERR(afe->clocks[i]);
 		}
 	}
-	clk_set_rate(afe->clocks[MTK_CLK_BCK0], 22579200); /* 22M */
-	clk_set_rate(afe->clocks[MTK_CLK_BCK1], 24576000); /* 24M */
 #endif
 	return 0;
 }

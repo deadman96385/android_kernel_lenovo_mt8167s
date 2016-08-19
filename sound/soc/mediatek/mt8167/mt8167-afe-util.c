@@ -93,34 +93,17 @@ int mt8167_afe_enable_main_clk(struct mtk_afe *afe)
 #if defined(COMMON_CLOCK_FRAMEWORK_API)
 	int ret;
 
-	ret = clk_prepare_enable(afe->clocks[MTK_CLK_INFRASYS_AUD]);
+	ret = clk_prepare_enable(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
 	if (ret)
-		return ret;
-
-	ret = clk_prepare_enable(afe->clocks[MTK_CLK_TOP_PDN_AUD_BUS]);
-	if (ret)
-		goto err_infra;
-
-	ret = clk_prepare_enable(afe->clocks[MTK_CLK_TOP_PDN_AUD]);
-	if (ret)
-		goto err_top_aud_bus;
-
-	/* clk_prepare_enable(afe->clocks[MTK_CLK_BCK0]); */
-	/* clk_prepare_enable(afe->clocks[MTK_CLK_BCK1]); */
+		goto err;
 #endif
 
 	mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_AFE);
-
 	return 0;
 
 #if defined(COMMON_CLOCK_FRAMEWORK_API)
-err_top_aud_bus:
-	clk_disable_unprepare(afe->clocks[MTK_CLK_TOP_PDN_AUD_BUS]);
-err_infra:
-	clk_disable_unprepare(afe->clocks[MTK_CLK_INFRASYS_AUD]);
-
+err:
 	dev_err(afe->dev, "%s failed %d\n", __func__, ret);
-
 	return ret;
 #endif
 }
@@ -129,11 +112,7 @@ int mt8167_afe_disable_main_clk(struct mtk_afe *afe)
 {
 	mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_AFE);
 #if defined(COMMON_CLOCK_FRAMEWORK_API)
-	/* clk_disable_unprepare(afe->clocks[MTK_CLK_BCK0]); */
-	/* clk_disable_unprepare(afe->clocks[MTK_CLK_BCK1]); */
-	clk_disable_unprepare(afe->clocks[MTK_CLK_TOP_PDN_AUD]);
-	clk_disable_unprepare(afe->clocks[MTK_CLK_TOP_PDN_AUD_BUS]);
-	clk_disable_unprepare(afe->clocks[MTK_CLK_INFRASYS_AUD]);
+	clk_disable_unprepare(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
 #endif
 	return 0;
 }
@@ -243,6 +222,48 @@ int mt8167_afe_disable_apll_tuner_cfg(struct mtk_afe *afe, unsigned int apll)
 	}
 
 	mutex_unlock(&afe->afe_clk_mutex);
+	return 0;
+}
+
+int mt8167_afe_enable_apll_associated_cfg(struct mtk_afe *afe, unsigned int apll)
+{
+	if (apll == MT8167_AFE_APLL1) {
+		clk_prepare_enable(afe->clocks[MT8167_CLK_ENGEN1]);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_22M);
+#ifdef ENABLE_AFE_APLL_TUNER
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_APLL_TUNER);
+		mt8167_afe_enable_apll_tuner_cfg(afe, MT8167_AFE_APLL1);
+#endif
+	} else {
+		clk_prepare_enable(afe->clocks[MT8167_CLK_ENGEN2]);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_24M);
+#ifdef ENABLE_AFE_APLL_TUNER
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_APLL2_TUNER);
+		mt8167_afe_enable_apll_tuner_cfg(afe, MT8167_AFE_APLL2);
+#endif
+	}
+
+	return 0;
+}
+
+int mt8167_afe_disable_apll_associated_cfg(struct mtk_afe *afe, unsigned int apll)
+{
+	if (apll == MT8167_AFE_APLL1) {
+#ifdef ENABLE_AFE_APLL_TUNER
+		mt8167_afe_disable_apll_tuner_cfg(afe, MT8167_AFE_APLL1);
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_APLL_TUNER);
+#endif
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_22M);
+		clk_disable_unprepare(afe->clocks[MT8167_CLK_ENGEN1]);
+	} else {
+#ifdef ENABLE_AFE_APLL_TUNER
+		mt8167_afe_disable_apll_tuner_cfg(afe, MT8167_AFE_APLL2);
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_APLL2_TUNER);
+#endif
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_24M);
+		clk_disable_unprepare(afe->clocks[MT8167_CLK_ENGEN2]);
+	}
+
 	return 0;
 }
 
