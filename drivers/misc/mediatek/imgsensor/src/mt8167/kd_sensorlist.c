@@ -26,6 +26,9 @@
 #include <linux/seq_file.h>
 #include <sync_write.h>
 #include <linux/types.h>
+#include <linux/of_gpio.h>
+#include <linux/gpio.h>
+
 #include "kd_camera_hw.h"
 #include "kd_camera_typedef.h"
 
@@ -63,7 +66,7 @@
 /*K.S. kernel standard*/
 #if !defined(CONFIG_MTK_LEGACY)
 #include <linux/regulator/consumer.h>
-#endif /* !defined(CONFIG_MTK_LEGACY) */
+#endif				/* !defined(CONFIG_MTK_LEGACY) */
 
 /* Camera information */
 #define PROC_CAMERA_INFO "driver/camera_info"
@@ -79,7 +82,6 @@ static DEFINE_SPINLOCK(kdsensor_drv_lock);
 #define SUPPORT_I2C_BUS_NUM2        2
 */
 
-/* The following is to avoid build error of project: mt6752_fpga related //Jessy @2014/06/04 */
 #ifndef SUPPORT_I2C_BUS_NUM1
 #define SUPPORT_I2C_BUS_NUM1        1
 #endif
@@ -87,29 +89,42 @@ static DEFINE_SPINLOCK(kdsensor_drv_lock);
 #define SUPPORT_I2C_BUS_NUM2        1
 #endif
 
+/* for PMIC may return fail, just ignore it */
+#define WORKAROUND_FOR_PMIC	1
+
+#define BYPASS_GPIO		1
+
+#define FORCE_IGNORE_CCF	1
 
 #define CAMERA_HW_DRVNAME1  "kd_camera_hw"
 #define CAMERA_HW_DRVNAME2  "kd_camera_hw_bus2"
 
+/* use GPIO API instead of pinctl*/
+unsigned int GPIO_CAM0_RST;
+unsigned int GPIO_CAM0_PDN;
+unsigned int GPIO_CAM1_RST;
+unsigned int GPIO_CAM1_PDN;
+
 #if defined(CONFIG_MTK_LEGACY)
-static struct i2c_board_info i2c_devs1 __initdata = {I2C_BOARD_INFO(CAMERA_HW_DRVNAME1, 0xfe>>1)};
-static struct i2c_board_info i2c_devs2 __initdata = {I2C_BOARD_INFO(CAMERA_HW_DRVNAME2, 0xfe>>1)};
+static struct i2c_board_info i2c_devs1 __initdata = {
+	I2C_BOARD_INFO(CAMERA_HW_DRVNAME1, 0xfe >> 1) };
+static struct i2c_board_info i2c_devs2 __initdata = {
+	I2C_BOARD_INFO(CAMERA_HW_DRVNAME2, 0xfe >> 1) };
 #endif
 
-#if 0 /*!defined(CONFIG_MTK_LEGACY)*/
-    /*PMIC*/
-	struct regulator *regVCAMA = NULL;
-	struct regulator *regVCAMD = NULL;
-	struct regulator *regVCAMIO = NULL;
-	struct regulator *regVCAMAF = NULL;
-	struct regulator *regSubVCAMD = NULL;
+#if 0				/*!defined(CONFIG_MTK_LEGACY) */
+ /*PMIC*/ struct regulator *regVCAMA = NULL;
+struct regulator *regVCAMD;
+struct regulator *regVCAMIO;
+struct regulator *regVCAMAF;
+struct regulator *regSubVCAMD;
 #endif
 
 /* Camera Power Regulator Framework */
 #define MTKCAM_USING_PWRREG
 #ifdef MTKCAM_USING_PWRREG
 
-struct cam_power{
+struct cam_power {
 	struct regulator *vcama;
 	struct regulator *vcamd;
 	struct regulator *vcamio;
@@ -127,7 +142,7 @@ struct clk *g_camclk_univpll_d26;
 struct clk *g_camclk_univpll2_d2;
 #endif
 
-struct device *sensor_device = NULL;
+struct device *sensor_device;
 
 #define SENSOR_WR32(addr, data)    mt65xx_reg_sync_writel(data, addr)	/* For 89 Only.   // NEED_TUNING_BY_PROJECT */
 /* #define SENSOR_WR32(addr, data)    iowrite32(data, addr)    // For 89 Only.   // NEED_TUNING_BY_PROJECT */
@@ -141,7 +156,7 @@ struct device *sensor_device = NULL;
 #define PK_INFO(fmt, arg...)    pr_info(PFX " [%s] " fmt, __func__, ##arg)
 
 #undef DEBUG_CAMERA_HW_K
-//#define DEBUG_CAMERA_HW_K
+#define DEBUG_CAMERA_HW_K
 #ifdef DEBUG_CAMERA_HW_K
 #define PK_DBG PK_DBG_FUNC
 #define PK_ERR(fmt, arg...)         pr_err(PFX "[%s] " fmt, __func__, ##arg)
@@ -188,11 +203,17 @@ inline void KD_IMGSENSOR_PROFILE(char *tag)
 	PK_DBG("[%s]Profile = %lu\n", tag, TimeIntervalUS);
 }
 #else
-static inline void KD_IMGSENSOR_PROFILE_INIT(void) {}
+static inline void KD_IMGSENSOR_PROFILE_INIT(void)
 {
 }
 
-static inline void KD_IMGSENSOR_PROFILE(char *tag) {}
+{
+}
+
+static inline void KD_IMGSENSOR_PROFILE(char *tag)
+{
+}
+
 {
 }
 #endif
@@ -242,7 +263,8 @@ static u32 gI2CBusNum = SUPPORT_I2C_BUS_NUM1;
 
 static DEFINE_MUTEX(kdCam_Mutex);
 static BOOL bSesnorVsyncFlag = FALSE;
-static ACDK_KD_SENSOR_SYNC_STRUCT g_NewSensorExpGain = {128, 128, 128, 128, 1000, 640, 0xFF, 0xFF, 0xFF, 0};
+static ACDK_KD_SENSOR_SYNC_STRUCT g_NewSensorExpGain = {
+	128, 128, 128, 128, 1000, 640, 0xFF, 0xFF, 0xFF, 0 };
 
 
 extern MULTI_SENSOR_FUNCTION_STRUCT2 kd_MultiSensorFunc;
@@ -255,12 +277,16 @@ SENSOR_FUNCTION_STRUCT *g_pInvokeSensorFunc[KDIMGSENSOR_MAX_INVOKE_DRIVERS] = { 
 /* static CAMERA_DUAL_CAMERA_SENSOR_ENUM g_invokeSocketIdx[KDIMGSENSOR_MAX_INVOKE_DRIVERS] = {DUAL_CAMERA_NONE_SENSOR,DUAL_CAMERA_NONE_SENSOR}; */
 /* static char g_invokeSensorNameStr[KDIMGSENSOR_MAX_INVOKE_DRIVERS][32] = {KDIMGSENSOR_NOSENSOR,KDIMGSENSOR_NOSENSOR}; */
 CAMERA_DUAL_CAMERA_SENSOR_ENUM g_invokeSocketIdx[KDIMGSENSOR_MAX_INVOKE_DRIVERS] = {
-    DUAL_CAMERA_NONE_SENSOR, DUAL_CAMERA_NONE_SENSOR };
+	DUAL_CAMERA_NONE_SENSOR, DUAL_CAMERA_NONE_SENSOR
+};
+
 char g_invokeSensorNameStr[KDIMGSENSOR_MAX_INVOKE_DRIVERS][32] = {
-    KDIMGSENSOR_NOSENSOR, KDIMGSENSOR_NOSENSOR };
+	KDIMGSENSOR_NOSENSOR, KDIMGSENSOR_NOSENSOR
+};
+
 /* static int g_SensorExistStatus[3]={0,0,0}; */
 static wait_queue_head_t kd_sensor_wait_queue;
-bool setExpGainDoneFlag = 0;
+bool setExpGainDoneFlag;
 static unsigned int g_CurrentSensorIdx;
 static unsigned int g_IsSearchSensor;
 /*=============================================================================
@@ -280,13 +306,13 @@ static const struct i2c_device_id CAMERA_HW_i2c_id2[] = { {CAMERA_HW_DRVNAME2, 0
 *******************************************************************************/
 UINT32 kdGetSensorInitFuncList(ACDK_KD_SENSOR_INIT_FUNCTION_STRUCT **ppSensorList)
 {
-	if (NULL == ppSensorList) {
+	if (ppSensorList == NULL) {
 		PK_ERR("[kdGetSensorInitFuncList]ERROR: NULL ppSensorList\n");
 		return 1;
 	}
 	*ppSensorList = &kdSensorList[0];
 	return 0;
-} /* kdGetSensorInitFuncList() */
+}				/* kdGetSensorInitFuncList() */
 
 
 /*******************************************************************************
@@ -391,7 +417,8 @@ int iReadReg(u16 a_u2Addr, u8 *a_puBuff, u16 i2cId)
 /*******************************************************************************
 * iReadRegI2C
 ********************************************************************************/
-int iReadRegI2C(u8 *a_pSendData , u16 a_sizeSendData, u8 *a_pRecvData, u16 a_sizeRecvData, u16 i2cId)
+int iReadRegI2C(u8 *a_pSendData, u16 a_sizeSendData, u8 *a_pRecvData, u16 a_sizeRecvData,
+		u16 i2cId)
 {
 	int i4RetValue = 0;
 
@@ -505,7 +532,7 @@ int kdSetI2CBusNum(u32 i2cBusNum)
 
 void kdSetI2CSpeed(u32 i2cSpeed)
 {
-#if 0 /* AOSP doesn't support mt_i2c */
+#if 0				/* AOSP doesn't support mt_i2c */
 	if (gI2CBusNum == SUPPORT_I2C_BUS_NUM1) {
 		spin_lock(&kdsensor_drv_lock);
 		g_pstI2Cclient->timing = i2cSpeed;
@@ -559,7 +586,7 @@ int iBurstWriteReg_multi(u8 *pData, u32 bytes, u16 i2cId, u16 transfer_length)
 		    dma_alloc_coherent(&(camerahw_platform_device.dev), bytes,
 				       (dma_addr_t *) &phyAddr, GFP_KERNEL);
 
-		if (NULL == buf) {
+		if (buf == NULL) {
 			PK_DBG("[iBurstWriteReg] Not enough memory\n");
 			return -1;
 		}
@@ -575,8 +602,11 @@ int iBurstWriteReg_multi(u8 *pData, u32 bytes, u16 i2cId, u16 transfer_length)
 		ret = 0;
 		retry = 3;
 		do {
-			ret = i2c_master_send(g_pstI2Cclient, (u8 *)phyAddr,
-					      bytes == transfer_length ? transfer_length : ((bytes / transfer_length) << 16) | transfer_length);
+			ret = i2c_master_send(g_pstI2Cclient, (u8 *) phyAddr,
+					      bytes ==
+					      transfer_length ? transfer_length
+					      : ((bytes /
+						  transfer_length) << 16) | transfer_length);
 			retry--;
 			if ((ret & 0xffff) != transfer_length) {
 				PK_ERR("Error sent I2C ret = %d\n", ret);
@@ -597,7 +627,7 @@ int iBurstWriteReg_multi(u8 *pData, u32 bytes, u16 i2cId, u16 transfer_length)
 		    dma_alloc_coherent(&(camerahw_platform_device.dev), bytes,
 				       (dma_addr_t *) &phyAddr, GFP_KERNEL);
 
-		if (NULL == buf) {
+		if (buf == NULL) {
 			PK_DBG("[iBurstWriteReg] Not enough memory\n");
 			return -1;
 		}
@@ -612,8 +642,11 @@ int iBurstWriteReg_multi(u8 *pData, u32 bytes, u16 i2cId, u16 transfer_length)
 		ret = 0;
 		retry = 3;
 		do {
-			ret = i2c_master_send(g_pstI2Cclient2, (u8 *)phyAddr,
-					      bytes == transfer_length ? transfer_length : ((bytes / transfer_length) << 16) | transfer_length);
+			ret = i2c_master_send(g_pstI2Cclient2, (u8 *) phyAddr,
+					      bytes ==
+					      transfer_length ? transfer_length
+					      : ((bytes /
+						  transfer_length) << 16) | transfer_length);
 			retry--;
 			if ((ret & 0xffff) != transfer_length) {
 				PK_ERR("Error sent I2C ret = %d\n", ret);
@@ -731,13 +764,12 @@ MUINT32 kd_MultiSensorOpen(void)
 #ifndef CONFIG_FPGA_EARLY_PORTING
 
 				/* turn on power */
-				ret =
-				    kdCISModulePowerOn((CAMERA_DUAL_CAMERA_SENSOR_ENUM)
-						       g_invokeSocketIdx[i],
-						       (char *)g_invokeSensorNameStr[i], true,
-						       CAMERA_HW_DRVNAME1);
+				ret = kdCISModulePowerOn((CAMERA_DUAL_CAMERA_SENSOR_ENUM)
+							 g_invokeSocketIdx[i],
+							 (char *)g_invokeSensorNameStr[i], true,
+							 CAMERA_HW_DRVNAME1);
 #endif
-				if (ERROR_NONE != ret) {
+				if (ret != ERROR_NONE) {
 					PK_ERR("[%s]", __func__);
 					return ret;
 				}
@@ -756,7 +788,7 @@ MUINT32 kd_MultiSensorOpen(void)
 						     gI2CBusNum);
 				}
 #else
-				if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
+				if (g_invokeSocketIdx[i] == DUAL_CAMERA_SUB_SENSOR) {
 					spin_lock(&kdsensor_drv_lock);
 					gI2CBusNum = SUPPORT_I2C_BUS_NUM2;
 					spin_unlock(&kdsensor_drv_lock);
@@ -773,7 +805,7 @@ MUINT32 kd_MultiSensorOpen(void)
 				/* KD_SET_I2C_SLAVE_ID(i,g_invokeSocketIdx[i],IMGSENSOR_SET_I2C_ID_STATE); */
 				/*  */
 				ret = g_pInvokeSensorFunc[i]->SensorOpen();
-				if (ERROR_NONE != ret) {
+				if (ret != ERROR_NONE) {
 #ifndef CONFIG_FPGA_EARLY_PORTING
 					kdCISModulePowerOn((CAMERA_DUAL_CAMERA_SENSOR_ENUM)
 							   g_invokeSocketIdx[i],
@@ -812,20 +844,22 @@ kd_MultiSensorGetInfo(MUINT32 *pScenarioId[2],
 	KD_MULTI_FUNCTION_ENTRY();
 	for (i = KDIMGSENSOR_INVOKE_DRIVER_0; i < KDIMGSENSOR_MAX_INVOKE_DRIVERS; i++) {
 		if (g_bEnableDriver[i] && g_pInvokeSensorFunc[i]) {
-			if (DUAL_CAMERA_MAIN_SENSOR == g_invokeSocketIdx[i]) {
+			if (g_invokeSocketIdx[i] == DUAL_CAMERA_MAIN_SENSOR) {
 				ret =
-				    g_pInvokeSensorFunc[i]->
-				    SensorGetInfo((MSDK_SCENARIO_ID_ENUM) (*pScenarioId[0]),
-						  &SensorInfo[0], &SensorConfigData[0]);
-			} else if ((DUAL_CAMERA_MAIN_2_SENSOR == g_invokeSocketIdx[i])
-				   || (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i])) {
+				    g_pInvokeSensorFunc[i]->SensorGetInfo((MSDK_SCENARIO_ID_ENUM)
+									  (*pScenarioId[0]),
+									  &SensorInfo[0],
+									  &SensorConfigData[0]);
+			} else if ((g_invokeSocketIdx[i] == DUAL_CAMERA_MAIN_2_SENSOR)
+				   || (g_invokeSocketIdx[i] == DUAL_CAMERA_SUB_SENSOR)) {
 				ret =
-				    g_pInvokeSensorFunc[i]->
-				    SensorGetInfo((MSDK_SCENARIO_ID_ENUM) (*pScenarioId[1]),
-						  &SensorInfo[1], &SensorConfigData[1]);
+				    g_pInvokeSensorFunc[i]->SensorGetInfo((MSDK_SCENARIO_ID_ENUM)
+									  (*pScenarioId[1]),
+									  &SensorInfo[1],
+									  &SensorConfigData[1]);
 			}
 
-			if (ERROR_NONE != ret) {
+			if (ret != ERROR_NONE) {
 				PK_ERR("[%s]\n", __func__);
 				return ret;
 			}
@@ -853,18 +887,18 @@ MUINT32 kd_MultiSensorGetResolution(MSDK_SENSOR_RESOLUTION_INFO_STRUCT * pSensor
 	KD_MULTI_FUNCTION_ENTRY();
 	for (i = KDIMGSENSOR_INVOKE_DRIVER_0; i < KDIMGSENSOR_MAX_INVOKE_DRIVERS; i++) {
 		if (g_bEnableDriver[i] && g_pInvokeSensorFunc[i]) {
-			if (DUAL_CAMERA_MAIN_SENSOR == g_invokeSocketIdx[i]) {
+			if (g_invokeSocketIdx[i] == DUAL_CAMERA_MAIN_SENSOR) {
 				ret =
-				    g_pInvokeSensorFunc[i]->
-				    SensorGetResolution(pSensorResolution[0]);
-			} else if ((DUAL_CAMERA_MAIN_2_SENSOR == g_invokeSocketIdx[i])
-				   || (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i])) {
+				    g_pInvokeSensorFunc[i]->SensorGetResolution(pSensorResolution
+										[0]);
+			} else if ((g_invokeSocketIdx[i] == DUAL_CAMERA_MAIN_2_SENSOR)
+				   || (g_invokeSocketIdx[i] == DUAL_CAMERA_SUB_SENSOR)) {
 				ret =
-				    g_pInvokeSensorFunc[i]->
-				    SensorGetResolution(pSensorResolution[1]);
+				    g_pInvokeSensorFunc[i]->SensorGetResolution(pSensorResolution
+										[1]);
 			}
 
-			if (ERROR_NONE != ret) {
+			if (ret != ERROR_NONE) {
 				PK_ERR("[%s]\n", __func__);
 				return ret;
 			}
@@ -902,7 +936,7 @@ kd_MultiSensorFeatureControl(CAMERA_DUAL_CAMERA_SENSOR_ENUM InvokeCamera,
 						     gI2CBusNum);
 				}
 #else
-				if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
+				if (g_invokeSocketIdx[i] == DUAL_CAMERA_SUB_SENSOR) {
 					spin_lock(&kdsensor_drv_lock);
 					gI2CBusNum = SUPPORT_I2C_BUS_NUM2;
 					spin_unlock(&kdsensor_drv_lock);
@@ -922,7 +956,7 @@ kd_MultiSensorFeatureControl(CAMERA_DUAL_CAMERA_SENSOR_ENUM InvokeCamera,
 				    g_pInvokeSensorFunc[i]->SensorFeatureControl(FeatureId,
 										 pFeaturePara,
 										 pFeatureParaLen);
-				if (ERROR_NONE != ret) {
+				if (ret != ERROR_NONE) {
 					PK_ERR("[%s]\n", __func__);
 					return ret;
 				}
@@ -959,7 +993,7 @@ kd_MultiSensorControl(CAMERA_DUAL_CAMERA_SENSOR_ENUM InvokeCamera,
 						     gI2CBusNum);
 				}
 #else
-				if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
+				if (g_invokeSocketIdx[i] == DUAL_CAMERA_SUB_SENSOR) {
 					spin_lock(&kdsensor_drv_lock);
 					gI2CBusNum = SUPPORT_I2C_BUS_NUM2;
 					spin_unlock(&kdsensor_drv_lock);
@@ -983,7 +1017,7 @@ kd_MultiSensorControl(CAMERA_DUAL_CAMERA_SENSOR_ENUM InvokeCamera,
 				ret =
 				    g_pInvokeSensorFunc[i]->SensorControl(ScenarioId, pImageWindow,
 									  pSensorConfigData);
-				if (ERROR_NONE != ret) {
+				if (ret != ERROR_NONE) {
 					PK_ERR("ERR:SensorControl(), i =%d\n", i);
 					return ret;
 				}
@@ -1037,7 +1071,7 @@ MUINT32 kd_MultiSensorClose(void)
 #else
 
 
-				if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
+				if (g_invokeSocketIdx[i] == DUAL_CAMERA_SUB_SENSOR) {
 					spin_lock(&kdsensor_drv_lock);
 					gI2CBusNum = SUPPORT_I2C_BUS_NUM2;
 					spin_unlock(&kdsensor_drv_lock);
@@ -1060,7 +1094,7 @@ MUINT32 kd_MultiSensorClose(void)
 						   (char *)g_invokeSensorNameStr[i], false,
 						   CAMERA_HW_DRVNAME1);
 #endif
-				if (ERROR_NONE != ret) {
+				if (ret != ERROR_NONE) {
 					PK_ERR("[%s]", __func__);
 					return ret;
 				}
@@ -1098,7 +1132,7 @@ kdModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM socketIdx[KDIMGSENSOR_MAX_INVOKE_
 #ifndef CONFIG_FPGA_EARLY_PORTING
 			ret = kdCISModulePowerOn(socketIdx[i], sensorNameStr[i], On, mode_name);
 #endif
-			if (ERROR_NONE != ret) {
+			if (ret != ERROR_NONE) {
 				PK_ERR("[%s]", __func__);
 				return ret;
 			}
@@ -1122,7 +1156,7 @@ int kdSetDriver(unsigned int *pDrvIndex)
 	/* Camera information */
 	gDrvIndex = pDrvIndex[KDIMGSENSOR_INVOKE_DRIVER_0];
 
-	if (0 != kdGetSensorInitFuncList(&pSensorList)) {
+	if (kdGetSensorInitFuncList(&pSensorList) != 0) {
 		PK_ERR("ERROR:kdGetSensorInitFuncList()\n");
 		return -EIO;
 	}
@@ -1137,9 +1171,8 @@ int kdSetDriver(unsigned int *pDrvIndex)
 		spin_unlock(&kdsensor_drv_lock);
 		drvIdx[i] = (pDrvIndex[i] & KDIMGSENSOR_DUAL_MASK_LSB);
 		/*  */
-		if (DUAL_CAMERA_NONE_SENSOR == g_invokeSocketIdx[i]) {
+		if (g_invokeSocketIdx[i] == DUAL_CAMERA_NONE_SENSOR)
 			continue;
-		}
 #if 0
 		if (DUAL_CAMERA_MAIN_SENSOR == g_invokeSocketIdx[i]
 		    || DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]
@@ -1151,7 +1184,7 @@ int kdSetDriver(unsigned int *pDrvIndex)
 		}
 #else
 
-		if (DUAL_CAMERA_SUB_SENSOR == g_invokeSocketIdx[i]) {
+		if (g_invokeSocketIdx[i] == DUAL_CAMERA_SUB_SENSOR) {
 			spin_lock(&kdsensor_drv_lock);
 			gI2CBusNum = SUPPORT_I2C_BUS_NUM2;
 			spin_unlock(&kdsensor_drv_lock);
@@ -1166,14 +1199,14 @@ int kdSetDriver(unsigned int *pDrvIndex)
 		PK_XLOG_INFO("[kdSetDriver]g_invokeSocketIdx[%d] = %d\n", i, g_invokeSocketIdx[i]);
 		PK_XLOG_INFO("[kdSetDriver]drvIdx[%d] = %d\n", i, drvIdx[i]);
 		/*  */
-		if (MAX_NUM_OF_SUPPORT_SENSOR > drvIdx[i]) {
+		if (drvIdx[i] < MAX_NUM_OF_SUPPORT_SENSOR) {
 			if (NULL == pSensorList[drvIdx[i]].SensorInit) {
 				PK_ERR("ERROR:kdSetDriver()\n");
 				return -EIO;
 			}
 
 			pSensorList[drvIdx[i]].SensorInit(&g_pInvokeSensorFunc[i]);
-			if (NULL == g_pInvokeSensorFunc[i]) {
+			if (g_pInvokeSensorFunc[i] == NULL) {
 				PK_ERR("ERROR:NULL g_pSensorFunc[%d]\n", i);
 				return -EIO;
 			}
@@ -1187,8 +1220,9 @@ int kdSetDriver(unsigned int *pDrvIndex)
 			       sizeof(pSensorList[drvIdx[i]].drvname));
 			/* return sensor ID */
 			/* pDrvIndex[0] = (unsigned int)pSensorList[drvIdx].SensorId; */
-			PK_XLOG_INFO("[kdSetDriver] :[%d][%d][%d][%s][%lu]\n", i, g_bEnableDriver[i],
-				     g_invokeSocketIdx[i], g_invokeSensorNameStr[i],
+			PK_XLOG_INFO("[kdSetDriver] :[%d][%d][%d][%s][%lu]\n", i,
+				     g_bEnableDriver[i], g_invokeSocketIdx[i],
+				     g_invokeSensorNameStr[i],
 				     sizeof(pSensorList[drvIdx[i]].drvname));
 		}
 	}
@@ -1247,7 +1281,7 @@ int kdCheckSensorPowerOn(void)
 {
 	if (atomic_read(&g_CamHWOpening) == 0) {
 		return 0;
-	} else { /* sensor power on */
+	} else {		/* sensor power on */
 		return 1;
 	}
 }
@@ -1261,7 +1295,7 @@ int kdSensorSyncFunctionPtr(void)
 	unsigned int FeatureParaLen = 0;
 	/* PK_DBG("[Sensor] kdSensorSyncFunctionPtr1:%d %d %d\n", g_NewSensorExpGain.uSensorExpDelayFrame, g_NewSensorExpGain.uSensorGainDelayFrame, g_NewSensorExpGain.uISPGainDelayFrame); */
 	mutex_lock(&kdCam_Mutex);
-	if (NULL == g_pSensorFunc) {
+	if (g_pSensorFunc == NULL) {
 		PK_ERR("ERROR:NULL g_pSensorFunc\n");
 		mutex_unlock(&kdCam_Mutex);
 		return -EIO;
@@ -1272,8 +1306,8 @@ int kdSensorSyncFunctionPtr(void)
 		FeatureParaLen = 2;
 		g_pSensorFunc->SensorFeatureControl(DUAL_CAMERA_MAIN_SENSOR,
 						    SENSOR_FEATURE_SET_ESHUTTER,
-						    (unsigned char *)&g_NewSensorExpGain.
-						    u2SensorNewExpTime,
+						    (unsigned char *)
+						    &g_NewSensorExpGain.u2SensorNewExpTime,
 						    (unsigned int *)&FeatureParaLen);
 		g_NewSensorExpGain.uSensorExpDelayFrame = 0xFF;	/* disable */
 	} else if (g_NewSensorExpGain.uSensorExpDelayFrame != 0xFF) {
@@ -1285,8 +1319,8 @@ int kdSensorSyncFunctionPtr(void)
 		FeatureParaLen = 2;
 		g_pSensorFunc->SensorFeatureControl(DUAL_CAMERA_MAIN_SENSOR,
 						    SENSOR_FEATURE_SET_GAIN,
-						    (unsigned char *)&g_NewSensorExpGain.
-						    u2SensorNewGain,
+						    (unsigned char *)
+						    &g_NewSensorExpGain.u2SensorNewGain,
 						    (unsigned int *)&FeatureParaLen);
 		g_NewSensorExpGain.uSensorGainDelayFrame = 0xFF;	/* disable */
 	} else if (g_NewSensorExpGain.uSensorGainDelayFrame != 0xFF) {
@@ -1335,7 +1369,7 @@ int kdSetExpGain(CAMERA_DUAL_CAMERA_SENSOR_ENUM InvokeCamera)
 	unsigned int FeatureParaLen = 0;
 
 	PK_DBG("[kd_sensorlist]enter kdSetExpGain\n");
-	if (NULL == g_pSensorFunc) {
+	if (g_pSensorFunc == NULL) {
 		PK_ERR("ERROR:NULL g_pSensorFunc\n");
 
 		return -EIO;
@@ -1409,7 +1443,7 @@ static inline int adopt_CAMERA_HW_Open(void)
 	/*  */
 	if (g_pSensorFunc) {
 		err = g_pSensorFunc->SensorOpen();
-		if (ERROR_NONE != err) {
+		if (err != ERROR_NONE) {
 			/*Multiopen fail would close power. */
 			/* kdModulePowerOn((CAMERA_DUAL_CAMERA_SENSOR_ENUM *) g_invokeSocketIdx, g_invokeSensorNameStr, false, CAMERA_HW_DRVNAME1); */
 			PK_ERR("ERROR:SensorOpen(), turn off power\n");
@@ -1430,7 +1464,7 @@ static inline int adopt_CAMERA_HW_Open(void)
 	/* } */
 
 	return err ? -EIO : err;
-}   /* adopt_CAMERA_HW_Open() */
+}				/* adopt_CAMERA_HW_Open() */
 
 /*******************************************************************************
 * adopt_CAMERA_HW_CheckIsAlive
@@ -1462,7 +1496,7 @@ static inline int adopt_CAMERA_HW_CheckIsAlive(void)
 
 	if (g_pSensorFunc) {
 		for (i = KDIMGSENSOR_INVOKE_DRIVER_0; i < KDIMGSENSOR_MAX_INVOKE_DRIVERS; i++) {
-			if (DUAL_CAMERA_NONE_SENSOR != g_invokeSocketIdx[i]) {
+			if (g_invokeSocketIdx[i] != DUAL_CAMERA_NONE_SENSOR) {
 				err =
 				    g_pSensorFunc->SensorFeatureControl(g_invokeSocketIdx[i],
 									SENSOR_FEATURE_CHECK_SENSOR_ID,
@@ -1483,7 +1517,7 @@ static inline int adopt_CAMERA_HW_CheckIsAlive(void)
 						 g_invokeSocketIdx[i], g_invokeSensorNameStr[i]);
 					err = ERROR_NONE;
 				}
-				if (ERROR_NONE != err) {
+				if (err != ERROR_NONE) {
 					PK_DBG
 					    ("ERROR:adopt_CAMERA_HW_CheckIsAlive(), No imgsensor alive\n");
 				}
@@ -1495,9 +1529,8 @@ static inline int adopt_CAMERA_HW_CheckIsAlive(void)
 
 	/* reset sensor state after power off */
 	err1 = g_pSensorFunc->SensorClose();
-	if (ERROR_NONE != err1) {
+	if (err1 != ERROR_NONE)
 		PK_DBG("SensorClose\n");
-	}
 	/*  */
 	kdModulePowerOn((CAMERA_DUAL_CAMERA_SENSOR_ENUM *) g_invokeSocketIdx, g_invokeSensorNameStr,
 			false, CAMERA_HW_DRVNAME1);
@@ -1548,13 +1581,13 @@ static inline int adopt_CAMERA_HW_GetInfo(void *pBuf)
 	}
 
 
-	if (NULL == pSensorGetInfo) {
+	if (pSensorGetInfo == NULL) {
 		PK_DBG("[CAMERA_HW] NULL arg.\n");
 		return -EFAULT;
 	}
 
-	if ((NULL == pSensorGetInfo->pInfo[0]) || (NULL == pSensorGetInfo->pInfo[1]) ||
-	    (NULL == pSensorGetInfo->pConfig[0]) || (NULL == pSensorGetInfo->pConfig[1])) {
+	if ((pSensorGetInfo->pInfo[0] == NULL) || (pSensorGetInfo->pInfo[1] == NULL) ||
+	    (pSensorGetInfo->pConfig[0] == NULL) || (pSensorGetInfo->pConfig[1] == NULL)) {
 		PK_DBG("[CAMERA_HW] NULL arg.\n");
 		return -EFAULT;
 	}
@@ -1632,11 +1665,11 @@ static inline int adopt_CAMERA_HW_GetInfo2(void *pBuf)
 		pScenarioId[i] = &ScenarioId[i];
 	}
 
-	if (NULL == pSensorGetInfo) {
+	if (pSensorGetInfo == NULL) {
 		PK_DBG("[CAMERA_HW] NULL arg.\n");
 		return -EFAULT;
 	}
-	if (NULL == g_pSensorFunc) {
+	if (g_pSensorFunc == NULL) {
 		PK_DBG("[CAMERA_HW]ERROR:NULL g_pSensorFunc\n");
 		return -EFAULT;
 	}
@@ -1659,7 +1692,7 @@ static inline int adopt_CAMERA_HW_GetInfo2(void *pBuf)
 	ScenarioId[0] = ScenarioId[1] = MSDK_SCENARIO_ID_SLIM_VIDEO;
 	g_pSensorFunc->SensorGetInfo(pScenarioId, pInfo4, pConfig4);
 	/* To set sensor information */
-	if (DUAL_CAMERA_MAIN_SENSOR == pSensorGetInfo->SensorId) {
+	if (pSensorGetInfo->SensorId == DUAL_CAMERA_MAIN_SENSOR) {
 		IDNum = 0;
 	} else {
 		IDNum = 1;
@@ -1768,7 +1801,7 @@ static inline int adopt_CAMERA_HW_GetInfo2(void *pBuf)
 	ScenarioId[0] = ScenarioId[1] = MSDK_SCENARIO_ID_CUSTOM5;
 	g_pSensorFunc->SensorGetInfo(pScenarioId, pInfo4, pConfig4);
 	/* To set sensor information */
-	if (DUAL_CAMERA_MAIN_SENSOR == pSensorGetInfo->SensorId) {
+	if (pSensorGetInfo->SensorId == DUAL_CAMERA_MAIN_SENSOR) {
 		IDNum = 0;
 	} else {
 		IDNum = 1;
@@ -1800,7 +1833,7 @@ static inline int adopt_CAMERA_HW_GetInfo2(void *pBuf)
 	PK_INFO("[CAMERA_HW][VD]w=0x%x, h = 0x%x\n", SensorResolution[0].SensorVideoWidth,
 		SensorResolution[0].SensorVideoHeight);
 
-	if (DUAL_CAMERA_MAIN_SENSOR == pSensorGetInfo->SensorId) {
+	if (pSensorGetInfo->SensorId == DUAL_CAMERA_MAIN_SENSOR) {
 		/* Resolution */
 		PK_DBG("[adopt_CAMERA_HW_GetInfo2]Resolution\n");
 		if (copy_to_user
@@ -1836,7 +1869,7 @@ static inline int adopt_CAMERA_HW_Control(void *pBuf)
 	memset(&imageWindow, 0, sizeof(ACDK_SENSOR_EXPOSURE_WINDOW_STRUCT));
 	memset(&sensorConfigData, 0, sizeof(ACDK_SENSOR_CONFIG_STRUCT));
 
-	if (NULL == pSensorCtrl) {
+	if (pSensorCtrl == NULL) {
 		PK_DBG("[CAMERA_HW] NULL arg.\n");
 		return -EFAULT;
 	}
@@ -1890,7 +1923,7 @@ static inline int adopt_CAMERA_HW_Control(void *pBuf)
 /*******************************************************************************
 * adopt_CAMERA_HW_FeatureControl
 ********************************************************************************/
-static inline int  adopt_CAMERA_HW_FeatureControl(void *pBuf)
+static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 {
 	ACDK_SENSOR_FEATURECONTROL_STRUCT *pFeatureCtrl =
 	    (ACDK_SENSOR_FEATURECONTROL_STRUCT *) pBuf;
@@ -1905,7 +1938,7 @@ static inline int  adopt_CAMERA_HW_FeatureControl(void *pBuf)
 
 
 
-	if (NULL == pFeatureCtrl) {
+	if (pFeatureCtrl == NULL) {
 		PK_ERR(" NULL arg.\n");
 		return -EFAULT;
 	}
@@ -1926,7 +1959,7 @@ static inline int  adopt_CAMERA_HW_FeatureControl(void *pBuf)
 	}
 
 	pFeaturePara = kmalloc(FeatureParaLen, GFP_KERNEL);
-	if (NULL == pFeaturePara) {
+	if (pFeaturePara == NULL) {
 		PK_ERR(" ioctl allocate mem failed\n");
 		return -ENOMEM;
 	}
@@ -2011,8 +2044,8 @@ static inline int  adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		g_NewSensorExpGain.uSensorGainDelayFrame = pSensorSyncInfo->uSensorGainDelayFrame;
 		g_NewSensorExpGain.uISPGainDelayFrame = pSensorSyncInfo->uISPGainDelayFrame;
 		/* AE smooth not change shutter to speed up */
-		if ((0 == g_NewSensorExpGain.u2SensorNewExpTime)
-		    || (0xFFFF == g_NewSensorExpGain.u2SensorNewExpTime)) {
+		if ((g_NewSensorExpGain.u2SensorNewExpTime == 0)
+		    || (g_NewSensorExpGain.u2SensorNewExpTime == 0xFFFF)) {
 			g_NewSensorExpGain.uSensorExpDelayFrame = 0xFF;
 		}
 
@@ -2020,8 +2053,8 @@ static inline int  adopt_CAMERA_HW_FeatureControl(void *pBuf)
 			FeatureParaLen = 2;
 			g_pSensorFunc->SensorFeatureControl(pFeatureCtrl->InvokeCamera,
 							    SENSOR_FEATURE_SET_ESHUTTER,
-							    (unsigned char *)&g_NewSensorExpGain.
-							    u2SensorNewExpTime,
+							    (unsigned char *)
+							    &g_NewSensorExpGain.u2SensorNewExpTime,
 							    (unsigned int *)&FeatureParaLen);
 			g_NewSensorExpGain.uSensorExpDelayFrame = 0xFF;	/* disable */
 		} else if (g_NewSensorExpGain.uSensorExpDelayFrame != 0xFF) {
@@ -2032,8 +2065,8 @@ static inline int  adopt_CAMERA_HW_FeatureControl(void *pBuf)
 			FeatureParaLen = 2;
 			g_pSensorFunc->SensorFeatureControl(pFeatureCtrl->InvokeCamera,
 							    SENSOR_FEATURE_SET_GAIN,
-							    (unsigned char *)&g_NewSensorExpGain.
-							    u2SensorNewGain,
+							    (unsigned char *)
+							    &g_NewSensorExpGain.u2SensorNewGain,
 							    (unsigned int *)&FeatureParaLen);
 			g_NewSensorExpGain.uSensorGainDelayFrame = 0xFF;	/* disable */
 		} else if (g_NewSensorExpGain.uSensorGainDelayFrame != 0xFF) {
@@ -2059,7 +2092,7 @@ static inline int  adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		pSensorGroupInfo = (ACDK_SENSOR_GROUP_INFO_STRUCT *) pFeaturePara;
 		pUserGroupNamePtr = pSensorGroupInfo->GroupNamePtr;
 		/*  */
-		if (NULL == pUserGroupNamePtr) {
+		if (pUserGroupNamePtr == NULL) {
 			kfree(pFeaturePara);
 			PK_DBG("[CAMERA_HW] NULL arg.\n");
 			return -EFAULT;
@@ -2207,7 +2240,7 @@ static inline int  adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		return -EFAULT;
 	}
 	return ret;
-}   /* adopt_CAMERA_HW_FeatureControl() */
+}				/* adopt_CAMERA_HW_FeatureControl() */
 
 
 /*******************************************************************************
@@ -2242,7 +2275,7 @@ static inline int adopt_CAMERA_HW_Close(void)
 	spin_unlock(&kdsensor_drv_lock);
 
 	return 0;
-}   /* adopt_CAMERA_HW_Close() */
+}				/* adopt_CAMERA_HW_Close() */
 
 /*******************************************************************************
 * Common Clock Framework (CCF)
@@ -2252,6 +2285,14 @@ static inline int adopt_CAMERA_HW_Close(void)
 
 static inline void Get_ccf_clk(struct platform_device *pdev)
 {
+#if defined(CONFIG_FPGA_EARLY_PORTING) || FORCE_IGNORE_CCF
+	return;
+#endif
+
+#if FORCE_IGNORE_CCF
+	/* force ignore ccf */
+	return;
+#endif
 	if (pdev == NULL) {
 		pr_err("[%s] pdev is null\n", __func__);
 		return;
@@ -2269,6 +2310,15 @@ static inline void Get_ccf_clk(struct platform_device *pdev)
 
 static inline void Check_ccf_clk(void)
 {
+#if defined(CONFIG_FPGA_EARLY_PORTING) || FORCE_IGNORE_CCF
+	return;
+#endif
+
+#if FORCE_IGNORE_CCF
+	/* force ignore ccf */
+	return;
+#endif
+
 	BUG_ON(IS_ERR(g_camclk_camtg_sel));
 	BUG_ON(IS_ERR(g_camclk_univpll_d26));
 	BUG_ON(IS_ERR(g_camclk_univpll2_d2));
@@ -2284,12 +2334,21 @@ static inline int kdSetSensorMclk(int *pBuf)
 	int ret = 0;
 	ACDK_SENSOR_MCLK_STRUCT *pSensorCtrl = (ACDK_SENSOR_MCLK_STRUCT *) pBuf;
 
+#if defined(CONFIG_FPGA_EARLY_PORTING) || FORCE_IGNORE_CCF
+	return 0;
+#endif
+
+#if FORCE_IGNORE_CCF
+	/* force ignore ccf */
+	return 0;
+#endif
+
 	PK_INFO("[CAMERA SENSOR] kdSetSensorMclk on=%d, freq= %d\n", pSensorCtrl->on,
 		pSensorCtrl->freq);
 #ifdef MTKCAM_USING_CCF
 	PK_DBG("========= MTKCAM_USING_CCF =======\n");
 	Check_ccf_clk();
-	if (1 == pSensorCtrl->on) {
+	if (pSensorCtrl->on == 1) {
 		clk_prepare_enable(g_camclk_camtg_sel);
 		if (pSensorCtrl->freq == 1 /*CAM_PLL_48_GROUP */)
 			clk_set_parent(g_camclk_camtg_sel, g_camclk_univpll_d26);
@@ -2302,7 +2361,7 @@ static inline int kdSetSensorMclk(int *pBuf)
 
 #else
 	PK_DBG("========= Old Clock =======\n");
-	if (1 == pSensorCtrl->on) {
+	if (pSensorCtrl->on == 1) {
 		enable_mux(MT_MUX_CAMTG, "CAMERA_SENSOR");
 		clkmux_sel(MT_MUX_CAMTG, pSensorCtrl->freq, "CAMERA_SENSOR");
 	} else {
@@ -2333,7 +2392,7 @@ static inline int kdSetSensorGpio(int *pBuf)
 
 	PK_INFO("[CAMERA SENSOR] kdSetSensorGpio enable=%d, type=%d\n",
 		pSensorgpio->GpioEnable, pSensorgpio->SensroInterfaceType);
-#if 0/*defined CONFIG_MTK_LEGACY*/
+#if 0				/*defined CONFIG_MTK_LEGACY */
 #ifndef CONFIG_MTK_FPGA
 	/* Please use DCT to set correct GPIO setting (below message only for debug) */
 	if (pSensorgpio->SensroInterfaceType == SENSORIF_PARALLEL) {
@@ -2393,12 +2452,12 @@ static inline int kdSetSensorGpio(int *pBuf)
 		}
 	}
 #endif
-#endif/*End of mtk legacy*/
+#endif				/*End of mtk legacy */
 	return ret;
 }
 
 
-#if 0 /*!defined(CONFIG_MTK_LEGACY)*/
+#if 0				/*!defined(CONFIG_MTK_LEGACY) */
 bool Get_Cam_Regulator(void)
 {
 	const char *name = NULL;
@@ -2436,24 +2495,19 @@ bool Get_Cam_Regulator(void)
 				   }
 				 */
 				if (regVCAMA == NULL) {
-					regVCAMA =
-					    regulator_get(sensor_device, "vcama");
+					regVCAMA = regulator_get(sensor_device, "vcama");
 				}
 				if (regVCAMD == NULL) {
-					regVCAMD =
-					    regulator_get(sensor_device, "vcamd");
+					regVCAMD = regulator_get(sensor_device, "vcamd");
 				}
 				if (regSubVCAMD == NULL) {
-					regSubVCAMD =
-					    regulator_get(sensor_device, "vcamd_sub");
+					regSubVCAMD = regulator_get(sensor_device, "vcamd_sub");
 				}
 				if (regVCAMIO == NULL) {
-					regVCAMIO =
-					    regulator_get(sensor_device, "vcamio");
+					regVCAMIO = regulator_get(sensor_device, "vcamio");
 				}
 				if (regVCAMAF == NULL) {
-					regVCAMAF =
-					    regulator_get(sensor_device, "vcamaf");
+					regVCAMAF = regulator_get(sensor_device, "vcamaf");
 				}
 				/* restore original dev.of_node */
 				sensor_device->of_node = kd_node;
@@ -2546,31 +2600,40 @@ int cam_power_init(struct platform_device *pdev, int PinIdx)
 {
 	PK_DBG(" == MTKCAM_USING_PWRREG : cam_power_init(%d) ==", PinIdx);
 
+#if defined(CONFIG_FPGA_EARLY_PORTING) || WORKAROUND_FOR_PMIC
+	PK_DBG("Just bypass power");
+	return 1;
+#else
 	g_cam[PinIdx].vcama = devm_regulator_get(&pdev->dev, "reg-vcama");
 	g_cam[PinIdx].vcamd = devm_regulator_get(&pdev->dev, "reg-vcamd");
 	g_cam[PinIdx].vcamio = devm_regulator_get(&pdev->dev, "reg-vcamio");
 	g_cam[PinIdx].vcamaf = devm_regulator_get(&pdev->dev, "reg-vcamaf");
 
 	if (IS_ERR(g_cam[PinIdx].vcama)) {
-		PK_ERR("Get regulator fail,[vcama] is null, errno:%ld", PTR_ERR(g_cam[PinIdx].vcama));
+		PK_ERR("Get regulator fail,[vcama] is null, errno:%ld",
+		       PTR_ERR(g_cam[PinIdx].vcama));
 		return PTR_ERR(g_cam[PinIdx].vcama);
 	}
 
 	if (IS_ERR(g_cam[PinIdx].vcamd)) {
-		PK_ERR("Get regulator fail,[vcamd] is null, errno:%ld", PTR_ERR(g_cam[PinIdx].vcamd));
+		PK_ERR("Get regulator fail,[vcamd] is null, errno:%ld",
+		       PTR_ERR(g_cam[PinIdx].vcamd));
 		return PTR_ERR(g_cam[PinIdx].vcamd);
 	}
 
 	if (IS_ERR(g_cam[PinIdx].vcamio)) {
-		PK_ERR("Get regulator fail,[vcamio] is null, errno:%ld", PTR_ERR(g_cam[PinIdx].vcamio));
+		PK_ERR("Get regulator fail,[vcamio] is null, errno:%ld",
+		       PTR_ERR(g_cam[PinIdx].vcamio));
 		return PTR_ERR(g_cam[PinIdx].vcamio);
 	}
 
 	if (IS_ERR(g_cam[PinIdx].vcamaf)) {
-		PK_ERR("Get regulator fail,[vcamaf] is null, errno:%ld", PTR_ERR(g_cam[PinIdx].vcamaf));
+		PK_ERR("Get regulator fail,[vcamaf] is null, errno:%ld",
+		       PTR_ERR(g_cam[PinIdx].vcamaf));
 		return PTR_ERR(g_cam[PinIdx].vcamaf);
 	}
 	return 0;
+#endif
 }
 
 bool CAMERA_Regulator_PowerOnOFF(struct regulator *pwrreg, BOOL IsOn, int vol)
@@ -2587,9 +2650,9 @@ bool CAMERA_Regulator_PowerOnOFF(struct regulator *pwrreg, BOOL IsOn, int vol)
 
 	if (IsOn) {		/* Power ON */
 		/*
-			Need to reset Highest Voltage, if the power is used by multi-user,
-			otherwise, it would be bounding at last time settings/Highest vol
-		*/
+		   Need to reset Highest Voltage, if the power is used by multi-user,
+		   otherwise, it would be bounding at last time settings/Highest vol
+		 */
 		voltage_count = regulator_count_voltages(pwrreg);
 		if (voltage_count <= 0) {
 			PK_ERR("Fails to count, voltage_count = %d", voltage_count);
@@ -2629,9 +2692,9 @@ bool CAMERA_Regulator_PowerOnOFF(struct regulator *pwrreg, BOOL IsOn, int vol)
 			return FALSE;
 		}
 		/*
-			Need to reset Lowest/Highest Voltage, if the power is used by multi-user,
-			otherwise, it would be bounding at last time settings
-		*/
+		   Need to reset Lowest/Highest Voltage, if the power is used by multi-user,
+		   otherwise, it would be bounding at last time settings
+		 */
 		high_bound_voltage = regulator_list_voltage(pwrreg, voltage_count - 1);
 		PK_DBG("high_bound_voltage = %d", high_bound_voltage);
 
@@ -2649,7 +2712,8 @@ bool CAMERA_Regulator_PowerOnOFF(struct regulator *pwrreg, BOOL IsOn, int vol)
 		}
 		ret = regulator_set_voltage(pwrreg, low_bound_voltage, high_bound_voltage);
 		if (ret != 0) {
-			PK_ERR("Fails to set High(%d) ~ Low(%d) voltage", high_bound_voltage, low_bound_voltage);
+			PK_ERR("Fails to set High(%d) ~ Low(%d) voltage", high_bound_voltage,
+			       low_bound_voltage);
 			return FALSE;
 		}
 	}
@@ -2686,12 +2750,16 @@ bool _hwPowerOn(int PinIdx, KD_REGULATOR_TYPE_T PwrType, int Voltage)
 		pwr = NULL;
 		break;
 	}
-	if(pwr != NULL)
+	if (pwr != NULL)
 		return CAMERA_Regulator_PowerOnOFF(pwr, 1, Voltage);
-	else
+	else {
+#if defined(CONFIG_FPGA_EARLY_PORTING) || WORKAROUND_FOR_PMIC
+		return TRUE;
+#else
 		return FALSE;
+#endif
+	}
 }
-
 EXPORT_SYMBOL(_hwPowerOn);
 
 
@@ -2699,7 +2767,7 @@ bool _hwPowerDown(int PinIdx, KD_REGULATOR_TYPE_T PwrType)
 {
 	struct regulator *pwr;
 
-	PK_DBG("PinIndex=%d , PowerType = %d",PinIdx, PwrType);
+	PK_DBG("PinIndex=%d , PowerType = %d", PinIdx, PwrType);
 
 	if ((PinIdx != 0) && (PinIdx != 1)) {
 		PK_ERR("PinIndex=%d is invalid\n", PinIdx);
@@ -2724,12 +2792,16 @@ bool _hwPowerDown(int PinIdx, KD_REGULATOR_TYPE_T PwrType)
 		pwr = NULL;
 		break;
 	}
-	if(pwr != NULL)
+	if (pwr != NULL)
 		return CAMERA_Regulator_PowerOnOFF(pwr, 0, 0);
-	else
+	else {
+#if defined(CONFIG_FPGA_EARLY_PORTING) || WORKAROUND_FOR_PMIC
+		return TRUE;
+#else
 		return FALSE;
+#endif
+	}
 }
-
 EXPORT_SYMBOL(_hwPowerDown);
 
 #endif
@@ -2808,9 +2880,10 @@ static int compat_put_imagesensor_getinfo_struct(COMPAT_IMAGESENSOR_GETINFO_STRU
 	    return err;
 }
 
-static int compat_get_acdk_sensor_featurecontrol_struct(
-	COMPAT_ACDK_SENSOR_FEATURECONTROL_STRUCT __user *data32,
-	ACDK_SENSOR_FEATURECONTROL_STRUCT __user *data)
+static int compat_get_acdk_sensor_featurecontrol_struct(COMPAT_ACDK_SENSOR_FEATURECONTROL_STRUCT
+							__user *data32,
+							ACDK_SENSOR_FEATURECONTROL_STRUCT __user *
+							data)
 {
 	compat_uptr_t p;
 	compat_uint_t i;
@@ -2827,9 +2900,10 @@ static int compat_get_acdk_sensor_featurecontrol_struct(
 	return err;
 }
 
-static int compat_put_acdk_sensor_featurecontrol_struct(
-	COMPAT_ACDK_SENSOR_FEATURECONTROL_STRUCT __user *data32,
-	ACDK_SENSOR_FEATURECONTROL_STRUCT __user *data)
+static int compat_put_acdk_sensor_featurecontrol_struct(COMPAT_ACDK_SENSOR_FEATURECONTROL_STRUCT
+							__user *data32,
+							ACDK_SENSOR_FEATURECONTROL_STRUCT __user *
+							data)
 {
 	MUINT8 *p;
 	MUINT32 *q;
@@ -2889,9 +2963,10 @@ static int compat_put_acdk_sensor_control_struct(COMPAT_ACDK_SENSOR_CONTROL_STRU
 	return err;
 }
 
-static int compat_get_acdk_sensor_resolution_info_struct(
-	COMPAT_ACDK_SENSOR_PRESOLUTION_STRUCT __user *data32,
-	ACDK_SENSOR_PRESOLUTION_STRUCT __user *data)
+static int compat_get_acdk_sensor_resolution_info_struct(COMPAT_ACDK_SENSOR_PRESOLUTION_STRUCT
+							 __user *data32,
+							 ACDK_SENSOR_PRESOLUTION_STRUCT __user *
+							 data)
 {
 	int err;
 	compat_uptr_t p;
@@ -2934,6 +3009,7 @@ static long CAMERA_HW_Ioctl_Compat(struct file *filp, unsigned int cmd, unsigned
 			COMPAT_ACDK_SENSOR_GETINFO_STRUCT __user *data32;
 			ACDK_SENSOR_GETINFO_STRUCT __user *data;
 			int err;
+
 			PK_DBG("[CAMERA SENSOR] CAOMPAT_KDIMGSENSORIOC_X_GETINFO E\n");
 			data32 = compat_ptr(arg);
 			data = compat_alloc_user_space(sizeof(*data));
@@ -2959,6 +3035,7 @@ static long CAMERA_HW_Ioctl_Compat(struct file *filp, unsigned int cmd, unsigned
 			COMPAT_ACDK_SENSOR_FEATURECONTROL_STRUCT __user *data32;
 			ACDK_SENSOR_FEATURECONTROL_STRUCT __user *data;
 			int err;
+
 			PK_DBG("[CAMERA SENSOR] CAOMPAT_KDIMGSENSORIOC_X_FEATURECONCTROL\n");
 			data32 = compat_ptr(arg);
 			data = compat_alloc_user_space(sizeof(*data));
@@ -2985,6 +3062,7 @@ static long CAMERA_HW_Ioctl_Compat(struct file *filp, unsigned int cmd, unsigned
 			COMPAT_ACDK_SENSOR_CONTROL_STRUCT __user *data32;
 			ACDK_SENSOR_CONTROL_STRUCT __user *data;
 			int err;
+
 			PK_DBG("[CAMERA SENSOR] CAOMPAT_KDIMGSENSORIOC_X_CONTROL\n");
 			data32 = compat_ptr(arg);
 			data = compat_alloc_user_space(sizeof(*data));
@@ -3009,6 +3087,7 @@ static long CAMERA_HW_Ioctl_Compat(struct file *filp, unsigned int cmd, unsigned
 			COMPAT_IMAGESENSOR_GETINFO_STRUCT __user *data32;
 			IMAGESENSOR_GETINFO_STRUCT __user *data;
 			int err;
+
 			PK_DBG("[CAMERA SENSOR] CAOMPAT_KDIMGSENSORIOC_X_GETINFO2\n");
 
 			data32 = compat_ptr(arg);
@@ -3035,6 +3114,7 @@ static long CAMERA_HW_Ioctl_Compat(struct file *filp, unsigned int cmd, unsigned
 			COMPAT_ACDK_SENSOR_PRESOLUTION_STRUCT __user *data32;
 			ACDK_SENSOR_PRESOLUTION_STRUCT __user *data;
 			int err;
+
 			PK_DBG("[CAMERA SENSOR] KDIMGSENSORIOC_X_GETRESOLUTION\n");
 			data32 = compat_ptr(arg);
 			data = compat_alloc_user_space(sizeof(data));
@@ -3093,11 +3173,11 @@ static long CAMERA_HW_Ioctl(struct file *a_pstFile,
 	mutex_lock(&kdCam_Mutex);
 
 
-	if (_IOC_NONE == _IOC_DIR(a_u4Command)) {
+	if (_IOC_DIR(a_u4Command) == _IOC_NONE) {
 	} else {
 		pBuff = kmalloc(_IOC_SIZE(a_u4Command), GFP_KERNEL);
 
-		if (NULL == pBuff) {
+		if (pBuff == NULL) {
 			PK_DBG("[CAMERA SENSOR] ioctl allocate mem failed\n");
 			i4RetValue = -ENOMEM;
 			goto CAMERA_HW_Ioctl_EXIT;
@@ -3299,7 +3379,7 @@ static inline int RegisterCAMERA_HWCharDrv(void)
 	/* Allocate driver */
 	g_pCAMERA_HW_CharDrv = cdev_alloc();
 
-	if (NULL == g_pCAMERA_HW_CharDrv) {
+	if (g_pCAMERA_HW_CharDrv == NULL) {
 		unregister_chrdev_region(g_CAMERA_HWdevno, 1);
 
 		PK_DBG("[CAMERA SENSOR] Allocate mem for kobject failed\n");
@@ -3364,7 +3444,7 @@ static int CAMERA_HW_i2c_probe(struct i2c_client *client, const struct i2c_devic
 	spin_lock(&kdsensor_drv_lock);
 	g_pstI2Cclient = client;
 	/* set I2C clock rate */
-	/*g_pstI2Cclient->timing = 200;*/	/* 100k */
+	/*g_pstI2Cclient->timing = 200; *//* 100k */
 
 	spin_unlock(&kdsensor_drv_lock);
 
@@ -3377,7 +3457,7 @@ static int CAMERA_HW_i2c_probe(struct i2c_client *client, const struct i2c_devic
 	}
 
 	/* spin_lock_init(&g_CamHWLock); */
-#if 0 /*!defined(CONFIG_MTK_LEGACY)*/
+#if 0				/*!defined(CONFIG_MTK_LEGACY) */
 	Get_Cam_Regulator();
 #endif
 
@@ -3396,7 +3476,7 @@ static int CAMERA_HW_i2c_remove(struct i2c_client *client)
 
 #ifdef CONFIG_OF
 static const struct of_device_id CAMERA_HW_i2c_of_ids[] = {
-    { .compatible = "mediatek,camera_main", },
+	{.compatible = "mediatek,camera_main",},
 	{}
 };
 #endif
@@ -3503,7 +3583,7 @@ static inline int RegisterCAMERA_HWCharDrv2(void)
 	/* Allocate driver */
 	g_pCAMERA_HW_CharDrv2 = cdev_alloc();
 
-	if (NULL == g_pCAMERA_HW_CharDrv2) {
+	if (g_pCAMERA_HW_CharDrv2 == NULL) {
 		unregister_chrdev_region(g_CAMERA_HWdevno2, 1);
 
 		PK_DBG("[CAMERA SENSOR] Allocate mem for kobject failed\n");
@@ -3565,7 +3645,7 @@ static int CAMERA_HW_i2c_probe2(struct i2c_client *client, const struct i2c_devi
 	g_pstI2Cclient2 = client;
 
 	/* set I2C clock rate */
-	/*g_pstI2Cclient2->timing = 100;*/	/* 100k */
+	/*g_pstI2Cclient2->timing = 100; *//* 100k */
 	spin_unlock(&kdsensor_drv_lock);
 
 	/* Register char driver */
@@ -3597,7 +3677,7 @@ static int CAMERA_HW_i2c_remove2(struct i2c_client *client)
 #if 1
 #ifdef CONFIG_OF
 static const struct of_device_id CAMERA_HW2_i2c_driver_of_ids[] = {
-	{ .compatible = "mediatek,camera_sub", },
+	{.compatible = "mediatek,camera_sub",},
 	{}
 };
 #endif
@@ -3623,6 +3703,9 @@ struct i2c_driver CAMERA_HW_i2c_driver2 = {
 ********************************************************************************/
 static int CAMERA_HW_probe(struct platform_device *pdev)
 {
+#if !BYPASS_GPIO && (!defined(CONFIG_FPGA_EARLY_PORTING) && !defined(CONFIG_MTK_LEGACY))
+	struct device *dev = &pdev->dev;
+#endif
 
 #ifdef MTKCAM_USING_PWRREG	/* Camera Power Regulator Framework base on Device Tree */
 
@@ -3631,18 +3714,47 @@ static int CAMERA_HW_probe(struct platform_device *pdev)
 	ret = cam_power_init(pdev, 0);
 
 	if (ret < 0) {
+#if defined(CONFIG_FPGA_EARLY_PORTING) || WORKAROUND_FOR_PMIC
+		PK_INFO("Workaround for Camera Probe because of PMIC error, just continue...\n");
 		if (ret == (-EPROBE_DEFER))
-			PK_ERR("Camera HW driver is probed earlier than PMIC, let's deferring probe");
+			PK_INFO
+			    ("Reason: Camera HW driver is probed earlier than PMIC, it may probe continuous...\n");
+#else
+		if (ret == (-EPROBE_DEFER))
+			PK_ERR
+			    ("Camera HW driver is probed earlier than PMIC, let's deferring probe\n");
 		return ret;
+#endif
 	}
-
 #endif
 
 #ifdef MTKCAM_USING_CCF
 	PK_DBG(" == MTKCAM_USING_CCF ==\n");
 	Get_ccf_clk(pdev);
 #endif
-#if !defined(CONFIG_MTK_LEGACY)
+
+#if !BYPASS_GPIO && (!defined(CONFIG_FPGA_EARLY_PORTING) && !defined(CONFIG_MTK_LEGACY))
+	/* request GPIO RST/PDN */
+	GPIO_CAM0_RST = of_get_named_gpio(dev->of_node, "cam0_rst", 0);
+	GPIO_CAM0_PDN = of_get_named_gpio(dev->of_node, "cam0_pdn", 0);
+	GPIO_CAM1_RST = of_get_named_gpio(dev->of_node, "cam0_rst", 0);
+	GPIO_CAM1_PDN = of_get_named_gpio(dev->of_node, "cam0_pdn", 0);
+
+	ret = gpio_request(GPIO_CAM0_RST, "cam0_rst");
+	if (ret < 0)
+		pr_err("[Camera][ERROR] Unable to request GPIO_CAM0_RST\n");
+
+	ret = gpio_request(GPIO_CAM0_PDN, "cam0_pdn");
+	if (ret < 0)
+		pr_err("[Camera][ERROR] Unable to request GPIO_CAM0_PDN\n");
+
+	ret = gpio_request(GPIO_CAM1_RST, "cam1_rst");
+	if (ret < 0)
+		pr_err("[Camera][ERROR] Unable to request GPIO_CAM1_RST\n");
+
+	ret = gpio_request(GPIO_CAM1_PDN, "cam1_pdn");
+	if (ret < 0)
+		pr_err("[Camera][ERROR] Unable to request GPIO_CAM1_PDN\n");
 	mtkcam_gpio_init(pdev);
 #endif
 	return i2c_add_driver(&CAMERA_HW_i2c_driver);
@@ -3653,6 +3765,17 @@ static int CAMERA_HW_probe(struct platform_device *pdev)
 ********************************************************************************/
 static int CAMERA_HW_remove(struct platform_device *pdev)
 {
+#if !BYPASS_GPIO && (!defined(CONFIG_FPGA_EARLY_PORTING) && !defined(CONFIG_MTK_LEGACY))
+
+	if (gpio_is_valid(GPIO_CAM0_RST))
+		gpio_free(GPIO_CAM0_RST);
+	if (gpio_is_valid(GPIO_CAM0_PDN))
+		gpio_free(GPIO_CAM0_PDN);
+	if (gpio_is_valid(GPIO_CAM1_RST))
+		gpio_free(GPIO_CAM1_RST);
+	if (gpio_is_valid(GPIO_CAM1_PDN))
+		gpio_free(GPIO_CAM1_PDN);
+#endif
 	i2c_del_driver(&CAMERA_HW_i2c_driver);
 	return 0;
 }
@@ -3686,11 +3809,17 @@ static int CAMERA_HW_probe2(struct platform_device *pdev)
 	ret = cam_power_init(pdev, 1);
 
 	if (ret < 0) {
+#if WORKAROUND_FOR_PMIC
+		PK_INFO("Workaround for Camera Probe because of PMIC error, just continue...");
 		if (ret == (-EPROBE_DEFER))
-			PK_ERR("Camera HW driver is probed earlier than PMIC, let's deferring probe");
+			PK_INFO("Reason: Camera HW driver is probed earlier than PMIC");
+#else
+		if (ret == (-EPROBE_DEFER))
+			PK_ERR
+			    ("Camera HW driver is probed earlier than PMIC, let's deferring probe");
 		return ret;
+#endif
 	}
-
 #endif
 
 
@@ -3901,17 +4030,20 @@ static int CAMERA_HW_Read_3D_Camera_Status(char *page, char **start, off_t off,
   * CAMERA_HW_DumpReg_To_Proc()
   * Used to dump some critical sensor register
   ********************************************************************************/
-static ssize_t  CAMERA_HW_DumpReg_To_Proc(struct file *file, char __user *data, size_t len, loff_t *ppos)
+static ssize_t CAMERA_HW_DumpReg_To_Proc(struct file *file, char __user *data, size_t len,
+					 loff_t *ppos)
 {
 	return 0;
 }
 
-static ssize_t  CAMERA_HW_DumpReg_To_Proc2(struct file *file, char __user *data, size_t len, loff_t *ppos)
+static ssize_t CAMERA_HW_DumpReg_To_Proc2(struct file *file, char __user *data, size_t len,
+					  loff_t *ppos)
 {
 	return 0;
 }
 
-static ssize_t  CAMERA_HW_DumpReg_To_Proc3(struct file *file, char __user *data, size_t len, loff_t *ppos)
+static ssize_t CAMERA_HW_DumpReg_To_Proc3(struct file *file, char __user *data, size_t len,
+					  loff_t *ppos)
 {
 	return 0;
 }
@@ -3920,7 +4052,8 @@ static ssize_t  CAMERA_HW_DumpReg_To_Proc3(struct file *file, char __user *data,
   * CAMERA_HW_Reg_Debug()
   * Used for sensor register read/write by proc file
   ********************************************************************************/
-static ssize_t CAMERA_HW_Reg_Debug(struct file *file, const char *buffer, size_t count, loff_t *data)
+static ssize_t CAMERA_HW_Reg_Debug(struct file *file, const char *buffer, size_t count,
+				   loff_t *data)
 {
 	char regBuf[64] = { '\0' };
 	u32 u4CopyBufSize = (count < (sizeof(regBuf) - 1)) ? (count) : (sizeof(regBuf) - 1);
@@ -3938,13 +4071,11 @@ static ssize_t CAMERA_HW_Reg_Debug(struct file *file, const char *buffer, size_t
 		if (g_pSensorFunc != NULL) {
 			g_pSensorFunc->SensorFeatureControl(DUAL_CAMERA_MAIN_SENSOR,
 							    SENSOR_FEATURE_SET_REGISTER,
-							    (MUINT8 *) &sensorReg,
-							    (MUINT32 *)
+							    (MUINT8 *) &sensorReg, (MUINT32 *)
 							    sizeof(MSDK_SENSOR_REG_INFO_STRUCT));
 			g_pSensorFunc->SensorFeatureControl(DUAL_CAMERA_MAIN_SENSOR,
 							    SENSOR_FEATURE_GET_REGISTER,
-							    (MUINT8 *) &sensorReg,
-							    (MUINT32 *)
+							    (MUINT8 *) &sensorReg, (MUINT32 *)
 							    sizeof(MSDK_SENSOR_REG_INFO_STRUCT));
 			PK_DBG("write addr = 0x%08x, data = 0x%08x\n", sensorReg.RegAddr,
 			       sensorReg.RegData);
@@ -3953,8 +4084,7 @@ static ssize_t CAMERA_HW_Reg_Debug(struct file *file, const char *buffer, size_t
 		if (g_pSensorFunc != NULL) {
 			g_pSensorFunc->SensorFeatureControl(DUAL_CAMERA_MAIN_SENSOR,
 							    SENSOR_FEATURE_GET_REGISTER,
-							    (MUINT8 *) &sensorReg,
-							    (MUINT32 *)
+							    (MUINT8 *) &sensorReg, (MUINT32 *)
 							    sizeof(MSDK_SENSOR_REG_INFO_STRUCT));
 			PK_DBG("read addr = 0x%08x, data = 0x%08x\n", sensorReg.RegAddr,
 			       sensorReg.RegData);
@@ -3966,8 +4096,7 @@ static ssize_t CAMERA_HW_Reg_Debug(struct file *file, const char *buffer, size_t
 		if (g_pSensorFunc != NULL) {
 			g_pSensorFunc->SensorFeatureControl(DUAL_CAMERA_MAIN_SENSOR,
 							    SENSOR_FEATURE_DEBUG_IMGSENSOR,
-							    (MUINT8 *) &debugSensor,
-							    (MUINT32 *)
+							    (MUINT8 *) &debugSensor, (MUINT32 *)
 							    sizeof
 							    (MSDK_SENSOR_DBG_IMGSENSOR_INFO_STRUCT));
 			PK_DBG("debug imgsensor = 0x%x, data = 0x%x\n", debugSensor.isGet,
@@ -3979,7 +4108,8 @@ static ssize_t CAMERA_HW_Reg_Debug(struct file *file, const char *buffer, size_t
 }
 
 
-static ssize_t CAMERA_HW_Reg_Debug2(struct file *file, const char *buffer, size_t count, loff_t *data)
+static ssize_t CAMERA_HW_Reg_Debug2(struct file *file, const char *buffer, size_t count,
+				    loff_t *data)
 {
 	char regBuf[64] = { '\0' };
 	u32 u4CopyBufSize = (count < (sizeof(regBuf) - 1)) ? (count) : (sizeof(regBuf) - 1);
@@ -3995,13 +4125,11 @@ static ssize_t CAMERA_HW_Reg_Debug2(struct file *file, const char *buffer, size_
 		if (g_pSensorFunc != NULL) {
 			g_pSensorFunc->SensorFeatureControl(DUAL_CAMERA_MAIN_2_SENSOR,
 							    SENSOR_FEATURE_SET_REGISTER,
-							    (MUINT8 *) &sensorReg,
-							    (MUINT32 *)
+							    (MUINT8 *) &sensorReg, (MUINT32 *)
 							    sizeof(MSDK_SENSOR_REG_INFO_STRUCT));
 			g_pSensorFunc->SensorFeatureControl(DUAL_CAMERA_MAIN_2_SENSOR,
 							    SENSOR_FEATURE_GET_REGISTER,
-							    (MUINT8 *) &sensorReg,
-							    (MUINT32 *)
+							    (MUINT8 *) &sensorReg, (MUINT32 *)
 							    sizeof(MSDK_SENSOR_REG_INFO_STRUCT));
 			PK_DBG("write addr = 0x%08x, data = 0x%08x\n", sensorReg.RegAddr,
 			       sensorReg.RegData);
@@ -4010,8 +4138,7 @@ static ssize_t CAMERA_HW_Reg_Debug2(struct file *file, const char *buffer, size_
 		if (g_pSensorFunc != NULL) {
 			g_pSensorFunc->SensorFeatureControl(DUAL_CAMERA_MAIN_2_SENSOR,
 							    SENSOR_FEATURE_GET_REGISTER,
-							    (MUINT8 *) &sensorReg,
-							    (MUINT32 *)
+							    (MUINT8 *) &sensorReg, (MUINT32 *)
 							    sizeof(MSDK_SENSOR_REG_INFO_STRUCT));
 			PK_DBG("read addr = 0x%08x, data = 0x%08x\n", sensorReg.RegAddr,
 			       sensorReg.RegData);
@@ -4021,7 +4148,8 @@ static ssize_t CAMERA_HW_Reg_Debug2(struct file *file, const char *buffer, size_
 	return count;
 }
 
-static ssize_t CAMERA_HW_Reg_Debug3(struct file *file, const char *buffer, size_t count, loff_t *data)
+static ssize_t CAMERA_HW_Reg_Debug3(struct file *file, const char *buffer, size_t count,
+				    loff_t *data)
 {
 	char regBuf[64] = { '\0' };
 	u32 u4CopyBufSize = (count < (sizeof(regBuf) - 1)) ? (count) : (sizeof(regBuf) - 1);
@@ -4037,13 +4165,11 @@ static ssize_t CAMERA_HW_Reg_Debug3(struct file *file, const char *buffer, size_
 		if (g_pSensorFunc != NULL) {
 			g_pSensorFunc->SensorFeatureControl(DUAL_CAMERA_SUB_SENSOR,
 							    SENSOR_FEATURE_SET_REGISTER,
-							    (MUINT8 *) &sensorReg,
-							    (MUINT32 *)
+							    (MUINT8 *) &sensorReg, (MUINT32 *)
 							    sizeof(MSDK_SENSOR_REG_INFO_STRUCT));
 			g_pSensorFunc->SensorFeatureControl(DUAL_CAMERA_SUB_SENSOR,
 							    SENSOR_FEATURE_GET_REGISTER,
-							    (MUINT8 *) &sensorReg,
-							    (MUINT32 *)
+							    (MUINT8 *) &sensorReg, (MUINT32 *)
 							    sizeof(MSDK_SENSOR_REG_INFO_STRUCT));
 			PK_DBG("write addr = 0x%08x, data = 0x%08x\n", sensorReg.RegAddr,
 			       sensorReg.RegData);
@@ -4052,8 +4178,7 @@ static ssize_t CAMERA_HW_Reg_Debug3(struct file *file, const char *buffer, size_
 		if (g_pSensorFunc != NULL) {
 			g_pSensorFunc->SensorFeatureControl(DUAL_CAMERA_SUB_SENSOR,
 							    SENSOR_FEATURE_GET_REGISTER,
-							    (MUINT8 *) &sensorReg,
-							    (MUINT32 *)
+							    (MUINT8 *) &sensorReg, (MUINT32 *)
 							    sizeof(MSDK_SENSOR_REG_INFO_STRUCT));
 			PK_DBG("read addr = 0x%08x, data = 0x%08x\n", sensorReg.RegAddr,
 			       sensorReg.RegData);
@@ -4138,9 +4263,9 @@ static int __init CAMERA_HW_i2C_init(void)
 	struct proc_dir_entry *prEntry;
 #endif
 #if defined(CONFIG_MTK_LEGACY)
-    /* i2c_register_board_info(CAMERA_I2C_BUSNUM, &kd_camera_dev, 1); */
-    i2c_register_board_info(SUPPORT_I2C_BUS_NUM1, &i2c_devs1, 1);
-    i2c_register_board_info(SUPPORT_I2C_BUS_NUM2, &i2c_devs2, 1);
+	/* i2c_register_board_info(CAMERA_I2C_BUSNUM, &kd_camera_dev, 1); */
+	i2c_register_board_info(SUPPORT_I2C_BUS_NUM1, &i2c_devs1, 1);
+	i2c_register_board_info(SUPPORT_I2C_BUS_NUM2, &i2c_devs2, 1);
 #endif
 	PK_DBG("[camerahw_probe] start\n");
 
