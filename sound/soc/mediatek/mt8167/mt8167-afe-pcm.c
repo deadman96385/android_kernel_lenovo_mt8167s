@@ -1211,10 +1211,22 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	unsigned int val;
 
 	/* TODO: change to I2S4_M */
-	mt8167_afe_dais_set_clks(afe,
+	if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI)
+		mt8167_afe_dais_set_clks(afe,
+			      afe->clocks[MTK_CLK_I2S3_M], runtime->rate * 64,
+			      afe->clocks[MTK_CLK_I2S3_B],
+			      runtime->rate * 2 * 32);
+	else if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S)
+		mt8167_afe_dais_set_clks(afe,
 			      afe->clocks[MTK_CLK_I2S3_M], runtime->rate * 128,
 			      afe->clocks[MTK_CLK_I2S3_B],
-			      runtime->rate * runtime->channels * 32);
+			      runtime->rate * 2 * snd_pcm_format_width(runtime->format));
+	else
+		mt8167_afe_dais_set_clks(afe,
+			      afe->clocks[MTK_CLK_I2S3_M], runtime->rate * 128,
+			      afe->clocks[MTK_CLK_I2S3_B],
+			      runtime->rate * runtime->channels *
+			      snd_pcm_format_width(runtime->format));
 
 	val = AFE_TDM_CON1_BCK_INV |
 	      AFE_TDM_CON1_1_BCK_DELAY |
