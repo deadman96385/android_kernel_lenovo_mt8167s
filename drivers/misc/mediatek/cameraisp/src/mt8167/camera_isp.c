@@ -142,7 +142,7 @@ typedef bool MBOOL;
 #define PLL_RANGE            (0x1000)	/* 0x200,the same with the value in seninf_drv.cpp and page-aligned */
 /*#define MIPIRX_CONFIG_ADDR   0x15008000*/	/*not used */
 /*#define MIPIRX_CONFIG_RANGE (0x100)*/	/* not used */
-#define MIPIRX_ANALOG_ADDR  (0x10011800)/* the same with the value in seninf_drv.cpp(chip-dependent) */
+#define MIPIRX_ANALOG_ADDR  (0x10011000)/* CODA: 0x10011800, 0x10011000: for PAGE aligned, otherwise mmap fail*/
 #define MIPIRX_ANALOG_RANGE (0x3000)
 #define GPIO_BASE_ADDR       0x10005000	/* the same with the value in seninf_drv.cpp(chip-dependent) */
 #define GPIO_RANGE          (0x1000)
