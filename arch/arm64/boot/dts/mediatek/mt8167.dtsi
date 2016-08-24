@@ -1093,8 +1093,8 @@
 			reg = <0 0x15001000 0 0x10000>;
 			mediatek,smi = <&smi_common>;
 			mediatek,larbid = <1>;
-			clocks = <&imgsys CLK_IMG_LARB2_SMI>,
-				 <&imgsys CLK_IMG_LARB2_SMI>;
+			clocks = <&imgsys CLK_IMG_LARB1_SMI>,
+				 <&imgsys CLK_IMG_LARB1_SMI>;
 			clock-names = "apb", "smi";
 			power-domains = <&scpsys MT8167_POWER_DOMAIN_ISP>;
 		};
@@ -1137,7 +1137,7 @@
 			mediatek,smi = <&smi_common>;
 			mediatek,larbid = <2>;
 			clocks = <&vdecsys CLK_VDEC_CKEN>,
-				 <&vdecsys CLK_VDEC_LARB_CKEN>;
+				 <&vdecsys CLK_VDEC_LARB1_CKEN>;
 			clock-names = "apb", "smi";
 			power-domains = <&scpsys MT8167_POWER_DOMAIN_VDEC>;
 		};
