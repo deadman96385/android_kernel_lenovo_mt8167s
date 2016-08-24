@@ -57,6 +57,8 @@ struct mt8167_codec_priv {
 	struct mutex regmap_mutex;
 	uint32_t lch_dccomp_val; /* L-ch DC compensation value */
 	uint32_t rch_dccomp_val; /* R-ch DC compensation value */
+	uint32_t lch_dc_offset; /* L-ch DC offset value */
+	uint32_t rch_dc_offset; /* R-ch DC offset value */
 	bool is_lch_dc_calibrated;
 	bool is_rch_dc_calibrated;
 	uint32_t pga_gain[PGA_GAIN_MAX];
@@ -1007,11 +1009,13 @@ static int mt8167_codec_hpl_dc_comp_get(struct snd_kcontrol *kcontrol,
 	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
 
 	if (!codec_data->is_lch_dc_calibrated) {
-		codec_data->lch_dccomp_val =
-			mt8167_codec_get_hpl_cali_val(codec_data->codec);
+		mt8167_codec_get_hpl_cali_val(codec_data->codec,
+			&codec_data->lch_dccomp_val,
+			&codec_data->lch_dc_offset);
 		codec_data->is_lch_dc_calibrated = true;
 	}
-	ucontrol->value.integer.value[0] = codec_data->lch_dccomp_val;
+	ucontrol->value.integer.value[0] = codec_data->lch_dc_offset;
+
 #if 1 /* use temp value until hp calibration is ready */
 	ucontrol->value.integer.value[0] = 2048;
 #endif
@@ -1026,7 +1030,11 @@ static int mt8167_codec_hpl_dc_comp_put(struct snd_kcontrol *kcontrol,
 			snd_soc_component_get_drvdata(component);
 
 	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
-	codec_data->lch_dccomp_val = ucontrol->value.integer.value[0];
+
+	codec_data->lch_dc_offset = ucontrol->value.integer.value[0];
+	codec_data->lch_dccomp_val =
+		mt8167_codec_conv_dc_offset_to_comp_val(
+			codec_data->lch_dc_offset);
 	return 0;
 }
 
@@ -1040,11 +1048,13 @@ static int mt8167_codec_hpr_dc_comp_get(struct snd_kcontrol *kcontrol,
 
 	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
 	if (!codec_data->is_rch_dc_calibrated) {
-		codec_data->rch_dccomp_val =
-			mt8167_codec_get_hpr_cali_val(codec_data->codec);
+		mt8167_codec_get_hpr_cali_val(codec_data->codec,
+			&codec_data->rch_dccomp_val,
+			&codec_data->rch_dc_offset);
 		codec_data->is_rch_dc_calibrated = true;
 	}
-	ucontrol->value.integer.value[0] = codec_data->rch_dccomp_val;
+	ucontrol->value.integer.value[0] = codec_data->rch_dc_offset;
+
 #if 1 /* use temp value until hp calibration is ready */
 	ucontrol->value.integer.value[0] = 2048;
 #endif
@@ -1059,7 +1069,12 @@ static int mt8167_codec_hpr_dc_comp_put(struct snd_kcontrol *kcontrol,
 			snd_soc_component_get_drvdata(component);
 
 	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
-	codec_data->rch_dccomp_val = ucontrol->value.integer.value[0];
+
+	codec_data->rch_dc_offset = ucontrol->value.integer.value[0];
+	codec_data->rch_dccomp_val =
+		mt8167_codec_conv_dc_offset_to_comp_val(
+			codec_data->rch_dc_offset);
+
 	return 0;
 }
 
