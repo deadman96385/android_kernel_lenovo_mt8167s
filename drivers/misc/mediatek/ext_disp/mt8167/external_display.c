@@ -79,6 +79,7 @@ struct ext_disp_path_context {
 #define pgc	_get_context()
 
 LCM_PARAMS extd_lcm_params;
+int enable_ut;
 
 static struct ext_disp_path_context *_get_context(void)
 {

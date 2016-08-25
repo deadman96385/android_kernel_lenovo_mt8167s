@@ -95,8 +95,8 @@
 
 #ifdef CONFIG_SINGLE_PANEL_OUTPUT
 #include "extd_hdmi.h"
-#include "external_display.h"
 #endif
+#include "external_display.h"
 
 enum ePREPARE_FENCE_TYPE {
 	PREPARE_INPUT_FENCE,
@@ -1308,7 +1308,7 @@ static int set_external_buffer(struct disp_session_input_config *input)
 	}
 
 #if defined(CONFIG_MTK_HDMI_SUPPORT) || defined(CONFIG_MTK_EPD_SUPPORT)
-	ret = external_display_config_input(input, input->config[0].next_buff_idx, session_id);
+	ret = ext_disp_config_input_multiple(input, input->config[0].next_buff_idx, session_id);
 #endif
 
 	if (ret == -2) {
