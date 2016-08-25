@@ -2658,6 +2658,7 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	spin_lock_init(&afe->afe_ctrl_lock);
+	mutex_init(&afe->afe_clk_mutex);
 #ifdef IDLE_TASK_DRIVER_API
 	mutex_init(&afe->emi_clk_mutex);
 #endif

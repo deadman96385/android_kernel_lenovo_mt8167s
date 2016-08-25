@@ -200,3 +200,49 @@ int mt8167_afe_disable_afe_on(struct mtk_afe *afe)
 	return 0;
 }
 
+int mt8167_afe_enable_apll_tuner_cfg(struct mtk_afe *afe, unsigned int apll)
+{
+	mutex_lock(&afe->afe_clk_mutex);
+
+	afe->apll_tuner_ref_cnt[apll]++;
+	if (afe->apll_tuner_ref_cnt[apll] != 1) {
+		mutex_unlock(&afe->afe_clk_mutex);
+		return 0;
+	}
+
+	if (apll == MT8167_AFE_APLL1) {
+		regmap_update_bits(afe->regmap, AFE_APLL1_TUNER_CFG,
+				   AFE_APLL1_TUNER_CFG_MASK, 0x832);
+		regmap_update_bits(afe->regmap, AFE_APLL1_TUNER_CFG,
+				   AFE_APLL1_TUNER_CFG_EN_MASK, 0x1);
+	} else {
+		regmap_update_bits(afe->regmap, AFE_APLL2_TUNER_CFG,
+				   AFE_APLL2_TUNER_CFG_MASK, 0x634);
+		regmap_update_bits(afe->regmap, AFE_APLL2_TUNER_CFG,
+				   AFE_APLL2_TUNER_CFG_EN_MASK, 0x1);
+	}
+
+	mutex_unlock(&afe->afe_clk_mutex);
+	return 0;
+}
+
+int mt8167_afe_disable_apll_tuner_cfg(struct mtk_afe *afe, unsigned int apll)
+{
+	mutex_lock(&afe->afe_clk_mutex);
+
+	afe->apll_tuner_ref_cnt[apll]--;
+	if (afe->apll_tuner_ref_cnt[apll] == 0) {
+		if (apll == MT8167_AFE_APLL1)
+			regmap_update_bits(afe->regmap, AFE_APLL1_TUNER_CFG,
+					   AFE_APLL1_TUNER_CFG_EN_MASK, 0x0);
+		else
+			regmap_update_bits(afe->regmap, AFE_APLL2_TUNER_CFG,
+					   AFE_APLL2_TUNER_CFG_EN_MASK, 0x0);
+	} else if (afe->apll_tuner_ref_cnt[apll] < 0) {
+		afe->apll_tuner_ref_cnt[apll] = 0;
+	}
+
+	mutex_unlock(&afe->afe_clk_mutex);
+	return 0;
+}
+

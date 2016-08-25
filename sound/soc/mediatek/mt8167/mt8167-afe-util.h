@@ -34,4 +34,8 @@ int mt8167_afe_enable_afe_on(struct mtk_afe *afe);
 
 int mt8167_afe_disable_afe_on(struct mtk_afe *afe);
 
+int mt8167_afe_enable_apll_tuner_cfg(struct mtk_afe *afe, unsigned int apll);
+
+int mt8167_afe_disable_apll_tuner_cfg(struct mtk_afe *afe, unsigned int apll);
+
 #endif
