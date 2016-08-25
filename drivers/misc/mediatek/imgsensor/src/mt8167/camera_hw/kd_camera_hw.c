@@ -47,10 +47,7 @@
 #define PK_XLOG_INFO(fmt, args...)
 #endif
 
-/* for PMIC may return fail, just ignore it */
-#define WORKAROUND_FOR_GPIO	1
-
-#define BYPASS_GPIO		1
+#define BYPASS_GPIO		0
 
 /* now, no used: GPIO Pin control*/
 struct platform_device *cam_plt_dev;
@@ -66,91 +63,10 @@ struct pinctrl_state *cam1_rst_l;
 struct pinctrl_state *cam_ldo0_h;
 struct pinctrl_state *cam_ldo0_l;
 
-#if 0
-static int check_pdn_rst_pin(void)
-{
-	return 1;
-}
-#endif
-
 int mtkcam_gpio_init(struct platform_device *pdev)
 {
 	int ret = 0;
 	/* struct device        *dev = &pdev->dev; */
-#if 1
-
-#else
-	camctrl = devm_pinctrl_get(&pdev->dev);
-	if (IS_ERR(camctrl)) {
-		dev_err(&pdev->dev, "Cannot find camera pinctrl!");
-		ret = PTR_ERR(camctrl);
-	}
-	/*Cam0 Power/Rst Ping initialization */
-	cam0_pdn_h = pinctrl_lookup_state(camctrl, "cam0_pdn1");
-	if (IS_ERR(cam0_pdn_h)) {
-		ret = PTR_ERR(cam0_pdn_h);
-		pr_debug("%s : pinctrl err, cam0_pdn_h\n", __func__);
-	}
-
-	cam0_pdn_l = pinctrl_lookup_state(camctrl, "cam0_pdn0");
-	if (IS_ERR(cam0_pdn_l)) {
-		ret = PTR_ERR(cam0_pdn_l);
-		pr_debug("%s : pinctrl err, cam0_pdn_l\n", __func__);
-	}
-
-
-	cam0_rst_h = pinctrl_lookup_state(camctrl, "cam0_rst1");
-	if (IS_ERR(cam0_rst_h)) {
-		ret = PTR_ERR(cam0_rst_h);
-		pr_debug("%s : pinctrl err, cam0_rst_h\n", __func__);
-	}
-
-	cam0_rst_l = pinctrl_lookup_state(camctrl, "cam0_rst0");
-	if (IS_ERR(cam0_rst_l)) {
-		ret = PTR_ERR(cam0_rst_l);
-		pr_debug("%s : pinctrl err, cam0_rst_l\n", __func__);
-	}
-
-	/*Cam1 Power/Rst Ping initialization */
-	cam1_pdn_h = pinctrl_lookup_state(camctrl, "cam1_pdn1");
-	if (IS_ERR(cam1_pdn_h)) {
-		ret = PTR_ERR(cam1_pdn_h);
-		pr_debug("%s : pinctrl err, cam1_pdn_h\n", __func__);
-	}
-
-	cam1_pdn_l = pinctrl_lookup_state(camctrl, "cam1_pdn0");
-	if (IS_ERR(cam1_pdn_l)) {
-		ret = PTR_ERR(cam1_pdn_l);
-		pr_debug("%s : pinctrl err, cam1_pdn_l\n", __func__);
-	}
-
-
-	cam1_rst_h = pinctrl_lookup_state(camctrl, "cam1_rst1");
-	if (IS_ERR(cam1_rst_h)) {
-		ret = PTR_ERR(cam1_rst_h);
-		pr_debug("%s : pinctrl err, cam1_rst_h\n", __func__);
-	}
-
-
-	cam1_rst_l = pinctrl_lookup_state(camctrl, "cam1_rst0");
-	if (IS_ERR(cam1_rst_l)) {
-		ret = PTR_ERR(cam1_rst_l);
-		pr_debug("%s : pinctrl err, cam1_rst_l\n", __func__);
-	}
-	/*externel LDO enable */
-	cam_ldo0_h = pinctrl_lookup_state(camctrl, "cam_ldo0_1");
-	if (IS_ERR(cam_ldo0_h)) {
-		ret = PTR_ERR(cam_ldo0_h);
-		pr_debug("%s : pinctrl err, cam_ldo0_h\n", __func__);
-	}
-
-
-	cam_ldo0_l = pinctrl_lookup_state(camctrl, "cam_ldo0_0");
-	if (IS_ERR(cam_ldo0_l)) {
-		ret = PTR_ERR(cam_ldo0_l);
-		pr_debug("%s : pinctrl err, cam_ldo0_l\n", __func__);
-	}
-#endif
 
 	return ret;
 }
@@ -161,47 +77,35 @@ int mtkcam_gpio_set(int PinIdx, int PwrType, int Val)
 
 	/* if (!check_pdn_rst_pin()) */
 
-#if BYPASS_GPIO || defined(CONFIG_FPGA_EARLY_PORTING)
+#if BYPASS_GPIO
 	return 0;
 #endif
 
 	switch (PwrType) {
 	case CAMRST:
 		if (PinIdx == 0) {
-			if (Val == 0) {
+			if (Val == 0)
 				gpio_direction_output(GPIO_CAM0_RST, 0);
-				gpio_set_value(GPIO_CAM0_RST, 0);	/* no need? */
-			} else {
+			else
 				gpio_direction_output(GPIO_CAM0_RST, 1);
-				gpio_set_value(GPIO_CAM0_RST, 1);
-			}
 		} else {
-			if (Val == 0) {
+			if (Val == 0)
 				gpio_direction_output(GPIO_CAM1_RST, 0);
-				gpio_set_value(GPIO_CAM1_RST, 0);
-			} else {
+			else
 				gpio_direction_output(GPIO_CAM1_RST, 1);
-				gpio_set_value(GPIO_CAM1_RST, 1);
-			}
 		}
 		break;
 	case CAMPDN:
 		if (PinIdx == 0) {
-			if (Val == 0) {
+			if (Val == 0)
 				gpio_direction_output(GPIO_CAM0_PDN, 0);
-				gpio_set_value(GPIO_CAM0_PDN, 0);
-			} else {
+			else
 				gpio_direction_output(GPIO_CAM0_PDN, 1);
-				gpio_set_value(GPIO_CAM0_PDN, 1);
-			}
 		} else {
-			if (Val == 0) {
+			if (Val == 0)
 				gpio_direction_output(GPIO_CAM1_PDN, 0);
-				gpio_set_value(GPIO_CAM1_PDN, 0);
-			} else {
+			else
 				gpio_direction_output(GPIO_CAM1_PDN, 1);
-				gpio_set_value(GPIO_CAM1_PDN, 1);
-			}
 		}
 
 		break;

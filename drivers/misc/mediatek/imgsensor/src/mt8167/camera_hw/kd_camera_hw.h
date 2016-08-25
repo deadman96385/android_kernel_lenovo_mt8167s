@@ -101,7 +101,6 @@ extern bool _hwPowerDown(int PinIdx, KD_REGULATOR_TYPE_T PwrType);
 extern bool _hwPowerOn(int PinIdx, KD_REGULATOR_TYPE_T PwrType, int Voltage);
 
 extern void ISP_MCLK1_EN(BOOL En);
-extern void ISP_MCLK2_EN(BOOL En);
 
 /* use GPIO API instead of pinctl*/
 extern unsigned int GPIO_CAM0_RST;
