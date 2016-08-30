@@ -13,11 +13,12 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/module.h>
-#include <sound/soc.h>
-#include <linux/of_platform.h>
-#include <linux/mfd/syscon.h>
+#include <linux/clk.h>
 #include <linux/debugfs.h>
+#include <linux/mfd/syscon.h>
+#include <linux/module.h>
+#include <linux/of_platform.h>
+#include <sound/soc.h>
 #include <sound/tlv.h>
 #include "mt8167-codec.h"
 #include "mt8167-codec-utils.h"
@@ -64,6 +65,7 @@ struct mt8167_codec_priv {
 	uint32_t pga_gain[PGA_GAIN_MAX];
 	uint32_t dmic_wire_mode;
 	uint32_t loopback_type;
+	struct clk *clk;
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs;
 #endif
@@ -1830,12 +1832,6 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 	return ret;
 }
 
-/* TODO:
- * before access registers,
- * need to power on
- *  1) AVDD22_AUDIO/AVDD28_AUDIO
- *  2) intbus clock (f_faud_intbus_aud_ck)
- */
 static int mt8167_codec_probe(struct snd_soc_codec *codec)
 {
 	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
@@ -1849,6 +1845,17 @@ static int mt8167_codec_probe(struct snd_soc_codec *codec)
 	if (ret < 0)
 		return ret;
 
+	codec_data->clk = devm_clk_get(codec->dev, "bus");
+	if (IS_ERR(codec_data->clk)) {
+		dev_err(codec->dev, "%s devm_clk_get %s fail\n",
+			__func__, "bus");
+		return PTR_ERR(codec_data->clk);
+	}
+
+	ret = clk_prepare_enable(codec_data->clk);
+	if (ret)
+		return ret;
+
 	mt8167_codec_init_regs(codec_data);
 #ifdef CONFIG_DEBUG_FS
 	codec_data->debugfs = debugfs_create_file("mt8167_codec_regs",
@@ -1856,17 +1863,19 @@ static int mt8167_codec_probe(struct snd_soc_codec *codec)
 			NULL, codec_data, &mt8167_codec_debug_ops);
 #endif
 #ifdef CONFIG_MTK_SPEAKER
-	mt6392_codec_probe(codec);
+	ret = mt6392_codec_probe(codec);
+	if (ret < 0)
+		clk_disable_unprepare(codec_data->clk);
 #endif
 	return ret;
 }
 
 static int mt8167_codec_remove(struct snd_soc_codec *codec)
 {
-#ifdef CONFIG_DEBUG_FS
 	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
 
-	dev_dbg(codec->dev, "%s\n", __func__);
+	clk_disable_unprepare(codec_data->clk);
+#ifdef CONFIG_DEBUG_FS
 	debugfs_remove(codec_data->debugfs);
 #endif
 #ifdef CONFIG_MTK_SPEAKER
@@ -1877,14 +1886,17 @@ static int mt8167_codec_remove(struct snd_soc_codec *codec)
 
 static int mt8167_codec_suspend(struct snd_soc_codec *codec)
 {
-	dev_dbg(codec->dev, "%s\n", __func__);
+	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
+
+	clk_disable_unprepare(codec_data->clk);
 	return 0;
 }
 
 static int mt8167_codec_resume(struct snd_soc_codec *codec)
 {
-	dev_dbg(codec->dev, "%s\n", __func__);
-	return 0;
+	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
+
+	return clk_prepare_enable(codec_data->clk);
 }
 
 static int mt8167_codec_set_bias_level(struct snd_soc_codec *codec,
