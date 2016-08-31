@@ -1058,26 +1058,26 @@ static const struct mtk_gate aud_clks[] __initconst = {
 	GATE_AUD(CLK_AUD_DAC_PREDIS, "aud_dac_predis", "aud_afe", 26),
 	GATE_AUD(CLK_AUD_TML, "aud_tml", "aud_afe", 27),
 };
-static const struct mtk_gate_regs mfgcfg_cg_regs = {
+static const struct mtk_gate_regs mfg_cg_regs = {
 	.set_ofs = 0x4,
 	.clr_ofs = 0x8,
 	.sta_ofs = 0x0,
 };
 
-#define GATE_MFGCFG(_id, _name, _parent, _shift) {	\
+#define GATE_MFG(_id, _name, _parent, _shift) {		\
 		.id = _id,				\
 		.name = _name,				\
 		.parent_name = _parent,			\
-		.regs = &mfgcfg_cg_regs,		\
+		.regs = &mfg_cg_regs,			\
 		.shift = _shift,			\
 		.ops = &mtk_clk_gate_ops_setclr,	\
 	}
 
-static const struct mtk_gate mfgcfg_clks[] __initconst = {
-	GATE_MFGCFG(CLK_MFGCFG_BAXI, "mfgcfg_baxi", "ahb_infra_sel", 0),
-	GATE_MFGCFG(CLK_MFGCFG_BMEM, "mfgcfg_bmem", "gfmux_emi1x_sel", 1),
-	GATE_MFGCFG(CLK_MFGCFG_BG3D, "mfgcfg_bg3d", "mfg_mm", 2),
-	GATE_MFGCFG(CLK_MFGCFG_B26M, "mfgcfg_b26m", "clk26m_ck", 3),
+static const struct mtk_gate mfg_clks[] __initconst = {
+	GATE_MFG(CLK_MFG_BAXI, "mfg_baxi", "ahb_infra_sel", 0),
+	GATE_MFG(CLK_MFG_BMEM, "mfg_bmem", "gfmux_emi1x_sel", 1),
+	GATE_MFG(CLK_MFG_BG3D, "mfg_bg3d", "mfg_mm", 2),
+	GATE_MFG(CLK_MFG_B26M, "mfg_b26m", "clk26m_ck", 3),
 };
 static const struct mtk_gate_regs mm0_cg_regs = {
 	.set_ofs = 0x104,
@@ -1362,9 +1362,9 @@ static void __init mtk_mfgcfg_init(struct device_node *node)
 	struct clk_onecell_data *clk_data;
 	int r;
 
-	clk_data = mtk_alloc_clk_data(CLK_MFGCFG_NR_CLK);
+	clk_data = mtk_alloc_clk_data(CLK_MFG_NR_CLK);
 
-	mtk_clk_register_gates(node, mfgcfg_clks, ARRAY_SIZE(mfgcfg_clks), clk_data);
+	mtk_clk_register_gates(node, mfg_clks, ARRAY_SIZE(mfg_clks), clk_data);
 
 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 
