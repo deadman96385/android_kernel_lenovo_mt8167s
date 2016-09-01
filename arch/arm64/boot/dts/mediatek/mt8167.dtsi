@@ -283,6 +283,92 @@
 			pins-are-numbered;
 			gpio-controller;
 			#gpio-cells = <2>;
+
+			/* UART GPIO Settings - Start */
+			/* UART0: rx set, rx clear, tx clear, tx clear*/
+			uart0_gpio_def_cfg:uart0gpiodefault {
+			};
+			uart0_rx_set_cfg:uart0_rx_set {
+				pins_cmd_dat {
+					pinmux = <MT8167_PIN_62_URXD0__FUNC_URXD0>;
+				};
+			};
+			uart0_rx_clr_cfg:uart0_rx_clear  {
+				pins_cmd_dat {
+					pinmux = <MT8167_PIN_62_URXD0__FUNC_GPIO62>;
+					slew-rate = <1>;
+					output-high;
+				};
+			};
+			uart0_tx_set_cfg:uart0_tx_set  {
+				pins_cmd_dat {
+					pinmux = <MT8167_PIN_63_UTXD0__FUNC_UTXD0>;
+				};
+			};
+			uart0_tx_clr_cfg:uart0_tx_clear  {
+				pins_cmd_dat {
+					pinmux = <MT8167_PIN_63_UTXD0__FUNC_GPIO63>;
+					slew-rate = <1>;
+					output-high;
+				};
+			};
+
+			/* UART1: rx set, rx clear, tx clear, tx clear*/
+			uart1_gpio_def_cfg:uart1gpiodefault {
+			};
+			uart1_rx_set_cfg:uart1_rx_set {
+				pins_cmd_dat {
+					pinmux = <MT8167_PIN_64_URXD1__FUNC_URXD1>;
+				};
+			};
+			uart1_rx_clr_cfg:uart1_rx_clear {
+				pins_cmd_dat {
+					pinmux = <MT8167_PIN_64_URXD1__FUNC_GPIO64>;
+					slew-rate = <1>;
+					output-high;
+				};
+			};
+			uart1_tx_set_cfg:uart1_tx_set {
+				pins_cmd_dat {
+					pinmux = <MT8167_PIN_65_UTXD1__FUNC_UTXD1>;
+				};
+			};
+			uart1_tx_clr_cfg:uart1_tx_clear {
+				pins_cmd_dat {
+					pinmux = <MT8167_PIN_65_UTXD1__FUNC_GPIO65>;
+					slew-rate = <1>;
+					output-high;
+				};
+			};
+
+			/* UART2: rx set, rx clear, tx clear, tx clear*/
+			uart2_gpio_def_cfg:uart2gpiodefault {
+			};
+			uart2_rx_set_cfg:uart2_rx_set {
+				pins_cmd_dat {
+					pinmux = <MT8167_PIN_34_URXD2__FUNC_URXD2>;
+				};
+			};
+			uart2_rx_clr_cfg:uart2_rx_clear {
+				pins_cmd_dat {
+					pinmux = <MT8167_PIN_34_URXD2__FUNC_GPIO34>;
+					slew-rate = <1>;
+					output-high;
+				};
+			};
+			uart2_tx_set_cfg:uart2_tx_set {
+				pins_cmd_dat {
+					pins = <MT8167_PIN_35_UTXD2__FUNC_UTXD2>;
+				};
+			};
+			uart2_tx_clr_cfg:uart2_tx_clear {
+				pins_cmd_dat {
+					pinmux = <MT8167_PIN_35_UTXD2__FUNC_GPIO35>;
+					slew-rate = <1>;
+					output-high;
+				};
+			};
+			/* UART GPIO Settings - End */
 		};
 
 		dramco: dramco@10207000 {
@@ -516,17 +602,17 @@
 			cell-index = <0>;
 			compatible = "mediatek,mt8167-uart";
 			reg = <0 0x11005000 0 0x1000>, /* UART base */
-			      <0 0x11000300 0 0x1000>, /* DMA Tx base */
-			      <0 0x11000380 0 0x80>; /* DMA Rx base */
+			      <0 0x11000480 0 0x80>, /* DMA Tx base */
+			      <0 0x11000500 0 0x80>; /* DMA Rx base */
 			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
 				     <GIC_SPI 96 IRQ_TYPE_LEVEL_LOW>, /* DMA Tx IRQ */
 				     <GIC_SPI 97 IRQ_TYPE_LEVEL_LOW>; /* DMA Rx IRQ */
 
 			clock-frequency = <26000000>;
 			clock-div = <1>;
-			clocks = <&infracfg CLK_INFRA_UART0>, <&infracfg CLK_INFRA_AP_DMA>;
+			clocks = <&topckgen CLK_TOP_UART0>, <&topckgen CLK_TOP_APDMA>;
 			clock-names = "uart0-main", "uart-apdma";
-			/*pinctrl-names = "uart0_gpio_default",
+			pinctrl-names = "uart0_gpio_default",
 					"uart0_rx_set",
 					"uart0_rx_clear",
 					"uart0_tx_set",
@@ -537,10 +623,8 @@
 			pinctrl-2 = <&uart0_rx_clr_cfg>;
 			pinctrl-3 = <&uart0_tx_set_cfg>;
 			pinctrl-4 = <&uart0_tx_clr_cfg>;
-			rx_gpios = <&pio 79 0>;
-			tx_gpios = <&pio 80 0>;
+
 			status = "disable";
-			*/
 		};
 
 		uart1: uart1@11006000 {
@@ -548,12 +632,28 @@
 			compatible = "mediatek,mt8167-uart",
 				     "mediatek,mt6577-uart";
 			reg = <0 0x11006000 0 0x1000>, /* UART base */
-			      <0 0x11000400 0 0x80>, /* DMA Tx base */
-			      <0 0x11000480 0 0x80>; /* DMA Rx base */
+			      <0 0x11000580 0 0x80>, /* DMA Tx base */
+			      <0 0x11000600 0 0x80>; /* DMA Rx base */
 			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
 				     <GIC_SPI 98 IRQ_TYPE_LEVEL_LOW>, /* DMA Tx IRQ */
 				     <GIC_SPI 99 IRQ_TYPE_LEVEL_LOW>; /* DMA Rx IRQ */
-			clocks = <&uart_clk>;
+
+			clock-frequency = <26000000>;
+			clock-div = <1>;
+			clocks = <&topckgen CLK_TOP_UART1>;
+			clock-names = "uart1-main";
+			pinctrl-names = "uart1_gpio_default",
+					"uart1_rx_set",
+					"uart1_rx_clear",
+					"uart1_tx_set",
+					"uart1_tx_clear";
+
+			pinctrl-0 = <&uart1_gpio_def_cfg>;
+			pinctrl-1 = <&uart1_rx_set_cfg>;
+			pinctrl-2 = <&uart1_rx_clr_cfg>;
+			pinctrl-3 = <&uart1_tx_set_cfg>;
+			pinctrl-4 = <&uart1_tx_clr_cfg>;
+
 			status = "disable";
 		};
 
@@ -561,17 +661,17 @@
 			cell-index = <2>;
 			compatible = "mediatek,mt8167-uart";
 			reg = <0 0x11007000 0 0x1000>, /* UART base */
-			      <0 0x11000500 0 0x80>, /* DMA Tx base */
-			      <0 0x11000580 0 0x80>; /* DMA Rx base */
-			interrupts = <GIC_SPI 211 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
+			      <0 0x11000980 0 0x80>, /* DMA Tx base */
+			      <0 0x11000a00 0 0x80>; /* DMA Rx base */
+			interrupts = <GIC_SPI 212 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
 				     <GIC_SPI 100 IRQ_TYPE_LEVEL_LOW>, /* DMA Tx IRQ */
 				     <GIC_SPI 101 IRQ_TYPE_LEVEL_LOW>; /* DMA Rx IRQ */
 
 			clock-frequency = <26000000>;
 			clock-div = <1>;
-			clocks = <&infracfg CLK_INFRA_UART2>;
+			clocks = <&topckgen CLK_TOP_UART2>;
 			clock-names = "uart2-main";
-			/*pinctrl-names = "uart2_gpio_default",
+			pinctrl-names = "uart2_gpio_default",
 					"uart2_rx_set",
 					"uart2_rx_clear",
 					"uart2_tx_set",
@@ -582,10 +682,8 @@
 			pinctrl-2 = <&uart2_rx_clr_cfg>;
 			pinctrl-3 = <&uart2_tx_set_cfg>;
 			pinctrl-4 = <&uart2_tx_clr_cfg>;
-			rx_gpios = <&pio 14 0>;
-			tx_gpios = <&pio 15 0>;
+
 			status = "disable";
-			*/
 		};
 
 		pwm: pwm@11008000 {
