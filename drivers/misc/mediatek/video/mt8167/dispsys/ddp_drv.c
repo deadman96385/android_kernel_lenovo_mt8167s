@@ -362,8 +362,7 @@ const char *disp_clk_name[MAX_DISP_CLK_CNT] = {
 	"MMSYS_CLK_MUX_TVDPLL_D8",
 	"MMSYS_CLK_MUX_TVDPLL_D16",
 	"MMSYS_CLK_PWM_SEL",
-	"TOP_UNIVPLL2_D2",
-	"SYSPLL4_D2",
+	"TOP_UNIVPLL_D12",
 };
 
 int ddp_clk_prepare(enum eDDP_CLK_ID id)
