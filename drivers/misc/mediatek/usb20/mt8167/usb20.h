@@ -61,15 +61,6 @@ struct mt_usb_glue {
 	struct platform_device	*musb;
 };
 
-/* Battery relative function */
-enum CHARGER_TYPE {
-	CHARGER_UNKNOWN = 0,
-	STANDARD_HOST,          /* USB : 450mA */
-	CHARGING_HOST,
-	NONSTANDARD_CHARGER,    /* AC : 450mA~1A*/
-	STANDARD_CHARGER,       /* AC : ~1A*/
-};
-
 extern void wake_up_bat(void);
 extern enum CHARGER_TYPE mt_charger_type_detection(void);
 extern bool upmu_is_chr_det(void);
