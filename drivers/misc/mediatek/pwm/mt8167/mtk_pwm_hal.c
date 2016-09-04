@@ -68,6 +68,8 @@ unsigned long PWM_register[PWM_NUM] = {
 	(PWM_BASE+0x0010),	   /* PWM1 register base,   15 registers */
 	(PWM_BASE+0x0050),	   /* PWM2 register base    15 registers */
 	(PWM_BASE+0x0090),	   /* PWM3 register base    15 registers */
+	(PWM_BASE+0x00d0),         /* PWM4 register base    15 registers */
+	(PWM_BASE+0x00110),        /* PWM5 register base    15 registers */
 };
 #endif
 
@@ -76,13 +78,15 @@ enum {
 	PWM1_CLK,
 	PWM2_CLK,
 	PWM3_CLK,
+	PWM4_CLK,
+	PWM5_CLK,
 	PWM_HCLK,
 	PWM_CLK,
 	PWM_CLK_NUM,
 };
 
 const char *pwm_clk_name[] = {
-	"PWM1-main", "PWM2-main", "PWM3-main", "PWM-HCLK-main", "PWM-main"
+	"PWM1-main", "PWM2-main", "PWM3-main", "PWM4-main", "PWM5-main", "PWM-HCLK-main", "PWM-main"
 };
 
 struct clk *pwm_clk[PWM_CLK_NUM];
@@ -179,6 +183,8 @@ void mt_pwm_init_power_flag(unsigned long *power_flag)
 	PWM_register[PWM1] = (unsigned long)pwm_base + 0x0010;
 	PWM_register[PWM2] = (unsigned long)pwm_base + 0x0050;
 	PWM_register[PWM3] = (unsigned long)pwm_base + 0x0090;
+	PWM_register[PWM4] = (unsigned long)pwm_base + 0x00d0;
+	PWM_register[PWM5] = (unsigned long)pwm_base + 0x00110;
 #endif
 }
 
