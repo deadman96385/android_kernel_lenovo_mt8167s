@@ -651,11 +651,10 @@
 			compatible = "mediatek,mt8167-nfi";
 			reg = <0 0x11001000 0 0x1000>;
 			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&infracfg CLK_INFRA_NFI>, <&infracfg CLK_INFRA_NFI_ECC>,
-				 <&infracfg CLK_INFRA_NFI_BCLK>, <&infracfg CLK_INFRA_NFI_ECC_66M>,
-				 <&infracfg CLK_INFRA_NFI_66M>;
-			clock-names = "nfi_hclk", "nfiecc_bclk", "nfi_bclk",
-				      "nfiecc_pclk", "nfi_pclk";
+			clocks = <&topckgen CLK_TOP_NFI_BUS>,
+				 <&topckgen CLK_TOP_NFIECC>,
+				 <&topckgen CLK_TOP_NFI>;
+			clock-names = "nfi_hclk", "nfiecc_bclk", "nfi_bclk";
 			status = "disabled";
 		};
 
