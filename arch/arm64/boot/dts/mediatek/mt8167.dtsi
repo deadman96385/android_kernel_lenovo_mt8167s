@@ -1182,6 +1182,8 @@
 			clock-names = "TOP_CAMTG_SEL",
 				      "TOP_CAM_TG_48M",  /* 48M */
 				      "TOP_CAM_TG_208M";  /* 208M, divided in setTgPhase */
+
+			power-domains = <&scpsys MT8167_POWER_DOMAIN_ISP>;
 		};
 
 		/* Sub Cam */
