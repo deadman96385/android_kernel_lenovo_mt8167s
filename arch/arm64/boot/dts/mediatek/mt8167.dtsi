@@ -283,6 +283,9 @@
 			pins-are-numbered;
 			gpio-controller;
 			#gpio-cells = <2>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+			interrupts = <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>;
 
 			/* UART GPIO Settings - Start */
 			/* UART0: rx set, rx clear, tx clear, tx clear*/
