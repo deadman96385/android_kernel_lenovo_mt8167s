@@ -989,7 +989,7 @@ int ddp_dpi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 		ret += enable_clock(MT_CG_DISP1_LVDS_CTS, "LVDS");
 #else
 		/*ret += clk_prepare(MM_CLK_MUX_DPI0_SEL);*/
-		/*ret += ddp_clk_enable(APMIXED_LVDSPLL, true);*/
+		ret += ddp_clk_enable(TOP_RG_FDPI0);
 		ret += ddp_clk_enable(DISP1_DPI0_PIXEL);
 		ret += ddp_clk_enable(DISP1_DPI0_ENGINE);
 		ret += ddp_clk_enable(DISP1_LVDS_PIXEL);
@@ -1036,6 +1036,7 @@ int ddp_dpi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 		disable_mux(MT_MUX_DPI0, "dpi0");
 		ret += disable_pll(LVDSPLL, "DPI0");
 #else
+		ret += ddp_clk_disable(TOP_RG_FDPI0);
 		ret += ddp_clk_disable(DISP1_DPI0_PIXEL);
 		ret += ddp_clk_disable(DISP1_DPI0_ENGINE);
 		ret += ddp_clk_enable(DISP1_LVDS_PIXEL);

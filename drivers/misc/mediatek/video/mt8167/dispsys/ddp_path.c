@@ -245,8 +245,6 @@ char *ddp_get_mutex_sof_name(enum MUTEX_SOF mode)
 		return "single";
 	case SOF_DSI0:
 		return "dsi0";
-	case SOF_DSI1:
-		return "dsi1";
 	case SOF_DPI0:
 		return "dpi0";
 	default:
@@ -556,11 +554,6 @@ static enum MUTEX_SOF ddp_get_mutex_sof(enum DISP_MODULE_ENUM dest_module, enum 
 	case DISP_MODULE_DSI0:
 		{
 			mode = (ddp_mode == DDP_VIDEO_MODE ? SOF_DSI0 : SOF_SINGLE);
-			break;
-		}
-	case DISP_MODULE_DSI1:
-		{
-			mode = (ddp_mode == DDP_VIDEO_MODE ? SOF_DSI1 : SOF_SINGLE);
 			break;
 		}
 	case DISP_MODULE_DSIDUAL:

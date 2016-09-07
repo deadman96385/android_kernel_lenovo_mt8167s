@@ -88,7 +88,6 @@ enum DISP_REG_ENUM {
 enum MUTEX_SOF {
 	SOF_SINGLE = 0,
 	SOF_DSI0,
-	SOF_DSI1,
 	SOF_DPI0,
 	SOF_DPI1,
 };
