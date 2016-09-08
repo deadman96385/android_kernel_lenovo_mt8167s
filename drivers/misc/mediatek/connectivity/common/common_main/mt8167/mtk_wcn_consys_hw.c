@@ -782,10 +782,10 @@ INT32 mtk_wcn_consys_hw_gpio_ctrl(UINT32 on)
 	if (on) {
 
 		/*if external modem used,GPS_SYNC still needed to control */
-		iRet += wmt_plat_gpio_ctrl(PIN_GPS_SYNC, PIN_STA_INIT);
-		iRet += wmt_plat_gpio_ctrl(PIN_GPS_LNA, PIN_STA_INIT);
-
-		iRet += wmt_plat_gpio_ctrl(PIN_I2S_GRP, PIN_STA_INIT);
+		/* Remove GPS & FM gpio ctrl due to no setting in dtsi */
+		/* iRet += wmt_plat_gpio_ctrl(PIN_GPS_SYNC, PIN_STA_INIT); */
+		/* iRet += wmt_plat_gpio_ctrl(PIN_GPS_LNA, PIN_STA_INIT); */
+		/* iRet += wmt_plat_gpio_ctrl(PIN_I2S_GRP, PIN_STA_INIT); */
 
 		/* TODO: [FixMe][GeorgeKuo] double check if BGF_INT is implemented ok */
 		/* iRet += wmt_plat_gpio_ctrl(PIN_BGF_EINT, PIN_STA_MUX); */
@@ -802,10 +802,11 @@ INT32 mtk_wcn_consys_hw_gpio_ctrl(UINT32 on)
 		/* iRet += wmt_plat_gpio_ctrl(PIN_BGF_EINT, PIN_STA_DEINIT); */
 
 		/*if external modem used,GPS_SYNC still needed to control */
-		iRet += wmt_plat_gpio_ctrl(PIN_GPS_SYNC, PIN_STA_DEINIT);
-		iRet += wmt_plat_gpio_ctrl(PIN_I2S_GRP, PIN_STA_DEINIT);
+		/* Remove GPS & FM gpio ctrl due to no setting in dtsi */
+		/* iRet += wmt_plat_gpio_ctrl(PIN_GPS_SYNC, PIN_STA_DEINIT); */
+		/* iRet += wmt_plat_gpio_ctrl(PIN_I2S_GRP, PIN_STA_DEINIT); */
 		/* deinit gps_lna */
-		iRet += wmt_plat_gpio_ctrl(PIN_GPS_LNA, PIN_STA_DEINIT);
+		/* iRet += wmt_plat_gpio_ctrl(PIN_GPS_LNA, PIN_STA_DEINIT); */
 
 	}
 	WMT_PLAT_INFO_FUNC("CONSYS-HW-GPIO-CTRL(0x%08x), finish\n", on);
