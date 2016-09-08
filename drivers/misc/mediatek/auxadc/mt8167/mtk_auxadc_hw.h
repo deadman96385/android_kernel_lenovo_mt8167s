@@ -28,6 +28,7 @@ extern void __iomem *auxadc_efuse_base;
 #include <mach/mt_reg_base.h>
 #endif
 
+#if 0
 /* For calibration */
 #define EFUSE_CALI
 #define ADC_GE_A_MASK 0x000ffc00
@@ -39,7 +40,7 @@ extern void __iomem *auxadc_efuse_base;
 #define ADC_CALI_EN_A_REG		(EFUSEC_BASE + 0x198)
 #define ADC_GE_A_REG            (EFUSEC_BASE + 0x198)
 #define ADC_OE_A_REG            (EFUSEC_BASE + 0x198)
-
+#endif
 
 /************************/
 
