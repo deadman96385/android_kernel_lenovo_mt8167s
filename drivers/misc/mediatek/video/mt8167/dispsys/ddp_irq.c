@@ -496,8 +496,10 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 			       DISP_REG_GET(DISP_REG_RDMA_OUT_LINE_CNT +
 					    DISP_RDMA_INDEX_OFFSET * index));
 #ifndef CONFIG_FPGA_EARLY_PORTING
+#ifndef MTK_FB_CMDQ_DISABLE
 			DDPERR("IRQ: RDMA%d underflow! cnt=%d\n", index,
 			       rdma_underflow_irq_cnt[index]++);
+#endif
 #endif
 			disp_irq_log_module |= 1 << module;
 			rdma_underflow_irq_cnt[index]++;
