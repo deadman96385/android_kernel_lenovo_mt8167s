@@ -28,7 +28,6 @@
 #include <linux/types.h>
 #include <linux/of_gpio.h>
 #include <linux/gpio.h>
-#include <linux/pm_runtime.h>
 
 #include "kd_camera_hw.h"
 #include "kd_camera_typedef.h"
@@ -3726,10 +3725,6 @@ static int CAMERA_HW_probe(struct platform_device *pdev)
 #endif
 
 	PK_DBG(" == MTKCAM_USING_CCF ==\n");
-	/* first, enable MTCMOS*/
-	pm_runtime_enable(dev);
-	pm_runtime_get_sync(dev);
-
 	Get_ccf_clk(pdev);
 
 #if !BYPASS_GPIO && !defined(CONFIG_MTK_LEGACY)
@@ -3764,9 +3759,6 @@ static int CAMERA_HW_probe(struct platform_device *pdev)
 ********************************************************************************/
 static int CAMERA_HW_remove(struct platform_device *pdev)
 {
-	pm_runtime_put_sync(&pdev->dev);
-	pm_runtime_disable(&pdev->dev);
-
 #if !BYPASS_GPIO && !defined(CONFIG_MTK_LEGACY)
 
 	if (gpio_is_valid(GPIO_CAM0_RST))
