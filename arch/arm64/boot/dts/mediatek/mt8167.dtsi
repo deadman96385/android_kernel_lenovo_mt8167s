@@ -1582,6 +1582,10 @@
 		compatible = "simple-bus";
 	};
 
+	clkao: clkao {
+		compatible = "simple-bus";
+	};
 };
 
 #include "mt8167-clkitg.dtsi"
+#include "mt8167-clkao.dtsi"
