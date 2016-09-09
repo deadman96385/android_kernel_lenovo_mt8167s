@@ -374,6 +374,9 @@ static int mt8167_afe_ap_loopback_put(struct snd_kcontrol *kcontrol,
 		regmap_update_bits(afe->regmap, AFE_CONN1, 1 << 19, 1 << 19);
 		/* IO4 connect with O04 */
 		regmap_update_bits(afe->regmap, AFE_CONN2, 1 << 4, 1 << 4);
+		/* 16 bit by default */
+		regmap_update_bits(afe->regmap, AFE_CONN_24BIT,
+				AFE_CONN_24BIT_O03 | AFE_CONN_24BIT_O04, 0);
 
 		/* configure uplink */
 		if (sample_rate == 32000) {
