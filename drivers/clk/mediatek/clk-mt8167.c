@@ -86,6 +86,7 @@ static const struct mtk_fixed_factor top_divs[] __initconst = {
 	FACTOR(CLK_TOP_TVDPLL_D8, "tvdpll_d8", "tvdpll_ck", 1, 8),
 	FACTOR(CLK_TOP_TVDPLL_D16, "tvdpll_d16", "tvdpll_ck", 1, 16),
 	FACTOR(CLK_TOP_AHB_INFRA_D2, "ahb_infra_d2", "ahb_infra_sel", 1, 2),
+	FACTOR(CLK_TOP_NFI1X, "nfi1x_ck", "nfi2x_pad_sel", 1, 2),
 	FACTOR(CLK_TOP_ETH_D2, "eth_d2_ck", "eth_sel", 1, 2),
 };
 
@@ -286,7 +287,7 @@ static const char * const nfi2x_pad_parents[] __initconst = {
 
 static const char * const nfi1x_pad_parents[] __initconst = {
 	"ahb_infra_sel",
-	"nfi2x_pad_sel"
+	"nfi1x_ck"
 };
 
 static const char * const mfg_mm_parents[] __initconst = {
@@ -1262,7 +1263,7 @@ CLK_OF_DECLARE(mtk_infracfg, "mediatek,mt8167-infracfg", mtk_infracfg_init);
 /* FIXME: modify FMAX */
 #define MT8167_PLL_FMAX		(2500UL * MHZ)
 
-#define CON0_MT8167_RST_BAR	BIT(24)
+#define CON0_MT8167_RST_BAR	BIT(27)
 
 #define PLL_B(_id, _name, _reg, _pwr_reg, _en_mask, _flags, _pcwbits,	\
 			_pd_reg, _pd_shift, _tuner_reg, _pcw_reg,	\
