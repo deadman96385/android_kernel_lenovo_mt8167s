@@ -564,12 +564,12 @@ static const struct reg_setting mt8167_codec_builtin_amic_enable_regs[] = {
 	},
 	{ /* left pga mux <- AU_VIN0 */
 		.reg = AUDIO_CODEC_CON00,
-		.mask = BIT(28),
+		.mask = GENMASK(31, 28),
 		.val = 0x0,
 	},
 	{ /* right pga mux <- AU_VIN2 */
 		.reg = AUDIO_CODEC_CON00,
-		.mask = BIT(10),
+		.mask = GENMASK(13, 10),
 		.val = 0x0,
 	},
 };
@@ -582,12 +582,12 @@ static const struct reg_setting mt8167_codec_headset_amic_enable_regs[] = {
 	},
 	{ /* left pga mux <- AU_VIN1 */
 		.reg = AUDIO_CODEC_CON00,
-		.mask = BIT(28),
+		.mask = GENMASK(31, 28),
 		.val = BIT(28),
 	},
 	{ /* right pga mux <- AU_VIN1 */
 		.reg = AUDIO_CODEC_CON00,
-		.mask = BIT(10),
+		.mask = GENMASK(13, 10),
 		.val = BIT(10),
 	},
 };
