@@ -564,8 +564,8 @@ void musb_sync_with_bat(struct musb *musb, int usb_state)
 {
 #ifndef FPGA_PLATFORM
 	DBG(0, "BATTERY_SetUSBState, state=%d\n", usb_state);
-	/*BATTERY_SetUSBState(usb_state);*/
-	/*wake_up_bat();*/
+	BATTERY_SetUSBState(usb_state);
+	wake_up_bat();
 #endif
 }
 
