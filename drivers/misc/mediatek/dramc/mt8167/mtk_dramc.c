@@ -44,6 +44,7 @@
 void __iomem *CQDMA_BASE_ADDR;
 void __iomem *DRAMCAO_BASE_ADDR;
 void __iomem *DDRPHY_BASE_ADDR;
+void __iomem *DDRPHY1_BASE_ADDR;
 void __iomem *DRAMCNAO_BASE_ADDR;
 
 unsigned char *dst_array_v;
@@ -425,26 +426,38 @@ bool pasr_is_valid(void)
 	return false;
 }
 
-struct clk *dramc_f26m_clk;
-
 unsigned int DRAM_MRR(int MRR_num)
 {
 	unsigned int MRR_value = 0x0;
 	unsigned int u4value;
+	unsigned char u1rank = 0;
 
-	return 0;
-	/* set DQ bit 0, 1, 2, 3, 4, 5, 6, 7 pinmux for LPDDR3 */
-	ucDram_Register_Write(DRAMC_REG_RRRATE_CTL, 0x13121110);
-	ucDram_Register_Write(DRAMC_REG_MRR_CTL, 0x17161514);
+	u4value = ucDram_Register_Read(DRAMC_REG_MRS);
+	u4value	&= ~(3 << 26);
+	u4value |= ((u1rank & 3) << 26);
+	ucDram_Register_Write(DRAMC_REG_MRS, u4value);
+	u4value	&= ~(0x1fff << 8);
+	u4value |= ((MRR_num & 0x1fff) << 8);
+	ucDram_Register_Write(DRAMC_REG_MRS, u4value);
 
-	ucDram_Register_Write(DRAMC_REG_MRS, MRR_num);
-	ucDram_Register_Write(DRAMC_REG_SPCMD, 0x00000002);
-	udelay(1);
-	ucDram_Register_Write(DRAMC_REG_SPCMD, 0x00000000);
-	udelay(1);
+	u4value = ucDram_Register_Read(DRAMC_REG_SPCMD);
+	u4value |= (1 << 1);
+	ucDram_Register_Write(DRAMC_REG_MRS, u4value);
 
-	u4value = ucDram_Register_Read(DRAMC_REG_SPCMDRESP);
-	MRR_value = (u4value >> 20) & 0xFF;
+	while ((ucDram_Register_Read(DRAMC_REG_SPCMDRESP) & 0x2) == 0)
+		udelay(1);
+
+	MRR_value = ucDram_Register_Read(DRAMC_REG_MRR_STATUS) & 0xffff;
+
+	u4value = ucDram_Register_Read(DRAMC_REG_SPCMD);
+	u4value &= ~(1 << 1);
+	ucDram_Register_Write(DRAMC_REG_MRS, u4value);
+
+	u4value = ucDram_Register_Read(DRAMC_REG_MRS);
+	u4value	&= ~(3 << 26);
+	ucDram_Register_Write(DRAMC_REG_MRS, u4value);
+
+	pr_debug("Read MR%d =0x%x\n", MRR_num, MRR_value);
 
 	return MRR_value;
 }
@@ -477,15 +490,6 @@ static ssize_t complex_mem_test_store(struct device_driver *driver, const char *
 DRIVER_ATTR(emi_clk_mem_test, 0664, complex_mem_test_show, complex_mem_test_store);
 
 
-static int dramc_clk_probe(struct platform_device *pdev)
-{
-	dramc_f26m_clk = devm_clk_get(&pdev->dev, "dramc_f26m");
-	clk_prepare(dramc_f26m_clk);
-	clk_enable(dramc_f26m_clk);
-
-	return 0;
-}
-
 static struct platform_driver dram_test_drv = {
 	.driver = {
 		.name = "emi_clk_test",
@@ -494,38 +498,18 @@ static struct platform_driver dram_test_drv = {
 	}
 };
 
-static const struct of_device_id dramc_clk_of_match[] = {
-	{.compatible = "mediatek,mt8167-ddrphy",},
-	{},
-};
-MODULE_DEVICE_TABLE(of, dramc_clk_of_match);
-
-static struct platform_driver dramc_clk_drv = {
-	.remove = NULL,
-	.shutdown = NULL,
-	.probe = dramc_clk_probe,
-	.suspend = NULL,
-	.resume = NULL,
-	.driver = {
-		.name = "dramc_clk",
-		.of_match_table = of_match_ptr(dramc_clk_of_match),
-	},
-};
 
 
 /* extern char __ssram_text, _sram_start, __esram_text; */
 int __init dram_test_init(void)
 {
-	int ret, err;
+	int ret;
 	struct device_node *node;
-
-	err = platform_driver_register(&dramc_clk_drv);
-	if (err)
-		pr_err("fail to register dramc_f26m_drv.\n");
 
 	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-dramco");
 	if (node) {
 		DRAMCAO_BASE_ADDR = of_iomap(node, 0);
+		pr_debug("DRAMCAO_BASE_ADDR:%p\n", DRAMCAO_BASE_ADDR);
 	} else {
 		pr_warn("can't find DRAMC0 compatible node\n");
 		return -1;
@@ -534,14 +518,26 @@ int __init dram_test_init(void)
 	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-ddrphy");
 	if (node) {
 		DDRPHY_BASE_ADDR = of_iomap(node, 0);
+		pr_debug("DDRPHY:%p\n", DDRPHY_BASE_ADDR);
 	} else {
 		pr_warn("can't find DDRPHY compatible node\n");
 		return -1;
 	}
+#if 0
+	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-ddrphy1");
+	if (node) {
+		DDRPHY1_BASE_ADDR = of_iomap(node, 0);
+		pr_debug("DDRPHY1:%p\n", DDRPHY0_BASE_ADDR);
+	} else {
+		pr_warn("can't find DDRPHY1 compatible node\n");
+		return -1;
+	}
+#endif
 
 	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-dramc_nao");
 	if (node) {
 		DRAMCNAO_BASE_ADDR = of_iomap(node, 0);
+		pr_debug("DRAMCNAO:%p\n", DRAMCNAO_BASE_ADDR);
 	} else {
 		pr_warn("can't find DRAMCNAO compatible node\n");
 		return -1;
