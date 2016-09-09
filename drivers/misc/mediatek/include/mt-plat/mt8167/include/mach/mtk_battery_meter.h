@@ -48,14 +48,14 @@
 /* ADC Channel Number */
 #define CUST_TABT_NUMBER 17
 #ifdef BAT_VOL_USE_ISENSE
-#define VBAT_CHANNEL_NUMBER      6 /* w/ powerpath, battery voltage is ISENSE(1)*/
-#define ISENSE_CHANNEL_NUMBER	 7 /* w/ powerpath, system voltage is VSENSE(0)*/
+#define VBAT_CHANNEL_NUMBER      1 /* w/ powerpath, battery voltage is ISENSE(1)*/
+#define ISENSE_CHANNEL_NUMBER	 0 /* w/ powerpath, system voltage is VSENSE(0)*/
 #else
-#define VBAT_CHANNEL_NUMBER      7
-#define ISENSE_CHANNEL_NUMBER	 6
+#define VBAT_CHANNEL_NUMBER      0
+#define ISENSE_CHANNEL_NUMBER	 1
 #endif
-#define VCHARGER_CHANNEL_NUMBER  4
-#define VBATTEMP_CHANNEL_NUMBER  5
+#define VCHARGER_CHANNEL_NUMBER  2
+#define VBATTEMP_CHANNEL_NUMBER  4
 
 
 /* ADC resistor  */
