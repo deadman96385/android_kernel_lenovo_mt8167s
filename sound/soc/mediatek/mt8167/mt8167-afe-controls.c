@@ -398,14 +398,14 @@ static int mt8167_afe_ap_loopback_put(struct snd_kcontrol *kcontrol,
 
 		if (sample_rate == 32000) {
 			regmap_update_bits(afe->regmap, AFE_ADDA_DL_SRC2_CON0,
-					   0xffffffff, 0x63001822);
+					   0xffffffff, 0x63001802);
 			regmap_update_bits(afe->regmap, AFE_I2S_CON1,
 					   0xf << 8, 0x9 << 8);
 		} else {
 			regmap_update_bits(afe->regmap, AFE_ADDA_DL_SRC2_CON0,
-					   0xffffffff, 0x83001822);
+					   0xffffffff, 0x83001802);
 			regmap_update_bits(afe->regmap, AFE_I2S_CON1,
-					   0xf << 8, 0xb << 8);
+					   0xf << 8, 0xa << 8);
 		}
 
 		regmap_update_bits(afe->regmap, AFE_ADDA_DL_SRC2_CON1,
