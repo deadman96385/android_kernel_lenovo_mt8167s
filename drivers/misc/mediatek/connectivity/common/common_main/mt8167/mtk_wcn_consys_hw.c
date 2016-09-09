@@ -674,7 +674,7 @@ INT32 mtk_wcn_consys_hw_reg_ctrl(UINT32 on, UINT32 co_clock_type)
 				 CONSYS_CPU_SW_RST_CTRL_KEY);
 
 #endif /* use HADRCODE */
-		usleep_range(5000, 10000);	/* msleep < 20ms can sleep for up to 20ms, so use usleep_range */
+		msleep(40);	/* less sleep time (5ms) may cause wmt timeout, 40ms is enough */
 
 	} else { /* off */
 
