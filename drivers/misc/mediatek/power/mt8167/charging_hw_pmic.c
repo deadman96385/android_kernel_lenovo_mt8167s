@@ -17,7 +17,7 @@
 #include <linux/delay.h>
 #include <mt-plat/mtk_boot.h>
 #include <mt-plat/mtk_reboot.h>
-
+#include <linux/reboot.h>
 #include <mach/mtk_battery_meter.h>
 #include <mach/mtk_charging.h>
 #include <mach/mtk_pmic.h>
@@ -526,7 +526,7 @@ static unsigned int charging_set_platform_reset(void *data)
 #else
 	pr_debug("charging_set_platform_reset\n");
 
-	arch_reset(0, NULL);
+	kernel_restart("battery service reboot system");
 #endif
 	return status;
 }
@@ -552,7 +552,7 @@ static unsigned int charging_set_power_off(void *data)
 #if defined(CONFIG_POWER_EXT) || defined(CONFIG_MTK_FPGA)
 #else
 	pr_debug("charging_set_power_off\n");
-	mt_power_off();
+	kernel_power_off();
 #endif
 
 	return status;
