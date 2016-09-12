@@ -11,7 +11,7 @@
 # GNU General Public License for more details.
 #
 
-obj-$(CONFIG_MTK_PMIC)          += pmic_mt6392.o pmic_chr_type_det.o
+obj-$(CONFIG_MTK_PMIC)          += pmic_mt6392.o pmic_chr_type_det.o pmic_auxadc.o
 
 obj-$(CONFIG_MTK_SMART_BATTERY) += battery_meter_hal.o
 
