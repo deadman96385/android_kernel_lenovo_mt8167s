@@ -941,9 +941,39 @@ static const struct reg_setting mt8167_codec_hp_enable_regs[] = {
 		.mask = BIT(11),
 		.val = BIT(11),
 	},
+	{ /* HP Pre-charge function release */
+		.reg = AUDIO_CODEC_CON02,
+		.mask = BIT(28),
+		.val = BIT(28),
+	},
+	{ /* Disable the depop mux of HP drivers */
+		.reg = AUDIO_CODEC_CON02,
+		.mask = BIT(25),
+		.val = 0x0,
+	},
+	{ /* Disable the depop VCM gen */
+		.reg = AUDIO_CODEC_CON02,
+		.mask = BIT(22),
+		.val = 0x0,
+	},
 };
 
 static const struct reg_setting mt8167_codec_hp_disable_regs[] = {
+	{ /* Reset HP Pre-charge function */
+		.reg = AUDIO_CODEC_CON02,
+		.mask = BIT(28),
+		.val = 0x0,
+	},
+	{ /* Enable the depop mux of HP drivers */
+		.reg = AUDIO_CODEC_CON02,
+		.mask = BIT(25),
+		.val = BIT(25),
+	},
+	{ /* Enable depop VCM gen */
+		.reg = AUDIO_CODEC_CON02,
+		.mask = BIT(22),
+		.val = BIT(22),
+	},
 	{ /* left audio amp */
 		.reg = AUDIO_CODEC_CON01,
 		.mask = BIT(12),
