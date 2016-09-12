@@ -27,6 +27,7 @@ endef
 ifneq (,$(findstring tb8167p,$(ARCH_MTK_PROJECT)))
 ccflags-y += -DSUPPORT_I2C_BUS_NUM1=2
 ccflags-y += -DSUPPORT_I2C_BUS_NUM2=2
+ccflags-y += -DDEMO_BOARD_SUPPORT=1
 $(info "ARCH_MTK_PROJECT:$(ARCH_MTK_PROJECT), set I2C Bus num:2")
 else
 $(info "ARCH_MTK_PROJECT:$(ARCH_MTK_PROJECT)")

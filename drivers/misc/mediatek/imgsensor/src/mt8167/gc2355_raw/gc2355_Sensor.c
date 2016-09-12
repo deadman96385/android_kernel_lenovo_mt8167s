@@ -220,6 +220,7 @@ static void write_cmos_sensor(kal_uint32 addr, kal_uint32 para)
 
 }
 
+#if 0
 static void set_dummy(void)
 {
 	kal_uint32 hb = 0;
@@ -241,6 +242,7 @@ static void set_dummy(void)
 	mdelay(50);
 /* end */
 }				/*    set_dummy  */
+#endif
 
 static kal_uint32 return_sensor_id(void)
 {
@@ -273,7 +275,7 @@ static void set_max_framerate(UINT16 framerate, kal_bool min_framelength_en)
 	if (min_framelength_en)
 		imgsensor.min_frame_length = imgsensor.frame_length;
 	spin_unlock(&imgsensor_drv_lock);
-	set_dummy();
+	/* set_dummy(); */
 }				/*    set_max_framerate  */
 
 
