@@ -1120,7 +1120,7 @@ static int mt8167_codec_loopback_put(struct snd_kcontrol *kcontrol,
 	if (prev_lpbk_type != CODEC_LOOPBACK_NONE)
 		mt8167_codec_turn_off_lpbk_path(
 			codec_data->codec, prev_lpbk_type);
-	else
+	if (next_lpbk_type != CODEC_LOOPBACK_NONE)
 		mt8167_codec_turn_on_lpbk_path(
 			codec_data->codec, next_lpbk_type);
 
