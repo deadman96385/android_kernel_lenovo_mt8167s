@@ -166,7 +166,7 @@
 			<&imgsys CLK_IMG_CAM_CAM>,
 			<&imgsys CLK_IMG_SEN_TG>,
 			<&imgsys CLK_IMG_SEN_CAM>,
-			<&imgsys CLK_IMG_CG>,
+			<&imgsys CLK_IMG_VENC>,
 			<&vdecsys CLK_VDEC_CKEN>,
 			<&vdecsys CLK_VDEC_LARB1_CKEN>,
 			<&clk26m>,

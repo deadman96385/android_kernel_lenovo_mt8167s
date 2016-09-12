@@ -1169,7 +1169,7 @@ static const struct mtk_gate img_clks[] __initconst = {
 	GATE_IMG(CLK_IMG_CAM_CAM, "img_cam_cam", "smi_mm", 6),
 	GATE_IMG(CLK_IMG_SEN_TG, "img_sen_tg", "cam_mm", 7),
 	GATE_IMG(CLK_IMG_SEN_CAM, "img_sen_cam", "smi_mm", 8),
-	GATE_IMG(CLK_IMG_CG, "img_venc", "smi_mm", 9),
+	GATE_IMG(CLK_IMG_VENC, "img_venc", "smi_mm", 9),
 };
 static const struct mtk_gate_regs vdec0_cg_regs = {
 	.set_ofs = 0x0,
