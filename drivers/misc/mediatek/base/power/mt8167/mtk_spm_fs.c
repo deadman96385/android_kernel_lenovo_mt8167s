@@ -140,13 +140,11 @@ static ssize_t show_pwr_ctrl(const struct pwr_ctrl *pwrctrl, char *buf)
 
 	p += sprintf(p, "conn_mask = %u\n", pwrctrl->conn_mask);
 
-	p += sprintf(p, "disp_req_mask = %u\n", pwrctrl->disp_req_mask);
+	p += sprintf(p, "disp0_req_mask = %u\n", pwrctrl->disp0_req_mask);
+	p += sprintf(p, "disp1_req_mask = %u\n", pwrctrl->disp1_req_mask);
 	p += sprintf(p, "mfg_req_mask = %u\n", pwrctrl->mfg_req_mask);
-	p += sprintf(p, "dsi0_ddr_en_mask = %u\n", pwrctrl->dsi0_ddr_en_mask);
-	p += sprintf(p, "dsi1_ddr_en_mask = %u\n", pwrctrl->dsi1_ddr_en_mask);
-	p += sprintf(p, "dpi_ddr_en_mask = %u\n", pwrctrl->dpi_ddr_en_mask);
-	p += sprintf(p, "isp0_ddr_en_mask = %u\n", pwrctrl->isp0_ddr_en_mask);
-	p += sprintf(p, "isp1_ddr_en_mask = %u\n", pwrctrl->isp1_ddr_en_mask);
+	p += sprintf(p, "vdec_req_mask = %u\n", pwrctrl->vdec_req_mask);
+	p += sprintf(p, "mm_ddr_req_mask = %u\n", pwrctrl->mm_ddr_req_mask);
 
 	p += sprintf(p, "syspwreq_mask = %u\n", pwrctrl->syspwreq_mask);
 	p += sprintf(p, "srclkenai_mask = %u\n", pwrctrl->srclkenai_mask);
@@ -260,20 +258,16 @@ static ssize_t store_pwr_ctrl(struct pwr_ctrl *pwrctrl, const char *buf, size_t 
 	else if (!strcmp(cmd, "conn_mask"))
 		pwrctrl->conn_mask = val;
 
-	else if (!strcmp(cmd, "disp_req_mask"))
-		pwrctrl->disp_req_mask = val;
+	else if (!strcmp(cmd, "disp0_req_mask"))
+		pwrctrl->disp0_req_mask = val;
+	else if (!strcmp(cmd, "disp1_req_mask"))
+		pwrctrl->disp1_req_mask = val;
 	else if (!strcmp(cmd, "mfg_req_mask"))
 		pwrctrl->mfg_req_mask = val;
-	else if (!strcmp(cmd, "dsi0_ddr_en_mask"))
-		pwrctrl->dsi0_ddr_en_mask = val;
-	else if (!strcmp(cmd, "dsi1_ddr_en_mask"))
-		pwrctrl->dsi1_ddr_en_mask = val;
-	else if (!strcmp(cmd, "dpi_ddr_en_mask"))
-		pwrctrl->dpi_ddr_en_mask = val;
-	else if (!strcmp(cmd, "isp0_ddr_en_mask"))
-		pwrctrl->isp0_ddr_en_mask = val;
-	else if (!strcmp(cmd, "isp1_ddr_en_mask"))
-		pwrctrl->isp1_ddr_en_mask = val;
+	else if (!strcmp(cmd, "vdec_req_mask"))
+		pwrctrl->vdec_req_mask = val;
+	else if (!strcmp(cmd, "mm_ddr_req_mask"))
+		pwrctrl->mm_ddr_req_mask = val;
 
 	else if (!strcmp(cmd, "syspwreq_mask"))
 		pwrctrl->syspwreq_mask = val;

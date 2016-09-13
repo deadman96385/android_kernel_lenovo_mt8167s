@@ -192,19 +192,22 @@ void __spm_set_power_control(const struct pwr_ctrl *pwrctrl)
 	/* set other SYS request mask */
 	spm_write(SPM_AP_STANBY_CON, (!pwrctrl->srclkenai_mask << 25) |
 		  (!pwrctrl->conn_mask << 23) |
-		  (!pwrctrl->gce_req_mask << 18) |
-		  (!pwrctrl->mfg_req_mask << 17) |
-		  (!pwrctrl->disp_req_mask << 16) |
+		  (!pwrctrl->mm_ddr_req_mask << 18) |
+		  (!pwrctrl->vdec_req_mask << 17) |
+		  (!pwrctrl->mfg_req_mask << 16) |
+		  (!pwrctrl->disp1_req_mask << 15) |
+		  (!pwrctrl->disp0_req_mask << 14) |
 		  (!!pwrctrl->mcusys_idle_mask << 7) |
 		  (!!pwrctrl->ca15top_idle_mask << 6) |
 		  (!!pwrctrl->ca7top_idle_mask << 5) | (!!pwrctrl->wfi_op << 4));
 	spm_write(SPM_PCM_SRC_REQ, (!!pwrctrl->pcm_f26m_req << 1) |
 		  (!!pwrctrl->pcm_apsrc_req << 0));
+#if 0
 	spm_write(SPM_PCM_PASR_DPD_2, (!pwrctrl->isp1_ddr_en_mask << 4) |
 		  (!pwrctrl->isp0_ddr_en_mask << 3) |
 		  (!pwrctrl->dpi_ddr_en_mask << 2) |
 		  (!pwrctrl->dsi1_ddr_en_mask << 1) | (!pwrctrl->dsi0_ddr_en_mask << 0));
-
+#endif
 	/* set CPU WFI mask */
 	spm_write(SPM_SLEEP_CA7_WFI0_EN, !!pwrctrl->ca7_wfi0_en);
 	spm_write(SPM_SLEEP_CA7_WFI1_EN, !!pwrctrl->ca7_wfi1_en);
@@ -285,8 +288,8 @@ void __spm_get_wakeup_status(struct wake_status *wakesta)
 	wakesta->r13 = spm_read(SPM_PCM_REG13_DATA);
 	wakesta->idle_sta = spm_read(SPM_SLEEP_SUBSYS_IDLE_STA);
 
-	/* get debug flag for PCM execution check */
-	wakesta->debug_flag = spm_read(SPM_PCM_RESERVE4);
+	/* get debug flag (r5) for PCM execution check */
+	wakesta->debug_flag = spm_read(SPM_PCM_REG5_DATA);
 
 	/* get special pattern (0xf0000 or 0x10000) if sleep abort */
 	wakesta->event_reg = spm_read(SPM_PCM_EVENT_REG_STA);
@@ -414,8 +417,8 @@ static void __iomem *pwrap_base;
 
 #define NR_PMIC_WRAP_CMD 8
 
-#define PMIC_ADDR_VPROC_CA53_VOSEL_ON	0x0228	/* [6:0] */
-#define PMIC_ADDR_VCORE_VOSEL_ON		0x027A	/* [6:0] */
+#define PMIC_ADDR_VPROC_CA53_VOSEL_ON	0x0220	/* [6:0] */
+#define PMIC_ADDR_VCORE_VOSEL_ON		0x0314	/* [6:0] */
 
 struct pmic_wrap_cmd {
 	unsigned long cmd_addr;
@@ -441,12 +444,12 @@ static struct pmic_wrap_setting pw = {
 
 	.addr = { {0, 0} },
 
-	/* Barry Chang firmware won't work, index 2, 3, 6, 7 are dummy setting */
+	/* Vproc only, power off: index 1, power on: 0 */
 	.set[PMIC_WRAP_PHASE_DEEPIDLE] = {
 		._[IDX_DI_VPROC_CA7_NORMAL] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
-			VOLT_TO_PMIC_VAL(1000),},
+			VOLT_TO_PMIC_VAL(1150),},
 		._[IDX_DI_VPROC_CA7_SLEEP] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
-			VOLT_TO_PMIC_VAL(800),},
+			VOLT_TO_PMIC_VAL(850),},
 		._[IDX_DI_VSRAM_CA7_FAST_TRSN_EN] = {PMIC_ADDR_VCORE_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(1125),},
 		._[IDX_DI_VSRAM_CA7_FAST_TRSN_DIS] = {PMIC_ADDR_VCORE_VOSEL_ON,

@@ -33,7 +33,7 @@
 #define SPM_CTRL_BIG_CPU	0
 #endif
 
-#define POWER_ON_VAL1_DEF	0x60015830
+#define POWER_ON_VAL1_DEF	0x40005830
 #define PCM_FSM_STA_DEF		0x48490
 
 #define PCM_WDT_TIMEOUT		(30 * 32768)	/* 30s */
@@ -156,6 +156,7 @@ struct pcm_desc {
 	const u16 size;		/* binary array size */
 	const u8 sess;		/* session number */
 	const u8 replace;	/* replace mode */
+	const u8 addr_2nd;
 
 	u32 vec0;		/* event vector 0 config */
 	u32 vec1;		/* event vector 1 config */
@@ -209,13 +210,11 @@ struct pwr_ctrl {
 
 	/* for MM */
 	u8 gce_req_mask;
-	u8 disp_req_mask;
+	u8 disp0_req_mask;
+	u8 disp1_req_mask;
 	u8 mfg_req_mask;
-	u8 dsi0_ddr_en_mask;	/* E2 */
-	u8 dsi1_ddr_en_mask;	/* E2 */
-	u8 dpi_ddr_en_mask;	/* E2 */
-	u8 isp0_ddr_en_mask;	/* E2 */
-	u8 isp1_ddr_en_mask;	/* E2 */
+	u8 vdec_req_mask;
+	u8 mm_ddr_req_mask;
 
 	/* for other SYS */
 	u8 syspwreq_mask;	/* make 26M off when attach ICE */
