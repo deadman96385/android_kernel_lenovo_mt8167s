@@ -497,7 +497,7 @@ static int mtk_cpufreq_init(struct cpufreq_policy *policy)
 	unsigned int freq;
 	unsigned long freq_long;
 	struct dev_pm_opp *opp;
-	int opp_idx;
+	int opp_idx = 0;
 
 	info = mtk_cpu_dvfs_info_lookup(policy->cpu);
 	if (!info) {
