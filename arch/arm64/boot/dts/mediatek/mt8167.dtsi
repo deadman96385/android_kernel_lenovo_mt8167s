@@ -388,9 +388,11 @@
 					<GIC_SPI 130 IRQ_TYPE_LEVEL_LOW>,
 					<GIC_SPI 131 IRQ_TYPE_LEVEL_LOW>;
 			infracfg = <&infracfg>;
-			clocks = <&topckgen CLK_TOP_RG_SLOW_MFG>,
-				 <&topckgen CLK_TOP_SMI_MM>;
-			clock-names = "mfg", "mm";
+			clocks = <&topckgen CLK_TOP_RG_AXI_MFG>,
+				 <&topckgen CLK_TOP_RG_SLOW_MFG>,
+				 <&topckgen CLK_TOP_SMI_MM>,
+				 <&topckgen CLK_TOP_RG_VDEC>;
+			clock-names = "axi_mfg", "mfg", "mm", "vdec";
 		};
 
 		hacc@1000a000 {
