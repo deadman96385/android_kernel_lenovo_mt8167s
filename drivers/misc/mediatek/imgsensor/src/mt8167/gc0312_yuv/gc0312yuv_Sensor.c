@@ -1437,7 +1437,7 @@ UINT32 GC0312_SetTestPatternMode(kal_bool bEnable)
 	return ERROR_NONE;
 }
 
-#define GC0312_TEST_PATTERN_CHECKSUM (0x86a9e2c6)
+#define GC0312_TEST_PATTERN_CHECKSUM (0xa8ccfa09)
 
 UINT32 GC0312FeatureControl(MSDK_SENSOR_FEATURE_ENUM FeatureId,
 			    UINT8 *pFeaturePara, UINT32 *pFeatureParaLen)
