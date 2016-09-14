@@ -131,7 +131,7 @@ static u32 slp_time = 30;
 #endif /* ENABLE_AUTO_SUSPEND_TEST */
 
 static u32 slp_spm_flags = {
-#if 1				/* normal suspend */
+#if 0				/* normal suspend */
 	SPM_L2_DORMANT_DIS | SPM_VPROC_LOW_DIS
 #else				/* legacy suspend */
 	SPM_L2_DORMANT_DIS | SPM_VPROC_LOW_DIS | SPM_CPU_PDN_DIS | SPM_INFRA_PDN_DIS |
