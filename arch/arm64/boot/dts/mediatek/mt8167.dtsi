@@ -61,8 +61,8 @@
 			enable-method = "psci";
 			cpu-idle-states = <&CLUSTER_SLEEP_0 &CLUSTER_SLEEP_0>,
 					  <&CPU_SLEEP_0_0 &CPU_SLEEP_0_0 &CPU_SLEEP_0_0>;
-			clocks = <&topckgen CLK_TOP_RTC_SEL>,
-				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+			clocks = <&infracfg CLK_IFR_MUX1_SEL>,
+				 <&topckgen CLK_TOP_MAINPLL_D2>;
 			clock-names = "cpu", "intermediate";
 			operating-points-v2 = <&cluster0_opp>;
 			clock-frequency = <1300000000>;
@@ -75,8 +75,8 @@
 			enable-method = "psci";
 			cpu-idle-states = <&CLUSTER_SLEEP_0 &CLUSTER_SLEEP_0>,
 					  <&CPU_SLEEP_0_0 &CPU_SLEEP_0_0 &CPU_SLEEP_0_0>;
-			clocks = <&topckgen CLK_TOP_RTC_SEL>,
-				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+			clocks = <&infracfg CLK_IFR_MUX1_SEL>,
+				 <&topckgen CLK_TOP_MAINPLL_D2>;
 			clock-names = "cpu", "intermediate";
 			operating-points-v2 = <&cluster0_opp>;
 			clock-frequency = <1300000000>;
@@ -89,8 +89,8 @@
 			enable-method = "psci";
 			cpu-idle-states = <&CLUSTER_SLEEP_0 &CLUSTER_SLEEP_0>,
 					  <&CPU_SLEEP_0_0 &CPU_SLEEP_0_0 &CPU_SLEEP_0_0>;
-			clocks = <&topckgen CLK_TOP_RTC_SEL>,
-				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+			clocks = <&infracfg CLK_IFR_MUX1_SEL>,
+				 <&topckgen CLK_TOP_MAINPLL_D2>;
 			clock-names = "cpu", "intermediate";
 			operating-points-v2 = <&cluster0_opp>;
 			clock-frequency = <1300000000>;
@@ -103,8 +103,8 @@
 			enable-method = "psci";
 			cpu-idle-states = <&CLUSTER_SLEEP_0 &CLUSTER_SLEEP_0>,
 					  <&CPU_SLEEP_0_0 &CPU_SLEEP_0_0 &CPU_SLEEP_0_0>;
-			clocks = <&topckgen CLK_TOP_RTC_SEL>,
-				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+			clocks = <&infracfg CLK_IFR_MUX1_SEL>,
+				 <&topckgen CLK_TOP_MAINPLL_D2>;
 			clock-names = "cpu", "intermediate";
 			operating-points-v2 = <&cluster0_opp>;
 			clock-frequency = <1300000000>;
