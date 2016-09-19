@@ -104,29 +104,22 @@ unsigned int __chip_hw_subcode(void)
 
 unsigned int __chip_func_code(void)
 {
-	return get_devinfo_with_index(30);
+	return 0;		/*not support*/
 }
 
 unsigned int __chip_date_code(void)
 {
-	/* DATE_CODE_YY[3:0] */
-	unsigned int val1 = (get_devinfo_with_index(27) & (0xF << 8)) >> 2;
-	/* DATE_CODE_WW[5:0] */
-	unsigned int val2 = get_devinfo_with_index(27) & 0x3F;
-
-	return (val1 | val2);
+	return 0;		/*not support*/
 }
 
 unsigned int __chip_proj_code(void)
 {
-	return get_devinfo_with_index(29);
+	return get_devinfo_with_index(45);
 }
 
 unsigned int __chip_fab_code(void)
 {
-	/*[22:20]*/
-	unsigned int val = (get_devinfo_with_index(27) & (0x7 << 20)) >> 20;
-	return val;
+	return 0;		/*not support*/
 }
 
 unsigned int mt_get_chip_id(void)
