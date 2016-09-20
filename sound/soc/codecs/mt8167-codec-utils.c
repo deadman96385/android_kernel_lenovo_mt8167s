@@ -371,7 +371,7 @@ uint32_t mt8167_codec_conv_dc_offset_to_comp_val(uint32_t dc_offset)
 
 	return dccomp_val;
 }
-EXPORT_SYMBOL_GPL(mt8167_codec_convert_offset_to_comp_val);
+EXPORT_SYMBOL_GPL(mt8167_codec_conv_dc_offset_to_comp_val);
 
 int mt8167_codec_get_hpl_cali_val(struct snd_soc_codec *codec,
 	uint32_t *dccomp_val, uint32_t *dc_offset)
