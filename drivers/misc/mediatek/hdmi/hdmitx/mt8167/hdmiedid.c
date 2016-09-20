@@ -45,7 +45,7 @@
 #include <linux/types.h>
 
 #include "hdmi_ctrl.h"
-
+#include "hdmictrl.h"
 #include "hdmiddc.h"
 #include "hdmiedid.h"
 #include "hdmihdcp.h"
@@ -1704,7 +1704,7 @@ void vShowEdidInformation(void)
 
 }
 
-void hdmi_AppGetEdidInfo(HDMI_EDID_T *pv_get_info)
+void hdmi_AppGetEdidInfo(struct HDMI_EDID_T *pv_get_info)
 {
 	HDMI_EDID_FUNC();
 

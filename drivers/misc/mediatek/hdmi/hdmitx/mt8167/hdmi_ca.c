@@ -47,7 +47,7 @@
 /* #include <mach/mt_pm_ldo.h> */
 /* #include <mach/mt_boot.h> */
 
-/* #include "mt_boot_common.h" */
+#include "mtk_boot_common.h"
 #include "tz_cross/trustzone.h"
 #include "tz_cross/ta_test.h"
 #include "tz_cross/ta_mem.h"

@@ -42,24 +42,12 @@
 #include <linux/fs.h>
 #include <linux/string.h>
 #include <linux/completion.h>
-#include "hdmitx.h"
 
 #include "hdmi_ctrl.h"
+#include "hdmictrl.h"
 #include "hdmicec.h"
-
-/* #include "hdmi_drv.h" */
-/*#include <cust_eint.h>*/
-/*#include "cust_gpio_usage.h"*/
-/* #include "mach/eint.h" */
-/* #include "mach/irqs.h" */
-
-
-/* #include <mach/devs.h> */
-/* #include <mach/mt_typedefs.h> */
-/* #include <mach/mt_gpio.h> */
 #include <linux/types.h>
-/* #include <mach/mt_pm_ldo.h> */
-/* #include <mach/mt_pmic_wrap.h> */
+#include "extd_hdmi.h"
 
 
 #define cec_clk_26m 0x1
@@ -78,16 +66,16 @@ static unsigned short _CEC_ErrStatus;
 #define IsCECErrorFlag(arg) ((_CEC_ErrStatus & (arg)) > 0)
 
 
-static CEC_FRAME_DESCRIPTION_IO ActiveRXFrame;
-static CEC_FRAME_DESCRIPTION_IO CTSTestFrame;
+static struct CEC_FRAME_DESCRIPTION_IO ActiveRXFrame;
+static struct CEC_FRAME_DESCRIPTION_IO CTSTestFrame;
 
-static CEC_FRAME_DESCRIPTION_IO CEC_rx_msg_queue[RX_Q_SIZE];
-static CEC_FRAME_DESCRIPTION_IO CEC_tx_msg_queue[TX_Q_SIZE];
+static struct CEC_FRAME_DESCRIPTION_IO CEC_rx_msg_queue[RX_Q_SIZE];
+static struct CEC_FRAME_DESCRIPTION_IO CEC_tx_msg_queue[TX_Q_SIZE];
 
-CEC_FRAME_DESCRIPTION_IO *ActiveTXFrame;
+struct CEC_FRAME_DESCRIPTION_IO *ActiveTXFrame;
 struct CEC_LA_ADDRESS _rCECLaAddr;
-static CEC_FRAME_DESCRIPTION_IO cecMwTxMsg;
-CEC_ADDRESS_IO _rCECPhysicAddr;
+static struct CEC_FRAME_DESCRIPTION_IO cecMwTxMsg;
+struct CEC_ADDRESS_IO _rCECPhysicAddr;
 
 static unsigned char _u1TxFailCause;
 static unsigned char _u1ReTxCnt;
@@ -96,7 +84,7 @@ static unsigned char CEC_rxQ_write_idx;
 static unsigned char CEC_txQ_read_idx;
 static unsigned char CEC_txQ_write_idx;
 struct CEC_ACK_INFO_T cec_send_result;
-CEC_FRAME_DESCRIPTION_IO *cec_receive_msg;
+struct CEC_FRAME_DESCRIPTION_IO *cec_receive_msg;
 static unsigned char cec_msg_report_pending;
 
 
@@ -495,7 +483,7 @@ void hdmi_cec_power_on(unsigned char pwr)
 		vRegWriteFldAlign(CEC_CKGEN, 0, PDN);
 }
 
-static unsigned char CEC_rx_enqueue(CEC_FRAME_DESCRIPTION_IO *frame)
+static unsigned char CEC_rx_enqueue(struct CEC_FRAME_DESCRIPTION_IO *frame)
 {
 	/* check if queue is full */
 	HDMI_CEC_FUNC();
@@ -503,7 +491,7 @@ static unsigned char CEC_rx_enqueue(CEC_FRAME_DESCRIPTION_IO *frame)
 		return FALSE;
 
 	/* copy the new incoming message to rx queue */
-	memcpy(&(CEC_rx_msg_queue[CEC_rxQ_write_idx]), frame, sizeof(CEC_FRAME_DESCRIPTION_IO));
+	memcpy(&(CEC_rx_msg_queue[CEC_rxQ_write_idx]), frame, sizeof(struct CEC_FRAME_DESCRIPTION_IO));
 	/* CYJ.NOTE: no critical section */
 	CEC_rxQ_write_idx = (CEC_rxQ_write_idx + 1) % RX_Q_SIZE;
 
@@ -513,7 +501,7 @@ static unsigned char CEC_rx_enqueue(CEC_FRAME_DESCRIPTION_IO *frame)
 static void _CEC_Receiving(void)
 {
 	static unsigned char *size;
-	static CEC_FRAME_DESCRIPTION_IO *frame = &ActiveRXFrame;
+	static struct CEC_FRAME_DESCRIPTION_IO *frame = &ActiveRXFrame;
 	unsigned int data;
 	unsigned char i, rxlen, is_d_eom, ret;
 
@@ -608,7 +596,7 @@ static void _CEC_Receiving(void)
 
 static unsigned char _CEC_SendRemainingDataBlocks(void)
 {
-	CEC_FRAME_DESCRIPTION_IO *frame;
+	struct CEC_FRAME_DESCRIPTION_IO *frame;
 	unsigned char errcode = 0;
 	unsigned char size;
 	unsigned char *sendidx;
@@ -754,7 +742,7 @@ static void _CEC_Check_Active_Tx_Result(void)
 
 }
 
-static CEC_FRAME_DESCRIPTION_IO *_CEC_Get_Cur_TX_Q_Msg(void)
+static struct CEC_FRAME_DESCRIPTION_IO *_CEC_Get_Cur_TX_Q_Msg(void)
 {
 	HDMI_CEC_FUNC();
 
@@ -798,14 +786,14 @@ void hdmi_cec_api_get_txsts(struct CEC_ACK_INFO_T *pt)
 }
 
 
-static void vApiNotifyCECDataArrival(CEC_FRAME_DESCRIPTION_IO *frame)
+static void vApiNotifyCECDataArrival(struct CEC_FRAME_DESCRIPTION_IO *frame)
 {
 	cec_receive_msg = frame;
 	vNotifyAppHdmiCecState(HDMI_CEC_GET_CMD);
 }
 
 
-static void PrintFrameDescription(CEC_FRAME_DESCRIPTION_IO *frame)
+static void PrintFrameDescription(struct CEC_FRAME_DESCRIPTION_IO *frame)
 {
 	unsigned char i;
 
@@ -827,7 +815,7 @@ static void PrintFrameDescription(CEC_FRAME_DESCRIPTION_IO *frame)
 }
 
 
-static unsigned char _CEC_SendFrame(CEC_FRAME_DESCRIPTION_IO *frame)
+static unsigned char _CEC_SendFrame(struct CEC_FRAME_DESCRIPTION_IO *frame)
 {
 	unsigned char errcode = 0;
 	unsigned char size;
@@ -948,7 +936,7 @@ static unsigned char _CEC_SendFrame(CEC_FRAME_DESCRIPTION_IO *frame)
 
 static void _CEC_TX_Queue_Loop(void)
 {
-	CEC_FRAME_DESCRIPTION_IO *frame;
+	struct CEC_FRAME_DESCRIPTION_IO *frame;
 
 	/* HDMI_CEC_FUNC(); */
 	/* if the tx message queue is empty */
@@ -1023,9 +1011,9 @@ static void _CEC_TX_Queue_Loop(void)
 	}
 }
 
-static CEC_FRAME_DESCRIPTION_IO *CEC_rx_dequeue(void)
+static struct CEC_FRAME_DESCRIPTION_IO *CEC_rx_dequeue(void)
 {
-	CEC_FRAME_DESCRIPTION_IO *ret;
+	struct CEC_FRAME_DESCRIPTION_IO *ret;
 	/* HDMI_CEC_FUNC(); */
 
 	/* check if queue is empty */
@@ -1041,7 +1029,7 @@ static CEC_FRAME_DESCRIPTION_IO *CEC_rx_dequeue(void)
 	return ret;
 }
 
-static unsigned char CEC_frame_validation(CEC_FRAME_DESCRIPTION_IO *frame)
+static unsigned char CEC_frame_validation(struct CEC_FRAME_DESCRIPTION_IO *frame)
 {
 	unsigned char size = frame->size;
 	unsigned char i1ret = TRUE;
@@ -1181,7 +1169,7 @@ static unsigned char CEC_frame_validation(CEC_FRAME_DESCRIPTION_IO *frame)
 	return i1ret;
 }
 
-static unsigned char check_and_init_tx_frame(CEC_FRAME_DESCRIPTION_IO *frame)
+static unsigned char check_and_init_tx_frame(struct CEC_FRAME_DESCRIPTION_IO *frame)
 {
 	unsigned char ret = 0x00;
 
@@ -1200,7 +1188,7 @@ static unsigned char check_and_init_tx_frame(CEC_FRAME_DESCRIPTION_IO *frame)
 	return ret;
 }
 
-unsigned char _CEC_TX_Enqueue(CEC_FRAME_DESCRIPTION_IO *frame)
+unsigned char _CEC_TX_Enqueue(struct CEC_FRAME_DESCRIPTION_IO *frame)
 {
 	HDMI_CEC_FUNC();
 	if (frame->size == 1) {
@@ -1218,7 +1206,7 @@ unsigned char _CEC_TX_Enqueue(CEC_FRAME_DESCRIPTION_IO *frame)
 		return 0x01;
 	}
 
-	memcpy(&(CEC_tx_msg_queue[CEC_txQ_write_idx]), frame, sizeof(CEC_FRAME_DESCRIPTION_IO));
+	memcpy(&(CEC_tx_msg_queue[CEC_txQ_write_idx]), frame, sizeof(struct CEC_FRAME_DESCRIPTION_IO));
 	/* CYJ.NOTE: no critical section */
 	CEC_txQ_write_idx = (CEC_txQ_write_idx + 1) % TX_Q_SIZE;
 
@@ -1249,7 +1237,7 @@ void hdmi_u4CecSendSLTData(unsigned char *pu1Data)
 void hdmi_GetSLTData(struct CEC_SLT_DATA *rCecSltData)
 {
 	unsigned char i;
-	CEC_FRAME_DESCRIPTION_IO *frame;
+	struct CEC_FRAME_DESCRIPTION_IO *frame;
 
 	HDMI_CEC_FUNC();
 
@@ -1284,7 +1272,7 @@ void hdmi_GetSLTData(struct CEC_SLT_DATA *rCecSltData)
 	}
 }
 
-void CTS_RXProcess(CEC_FRAME_DESCRIPTION_IO *frame)
+void CTS_RXProcess(struct CEC_FRAME_DESCRIPTION_IO *frame)
 {
 	HDMI_CEC_FUNC();
 
@@ -1335,7 +1323,7 @@ void CTS_RXProcess(CEC_FRAME_DESCRIPTION_IO *frame)
 
 static void CEC_rx_msg_notify(unsigned char u1rxmode)
 {
-	CEC_FRAME_DESCRIPTION_IO *frame;
+	struct CEC_FRAME_DESCRIPTION_IO *frame;
 
 	if (u1rxmode == CEC_SLT_MODE)
 		return;
@@ -1508,14 +1496,14 @@ void hdmi_CECMWSetLA(struct CEC_DRV_ADDR_CFG_T *prAddr)
 	CECMWSetLA(&rLA);
 }
 
-void hdmi_CECMWGet(CEC_FRAME_DESCRIPTION_IO *frame)
+void hdmi_CECMWGet(struct CEC_FRAME_DESCRIPTION_IO *frame)
 {
 	HDMI_CEC_FUNC();
 	if (cec_msg_report_pending == 0) {
 		pr_err("[hdim_cec]get cec msg fail\n");
 		return;
 	}
-	memcpy(frame, cec_receive_msg, sizeof(CEC_FRAME_DESCRIPTION_IO));
+	memcpy(frame, cec_receive_msg, sizeof(struct CEC_FRAME_DESCRIPTION_IO));
 	cec_msg_report_pending = 0;
 }
 
@@ -1577,7 +1565,7 @@ void hdmi_CECMWSetEnableCEC(unsigned char u1EnCec)
 	}
 }
 
-void hdmi_NotifyApiCECAddress(CEC_ADDRESS_IO *cecaddr)
+void hdmi_NotifyApiCECAddress(struct CEC_ADDRESS_IO *cecaddr)
 {
 	HDMI_CEC_FUNC();
 

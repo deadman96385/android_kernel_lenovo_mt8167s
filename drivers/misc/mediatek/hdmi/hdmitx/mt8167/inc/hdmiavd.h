@@ -46,7 +46,7 @@
 #include <linux/completion.h>
 
 
-#include "internal_hdmi_drv.h"
+#include "hdmi_drv.h"
 
 enum AV_D_HDMI_DRV_SET_TYPE_T {
 	HDMI_SET_VIDEO_RES_CHG = 1,

@@ -188,13 +188,13 @@ void vInitHdcpKeyGetMethod(unsigned char bMethod)
 {
 	HDMI_HDCP_FUNC();
 	if (bMethod == NON_HOST_ACCESS_FROM_EEPROM) {
-		vWriteHdmiSYSMsk(HDMI_SYS_CFG1C, (I2CM_ON | EXT_E2PROM_ON),
+		vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_00, (I2CM_ON | EXT_E2PROM_ON),
 				 (I2CM_ON | EXT_E2PROM_ON));
 	} else if (bMethod == NON_HOST_ACCESS_FROM_MCM) {
-		vWriteHdmiSYSMsk(HDMI_SYS_CFG1C, (I2CM_ON | MCM_E2PROM_ON),
+		vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_00, (I2CM_ON | MCM_E2PROM_ON),
 				 (I2CM_ON | MCM_E2PROM_ON));
 	} else if (bMethod == NON_HOST_ACCESS_FROM_GCPU) {
-		vWriteHdmiSYSMsk(HDMI_SYS_CFG1C, AES_EFUSE_ENABLE,
+		vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_00, AES_EFUSE_ENABLE,
 				 (AES_EFUSE_ENABLE | I2CM_ON | EXT_E2PROM_ON | MCM_E2PROM_ON));
 	}
 }
@@ -342,8 +342,8 @@ void vWriteAksvKeyMask(unsigned char *PrData)
 {
 #if (defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT) && defined(CONFIG_MTK_HDMI_HDCP_SUPPORT))
 	HDMI_HDCP_FUNC();
-	vWriteHdmiSYSMsk(HDMI_SYS_CFG1C, 0, SYS_KEYMASK2);
-	vWriteHdmiSYSMsk(HDMI_SYS_CFG1C, 0, SYS_KEYMASK1);
+	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_00, 0, SYS_KEYMASK2);
+	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_00, 0, SYS_KEYMASK1);
 #else
 	unsigned char bData;
 	/* - write wIdx into 92. */
@@ -352,10 +352,10 @@ void vWriteAksvKeyMask(unsigned char *PrData)
 
 	bData = (*(PrData + 2) & 0x0f) | ((*(PrData + 3) & 0x0f) << 4);
 
-	vWriteHdmiSYSMsk(HDMI_SYS_CFG1C, (bData << 16), SYS_KEYMASK2);
+	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_00, (bData << 16), SYS_KEYMASK2);
 	bData = (*(PrData + 0) & 0x0f) | ((*(PrData + 1) & 0x0f) << 4);
 
-	vWriteHdmiSYSMsk(HDMI_SYS_CFG1C, (bData << 8), SYS_KEYMASK1);
+	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_00, (bData << 8), SYS_KEYMASK1);
 #endif
 }
 

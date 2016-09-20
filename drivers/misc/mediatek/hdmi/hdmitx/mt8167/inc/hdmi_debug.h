@@ -20,7 +20,7 @@
 
 extern unsigned char _bHdcpOff;
 
-extern HDMI_AV_INFO_T _stAvdAVInfo;
+extern struct HDMI_AV_INFO_T _stAvdAVInfo;
 extern struct HDMI_SINK_AV_CAP_T _HdmiSinkAvCap;
 extern unsigned char cDstStr[50];
 extern const unsigned char _cFsStr[][7];

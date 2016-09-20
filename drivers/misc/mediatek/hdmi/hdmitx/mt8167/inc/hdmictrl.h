@@ -47,7 +47,7 @@
 #include <linux/completion.h>
 
 #include "hdmitable.h"
-#include "internal_hdmi_drv.h"
+#include "hdmi_drv.h"
 /* #include "mt_boot_common.h" */
 /* #define HDMIDRV_BASE  (0xF4015000) */
 /* #define HDMISYS_BASE  (0xF4000000) */
@@ -72,10 +72,7 @@ enum HDMI_REF_MODULE_ENUM {
 	MMSYS_CONFIG,
 	GPIO_REG,
 	DPI1_REG,
-	EFUSE_REG,
-	DISP_CONFIG2,
 	GIC_REG,
-	PERISYS_REG,
 	HDMI_REF_REG_NUM,
 };
 
@@ -83,8 +80,9 @@ enum HDMI_REF_CLOCK_ENUM {
 /*	MMSYS_POWER,	 Must be first,  power of the mmsys */
 /*	PERI_DDC,*/
 /*	MMSYS_HDMI_HDCP, */
-	INFRA_SYS_CEC,
+	INFRA_SYS_CLK_DDC,	/* DDC Clock */
 	INFRA_SYS_CEC_26M,
+	INFRA_SYS_CEC_32K,
 	MMSYS_HDMI_PLL,
 	MMSYS_HDMI_PIXEL,
 	MMSYS_HDMI_AUDIO,
@@ -107,9 +105,6 @@ extern unsigned char hdmi_dpi_output;
 #define HDMICKGEN_BASE (hdmi_ref_reg[TOPCK_GEN])
 #define HDMIPAD_BASE   (hdmi_ref_reg[GPIO_REG])
 #define HDMI_INFRA_SYS (hdmi_ref_reg[INFRA_SYS])
-#define DISP_CONFIG2_BASE (hdmi_ref_reg[DISP_CONFIG2])
-
-
 
 /* ////////////////////////////////////// */
 #define PORD_MODE     (1<<0)
@@ -399,6 +394,25 @@ extern unsigned char hdmi_dpi_output;
 #define HDMIPLL_D2  (0x2<<8)
 #define HDMIPLL_D4  (0x3<<8)
 
+#define HDCP_STATUS_RESET		0x398
+#define HDCP_STATUS_RESET0	(0x1 << 0)
+#define VSYNC_RESET_SELECT  (0x1 << 1)
+#define RG_N_DIV2			(0x1 << 2)
+#define RG_SPD_IIS_SEL		(0x1 << 3)
+
+#define CLK_MUX_SEL8     0x40
+#define RG_FDPI1_MUX_SEL_MASK (0x7 << 15)
+#define RG_FDPI1_MUX_SEL_SHIFT 15
+#define DPI1_26M_CLK_SEL     (0x0 << 15)
+#define DPI1_297M_CLK_SEL	 (0x1 << 15)
+#define DPI1_148M_CLK_SEL	 (0x2 << 15)
+#define DPI1_78M_CLK_SEL     (0x3 << 15)
+#define DPI1_37M_CLK_SEL      (0x4 << 15)
+
+#define CLK_GATING_CTRL8   0x70
+#define RG_FDPI1_SW_CG	(0x1 << 5)
+#define RG_FDPI1_SW_CG_CLR (0x0 << 5)
+/* This infrasys register should be removed */
 #define INFRA_RST0	0x30
 #define CEC_SOFT_RST (0x1<<10)
 
@@ -419,33 +433,6 @@ extern unsigned char hdmi_dpi_output;
 #define hdmi_ck_update (0x1 << 11)
 #define dpi1_ck_update (0x1 << 6)
 
-
-#define CLK_CFG_6   0xA0
-#define CLK_DPI0_INV       (0x01 << 4)
-#define CLK_DPI0_SEL       (0x07 << 0)
-#define CLK_DPI0_SEL_26M       (0x0 << 0)
-#define CLK_DPI0_SEL_D2       (0x01 << 0)
-#define CLK_DPI0_SEL_D4       (0x02 << 0)
-#define CLK_DPI0_SEL_D8       (0x05 << 0)
-#define CLK_DPI0_SEL_D16       (0x06 << 0)
-
-
-#define CLK_CFG_7   0xB0
-#define CLK_DPI1_INV	   (0x01 << 4)
-#define CLK_DPI1_SEL	   (0x07 << 0)
-#define CLK_DPI1_SEL_26M	   (0x0 << 0)
-#define CLK_DPI1_SEL_D2		(0x01 << 0)
-#define CLK_DPI1_SEL_D4		(0x02 << 0)
-#define CLK_DPI1_SEL_D8		(0x03 << 0)
-#define CLK_DPI1_SEL_D16	   (0x04 << 0)
-
-#define CLK_CFG_8   0xC0
-#define fhdmi_cts_ck_26M (0x0 << 16)	/*26M */
-#define fhdmi_cts_ck (0x01 << 16)	/*fhdmi_cts_ck */
-#define fhdmi_cts_ck_d2 (0x10 << 16)	/*fhdmi_cts_ck_d2 */
-#define fhdmi_cts_ck_d3 (0x11 << 16)	/*fhdmi_cts_ck_d3 */
-#define CLK_HDMI_SEL (0x3 << 16)	/*clk_hdmi_sel */
-
 #define GPIO_MODE4 0x5630
 #define HDMISCK (0x1 << 12)
 #define HDMI2SCK (0x2 << 12)
@@ -456,45 +443,28 @@ extern unsigned char hdmi_dpi_output;
 #define SDAMASK (0x7 << 0)
 
    /***********************************************/
+#define MMSYS_CG_CON1   0x110
+#define DISP_PWM_MM_CG	         (0x1 << 0)
+#define DPI1_ENGINE_CLK_CG       (0x1 << 16)
+#define DPI1_ENGINE_CLK_CG_CLR   (0x0 << 16)
+#define DPI1_PIXEL_CLK_CG        (0x1 << 17)
+#define DPI1_PIXEL_CLK_CG_CLR    (0x0 << 17)
+#define HDMI_PIXEL_CLK_CG	 (0x1 << 18)
+#define HDMI_PIXEL_CLK_CG_CLR	 (0x0 << 18)
+#define HDMI_SPDIF_CLK_CG	 (0x1 << 19)
+#define HDMI_SPDIF_CLK_CG_CLR	 (0x0 << 19)
+#define HDMI_ADSP_BCK_CG	 (0x1 << 20)
+#define HDMI_ADSP_BCK_CG_CLR     (0x0 << 20)
+#define HDMI_PLL_CK_CG		 (0x1 << 21)
+#define HDMI_PLL_CK_CG_CLR	 (0x0 << 21)
 
-#define HDMI_SYS_CFG110   0x110
-#define DPI1_ENGINE_CLK  (0x1 << 8)
-#define DPI1_PIXEL_CLK   (0x1 << 9)
-#define HDMI_PIXEL_CLK  (0x1 << 10)
-#define HDMI_SPDIF_CLK	(0x1 << 11)
-#define HDMI_ADSP_CLK	(0x1 << 12)
-#define HDMI_PLL_CLK    (0x1 << 13)
-#define HDMI_AUDIO_BCLK (0x1 << 14)
-#define HDMI_HDCP_CLK   (0x1 << 19)
-#define HDMI_HDCP24_CLK (0x1 << 20)
-
-#define DPI1_ENGINE_CLK_EN  (0x0 << 8)
-#define DPI1_PIXEL_CLK_EN	 (0x0 << 9)
-#define HDMI_PIXEL_CLK_EN	(0x0 << 10)
-#define HDMI_SPDIF_CLK_EN	(0x0 << 11)
-#define HDMI_ADSP_CLK_EN	(0x0 << 12)
-#define HDMI_PLL_CLK_EN	    (0x0 << 13)
-#define HDMI_AUDIO_BCLK_EN  (0x0 << 14)
-#define HDMI_HDCP_CLK_EN	(0x0 << 19)
-#define HDMI_HDCP24_CLK_EN  (0x0 << 20)
-
-#define DPI1_ENGINE_CLK_DISABLE  (0x1 << 8)
-#define DPI1_PIXEL_CLK_DISABLE	 (0x1 << 9)
-#define HDMI_PIXEL_CLK_DISABLE	(0x1 << 10)
-#define HDMI_SPDIF_CLK_DISABLE	(0x1 << 11)
-#define HDMI_ADSP_CLK_DISABLE	(0x1 << 12)
-#define HDMI_PLL_CLK_DISABLE	    (0x1 << 13)
-#define HDMI_AUDIO_BCLK_DISABLE  (0x1 << 14)
-#define HDMI_HDCP_CLK_DISABLE	(0x1 << 19)
-#define HDMI_HDCP24_CLK_DISABLE  (0x1 << 20)
-
-
-#define HDMI_SYS_CFG1C   0x900
+#define DISP_HDMI_SYS_CFG_00   0x900
 #define HDMI_SPIDIF_ON		(0x01 << 0)
 #define HDMI_RST           (0x01 << 1)
 #define ANLG_ON           (0x01 << 2)
 #define CFG10_DVI          (0x01 << 3)
-#define HDMI_TST           (0x01 << 3)
+#define TEST_HDMI_TX_REG   (0x01 << 4)
+#define HDMI_TEST_SEL		 (0x7 << 5)
 #define SYS_KEYMASK1       (0xff << 8)
 #define SYS_KEYMASK2       (0xff << 16)
 #define AUD_OUTSYNC_EN     (((unsigned int)1) << 24)
@@ -506,15 +476,16 @@ extern unsigned char hdmi_dpi_output;
 #define HTPLG_PIN_SEL_OFF  (((unsigned int)1) << 30)
 #define AES_EFUSE_ENABLE   (((unsigned int)1) << 31)
 
-#define HDMI_SYS_CFG20   0x904
-#define DEEP_COLOR_MODE_MASK (3 << 1)
+#define DISP_HDMI_SYS_CFG_01   0x904
+#define DEEP_COLOR_MODE_MASK (0x3 << 1)
 #define COLOR_8BIT_MODE		(0 << 1)
 #define COLOR_10BIT_MODE	(1 << 1)
 #define COLOR_12BIT_MODE	 (2 << 1)
 #define COLOR_16BIT_MODE	 (3 << 1)
 #define DEEP_COLOR_EN		 (1 << 0)
 #define HDMI_AUDIO_TEST_SEL	(0x01 << 8)
-#define HDMI_SECURE_MODE        (0x0 << 15)
+#define HDMI_PSECURE_EN           (0x0 << 15)
+#define HDMI_PSECURE_EN_MASK	    (0x1 << 15)
 #define HDMI_OUT_FIFO_EN		  (0x01 << 16)
 #define HDMI_OUT_FIFO_CLK_INV	  (0x01 << 17)
 #define MHL_MODE_ON		(0x01 << 28)
@@ -611,14 +582,13 @@ extern unsigned char hdmi_dpi_output;
 #define TX_DRV_ENABLE (0xFF << 16)
 #define TX_DRV_ENABLE_MSK (0xFF << 16)
 
-
-#define HDMI_CON0	0x100
+#define HDMI_CON0	0x300
 #define RG_HDMITX_DRV_IBIAS				(0)
 #define RG_HDMITX_DRV_IBIAS_MASK		(0x3F << 0)
 #define RG_HDMITX_SER_PASS_SEL			(6)
 #define RG_HDMITX_SER_PASS_SEL_MASK		(0x03 << 6)
 #define RG_HDMITX_EN_SER_ABEDG			(0x01 << 8)
-#define RG_HDMITX_EN_SER_ABIST			(0x01 << 9)
+#define RG_HDMITX_EN_SER_ABIST			(0x01 << 9)	/* NC */
 #define RG_HDMITX_EN_SER_PEM			(0x01 << 10)
 #define RG_HDMITX_EN_DIN_BIST			(0x01 << 11)
 #define RG_HDMITX_EN_SER				(12)
@@ -632,27 +602,28 @@ extern unsigned char hdmi_dpi_output;
 #define RG_HDMITX_EN_DRV				(28)
 #define RG_HDMITX_EN_DRV_MASK			(0x0F << 28)
 
-#define HDMI_CON1	0x104
-#define RG_HDMITX_SER_DIN				(4)
+#define HDMI_CON1	0x304
+#define RG_HDMITX_SER_DIN				(4)	/* SHIFT  VALUE */
 #define RG_HDMITX_SER_DIN_MASK			(0x3FF << 4)
 #define RG_HDMITX_SLDO_LVROD			(14)
 #define RG_HDMITX_SLDO_LVROD_MASK		(0x03 << 14)
 #define RG_HDMITX_CKLDO_LVROD			(16)
 #define RG_HDMITX_CKLDO_LVROD_MASK		(0x03 << 16)
-#define RG_HDMITX_PRED_IBIAS			(18)
+#define RG_HDMITX_PRED_IBIAS			(18)	/* set Predivirver bias current */
 #define RG_HDMITX_PRED_IBIAS_MASK		(0x0F << 18)
-#define RG_HDMITX_PRED_IMP				(0x01 << 22)
+#define RG_HDMITX_PRED_IMP				(0x01 << 22)	/* mask */
+#define RG_HDMITX_PRED_IMP_SHIFT		(22)
 #define RG_HDMITX_SER_DIN_SEL			(0x01 << 23)
 #define RG_HDMITX_SER_CLKDIG_INV		(0x01 << 24)
 #define RG_HDMITX_SER_BIST_TOG			(0x01 << 25)
-#define RG_HDMITX_DRV_IMP				(26)
+#define RG_HDMITX_DRV_IMP				(26)	/* shift value */
 #define RG_HDMITX_DRV_IMP_MASK			(0x3F << 26)
 
-#define HDMI_CON2	0x108
-#define RG_HDMITX_EN_TX_CKLDO			(0x01 << 0)
+#define HDMI_CON2	0x308
+#define RG_HDMITX_EN_TX_CKLDO			(0x01 << 0)	/* MASK */
 #define RG_HDMITX_EN_TX_POSDIV			(0x01 << 1)
 #define RG_HDMITX_REFEXT_SEL			(0x01 << 2)
-#define RG_HDMITX_TX_POSDIV				(3)
+#define RG_HDMITX_TX_POSDIV				(3)	/* shift value */
 #define RG_HDMITX_TX_POSDIV_MASK		(0x03 << 3)
 #define RG_HDMITX_TX_POSDIV_SEL			(0x01 << 5)
 #define RG_HDMITX_EN_MBIAS				(0x01 << 6)
@@ -668,7 +639,7 @@ extern unsigned char hdmi_dpi_output;
 #define RG_HDMITX_SER_TEST_SEL			(24)
 #define RG_HDMITX_SER_TEST_SEL_MASK		(0xFF << 24)
 
-#define HDMI_CON3	0x10c
+#define HDMI_CON3	0x30c
 #define RG_HDMITX_TEST_SEL				(16)
 #define RG_HDMITX_TEST_SEL_MASK			(0x3F << 16)
 #define RG_HDMITX_SER_EIN_SEL_CKCH		(0x01 << 22)
@@ -680,11 +651,17 @@ extern unsigned char hdmi_dpi_output;
 #define RG_HDMITX_TEST_DIV_SEL			(30)
 #define RG_HDMITX_TEST_DIV_SEL_MASK		(0x02 << 30)
 
-#define HDMI_CON4	0x110
-#define RG_HDMITX_RESERVE				(0)
+#define HDMI_CON4	0x310
+#define RG_HDMITX_RESERVE			(0)
+#define RG_HDMITX_D0_IMP_SHIFT		(0)
+#define RG_HDMITX_D0_IMP_MASK		(0x3f << 0)
+#define RG_HDMITX_D1_IMP_SHIFT		(8)
+#define RG_HDMITX_D1_IMP_MASK		(0x3f << 8)
+#define RG_HDMITX_D2_IMP_SHIFT		(16)
+#define RG_HDMITX_D2_IMP_MASK		(0x3f << 16)
 #define RG_HDMITX_RESERVE_MASK			(0xFFFFFFFF << 0)
 
-#define HDMI_CON5	0x114
+#define HDMI_CON5	0x314
 #define RGS_HDMITX_CAL_STATUS			(4)
 #define RGS_HDMITX_CAL_STATUS_MASK		(0xFF << 4)
 #define RGS_HDMITX_ABIST_21LEV			(12)
@@ -697,7 +674,7 @@ extern unsigned char hdmi_dpi_output;
 #define RGS_HDMITX_ABIST_51EDG_MASK		(0x0F << 24)
 #define RGS_HDMITX_PLUG_TST				(0x01 << 31)
 
-#define HDMI_CON6	0x118
+#define HDMI_CON6	0x318
 #define RG_HTPLL_BR						(0)
 #define RG_HTPLL_BR_MASK				(0x03 << 0)
 #define RG_HTPLL_BC						(2)
@@ -720,7 +697,7 @@ extern unsigned char hdmi_dpi_output;
 #define RG_HTPLL_FBKDIV_MASK			(0x7F << 24)
 #define RG_HTPLL_EN						(0x01 << 31)
 
-#define HDMI_CON7	0x11c
+#define HDMI_CON7	0x31c
 #define RG_HTPLL_RESERVE				(0)
 #define RG_HTPLL_RESERVE_MASK			(0xFF << 0)
 #define RG_HTPLL_BIAS_EN				(0x01 << 8)
@@ -742,236 +719,95 @@ extern unsigned char hdmi_dpi_output;
 #define RG_HTPLL_DIVEN_MASK				(0x07 << 28)
 #define RG_HTPLL_AUTOK_LOAD				(0x01 << 31)
 
-#define HDMI_CON8	0x120
+#define HDMI_CON8	0x320
 #define RGS_HTPLL_AUTOK_PASS			(0x01 << 15)
 #define RGS_HTPLL_AUTOK_BAND			(0x01 << 23)
 #define RGS_HTPLL_AUTOK_FAIL			(25)
 #define RGS_HTPLL_AUTOK_FAIL_MASK		(0x7F << 25)
 
 
- /* HDMI TVD Relate register */
-#define PLL_TEST_CON0 0x40
-#define TVDPLL_POSDIV_2 (0x7 << 16)
+#define IO_PAD_PD 0x670
+#define IO_PAD_HOT_PLUG_PD (0x1<<10)
+#define IO_PAD_EN 0x570
+#define IO_PAD_HOT_PLUG_EN (0x1<<10)
 
-#define MHL_TVDPLL_CON0	0x270
-#define RG_TVDPLL_EN			(1)
-#define RG_TVDPLL_POSDIV				(4)
-#define RG_TVDPLL_POSDIV_MASK			(0x07 << 4)
-#define MHL_TVDPLL_CON1	0x274
-#define RG_TVDPLL_SDM_PCW				(0)	/*shift of TVDPLL */
-#define RG_TVDPLL_SDM_PCW_MASK			(0xFFFFFFFF)	/* */
+#define TVDPLL_CON0 0x1c0
+#define  TVDPLL_EN (0x1 < 0)
+
+#define TVDPLL_CON1	0x1c4
+#define RG_TVDPLL_SDM_PCW				(0)
+#define RG_TVDPLL_SDM_PCW_MASK			(0x1FFFFF)	/* */
 #define TVDPLL_SDM_PCW_CHG        (1 << 31)
 #define TVDPLL_SDM_PCW_F        (1<<23)
+#define TVDPLL_POSDIV			24	/* default value 010, div = /4 */
+#define TVDPLL_PISDIV_MASK      (0x7 << 24)
 
-#define MHL_TVDPLL_PWR	0x27C
-#define RG_TVDPLL_PWR_ON		(1 << 0)
-#define RG_TVDPLL_SDM_ISO_EN    (1 << 1)
-#if 0
-#define MHL_TVDPLL_CON0	0x294
-#define RG_TVDPLL_POSDIV				(6)
-#define RG_TVDPLL_POSDIV_MASK			(0x07 << 6)
-#define MHL_TVDPLL_CON1	0x298
-#define RG_TVDPLL_SDM_PCW				(0)
-#define RG_TVDPLL_SDM_PCW_MASK			(0x7FFFFFFF)
-#endif
-
-/*******************DGI************************/
-#define dgi0_anaif_ctrl2 0x448
-#define dgi1_del_d2_d4_sel             (1<<17)
-#define dgi1_del_d1_sel                (1<<16)
-#define dgi0_anaif_ctrl1 0x450
-#define dgi1_pad_clk_inv_en            (1<<31)
-#define dgi1_clk_delay_sel1            (0x3f<<24)
-#define dgi1_clk_delay_sel0            (0x3f<<16)
-#define dgi1_clk_delay_sel0            (0x3f<<16)
-#define dgi1_clk_pad_sel_tv_mode       (1<<10)
-#define data_in_tv_mode                (1<<9)
-#define data_bit_inv                   (1<<8)
-#define anaif_dig1_clk_sel             (1<<6)
-#define clk_sel_tv_mode                (1<<4)
-#define clk_mode_sel                   (1<<3)
-#define nweb_clk_en                    (1<<2)
-#define dgi1_pad_clk_en                (1<<1)
-#define tv_mode_clk_en                 (1<<0)
-#define ttl_anaif_ctrl  0x454
-
-#define dec_ctl  0x600
-#define reset_counter                  (1<<27)
-#define field_dec_polar                (1<<10)
-#define hsync_dec_polar                (1<<9)
-#define vsync_dec_polar                (1<<8)
-#define data_dec_delay_fall            (0x3<<6)
-#define data_dec_delay_risc            (0x3<<4)
-#define dgi1_on                        (1<<0)
-
-#define fifo_ctrl 0x604
-#define timing_fifo_in_dly_risc        (1<<31)
-#define timing_fifo_in_dly_fall        (1<<30)
-#define data_fifo_in_dly_rise          (1<<29)
-#define data_fifo_in_dly_fall          (1<<28)
-#define sw_rst                         (1<<19)
-#define vsync_polar_in                 (1<<18)
-#define fifo_reset_on                  (1<<17)
-#define fifo_reset_sel                 (1<<16)
-#define rd_start_sel                   (1<<7)
-#define rd_start                       (0x7f<<0)
-
-#define data_out_ctrl 0x608
-#define tv_mode                        (1<<31)
-#define tim_out_bypass                 (1<<30)
-#define bit_inv_y                      (1<<28)
-#define bit_inv_c                      (1<<27)
-#define yc_swap                        (1<<26)
-#define rise_use_fall                  (1<<21)
-#define fall_use_fall                  (1<<20)
-#define rg_timing_sel                  (1<<19)
-#define vsync_out_polar                (1<<17)
-#define hsync_out_polar                (1<<16)
-#define field_out_polar                (1<<15)
-#define de_out_polar                   (1<<14)
-#define y_out_delay                    (0x3<<4)
-#define c1_out_delay                   (0x3<<2)
-#define c2_out_delay                   (0x3<<0)
-
-#define ctrl_422_444 0x60c
-#define rg_cbcr_preload                (0xf<<8)
-#define single_8bit                    (1<<6)
-#define yc_sel_preload                 (1<<5)
-#define hsync_ycrst_polar              (1<<4)
-#define rpt_422_444                    (1<<1)
-#define bypass_422_444                 (1<<0)
-
-#define tg_ctrl00 0x61c
-#define tve_fld                        (1<<31)
-#define prgs_autofld                   (1<<30)
-#define prgs_invfld	                 (1<<29)
-#define fmtmas	                     (1<<28)
-#define hw_option	                     (0xf<<24)
-#define syn_del	                     (0x3<<22)
-#define c_fmtrst_m2	                 (1<<21)
-#define prgs_out	                     (1<<20)
-#define tvf_nd	                     (1<<19)
-#define v_total_m2	                 (0xfff<<0)
-
-#define tg_ctrl01 0x620
-#define rg_vsync_forward	             (1<<31)
-#define rg_vsync_delay	             (0x1fff<<16)
-#define rg_hsync_delay	             (0x1fff<<0)
-
-#define tg_ctrl02 0x624
-#define vsync_total                    (0xfff<<16)
-#define hsync_total                    (0x1fff<<0)
-
-#define tg_ctrl03 0x628
-#define vysnc_width                    (0x1ff<<16)
-#define hsync_width                    (0xfff<<0)
-
-#define tg_ctrl04 0x62c
-#define h_act2_en                      (1<<10)
-#define v_act2_en                      (1<<9)
-#define hd_on                          (1<<8)
-#define vsync_polar                    (1<<6)
-#define hsync_polar                    (1<<5)
-#define de_polar                       (1<<4)
-
-#define tg_ctrl05 0x630
-#define x_active_start                 (0x1fff<<16)
-#define x_active_end                   (0x1fff<<0)
-
-#define tg_ctrl06 0x634
-#define y_active_ostart                (0xfff<<16)
-#define y_active_oend                  (0xfff<<0)
-
-#define tg_ctrl07 0x638
-#define y_active_estart                (0xfff<<16)
-#define y_active_eend                  (0xfff<<0)
-
-#define tg_ctrl08 0x63c
-#define x_active_start_1               (0x1fff<<16)
-#define x_active_end_1                 (0x1fff<<0)
-
-#define tg_ctrl09 0x640
-#define y_active_ostart_1              (0xfff<<16)
-#define y_active_oend_1                (0xfff<<0)
-
-#define tg_ctrl10 0x644
-#define y_active_estart_1              (0xfff<<16)
-#define y_active_eend_1                (0xfff<<0)
-
-#define dgi1_clk_rst_ctrl 0x65c
-#define dgi1_test_mode	             (1<<31)
-#define clk_out_to_in_inv	             (1<<5)
-#define clk_out_to_in	                 (1<<4)
-#define clk_pat_gen_en	             (1<<3)
-#define dgi1_clk_out_enable	         (1<<2)
-#define dgi1_clk_in_inv_enable	     (1<<1)
-#define dgi1_clk_in_enable	         (1<<0)
-
-#define  pat_gen_ctrl0  0x700
-#define rg_ptgen_v_total               (0xfff<<16)
-#define rg_ptgen_h_total               (0x1fff<<0)
-
-#define  pat_gen_ctrl1  0x704
-#define rg_ptgen_v_width               (0xfff<<16)
-#define rg_ptgen_h_width               (0x1fff<<0)
-
-#define  pat_gen_ctrl2  0x708
-#define rg_ptgen_v_start               (0xfff<<16)
-#define rg_ptgen_h_start               (0x1fff<<0)
-
-#define  pat_gen_ctrl3  0x70c
-#define rg_ptgen_v_active              (0xfff<<16)
-#define rg_ptgen_h_active              (0x1fff<<0)
-
-#define  pat_gen_ctrl4  0x710
-#define rg_ptgen_color_bar_th	         (0xfff<<16)
-#define disable_edge	                 (1<<15)
-#define rg_ptgen_width                 (0x3<<12)
-#define rg_ptgen_type	                 (0x3<<8)
-#define black_color                  (0x0<<8)
-#define pure_color                   (0x1<<8)
-#define pat_gen_rst	                 (1<<2)
-#define pat_in	                     (1<<1)
-#define rg_tst_pat_en	                 (1<<0)
-
-#define  pat_gen_ctrl5  0x714
-#define rg_ptgen_bd_in_fall	         (0xff<<8)
-#define rg_ptgen_bd_in_rise	         (0xff<<0)
-
-#define  pat_gen_ctrl6  0x718
-#define rg_ptgen_in_fall	             (0xff<<8)
-#define rg_ptgen_in_rise	             (0xff<<0)
-
-#define dgi1_crc_mon_ctrl 0x71c
-#define dgi1_mon_en	                 (1<<20)
-#define dgi1_mon_sel	                 (0x7<<16)
-#define c_crc_clr	                     (1<<1)
-#define c_crc_start	                 (1<<0)
-
-#define dgi1_crc_out 0x720
-#define crc_rdy                        (1<<28)
-#define crc_out                        (0xffff<<0)
-
-#define dgi1_mon 0x724
-#define dgi1_mon_value                       (0xffffffff<<0)
-
-#define dgi1_yuv2rgb_ctr  0x728
-#define fifo_write_en (1<<31)
-#define vsync_pu_sel  (1<<30)
-#define inbuf_del_sel  (1<<29)
-#define rg_full_range_out  (1<<4)
-#define rg_uv_swap    (1<<3)
-#define rg_full_renge_input  (1<<2)
-#define rg_yuv709_rgb  (1<<1)
-#define rg_yuv2rgb_en  (1<<0)
-
-#define IO_PAD_PD 0x280
-#define IO_PAD_HOT_PLUG_PD (1<<11)
-#define IO_PAD_EN 0x180
-#define IO_PAD_HOT_PLUG_EN (1<<11)
+#define TVDPLL_PWR_CON0	 0x1d0
+#define TVDPLL_PWR_ON		(1 << 0)
+#define TVDPLL_SDM_ISO_EN	(1 << 1)
 
 
-extern HDMI_AV_INFO_T _stAvdAVInfo;
+enum AUD_CH_NUM_T {
+	AUD_INPUT_1_0 = 0,
+	AUD_INPUT_1_1,
+	AUD_INPUT_2_0,
+	AUD_INPUT_2_1,
+	AUD_INPUT_3_0,		/* C,L,R */
+	AUD_INPUT_3_1,		/* C,L,R */
+	AUD_INPUT_4_0,		/* L,R,RR,RL */
+	AUD_INPUT_4_1,		/* L,R,RR,RL */
+	AUD_INPUT_5_0,
+	AUD_INPUT_5_1,
+	AUD_INPUT_6_0,
+	AUD_INPUT_6_1,
+	AUD_INPUT_7_0,
+	AUD_INPUT_7_1,
+	AUD_INPUT_3_0_LRS,	/* LRS */
+	AUD_INPUT_3_1_LRS,	/* LRS */
+	AUD_INPUT_4_0_CLRS,	/* C,L,R,S */
+	AUD_INPUT_4_1_CLRS,	/* C,L,R,S */
+	/* new layout added for DTS */
+	AUD_INPUT_6_1_Cs,
+	AUD_INPUT_6_1_Ch,
+	AUD_INPUT_6_1_Oh,
+	AUD_INPUT_6_1_Chr,
+	AUD_INPUT_7_1_Lh_Rh,
+	AUD_INPUT_7_1_Lsr_Rsr,
+	AUD_INPUT_7_1_Lc_Rc,
+	AUD_INPUT_7_1_Lw_Rw,
+	AUD_INPUT_7_1_Lsd_Rsd,
+	AUD_INPUT_7_1_Lss_Rss,
+	AUD_INPUT_7_1_Lhs_Rhs,
+	AUD_INPUT_7_1_Cs_Ch,
+	AUD_INPUT_7_1_Cs_Oh,
+	AUD_INPUT_7_1_Cs_Chr,
+	AUD_INPUT_7_1_Ch_Oh,
+	AUD_INPUT_7_1_Ch_Chr,
+	AUD_INPUT_7_1_Oh_Chr,
+	AUD_INPUT_7_1_Lss_Rss_Lsr_Rsr,
+	AUD_INPUT_6_0_Cs,
+	AUD_INPUT_6_0_Ch,
+	AUD_INPUT_6_0_Oh,
+	AUD_INPUT_6_0_Chr,
+	AUD_INPUT_7_0_Lh_Rh,
+	AUD_INPUT_7_0_Lsr_Rsr,
+	AUD_INPUT_7_0_Lc_Rc,
+	AUD_INPUT_7_0_Lw_Rw,
+	AUD_INPUT_7_0_Lsd_Rsd,
+	AUD_INPUT_7_0_Lss_Rss,
+	AUD_INPUT_7_0_Lhs_Rhs,
+	AUD_INPUT_7_0_Cs_Ch,
+	AUD_INPUT_7_0_Cs_Oh,
+	AUD_INPUT_7_0_Cs_Chr,
+	AUD_INPUT_7_0_Ch_Oh,
+	AUD_INPUT_7_0_Ch_Chr,
+	AUD_INPUT_7_0_Oh_Chr,
+	AUD_INPUT_7_0_Lss_Rss_Lsr_Rsr,
+	AUD_INPUT_8_0_Lh_Rh_Cs,
+	AUD_INPUT_UNKNOWN = 0xFF
+};
+
+extern struct HDMI_AV_INFO_T _stAvdAVInfo;
 extern unsigned char _bflagvideomute;
 extern unsigned char _bflagaudiomute;
 extern unsigned char _bsvpvideomute;
@@ -999,8 +835,6 @@ extern void hdmi_hdmitopck_write(unsigned short u2Reg, unsigned int u4Data);
 extern void hdmi_infrasys_write(unsigned short u2Reg, unsigned int u4Data);
 extern unsigned int hdmi_infrasys_read(unsigned short u2Reg);
 extern void hdmi_perisys_write(unsigned short u2Reg, unsigned int u4Data);
-extern unsigned int hdmi_perisys_read(unsigned short u2Reg);
-
 
 #define vWriteByteHdmiGRL(dAddr, dVal)  (hdmi_drv_write(dAddr, dVal))
 #define bReadByteHdmiGRL(bAddr)         (hdmi_drv_read(bAddr))

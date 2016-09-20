@@ -15,6 +15,7 @@
 
 #include "hdmi_ctrl.h"
 #include "hdmicmd.h"
+#include "hdmictrl.h"
 
 static unsigned int pdMpegInfoReg[] = {
 	0x19c, 0x00000001,	/* version */

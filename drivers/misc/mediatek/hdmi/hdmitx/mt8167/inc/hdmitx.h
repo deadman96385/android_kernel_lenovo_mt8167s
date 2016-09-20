@@ -55,13 +55,6 @@ typedef enum {
 	HDMI_VIDEO_RESOLUTION_NUM
 } HDMI_VIDEO_RESOLUTION;
 
-typedef enum {
-	HDMI_DEEP_COLOR_AUTO = 0,
-	HDMI_NO_DEEP_COLOR,
-	HDMI_DEEP_COLOR_10_BIT,
-	HDMI_DEEP_COLOR_12_BIT,
-	HDMI_DEEP_COLOR_16_BIT
-} HDMI_DEEP_COLOR_T;
 
 typedef enum {
 	SV_I2S = 0,
@@ -106,7 +99,7 @@ typedef enum {
 
 } IEC_FRAME_RATE_T;
 
-typedef enum {
+enum HDMI_AUDIO_SAMPLING_T {
 	HDMI_FS_32K = 0,
 	HDMI_FS_44K,
 	HDMI_FS_48K,
@@ -114,7 +107,7 @@ typedef enum {
 	HDMI_FS_96K,
 	HDMI_FS_176K,
 	HDMI_FS_192K
-} HDMI_AUDIO_SAMPLING_T;
+};
 
 typedef enum {
 	PCM_16BIT = 0,
@@ -209,78 +202,6 @@ typedef enum {
 	MCLK_768FS,
 	MCLK_1152FS,
 } SAMPLE_FREQUENCY_T;
-
-
-/* /////////////////////////////////////////////////////////// */
-typedef struct _AUDIO_DEC_OUTPUT_CHANNEL_T {
-	unsigned short FL:1;	/* bit0 */
-	unsigned short FR:1;	/* bit1 */
-	unsigned short LFE:1;	/* bit2 */
-	unsigned short FC:1;	/* bit3 */
-	unsigned short RL:1;	/* bit4 */
-	unsigned short RR:1;	/* bit5 */
-	unsigned short RC:1;	/* bit6 */
-	unsigned short FLC:1;	/* bit7 */
-	unsigned short FRC:1;	/* bit8 */
-	unsigned short RRC:1;	/* bit9 */
-	unsigned short RLC:1;	/* bit10 */
-
-} HDMI_AUDIO_DEC_OUTPUT_CHANNEL_T;
-
-typedef union _AUDIO_DEC_OUTPUT_CHANNEL_UNION_T {
-	HDMI_AUDIO_DEC_OUTPUT_CHANNEL_T bit;	/* HDMI_AUDIO_DEC_OUTPUT_CHANNEL_T */
-	unsigned short word;
-
-} AUDIO_DEC_OUTPUT_CHANNEL_UNION_T;
-
-/* //////////////////////////////////////////////////////// */
-typedef struct _HDMI_AV_INFO_T {
-	HDMI_VIDEO_RESOLUTION e_resolution;
-	unsigned char fgHdmiOutEnable;
-	unsigned char u2VerFreq;
-	unsigned char b_hotplug_state;
-	HDMI_OUT_COLOR_SPACE_T e_video_color_space;
-	HDMI_DEEP_COLOR_T e_deep_color_bit;
-	unsigned char ui1_aud_out_ch_number;
-	HDMI_AUDIO_SAMPLING_T e_hdmi_fs;
-	unsigned char bhdmiRChstatus[6];
-	unsigned char bhdmiLChstatus[6];
-	unsigned char bMuteHdmiAudio;
-	unsigned char u1HdmiI2sMclk;
-	unsigned char u1hdcponoff;
-	unsigned char u1audiosoft;
-	unsigned char fgHdmiTmdsEnable;
-	AUDIO_DEC_OUTPUT_CHANNEL_UNION_T ui2_aud_out_ch;
-
-	unsigned char e_hdmi_aud_in;
-	unsigned char e_iec_frame;
-	unsigned char e_aud_code;
-	unsigned char u1Aud_Input_Chan_Cnt;
-	unsigned char e_I2sFmt;
-} HDMI_AV_INFO_T;
-
-
-typedef enum {
-	AVD_BITS_NONE = 0,
-	AVD_LPCM = 1,
-	AVD_AC3,
-	AVD_MPEG1_AUD,
-	AVD_MP3,
-	AVD_MPEG2_AUD,
-	AVD_AAC,
-	AVD_DTS,
-	AVD_ATRAC,
-	AVD_DSD,
-	AVD_DOLBY_PLUS,
-	AVD_DTS_HD,
-	AVD_MAT_MLP,
-	AVD_DST,
-	AVD_WMA,
-	AVD_CDDA,
-	AVD_SACD_PCM,
-	AVD_HDCD = 0xfe,
-	AVD_BITS_OTHERS = 0xff
-} AUDIO_BITSTREAM_TYPE_T;
 
 typedef enum {
 	EXTERNAL_EDID = 0,
@@ -543,7 +464,7 @@ typedef struct {
 	unsigned char u1sendsltdata[15];
 } send_slt_data;
 
-typedef struct _HDMI_EDID_T {
+struct HDMI_EDID_T {
 	unsigned int ui4_ntsc_resolution;	/* use EDID_VIDEO_RES_T, there are many resolution */
 	unsigned int ui4_pal_resolution;	/* use EDID_VIDEO_RES_T */
 	/* use EDID_VIDEO_RES_T, only one NTSC resolution, Zero means none native NTSC resolution is available */
@@ -592,7 +513,7 @@ typedef struct _HDMI_EDID_T {
 	unsigned char b_sink_LTE_340M_sramble;
 	unsigned int ui4_sink_hdmi_4k2kvic;
 	unsigned char ui1rawdata_edid[512];
-} HDMI_EDID_T;
+};
 
 typedef struct {
 	unsigned int ui4_sink_FP_SUP_3D_resolution;
@@ -735,7 +656,7 @@ typedef struct {
 #define MTK_HDMI_ENABLE_HDCP                    HDMI_IOWR(58, unsigned int)
 #define MTK_HDMI_STATUS                         HDMI_IOWR(59, unsigned int)
 #define MTK_HDMI_HDCP_KEY                       HDMI_IOWR(60, hdmi_hdcp_key)
-#define MTK_HDMI_GET_EDID                       HDMI_IOWR(61, HDMI_EDID_T)
+#define MTK_HDMI_GET_EDID                       HDMI_IOWR(61, struct HDMI_EDID_T)
 #define MTK_HDMI_SETLA                          HDMI_IOWR(62, CEC_DRV_ADDR_CFG)
 #define MTK_HDMI_GET_CECCMD                     HDMI_IOWR(63, CEC_FRAME_DESCRIPTION_IO)
 #define MTK_HDMI_SET_CECCMD                     HDMI_IOWR(64, CEC_SEND_MSG)
