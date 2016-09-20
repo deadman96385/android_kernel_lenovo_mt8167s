@@ -2029,6 +2029,8 @@ const char *_session_ioctl_spy(unsigned int cmd)
 		return "DISP_IOCTL_WRITE_SW_REG";
 	case DISP_IOCTL_READ_SW_REG:
 		return "DISP_IOCTL_READ_SW_REG";
+	case DISP_IOCTL_SET_COLOR_REG:
+		return "DISP_IOCTL_SET_COLOR_REG";
 
 	default:
 		return "unknown";
@@ -2106,6 +2108,7 @@ long mtk_disp_mgr_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case DISP_IOCTL_PQ_GET_MDP_TDSHP_REG:
 	case DISP_IOCTL_WRITE_SW_REG:
 	case DISP_IOCTL_READ_SW_REG:
+	case DISP_IOCTL_SET_COLOR_REG:
 		ret = primary_display_user_cmd(cmd, arg);
 		break;
 	default:
