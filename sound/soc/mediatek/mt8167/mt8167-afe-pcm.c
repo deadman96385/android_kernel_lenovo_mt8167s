@@ -2358,7 +2358,7 @@ static const struct snd_soc_dapm_route mt8167_afe_pcm_routes[] = {
 	{"O11", "I02 Switch", "I02"},
 	{"DAI", NULL, "O11"},
 
-	{"TDM_IN", NULL, "TDM Capture"},
+	{"TDM_IN", NULL, "TDM IN Capture"},
 };
 
 static const struct snd_soc_component_driver mt8167_afe_pcm_dai_component = {
