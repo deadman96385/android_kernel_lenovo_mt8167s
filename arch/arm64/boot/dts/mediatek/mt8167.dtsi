@@ -854,14 +854,11 @@
 			#size-cells = <0>;
 			reg = <0 0x1100c000 0 0x1000>;
 			interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&topckgen CLK_TOP_SYSPLL3_D2>,
+			clocks = <&topckgen CLK_TOP_UNIVPLL_D12>,
 				 <&topckgen CLK_TOP_SPI_SEL>,
-				 <&infracfg CLK_INFRA_SPI>;
+				 <&topckgen CLK_TOP_SPI>;
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
-			/*pinctrl-names = "default";
-			pinctrl-0 = <&spi_pins_a>;
 			status = "disabled";
-			*/
 		};
 
 		ptp_od: ptp_od@1100b000 {
