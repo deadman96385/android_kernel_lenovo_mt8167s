@@ -404,9 +404,9 @@ void mt_spower_ut(void)
 
 int mt_spower_init(void)
 {
-#define DEVINFO_IDX0 (21)
+#define DEVINFO_IDX0 (68)
 #define DEVINFO_IDX1 (5)
-#define DEVINFO_MP0_BIT (16)
+#define DEVINFO_MP0_BIT (8)
 #define DEVINFO_GPU_BIT (24)
 
 	int devinfo;
