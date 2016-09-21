@@ -64,41 +64,9 @@ atomic_t PMaster_enable = ATOMIC_INIT(0);
 static int dsi_reg_op_debug;
 #include <mt-plat/sync_write.h>
 
-#ifndef CONFIG_MTK_CLKMGR
-#include <linux/of.h>
-#include <linux/of_address.h>
-#include <linux/types.h>
-
-static void __iomem *ddp_apmixed_base;
-#ifndef AP_PLL_CON0
-#define AP_PLL_CON0 (ddp_apmixed_base + 0x00)
-#endif
-
-#define DRV_Reg32(addr)                          (*(volatile unsigned int * const)(addr))
-#define clk_readl(addr) DRV_Reg32(addr)
-#define clk_writel(addr, val) mt_reg_sync_writel(val, addr)
-#define clk_setl(addr, val) mt_reg_sync_writel(clk_readl(addr) | (val), addr)
-#define clk_clrl(addr, val) mt_reg_sync_writel(clk_readl(addr) & ~(val), addr)
-
-enum DSI_TE_MODE {
-	NO_TE  = 0,
-	BTA_TE = 1,
-	EXT_TE = 4,
-};
-
-void ddp_set_mipi26m(int en)
-{
-	if (en)
-		clk_setl(AP_PLL_CON0, 1 << 6);
-	else
-		clk_clrl(AP_PLL_CON0, 1 << 6);
-}
-#endif /* CONFIG_MTK_CLKMGR */
-
 #define DSI_OUTREG32(cmdq, addr, val) DISP_REG_SET(cmdq, addr, val)
 #define DSI_BACKUPREG32(cmdq, hSlot, idx, addr) DISP_REG_BACKUP(cmdq, hSlot, idx, addr)
 #define DSI_POLLREG32(cmdq, addr, mask, value) DISP_REG_CMDQ_POLLING(cmdq, addr, value, mask)
-
 
 #define DSI_MASKREG32(cmdq, REG, MASK, VALUE)	DISP_REG_MASK((cmdq), (REG), (VALUE), (MASK))
 
@@ -1675,12 +1643,7 @@ void DSI_PHY_clk_switch(enum DISP_MODULE_ENUM module, void *cmdq, int on)
 
 enum DSI_STATUS DSI_EnableClk(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
-	DISPFUNC();
-
 	DSI_OUTREGBIT(cmdq, struct DSI_COM_CTRL_REG, DSI_REG[0]->DSI_COM_CTRL, DSI_EN, 1);
-
-	/* 8127 */
-	/* OUTREGBIT(DSI_COM_CTRL_REG, DSI_REG->DSI_COM_CTRL, DSI_EN, 1); */
 
 	return DSI_STATUS_OK;
 }
@@ -2309,25 +2272,12 @@ int ddp_dsi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 	enum DSI_STATUS ret = DSI_STATUS_OK;
 #endif
 	int i = 0;
-#ifndef CONFIG_MTK_CLKMGR
-	struct device_node *node;
-#endif
 
 	DISPFUNC();
 	/* DSI_OUTREG32(cmdq, 0xf0000048, 0x80000000); */
 	/* DSI_OUTREG32(cmdq, MMSYS_CONFIG_BASE+0x108, 0xffffffff); */
 	/* DSI_OUTREG32(cmdq, MMSYS_CONFIG_BASE+0x118, 0xffffffff); */
 	/* DSI_OUTREG32(MMSYS_CONFIG_BASE+0xC08, 0xffffffff); */
-
-#ifndef CONFIG_MTK_CLKMGR
-	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-apmixedsys");
-	if (!node)
-		DDPERR("[DDP_APMIXED] DISP find apmixed node failed\n");
-
-	ddp_apmixed_base = of_iomap(node, 0);
-	if (!ddp_apmixed_base)
-		DDPERR("[DDP_APMIXED] DISP apmixed base failed\n");
-#endif
 
 	DSI_REG[0] = (struct DSI_REGS *) DISPSYS_DSI0_BASE;
 	DSI_PHY_REG[0] = (struct DSI_PHY_REGS *) MIPITX_BASE;
@@ -2355,26 +2305,21 @@ int ddp_dsi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 	if (MIPITX_IsEnabled(module, cmdq)) {
 		s_isDsiPowerOn = true;
 #ifdef ENABLE_CLK_MGR
-#ifdef CONFIG_MTK_CLKMGR
-				set_mipi26m(1);
-#else
-				ddp_set_mipi26m(1);
-#endif
 		if (module == DISP_MODULE_DSI0) {
 #ifndef CONFIG_MTK_CLKMGR
+			ret += ddp_clk_prepare_enable(TOP_RG_MIPI_26M_DBG);
 			ret += ddp_clk_enable(DISP1_DSI0_ENGINE);
 			ret += ddp_clk_enable(DISP1_DSI0_DIGITAL);
 #endif
 			if (ret > 0)
 				DDPERR("DSI0 power manager API return false\n");
-
 		}
 #endif
 		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[0]->DSI_INTEN, CMD_DONE, 1);
 		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[0]->DSI_INTEN, RD_RDY, 1);
-		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[0]->DSI_INTEN, TE_RDY, 1);
-		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[0]->DSI_INTEN, EXT_TE, 1);
 		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[0]->DSI_INTEN, VM_DONE, 1);
+		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[0]->DSI_INTEN, VM_CMD_DONE, 1);
+		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[0]->DSI_INTEN, SLEEPOUT_DONE, 1);
 
 		DSI_BackupRegisters(module, NULL);
 	}
@@ -2611,6 +2556,7 @@ force_config:
 	DSI_TXRX_Control(module, cmdq, dsi_config);
 	DSI_PS_Control(module, cmdq, dsi_config, config->dst_w, config->dst_h);
 	DSI_PHY_TIMCONFIG(dsi_config);
+	DSI_EnableClk(module, cmdq);
 
 	if (dsi_config->mode != CMD_MODE
 	    || ((dsi_config->switch_mode_enable == 1) && (dsi_config->switch_mode != CMD_MODE))) {
@@ -2912,11 +2858,11 @@ int ddp_dsi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 #ifdef CONFIG_MTK_CLKMGR
 		set_mipi26m(1);
 #else
-		ddp_set_mipi26m(1);
 #endif
 		if (is_ipoh_bootup) {
 			if (module == DISP_MODULE_DSI0 || module == DISP_MODULE_DSIDUAL) {
 #ifndef CONFIG_MTK_CLKMGR
+				ret += ddp_clk_prepare_enable(TOP_RG_MIPI_26M_DBG);
 				ret += ddp_clk_enable(DISP1_DSI0_ENGINE);
 				ret += ddp_clk_enable(DISP1_DSI0_DIGITAL);
 #endif
@@ -2932,6 +2878,7 @@ int ddp_dsi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 
 		if (module == DISP_MODULE_DSI0 || module == DISP_MODULE_DSIDUAL) {
 #ifndef CONFIG_MTK_CLKMGR
+			ret += ddp_clk_prepare_enable(TOP_RG_MIPI_26M_DBG);
 			ret += ddp_clk_enable(DISP1_DSI0_ENGINE);
 			ret += ddp_clk_enable(DISP1_DSI0_DIGITAL);
 #else
@@ -3012,6 +2959,7 @@ int ddp_dsi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 #ifndef CONFIG_MTK_CLKMGR
 			ddp_clk_disable(DISP1_DSI0_ENGINE);
 			ddp_clk_disable(DISP1_DSI0_DIGITAL);
+			ddp_clk_disable_unprepare(TOP_RG_MIPI_26M_DBG);
 #else
 			ret += disable_clock(MT_CG_DISP1_DSI_ENGINE, "DSI");
 			ret += disable_clock(MT_CG_DISP1_DSI_DIGITAL, "DSI");
@@ -3025,7 +2973,6 @@ int ddp_dsi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 #ifdef CONFIG_MTK_CLKMGR
 		set_mipi26m(0);
 #else
-		ddp_set_mipi26m(0);
 #endif
 #endif
 		s_isDsiPowerOn = false;
