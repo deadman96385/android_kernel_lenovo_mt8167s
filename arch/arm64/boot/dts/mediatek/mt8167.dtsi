@@ -962,6 +962,22 @@
 			reg = <0 0x13000000 0 0x80000>, <0 0x13ffe000 0 0x1000>;
 			interrupts = <GIC_SPI 185 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-names = "RGX";
+			power-domains =  <&scpsys MT8167_POWER_DOMAIN_MFG>;
+			clocks = <&apmixedsys CLK_APMIXED_MMPLL>,
+				 <&topckgen CLK_TOP_MFG_MM_SEL>,
+				 <&topckgen CLK_TOP_AXI_MFG_IN_SEL>,
+				 <&topckgen CLK_TOP_SLOW_MFG_SEL>,
+				 <&topckgen CLK_TOP_RG_SLOW_MFG>,
+				 <&topckgen CLK_TOP_RG_AXI_MFG>,
+				 <&topckgen CLK_TOP_MFG_MM>;
+			clock-names = "mmpll_clk",
+				      "mfg_mm_in_sel",
+				      "mfg_axi_in_sel",
+				      "mfg_slow_in_sel",
+				      "top_slow",
+				      "top_axi",
+				      "top_mm";
+			clock-frequency = <500000000>;
 		};
 
 		mfgcfg: mfgcfg@13ffe000 {
@@ -1577,10 +1593,25 @@
 			compatible = "mediatek,mt8167-isp_sysram";
 		};
 
+		mfg_async: mfgsys-async {
+			compatible = "mediatek,mt8167-mfg-async";
+			power-domains = <&scpsys MT8167_POWER_DOMAIN_MFG_ASYNC>;
+		};
+
+		mfg_2d: mfgsys-2d {
+			compatible = "mediatek,mt8167-mfg-2d";
+			power-domains = <&scpsys MT8167_POWER_DOMAIN_MFG_2D>;
+		};
+
 		mtee {
 			compatible = "mediatek,mtee";
 			clocks = <&infracfg CLK_INFRA_GCPU>;
 			clock-names = "GCPU";
+		};
+
+		mtgpufreq {
+			compatible = "mediatek,mt8167-gpufreq";
+			reg-vgpu-supply = <&mt6392_vcore_reg>;
 		};
 	};
 

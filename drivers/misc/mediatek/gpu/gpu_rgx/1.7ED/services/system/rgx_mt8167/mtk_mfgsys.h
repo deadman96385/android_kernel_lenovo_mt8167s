@@ -21,6 +21,22 @@
 /* control APM is enabled or not  */
 #define MTK_PM_SUPPORT 0
 
+struct mtk_mfg_base {
+	struct platform_device *pdev;
+	struct platform_device *mfg_2d_pdev;
+	struct platform_device *mfg_async_pdev;
+
+	struct clk **top_clk;
+	void __iomem *reg_base;
+
+	/* mutex protect for set power state */
+	struct mutex set_power_state;
+	bool shutdown;
+	struct notifier_block mfg_notifier;
+};
+
+
+
 /* extern to be used by PVRCore_Init in RGX DDK module.c */
 PVRSRV_ERROR MTKMFGSystemInit(void);
 
@@ -41,7 +57,7 @@ PVRSRV_ERROR MTKSystemPrePowerState(PVRSRV_SYS_POWER_STATE eNewPowerState);
 
 PVRSRV_ERROR MTKSystemPostPowerState(PVRSRV_SYS_POWER_STATE eNewPowerState);
 
-void MTKRGXDeviceInit(void *pvOSDevice);
+int MTKRGXDeviceInit(void *pvOSDevice);
 
 
 #ifdef CONFIG_MTK_HIBERNATION
