@@ -52,6 +52,13 @@ struct clk *icusb_clk;
 #endif
 /*#include <mach/mt_boot_common.h>*/
 
+/*for evb project, vbus always on,then device can't suspend*/
+/*add external flag to fix this for evb project*/
+#if defined(CONFIG_POWER_EXT)
+bool usb_discont = true;
+bool first_boot = true;
+#endif
+
 /* default value 0 */
 static int usb_rdy;
 void set_usb_rdy(void)
@@ -322,7 +329,6 @@ void do_connection_work(struct work_struct *data)
 	unsigned long flags = 0;
 	bool usb_in = false;
 
-
 	if (mtk_musb) {
 		if (__ratelimit(&ratelimit))
 			DBG(0, "is ready %d is_host %d power %d\n", mtk_musb->is_ready, mtk_musb->is_host,
@@ -334,8 +340,6 @@ void do_connection_work(struct work_struct *data)
 		queue_delayed_work(mtk_musb->st_wq, &connection_work, msecs_to_jiffies(CONN_WORK_DELAY));
 		return;
 	}
-
-
 
 	if (!mtk_musb->is_ready) {
 		/* re issue work */
@@ -364,6 +368,9 @@ void do_connection_work(struct work_struct *data)
 	}
 #endif
 
+#if defined(CONFIG_POWER_EXT)
+	if (!first_boot) {
+#endif
 	if (!mtk_musb->power && (usb_in == true)) {
 		/* enable usb */
 		if (!wake_lock_active(&mtk_musb->usb_lock)) {
@@ -376,7 +383,11 @@ void do_connection_work(struct work_struct *data)
 		/* note this already put SOFTCON */
 		musb_start(mtk_musb);
 
-	} else if (mtk_musb->power && (usb_in == false)) {
+	}
+#if defined(CONFIG_POWER_EXT)
+	}
+#endif
+	else if (mtk_musb->power && (usb_in == false)) {
 		/* disable usb */
 		musb_stop(mtk_musb);
 		if (wake_lock_active(&mtk_musb->usb_lock)) {
@@ -389,6 +400,21 @@ void do_connection_work(struct work_struct *data)
 	} else
 		DBG(0, "do nothing, usb_in:%d, power:%d\n",
 				usb_in, mtk_musb->power);
+
+#if defined(CONFIG_POWER_EXT)
+	if (first_boot)
+		first_boot = false;
+	if (!usb_discont && mtk_musb->power) {
+		DBG(0, "disconnect VBUS, usb_in:%d, power:%d\n",
+				usb_in, mtk_musb->power);
+		musb_stop(mtk_musb);
+		usb_discont = true;
+		if (wake_lock_active(&mtk_musb->usb_lock)) {
+			DBG(0, "unlock\n");
+			wake_unlock(&mtk_musb->usb_lock);
+		}
+	}
+#endif
 
 	spin_unlock_irqrestore(&mtk_musb->lock, flags);
 
@@ -413,6 +439,9 @@ void mt_usb_disconnect(void)
 		DBG(0, "mtk_musb = NULL\n");
 		return;
 	}
+	#if defined(CONFIG_POWER_EXT)
+	usb_discont = false;
+	#endif
 	/* issue connection work */
 	DBG(0, "issue work\n");
 	queue_delayed_work(mtk_musb->st_wq, &connection_work, 0);
