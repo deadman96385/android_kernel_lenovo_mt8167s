@@ -148,8 +148,8 @@ static VAL_UINT32_T gu4VdecLockThreadId;
 /* VENC physical base address */
 #undef VENC_BASE
 
-#ifdef CONFIG_ARCH_MT8167
-#define VENC_BASE       0x17002000
+#ifdef CONFIG_MACH_MT8167
+#define VENC_BASE       0x15009000
 #define VENC_LT_BASE    0x19002000
 #define VENC_REGION     0x1000
 #else
@@ -303,7 +303,7 @@ void venc_power_on(void)
 #ifdef CONFIG_OF
 	MODULE_MFV_LOGD("venc_power_on D+\n");
 	mtk_smi_larb_clock_on(3, true);
-	#ifndef CONFIG_ARCH_MT8167
+	#ifndef CONFIG_MACH_MT8167
 	mtk_smi_larb_clock_on(5, true);
 	#endif
 	/* clk_prepare(clk_venc_clk);
@@ -338,7 +338,7 @@ void venc_power_off(void)
 		 * clk_unprepare(clk_venc_lt_clk);
 		 */
 
-		#ifndef CONFIG_ARCH_MT8167
+		#ifndef CONFIG_MACH_MT8167
 		mtk_smi_larb_clock_off(5, true);
 		#endif
 		mtk_smi_larb_clock_off(3, true);
@@ -444,7 +444,7 @@ void enc_isr(void)
 		VDO_HW_WRITE(KVA_VENC_IRQ_ACK_ADDR, VENC_IRQ_STATUS_PAUSE);
 
 		/*VP8 IRQ reset */
-		#ifndef CONFIG_ARCH_MT8167
+		#ifndef CONFIG_MACH_MT8167
 		VDO_HW_WRITE(KVA_VENC_LT_IRQ_ACK_ADDR, VENC_IRQ_STATUS_PAUSE);
 		VDO_HW_WRITE(KVA_VENC_LT_IRQ_ACK_ADDR, VENC_IRQ_STATUS_SWITCH);
 		VDO_HW_WRITE(KVA_VENC_LT_IRQ_ACK_ADDR, VENC_IRQ_STATUS_DRAM);
@@ -807,8 +807,19 @@ static long vcodec_lockhw(unsigned long arg)
 			spin_unlock_irqrestore(&LockDecHWCountLock, ulFlagsLockHW);
 		}
 	} else if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC ||
-		   rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC ||
-		   rHWLock.eDriverType == VAL_DRIVER_TYPE_JPEG_ENC) {
+		rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC ||
+		rHWLock.eDriverType == VAL_DRIVER_TYPE_JPEG_ENC) {
+		/* TODO: for hybrid */
+		/* LQ-TO-DO   hardware */
+		#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+		MODULE_MFV_LOGE(
+			"[Hybrid][VCODEC_LOCKHW] ENC CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT!!type=%d\n",
+			rHWLock.eDriverType);
+		if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC) {
+			venc_power_on();
+			break;
+		}
+		#endif
 		while (bLockedHW == VAL_FALSE) {
 			/* Early break for JPEG VENC */
 			if (rHWLock.u4TimeoutMs == 0) {
@@ -1025,8 +1036,19 @@ static long vcodec_unlockhw(unsigned long arg)
 		mutex_unlock(&VdecHWLock);
 		eValRet = eVideoSetEvent(&DecHWLockEvent, sizeof(VAL_EVENT_T));
 	} else if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC ||
-			 rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC ||
-			 rHWLock.eDriverType == VAL_DRIVER_TYPE_JPEG_ENC) {
+		rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC ||
+		rHWLock.eDriverType == VAL_DRIVER_TYPE_JPEG_ENC) {
+		/* TODO: for hybrid */
+		/* LQ-TO-DO   hardware */
+		#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+		MODULE_MFV_LOGE(
+			"[Hybrid][VCODEC_LOCKHW] ENC CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT!!type=%d\n",
+			rHWLock.eDriverType);
+		if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC) {
+			venc_power_off();
+			break;
+		}
+		#endif
 		mutex_lock(&VencHWLock);
 		/* Current owner give up hw lock */
 		if (grVcodecEncHWLock.pvHandle == (VAL_VOID_T *)pmem_user_v2p_video((VAL_ULONG_T)rHWLock.pvHandle)) {
@@ -2336,12 +2358,12 @@ static int vcodec_probe(struct platform_device *pdev)
 	if (request_irq
 	    (VENC_IRQ_ID, (irq_handler_t) video_intr_dlr2, IRQF_TRIGGER_LOW, VCODEC_DEVNAME,
 	     NULL) < 0) {
-		MODULE_MFV_LOGD("[VCODEC_DEBUG][ERROR] error to request enc irq\n");
+		MODULE_MFV_LOGD("[VCODEC_DEBUG][ERROR] error to request enc irq: %d\n", VENC_IRQ_ID);
 	} else {
 		MODULE_MFV_LOGD("[VCODEC_DEBUG] success to request enc irq: %d\n", VENC_IRQ_ID);
 	}
 
-	#ifndef CONFIG_ARCH_MT8167
+	#ifndef CONFIG_MACH_MT8167
 	if (request_irq
 	    (VENC_LT_IRQ_ID, (irq_handler_t) video_intr_dlr2, IRQF_TRIGGER_LOW, VCODEC_DEVNAME,
 	     NULL) < 0) {
@@ -2359,7 +2381,7 @@ static int vcodec_probe(struct platform_device *pdev)
 	disable_irq(VDEC_IRQ_ID);
 	/* disable_irq(MT_VENC_IRQ_ID); */
 	disable_irq(VENC_IRQ_ID);
-	#ifndef CONFIG_ARCH_MT8167
+	#ifndef CONFIG_MACH_MT8167
 	disable_irq(VENC_LT_IRQ_ID);
 	#endif
 #endif
@@ -2540,7 +2562,7 @@ static int __init vcodec_driver_init(void)
 	mutex_unlock(&DriverOpenCountLock);
 
 	/* get VENC related */
-	#ifdef CONFIG_ARCH_MT8167
+	#ifdef CONFIG_MACH_MT8167
 	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-venc");
 	#else
 	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8173-venc");
@@ -2552,7 +2574,7 @@ static int __init vcodec_driver_init(void)
 	KVA_VENC_SW_PAUSE = KVA_VENC_BASE + VENC_SW_PAUSE;
 	KVA_VENC_SW_HRST_N = KVA_VENC_BASE + VENC_SW_HRST_N;
 
-	#ifndef CONFIG_ARCH_MT8167
+	#ifndef CONFIG_MACH_MT8167
 	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-venclt");
 	KVA_VENC_LT_BASE = (VAL_ULONG_T) of_iomap(node, 0);
 	VENC_LT_IRQ_ID = irq_of_parse_and_map(node, 0);
