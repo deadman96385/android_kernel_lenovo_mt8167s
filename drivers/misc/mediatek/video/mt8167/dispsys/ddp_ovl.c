@@ -539,8 +539,12 @@ int ovl_layer_config(enum DISP_MODULE_ENUM module,
 		ASSERT(0);
 	}
 
+	DDPDBG("ovl%d, layer=%d source=%s off(x=%d, y=%d), dst(%d, %d, %d, %d), pitch=%d, fmt=%s, addr=0x%lx\n",
+			idx, layer, (source == 0) ? "memory" : "dim", src_x, src_y, dst_x, dst_y,
+	       dst_w, dst_h, src_pitch, ovl_intput_format_name(fmt, input_swap), addr);
+
 	/*
-	*DDPPRINT(
+	DDPPRINT(
 	"ovl%d, layer=%d, source=%s, off(x=%d, y=%d), dst(%d, %d, %d, %d), pitch=%d, fmt=%s,
 		addr=%lx, keyEn=%d, key=%d, aen=%d, alpha=%d,
 		sur_aen=%d,sur_alpha=0x%x, constant_color=0x%x, yuv_range=%d\n",
@@ -548,7 +552,7 @@ int ovl_layer_config(enum DISP_MODULE_ENUM module,
 	       dst_w, dst_h, src_pitch, ovl_intput_format_name(fmt, input_swap),
 	       addr, key_en, key, aen, alpha, sur_aen,
 	       dst_alpha << 2 | src_alpha, constant_color, yuv_range);
-	*/
+	       */
 
 	if (source == OVL_LAYER_SOURCE_RESERVED) {
 		if (aen == 0)
@@ -936,6 +940,7 @@ static int ovl_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_confi
 		DISP_REG_SET(handle, DISP_REG_OVL_RST + offset, 0x1);
 		DISP_REG_SET(handle, DISP_REG_OVL_RST + offset, 0x0);
 		cmdqRecPoll(handle, disp_addr_convert(DISP_REG_OVL_STA + offset), 0, 0x1);
+		DDPMSG("ovl%d warm reset done\n", ovl_idx);
 	}
 
 	for (i = 0; i < OVL_LAYER_NUM; i++) {

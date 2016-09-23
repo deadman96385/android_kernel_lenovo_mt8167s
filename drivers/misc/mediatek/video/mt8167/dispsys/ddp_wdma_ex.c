@@ -222,18 +222,8 @@ void wdma_calc_ultra(unsigned int idx, unsigned int width, unsigned int height, 
 	   UYVY: FHD=0x22011283, HD=0x0f0108c8, qHD=0x080104e1
 	   RGB:  FHD=0x35011b44, HD=0x17010bad, qHD=0x0c0107d1
 	 */
-	if (idx == 0 && primary_display_is_decouple_mode() == 0) {
-		DISP_REG_SET(handle, idx * DISP_WDMA_INDEX_OFFSET + DISP_REG_WDMA_BUF_CON2,
-			     0x1B010E22);
-		DISP_REG_SET(handle, idx * DISP_WDMA_INDEX_OFFSET + DISP_REG_WDMA_BUF_CON1,
-			     0xD0100080);
-	} else {
-		DISP_REG_SET(handle, idx * DISP_WDMA_INDEX_OFFSET + DISP_REG_WDMA_BUF_CON2,
-			     0x1B010E22);
-		DISP_REG_SET(handle, idx * DISP_WDMA_INDEX_OFFSET + DISP_REG_WDMA_BUF_CON1,
-			     0x50100080);
-	}
-
+	DISP_REG_SET(handle, idx*DISP_WDMA_INDEX_OFFSET+DISP_REG_WDMA_BUF_CON2, 0x1B010E22);
+	DISP_REG_SET(handle, idx*DISP_WDMA_INDEX_OFFSET+DISP_REG_WDMA_BUF_CON1, 0xD0100080);
 
 	DDPDBG("pre_ultra_low_level  = 0x%03x = %d\n", pre_ultra_low_level, pre_ultra_low_level);
 	DDPDBG("ultra_low_level      = 0x%03x = %d\n", ultra_low_level, ultra_low_level);
@@ -265,12 +255,12 @@ static int wdma_config(enum DISP_MODULE_ENUM module,
 	unsigned int idx_offst = idx * DISP_WDMA_INDEX_OFFSET;
 	size_t size = dstPitch * clipHeight;
 
-#if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) && defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
-	DDPMSG("module %s, src(w=%d,h=%d), clip(x=%d,y=%d,w=%d,h=%d),out_fmt=%s,dst_address=0x%lx,dst_p=%d,\n",
+/* #if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) && defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT) */
+	DDPDBG("module %s, src(w=%d,h=%d), clip(x=%d,y=%d,w=%d,h=%d),out_fmt=%s,dst_address=0x%lx,dst_p=%d,\n",
 		ddp_get_module_name(module), srcWidth, srcHeight, clipX, clipY, clipWidth, clipHeight,
 		fmt_string(out_format), dstAddress, dstPitch);
-	DDPMSG("spific_alfa=%d,alpa=%d,handle=0x%p,sec%d\n", useSpecifiedAlpha, alpha, handle, sec);
-#endif
+	DDPDBG("spific_alfa=%d,alpa=%d,handle=0x%p,sec%d\n", useSpecifiedAlpha, alpha, handle, sec);
+/* #endif */
 	/* should use OVL alpha instead of sw config */
 	DISP_REG_SET(handle, idx_offst + DISP_REG_WDMA_SRC_SIZE, srcHeight << 16 | srcWidth);
 	DISP_REG_SET(handle, idx_offst + DISP_REG_WDMA_CLIP_COORD, clipY << 16 | clipX);
@@ -487,6 +477,7 @@ static int wdma_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_conf
 				    disp_addr_convert(idx_offst + DISP_REG_WDMA_FLOW_CTRL_DBG), 1,
 				    0x1);
 			DISP_REG_SET(handle, idx_offst + DISP_REG_WDMA_RST, 0x0);	/* trigger soft reset */
+			DDPDBG("wdma%d warm reset done\n", wdma_idx);
 		}
 	}
 

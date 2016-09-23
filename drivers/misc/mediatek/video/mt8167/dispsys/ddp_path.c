@@ -247,6 +247,8 @@ char *ddp_get_mutex_sof_name(enum MUTEX_SOF mode)
 		return "dsi0";
 	case SOF_DPI0:
 		return "dpi0";
+	case SOF_DPI1:
+		return "dpi1";
 	default:
 		DDPMSG("invalid sof =%d\n", mode);
 		return "unknown";
