@@ -1363,6 +1363,14 @@
 			/*power-domains = <&scpsys MT8167_POWER_DOMAIN_ISP>;*/
 		};
 
+		vencsys: vencsys@15000000 {
+			/* TODO: remove vencsys: not supported in MT8167 */
+			status = "disabled";
+			compatible = "mediatek,mt8167-vencsys", "syscon";
+			reg = <0 0x15000000 0 0x1000>;
+			#clock-cells = <1>;
+		};
+
 		larb1: larb@15001000 {
 			compatible = "mediatek,mt8167-smi-larb";
 			reg = <0 0x15001000 0 0x10000>;
@@ -1397,6 +1405,12 @@
 			reg = <0 0x15008000 0 0x1000>;  /* SENINF_ADDR */
 		};
 
+		venc@15009000 {
+			compatible = "mediatek,mt8167-venc";
+			reg = <0 0x15009000 0 0x1000>;
+			interrupts = <GIC_SPI 179 IRQ_TYPE_LEVEL_LOW>;
+		};
+
 		vdecsys: vdecsys@16000000 {
 			compatible = "mediatek,mt8167-vdecsys", "syscon";
 			reg = <0 0x16000000 0 0x1000>;
@@ -1423,20 +1437,6 @@
 			compatible = "mediatek,mt8167-vdec";
 			reg = <0 0x16020000 0 0x10000>;
 			interrupts = <GIC_SPI 212 IRQ_TYPE_LEVEL_LOW>;
-		};
-
-		vencsys: vencsys@17000000 {
-			/* TODO: remove vencsys: not supported in MT8167 */
-			status = "disabled";
-			compatible = "mediatek,mt8167-vencsys", "syscon";
-			reg = <0 0x17000000 0 0x1000>;
-			#clock-cells = <1>;
-		};
-
-		venc@17002000 {
-			compatible = "mediatek,mt8167-venc";
-			reg = <0 0x17002000 0 0x1000>;
-			interrupts = <GIC_SPI 206 IRQ_TYPE_LEVEL_LOW>;
 		};
 
 		jpgenc@17003000 {
