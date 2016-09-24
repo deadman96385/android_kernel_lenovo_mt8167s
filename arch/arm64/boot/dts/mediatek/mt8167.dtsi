@@ -1258,7 +1258,7 @@
 			reg  =	<0 0x1401b000 0 0x1000>, /* HDMI Shell */
 				<0 0x11011000 0 0x10>, /* HDMI DDC  */
 				<0 0x1001a000 0 0xbc>; /* HDMI CEC  */
-			interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_LOW>;
+			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_LOW>;
 			clocks = <&topckgen CLK_TOP_26M_HDMI_SIFM>,
 				 <&topckgen CLK_TOP_26M_CEC>,
 				 <&topckgen CLK_TOP_32K_CEC>,
