@@ -1023,6 +1023,16 @@
 			#clock-cells = <1>;
 		};
 
+		mmc2: sdio@11170000 {
+			compatible = "mediatek,mt8167-sdio";
+			reg = <0 0x11170000 0 0x1000>;
+			interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_LOW>;
+			/* power domain always on */
+			clocks = <&topckgen CLK_TOP_MSDC2>;
+			clock-names = "sdio-clock";
+			status = "disabled";
+		};
+
 		usb1: usb@11190000 {
 			compatible = "mediatek,mt8167-usb11";
 			cell-index = <1>;
