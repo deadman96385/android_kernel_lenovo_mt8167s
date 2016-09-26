@@ -19,13 +19,15 @@
 #include "ged_dvfs.h"
 
 /* control APM is enabled or not  */
-#define MTK_PM_SUPPORT 0
+#define MTK_PM_SUPPORT 1
 
 struct mtk_mfg_base {
 	struct platform_device *pdev;
 	struct platform_device *mfg_2d_pdev;
 	struct platform_device *mfg_async_pdev;
 
+	struct clk **top_clk_sel;
+	struct clk **top_clk_sel_parent;
 	struct clk **top_clk;
 	void __iomem *reg_base;
 
