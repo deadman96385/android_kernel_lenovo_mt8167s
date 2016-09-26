@@ -60,6 +60,6 @@ endif
 
 ccflags-$(CONFIG_MTK_LCM_DEVICE_TREE_SUPPORT) += -DMTK_LCM_DEVICE_TREE_SUPPORT
 
-ifeq ($(CONFIG_ARCH_MT8167),y)
+ifeq ($(CONFIG_MACH_MT8167),y)
 ccflags-y += -DCMDQ_USE_CCF
 endif
