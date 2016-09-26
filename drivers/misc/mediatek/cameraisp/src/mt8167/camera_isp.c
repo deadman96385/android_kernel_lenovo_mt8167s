@@ -184,7 +184,7 @@ struct ISP_CLK_STRUCT {
 };
 
 struct ISP_CLK_STRUCT ispclk[] = {
-#ifndef CONFIG_MTK_SMI_VARIANT
+#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU)
 	{"MM_SMI_COMMON", NULL},
 	{"IMG_LARB_SMI", NULL}, /* Change to generic clock name to avoid changing everytime */
 #endif
@@ -198,7 +198,7 @@ struct ISP_CLK_STRUCT ispclk[] = {
 unsigned long g_scpsys_baseaddr;
 unsigned long g_ddrphy_baseaddr;
 
-#ifndef CONFIG_MTK_SMI_VARIANT /* Power Domain */
+#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU) /* Power Domain */
 
 #include <linux/pm_runtime.h>
 struct device *g_pmdev_isp;
@@ -210,6 +210,11 @@ struct device *g_pmdev_disp;
 	in order to make sure suspend/resume works correctly.
 */
 #include "mtk_smi.h"
+#endif
+
+#ifdef CONFIG_MTK_IOMMU
+#include <soc/mediatek/smi.h>
+struct device *g_dev_smilarb;
 #endif
 
 #endif
@@ -1750,7 +1755,7 @@ static inline void Prepare_Enable_ccf_clock(void)
 #endif
 
 	/* must keep this clk open order: CG_SCP_SYS_DIS-> CG_DISP0_SMI_COMMON -> CG_SCP_SYS_ISP -> ISP clk */
-#ifndef CONFIG_MTK_SMI_VARIANT
+#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU)
 	/*
 		pm_runtime_get_sync return val:
 		> 0 : already power on
@@ -1770,9 +1775,20 @@ static inline void Prepare_Enable_ccf_clock(void)
 	/* Through this API, it opens power & clock of Larb#2 & its parents */
 	/* Return : 0 is successful, Others is failed.*/
 	/*LOG_DBG("ISP power/clock on by SMI ==>");*/
+#ifdef CONFIG_MTK_IOMMU
+	if (!g_dev_smilarb) {
+		LOG_ERR("camera smi larb device is null, can't turn on power\n");
+		return;
+	}
+	ret = mtk_smi_larb_get(g_dev_smilarb);	/* 8167 change to controlled by iommu */
+	if (ret != 0)
+		LOG_ERR("mtk_smi_larb_get(g_dev_smilarb) fail, ret = %d\n", ret);
+#else
 	ret = mtk_smi_larb_clock_on(1, true);	/* 8167 clock system is from ranier, change to LARB1 */
 	if (ret != 0)
 		LOG_ERR("mtk_smi_larb_clock_on(Larb1, true) fail, ret = %d\n", ret);
+#endif
+
 #endif
 
 	for (i = 0; i < ARRAY_SIZE(ispclk); i++) {
@@ -1794,14 +1810,23 @@ static inline void Disable_Unprepare_ccf_clock(void)
 	for (i = ARRAY_SIZE(ispclk) - 1 ; i >= 0 ; i--)
 		clk_disable_unprepare(ispclk[i].clock);
 
-#ifndef CONFIG_MTK_SMI_VARIANT
+#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU)
 	/*LOG_DBG("ISP power/clock off by PM <==");*/
 	pm_runtime_put_sync(g_pmdev_isp);
 	pm_runtime_put_sync(g_pmdev_disp);
 
 #else
 	/*LOG_DBG("ISP power/clock off by SMI <==");*/
+#ifdef CONFIG_MTK_IOMMU
+	if (!g_dev_smilarb) {
+		LOG_ERR("camera smi larb device is null, can't turn off power\n");
+		return;
+	}
+	mtk_smi_larb_put(g_dev_smilarb); /* 8167 change to controlled by iommu */
+#else
 	mtk_smi_larb_clock_off(1, true); /* 8167 clock system is from ranier, change to LARB1 */
+#endif
+
 #endif
 
 }
@@ -5568,7 +5593,7 @@ EXIT:
 		spin_unlock(&(g_IspInfo.SpinLockIspRef));
 
 		if (g_IspInfo.UserCount == 1)
-			LOG_DBG("Curr UserCount(%d), (process, pid, tgid)=(%s, %d, %d), first user",
+			LOG_INF("Curr UserCount(%d), (process, pid, tgid)=(%s, %d, %d), first user",
 			g_IspInfo.UserCount, current->comm, current->pid, current->tgid);
 
 		ISP_EnableClock(MTRUE, 1);
@@ -5618,7 +5643,7 @@ static MINT32 ISP_release(struct inode *pInode, struct file *pFile)
 	detect_count = g_log_def_constraint;
 	#endif
 
-	LOG_DBG("+ Curr UserCount(%d->%d), (process, pid, tgid)=(%s, %d, %d), last user",
+	LOG_INF("+ Curr UserCount(%d->%d), (process, pid, tgid)=(%s, %d, %d), last user",
 		(g_IspInfo.UserCount+1), g_IspInfo.UserCount, current->comm, current->pid, current->tgid);
 
 	/* Disable clock. */
@@ -5996,6 +6021,10 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 	int new_count;
 	struct cam_isp_device *cam_isp_dev;
 #endif
+#ifdef CONFIG_MTK_IOMMU
+	struct device_node *larb_node = NULL;
+	struct platform_device *plat_dev = NULL;
+#endif
 
 	LOG_INF("isp Probe +");
 
@@ -6091,7 +6120,7 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 
 #ifndef CONFIG_MTK_CLKMGR	/*CCF: Grab clock pointer (struct clk*) */
 
-#ifndef CONFIG_MTK_SMI_VARIANT
+#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU)
 /* [Houston] Need to power on ISP firstly to avoid ISP reg UN-accessed +++ */
 	LOG_INF("[Houston] pm_runtime_enable(ISP)");
 	/* Save isp power domain handle */
@@ -6099,6 +6128,21 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 	BUG_ON(IS_ERR(g_pmdev_isp)); pm_runtime_enable(g_pmdev_isp);
 	pm_runtime_get_sync(g_pmdev_isp);	LOG_INF("[Houston] pm_runtime_get_sync(ISP)");
 /* [Houston] --- */
+#endif
+
+#ifdef CONFIG_MTK_IOMMU
+	larb_node = of_parse_phandle(pDev->dev.of_node, "mediatek,smilarb", 0);
+	if (!larb_node)
+		LOG_ERR("can not find \"mediatek,smilarb\" in ispsys\n");
+	else {
+		plat_dev = of_find_device_by_node(larb_node);
+		if (WARN_ON(!plat_dev))
+			LOG_ERR("g_dev_smilarb NULL");
+		else {
+			LOG_INF("camera smi larb device is found !\n");
+			g_dev_smilarb = &plat_dev->dev;
+		}
+	}
 #endif
 
 	for (i = 0; i < ARRAY_SIZE(ispclk); i++) {
@@ -6201,7 +6245,7 @@ static MINT32 ISP_remove(struct platform_device *pDev)
 	MINT32 IrqNum;
 
 	LOG_DBG("+");
-#ifndef CONFIG_MTK_SMI_VARIANT
+#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU)
 	LOG_INF("[Houston] pm_runtime_disable(ISP)");
 	BUG_ON(IS_ERR(g_pmdev_isp)); pm_runtime_disable(g_pmdev_isp);
 #endif
@@ -6947,7 +6991,7 @@ static MVOID __exit ISP_Exit(MVOID)
 }
 /* One more driver for DISP power domain */
 
-#ifndef CONFIG_MTK_SMI_VARIANT
+#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU)
 
 /* Attach another pm_domain driver */
 static int disp_pm_probe(struct platform_device *pdev)
