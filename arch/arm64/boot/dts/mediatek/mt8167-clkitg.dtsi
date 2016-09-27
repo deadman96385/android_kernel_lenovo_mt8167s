@@ -40,7 +40,7 @@
 			<&topckgen CLK_TOP_SEJ>,
 			<&clk26m>,
 			<&clk26m>,
-			<&topckgen CLK_TOP_APXGPT>,
+			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
