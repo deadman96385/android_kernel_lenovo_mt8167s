@@ -52,8 +52,8 @@ enum DISP_ENGINE_SIGNAL0 {
 	DDP_SIGNAL_OVL0__OVL0_MOUT = 0,
 };
 
-extern unsigned int mutex_start_irq_cnt;
-extern unsigned int mutex_done_irq_cnt;
+extern unsigned int mutex_start_irq_cnt[5];
+extern unsigned int mutex_done_irq_cnt[5];
 
 char *ddp_get_fmt_name(enum DISP_MODULE_ENUM module, unsigned int fmt);
 int ddp_dump_analysis(enum DISP_MODULE_ENUM module);

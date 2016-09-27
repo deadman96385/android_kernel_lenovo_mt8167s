@@ -18,7 +18,7 @@
 #include "ddp_manager.h"
 
 #define ALIGN_TO(x, n)  (((x) + ((n) - 1)) & ~((n) - 1))
-#define MTK_EXT_CMDQ_DISABLE
+/* #define MTK_EXT_CMDQ_DISABLE */
 
 
 enum EXT_DISP_PATH_MODE {

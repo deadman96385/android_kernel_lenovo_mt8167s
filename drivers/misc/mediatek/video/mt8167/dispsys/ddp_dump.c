@@ -232,9 +232,9 @@ char *ddp_get_fmt_name(enum DISP_MODULE_ENUM module, unsigned int fmt)
 		case 1:
 			return "dsi0_vdo";
 		case 2:
-			return "dsi1_vdo";
+			return "dp10";
 		case 3:
-			return "dpi";
+			return "dpi1";
 		default:
 			DDPDUMP("ddp_get_fmt_name, unknown fmt=%d, module=%d\n", fmt, module);
 			return "unknown";
@@ -367,8 +367,8 @@ static void mutex_dump_analysis(void)
 				}
 			}
 			DDPDUMP("%s)\n", mutex_module);
-			DDPDUMP("irq cnt: start=%d, end=%d\n", mutex_start_irq_cnt,
-				mutex_done_irq_cnt);
+			DDPDUMP("irq cnt: start=%d, end=%d\n", mutex_start_irq_cnt[i],
+				mutex_done_irq_cnt[i]);
 		}
 	}
 }
