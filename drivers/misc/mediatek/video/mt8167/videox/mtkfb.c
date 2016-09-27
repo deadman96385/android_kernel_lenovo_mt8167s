@@ -33,6 +33,7 @@
 #include <linux/atomic.h>
 #include <asm/cacheflush.h>
 #include <linux/io.h>
+#include <linux/of_platform.h>
 
 #include <linux/compat.h>
 #include <linux/dma-mapping.h>
@@ -2221,12 +2222,28 @@ static int mtkfb_probe(struct platform_device *pdev)
 #ifdef DISP_GPIO_DTS
 	long dts_gpio_state = 0;
 #endif
+#ifdef CONFIG_MTK_IOMMU
+	struct device_node *larb_node;
+	struct platform_device *larb_pdev;
+#endif
 
 	DISPPRINT("mtkfb_probe name [%s]  = [%s][%p]\n",
 		pdev->name, pdev->dev.init_name, (void *)&pdev->dev);
 #ifndef CONFIG_MTK_IOMMU
 	if (!mtk_smi_larb_get_base(0))
 		return -EPROBE_DEFER;
+#else
+	larb_node = of_parse_phandle(pdev->dev.of_node, "mediatek,larb", 0);
+	if (!larb_node)
+		return -EINVAL;
+
+	larb_pdev = of_find_device_by_node(larb_node);
+	of_node_put(larb_node);
+	if ((!larb_pdev) || (!larb_pdev->dev.driver)) {
+		pr_err("disp_probe is earlier than SMI\n");
+		return -EPROBE_DEFER;
+	}
+
 #endif
 
 #ifdef CONFIG_OF

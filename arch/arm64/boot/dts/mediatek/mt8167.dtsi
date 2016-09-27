@@ -1082,7 +1082,7 @@
 
 		dispsys: mt8167-dispsys {
 			compatible = "mediatek,mt8167-dispsys";
-
+			mediatek,larb = <&larb0>;
 			clocks =
 				<&mmsys CLK_MM_SMI_COMMON>,
 				<&mmsys CLK_MM_SMI_LARB0>,
@@ -1570,6 +1570,7 @@
 
 		mtkfb: mtkfb@0 {
 			compatible = "mediatek,MTKFB";
+			mediatek,larb = <&larb0>;
 		};
 
 		bat_meter: bat_meter {
