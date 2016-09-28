@@ -198,16 +198,6 @@
 		power-domains = <&scpsys MT8167_POWER_DOMAIN_MM>;
 	};
 
-	bring-up-pd-vdec {
-		compatible = "mediatek,scpsys-bring-up";
-		power-domains = <&scpsys MT8167_POWER_DOMAIN_VDEC>;
-	};
-
-	bring-up-pd-isp {
-		compatible = "mediatek,scpsys-bring-up";
-		power-domains = <&scpsys MT8167_POWER_DOMAIN_ISP>;
-	};
-
 	bring-up-pd-mfg-async {
 		compatible = "mediatek,scpsys-bring-up";
 		power-domains = <&scpsys MT8167_POWER_DOMAIN_MFG_ASYNC>;
