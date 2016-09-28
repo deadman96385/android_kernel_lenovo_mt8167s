@@ -616,12 +616,14 @@ int32_t cmdqMdpClockOff(uint64_t engineFlag)
 
 void cmdqMdpInitialSetting(void)
 {
+#ifdef CONFIG_MTK_M4U
 	char *data = kzalloc(MDP_DISPATCH_KEY_STR_LEN, GFP_KERNEL);
 
 	/* Register M4U Translation Fault function */
 	m4u_register_fault_callback(M4U_PORT_MDP_RDMA, cmdq_M4U_TranslationFault_callback, (void *)data);
 	m4u_register_fault_callback(M4U_PORT_MDP_WDMA, cmdq_M4U_TranslationFault_callback, (void *)data);
 	m4u_register_fault_callback(M4U_PORT_MDP_WROT, cmdq_M4U_TranslationFault_callback, (void *)data);
+#endif
 }
 
 uint32_t cmdq_mdp_rdma_get_reg_offset_src_addr(void)
