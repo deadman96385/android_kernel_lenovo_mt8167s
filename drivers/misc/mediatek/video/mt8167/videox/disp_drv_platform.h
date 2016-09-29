@@ -83,7 +83,7 @@
  * Enable Ovl time-sharing.
  * turned off for FPGA and bringup
  */
-#define OVL_TIME_SHARING
+/* #define OVL_TIME_SHARING */
 
 /**
  * Build CMDQ command in trigger stage.
