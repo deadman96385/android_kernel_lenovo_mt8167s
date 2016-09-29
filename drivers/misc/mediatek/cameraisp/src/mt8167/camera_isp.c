@@ -184,7 +184,7 @@ struct ISP_CLK_STRUCT {
 };
 
 struct ISP_CLK_STRUCT ispclk[] = {
-#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU)
+#if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU)
 	{"MM_SMI_COMMON", NULL},
 	{"IMG_LARB_SMI", NULL}, /* Change to generic clock name to avoid changing everytime */
 #endif
@@ -198,7 +198,7 @@ struct ISP_CLK_STRUCT ispclk[] = {
 unsigned long g_scpsys_baseaddr;
 unsigned long g_ddrphy_baseaddr;
 
-#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU) /* Power Domain */
+#if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU) /* Power Domain */
 
 #include <linux/pm_runtime.h>
 struct device *g_pmdev_isp;
@@ -1755,7 +1755,7 @@ static inline void Prepare_Enable_ccf_clock(void)
 #endif
 
 	/* must keep this clk open order: CG_SCP_SYS_DIS-> CG_DISP0_SMI_COMMON -> CG_SCP_SYS_ISP -> ISP clk */
-#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU)
+#if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU)
 	/*
 		pm_runtime_get_sync return val:
 		> 0 : already power on
@@ -1810,7 +1810,7 @@ static inline void Disable_Unprepare_ccf_clock(void)
 	for (i = ARRAY_SIZE(ispclk) - 1 ; i >= 0 ; i--)
 		clk_disable_unprepare(ispclk[i].clock);
 
-#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU)
+#if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU)
 	/*LOG_DBG("ISP power/clock off by PM <==");*/
 	pm_runtime_put_sync(g_pmdev_isp);
 	pm_runtime_put_sync(g_pmdev_disp);
@@ -6027,6 +6027,24 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 #endif
 
 	LOG_INF("isp Probe +");
+#ifdef CONFIG_MTK_IOMMU
+	larb_node = of_parse_phandle(pDev->dev.of_node, "mediatek,smilarb", 0);
+	if (!larb_node)
+		LOG_ERR("can not find \"mediatek,smilarb\" in ispsys\n");
+	else {
+		plat_dev = of_find_device_by_node(larb_node);
+		if (WARN_ON(!plat_dev))
+			LOG_ERR("g_dev_smilarb NULL");
+		else {
+			/* wait for smi larb probe done */
+			if (!plat_dev->dev.driver)
+				return -EPROBE_DEFER;
+
+			LOG_INF("camera smi larb device is found !\n");
+			g_dev_smilarb = &plat_dev->dev;
+		}
+	}
+#endif
 
 	/* Check platform_device parameters */
 	if (pDev == NULL) {
@@ -6120,7 +6138,7 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 
 #ifndef CONFIG_MTK_CLKMGR	/*CCF: Grab clock pointer (struct clk*) */
 
-#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU)
+#if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU)
 /* [Houston] Need to power on ISP firstly to avoid ISP reg UN-accessed +++ */
 	LOG_INF("[Houston] pm_runtime_enable(ISP)");
 	/* Save isp power domain handle */
@@ -6128,21 +6146,6 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 	BUG_ON(IS_ERR(g_pmdev_isp)); pm_runtime_enable(g_pmdev_isp);
 	pm_runtime_get_sync(g_pmdev_isp);	LOG_INF("[Houston] pm_runtime_get_sync(ISP)");
 /* [Houston] --- */
-#endif
-
-#ifdef CONFIG_MTK_IOMMU
-	larb_node = of_parse_phandle(pDev->dev.of_node, "mediatek,smilarb", 0);
-	if (!larb_node)
-		LOG_ERR("can not find \"mediatek,smilarb\" in ispsys\n");
-	else {
-		plat_dev = of_find_device_by_node(larb_node);
-		if (WARN_ON(!plat_dev))
-			LOG_ERR("g_dev_smilarb NULL");
-		else {
-			LOG_INF("camera smi larb device is found !\n");
-			g_dev_smilarb = &plat_dev->dev;
-		}
-	}
 #endif
 
 	for (i = 0; i < ARRAY_SIZE(ispclk); i++) {
@@ -6245,7 +6248,7 @@ static MINT32 ISP_remove(struct platform_device *pDev)
 	MINT32 IrqNum;
 
 	LOG_DBG("+");
-#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU)
+#if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU)
 	LOG_INF("[Houston] pm_runtime_disable(ISP)");
 	BUG_ON(IS_ERR(g_pmdev_isp)); pm_runtime_disable(g_pmdev_isp);
 #endif
@@ -6948,6 +6951,7 @@ static MINT32 __init ISP_Init(MVOID)
 		SetPageReserved(virt_to_page(((unsigned long)g_pTbl_RTBuf) + i));
 	}
 
+#ifndef CONFIG_MTK_IOMMU
 	/* Register M4U callback dump */
 	LOG_DBG("register M4U callback dump");
 	m4u_register_fault_callback(M4U_PORT_CAM_IMGO, ISP_M4U_TranslationFault_callback, NULL);
@@ -6956,7 +6960,7 @@ static MINT32 __init ISP_Init(MVOID)
 	m4u_register_fault_callback(M4U_PORT_CAM_IMGI, ISP_M4U_TranslationFault_callback, NULL);
 	m4u_register_fault_callback(M4U_PORT_CAM_ESFKO, ISP_M4U_TranslationFault_callback, NULL);
 	m4u_register_fault_callback(M4U_PORT_CAM_AAO, ISP_M4U_TranslationFault_callback, NULL);
-
+#endif
 	ISP_Init_FrmB();
 
 	LOG_DBG("Ret(%d)", Ret);
@@ -6991,7 +6995,7 @@ static MVOID __exit ISP_Exit(MVOID)
 }
 /* One more driver for DISP power domain */
 
-#if !defined(CONFIG_MTK_SMI_VARIANT) || !defined(CONFIG_MTK_IOMMU)
+#if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU)
 
 /* Attach another pm_domain driver */
 static int disp_pm_probe(struct platform_device *pdev)
