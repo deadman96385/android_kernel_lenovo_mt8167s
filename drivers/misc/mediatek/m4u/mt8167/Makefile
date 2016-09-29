@@ -10,8 +10,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
-
-ccflags-y += -I$(srctree)/include/trustzone
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/trustzone/
 ccflags-y += -I$(srctree)/drivers/staging/android/ion
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/mmp
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/smi/variant
