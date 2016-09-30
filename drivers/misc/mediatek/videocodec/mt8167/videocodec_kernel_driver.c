@@ -834,7 +834,7 @@ static long vcodec_lockhw(unsigned long arg)
 			rHWLock.eDriverType);
 		if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC) {
 			venc_power_on();
-			break;
+			/*break;*/
 		}
 		#endif
 		while (bLockedHW == VAL_FALSE) {
@@ -1063,7 +1063,7 @@ static long vcodec_unlockhw(unsigned long arg)
 			rHWLock.eDriverType);
 		if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC) {
 			venc_power_off();
-			break;
+			/*break;*/
 		}
 		#endif
 		mutex_lock(&VencHWLock);
@@ -2367,7 +2367,7 @@ static int vcodec_probe(struct platform_device *pdev)
 
 	vcodec_device = device_create(vcodec_class, NULL, vcodec_devno, NULL, VCODEC_DEVNAME);
 
-#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+#if 0 /*def CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT*/
 #else
 	/* if (request_irq(MT_VDEC_IRQ_ID , (irq_handler_t)video_intr_dlr,
 	* IRQF_TRIGGER_LOW, VCODEC_DEVNAME, NULL) < 0)
