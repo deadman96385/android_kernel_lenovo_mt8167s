@@ -625,7 +625,7 @@ void vWriteHdmiIntMask(unsigned char bMask)
 {
 	HDMI_DRV_FUNC();
 
-	vWriteByteHdmiGRL(GRL_INT_MASK, bMask);
+	/* vWriteByteHdmiGRL(GRL_INT_MASK, bMask); */
 	vEnable_hotplug_pord_int(bMask & 0x1);
 }
 
