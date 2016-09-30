@@ -440,7 +440,7 @@ static int mt8167_evb_gpio_probe(struct snd_soc_card *card)
 				mt8167_evb_pinctrl_pin_str[i]);
 		if (IS_ERR(card_data->pin_states[i])) {
 			ret = PTR_ERR(card_data->pin_states[i]);
-			dev_err(card->dev, "%s pinctrl_lookup_state %s failed %d\n",
+			dev_warn(card->dev, "%s Can't find pinctrl state %s %d\n",
 				__func__, mt8167_evb_pinctrl_pin_str[i], ret);
 		}
 	}
@@ -494,9 +494,8 @@ static int mt8167_evb_dev_probe(struct platform_device *pdev)
 	}
 
 	snd_soc_card_set_drvdata(card, card_data);
-	if (mt8167_evb_gpio_probe(card))
-		dev_err(&pdev->dev,
-			"%s mt8167_evb_gpio_probe fail\n", __func__);
+
+	mt8167_evb_gpio_probe(card);
 
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret)
