@@ -26,6 +26,12 @@
 	#address-cells = <2>;
 	#size-cells = <2>;
 
+	/* ATF logger SW IRQ number 253 = 32 + 221 */
+	atf_logger {
+		compatible = "mediatek,atf_logger";
+		interrupts = <GIC_SPI 221 IRQ_TYPE_EDGE_RISING>;
+	};
+
 	cluster0_opp: opp_table0 {
 		compatible = "operating-points-v2";
 		opp-shared;
