@@ -30,3 +30,4 @@ obj-$(CONFIG_MACH_MT8167) += mtk_dcm.o
 obj-y += mtk_cpuidle.o
 
 obj-y += cpu_dormant.o
+obj-y += mtk_idle.o
