@@ -736,6 +736,77 @@ const struct clk_ops mtk_clk_gate_ops_inv = {
 	.disable	= mtk_cg_disable_inv,
 };
 
+struct mtk_clk_divider {
+	int id;
+	const char *name;
+	const char *parent_name;
+	unsigned long flags;
+
+	u32 div_reg;
+	unsigned char div_shift;
+	unsigned char div_width;
+	unsigned char clk_divider_flags;
+	const struct clk_div_table *clk_div_table;
+};
+
+#define DIV_ADJ(_id, _name, _parent, _reg, _shift, _width) {	\
+		.id = _id,					\
+		.name = _name,					\
+		.parent_name = _parent,				\
+		.div_reg = _reg,				\
+		.div_shift = _shift,				\
+		.div_width = _width,				\
+}
+
+void mtk_clk_register_dividers(const struct mtk_clk_divider *mcds,
+			int num, void __iomem *base, spinlock_t *lock,
+				struct clk_onecell_data *clk_data)
+{
+	struct clk *clk;
+	int i;
+
+	for (i = 0; i <  num; i++) {
+		const struct mtk_clk_divider *mcd = &mcds[i];
+
+		if (clk_data && !IS_ERR_OR_NULL(clk_data->clks[mcd->id]))
+			continue;
+
+		clk = clk_register_divider(NULL, mcd->name, mcd->parent_name,
+			mcd->flags, base +  mcd->div_reg, mcd->div_shift,
+			mcd->div_width, mcd->clk_divider_flags, lock);
+
+		if (IS_ERR(clk)) {
+			pr_err("Failed to register clk %s: %ld\n",
+				mcd->name, PTR_ERR(clk));
+			continue;
+		}
+
+		if (clk_data)
+			clk_data->clks[mcd->id] = clk;
+	}
+}
+
+static const struct mtk_clk_divider top_adj_divs[] = {
+	DIV_ADJ(CLK_TOP_APLL12_CK_DIV0, "apll12_ck_div0", "aud_i2s0_m_sel",
+		0x0048, 0, 8),
+	DIV_ADJ(CLK_TOP_APLL12_CK_DIV1, "apll12_ck_div1", "aud_i2s1_m_sel",
+		0x0048, 8, 8),
+	DIV_ADJ(CLK_TOP_APLL12_CK_DIV2, "apll12_ck_div2", "aud_i2s2_m_sel",
+		0x0048, 16, 8),
+	DIV_ADJ(CLK_TOP_APLL12_CK_DIV3, "apll12_ck_div3", "aud_i2s3_m_sel",
+		0x0048, 24, 8),
+	DIV_ADJ(CLK_TOP_APLL12_CK_DIV4, "apll12_ck_div4", "aud_i2s4_m_sel",
+		0x004c, 0, 8),
+	DIV_ADJ(CLK_TOP_APLL12_CK_DIV4B, "apll12_ck_div4b", "apll12_div4",
+		0x004c, 8, 8),
+	DIV_ADJ(CLK_TOP_APLL12_CK_DIV5, "apll12_ck_div5", "aud_i2s5_m_sel",
+		0x004c, 16, 8),
+	DIV_ADJ(CLK_TOP_APLL12_CK_DIV5B, "apll12_ck_div5b", "apll12_div5",
+		0x004c, 24, 8),
+	DIV_ADJ(CLK_TOP_APLL12_CK_DIV6, "apll12_ck_div6", "aud_spdif_b_sel",
+		0x0078, 0, 8),
+};
+
 static const struct mtk_gate_regs top0_cg_regs = {
 	.set_ofs = 0x50,
 	.clr_ofs = 0x80,
@@ -1020,23 +1091,23 @@ static const struct mtk_gate top_clks[] __initconst = {
 	GATE_TOP4_I(CLK_TOP_RG_APLL2_D8_EN, "rg_apll2_d8_en", "apll2_d8",
 		13),
 	/* TOP5 */
-	GATE_TOP5(CLK_TOP_APLL12_DIV0, "apll12_div0", "aud_i2s0_m_sel",
+	GATE_TOP5(CLK_TOP_APLL12_DIV0, "apll12_div0", "apll12_ck_div0",
 		0),
-	GATE_TOP5(CLK_TOP_APLL12_DIV1, "apll12_div1", "aud_i2s1_m_sel",
+	GATE_TOP5(CLK_TOP_APLL12_DIV1, "apll12_div1", "apll12_ck_div1",
 		1),
-	GATE_TOP5(CLK_TOP_APLL12_DIV2, "apll12_div2", "aud_i2s2_m_sel",
+	GATE_TOP5(CLK_TOP_APLL12_DIV2, "apll12_div2", "apll12_ck_div2",
 		2),
-	GATE_TOP5(CLK_TOP_APLL12_DIV3, "apll12_div3", "aud_i2s3_m_sel",
+	GATE_TOP5(CLK_TOP_APLL12_DIV3, "apll12_div3", "apll12_ck_div3",
 		3),
-	GATE_TOP5(CLK_TOP_APLL12_DIV4, "apll12_div4", "aud_i2s4_m_sel",
+	GATE_TOP5(CLK_TOP_APLL12_DIV4, "apll12_div4", "apll12_ck_div4",
 		4),
-	GATE_TOP5(CLK_TOP_APLL12_DIV4B, "apll12_div4b", "apll12_div4",
+	GATE_TOP5(CLK_TOP_APLL12_DIV4B, "apll12_div4b", "apll12_ck_div4b",
 		5),
-	GATE_TOP5(CLK_TOP_APLL12_DIV5, "apll12_div5", "aud_i2s5_m_sel",
+	GATE_TOP5(CLK_TOP_APLL12_DIV5, "apll12_div5", "apll12_ck_div5",
 		6),
-	GATE_TOP5(CLK_TOP_APLL12_DIV5B, "apll12_div5b", "apll12_div5",
+	GATE_TOP5(CLK_TOP_APLL12_DIV5B, "apll12_div5b", "apll12_ck_div5b",
 		7),
-	GATE_TOP5(CLK_TOP_APLL12_DIV6, "apll12_div6", "aud_spdif_b_sel",
+	GATE_TOP5(CLK_TOP_APLL12_DIV6, "apll12_div6", "apll12_ck_div6",
 		8),
 };
 static const struct mtk_gate_regs aud_cg_regs = {
@@ -1155,7 +1226,7 @@ static const struct mtk_gate mm_clks[] __initconst = {
 	GATE_MM1(CLK_MM_DPI1_PXL, "mm_dpi1_pxl", "rg_fdpi1", 17),
 	GATE_MM1(CLK_MM_HDMI_PXL, "mm_hdmi_pxl", "rg_fdpi1", 18),
 	GATE_MM1(CLK_MM_HDMI_SPDIF, "mm_hdmi_spdif", "apll12_div6", 19),
-	GATE_MM1(CLK_MM_HDMI_ADSP_BCK, "mm_hdmi_adsp_b", "apll12_div4", 20),
+	GATE_MM1(CLK_MM_HDMI_ADSP_BCK, "mm_hdmi_adsp_b", "apll12_div4b", 20),
 	GATE_MM1(CLK_MM_HDMI_PLL, "mm_hdmi_pll", "hdmtx_dig_cts", 21),
 };
 static const struct mtk_gate_regs img_cg_regs = {
@@ -1238,6 +1309,9 @@ static void __init mtk_topckgen_init(struct device_node *node)
 	mtk_clk_register_factors(top_divs, ARRAY_SIZE(top_divs), clk_data);
 	mtk_clk_register_composites(top_muxes, ARRAY_SIZE(top_muxes), base,
 		&mt8167_clk_lock, clk_data);
+	mtk_clk_register_dividers(top_adj_divs, ARRAY_SIZE(top_adj_divs),
+				base, &mt8167_clk_lock, clk_data);
+
 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 
 	if (r)
