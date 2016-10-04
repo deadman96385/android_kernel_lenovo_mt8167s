@@ -403,6 +403,7 @@
 				 <&topckgen CLK_TOP_SMI_MM>,
 				 <&topckgen CLK_TOP_RG_VDEC>;
 			clock-names = "axi_mfg", "mfg", "mm", "vdec";
+			mediatek,pwrap-regmap = <&pwrap>;
 		};
 
 		hacc@1000a000 {
