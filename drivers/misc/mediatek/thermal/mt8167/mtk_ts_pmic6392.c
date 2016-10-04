@@ -75,8 +75,6 @@ do {									\
 } while (0)
 
 /* Cali */
-static kal_int32 g_adc_ge;
-static kal_int32 g_adc_oe;
 static kal_int32 g_o_vts;
 static kal_int32 g_degc_cali;
 static kal_int32 g_adc_cali_en;
@@ -99,43 +97,29 @@ static u16 pmic_read(u16 addr)
 
 static void pmic_cali_prepare(void)
 {
-	kal_uint32 temp0, temp1, temp2, sign;
+	kal_uint32 temp0, temp1;
 
-	temp0 = pmic_read(0x1E2);
-	temp1 = pmic_read(0x1EA);
-	temp2 = pmic_read(0x1EC);
-	pr_info("Power/PMIC_Thermal: Reg(0x1E2)=0x%x, Reg(0x1EA)=0x%x, Reg(0x1EC)=0x%x\n", temp0,
-		temp1, temp2);
+	temp0 = pmic_read(0x622); /* efuse val between 160 to 175. */
+	temp1 = pmic_read(0x624); /* efuse val between 176 to 191. */
+	pr_info("Power/PMIC_Thermal: Reg(0x622)=0x%x, Reg(0x624)=0x%x\n", temp0, temp1);
 
-	g_adc_ge = (temp0 >> 1) & 0x007f;
-	g_adc_oe = (temp0 >> 8) & 0x003f;
-	g_o_vts = ((temp2 & 0x0001) << 8) + ((temp1 >> 8) & 0x00ff);
-	g_degc_cali = (temp1 >> 2) & 0x003f;
-	g_adc_cali_en = (temp1 >> 1) & 0x0001;
-	g_o_slope_sign = (temp2 >> 1) & 0x0001;
-	g_o_slope = (temp2 >> 2) & 0x003f;
-	g_id = (temp2 >> 8) & 0x0001;
-
-	sign = (temp0 >> 7) & 0x0001;
-	if (sign == 1)
-		g_adc_ge = g_adc_ge - 0x80;
-
-	sign = (temp0 >> 13) & 0x0001;
-	if (sign == 1)
-		g_adc_oe = g_adc_oe - 0x40;
+	g_o_vts = ((temp1 & 0x001f) << 8) + ((temp0 >> 8) & 0x00ff);
+	g_degc_cali = (temp0 >> 2) & 0x003f;
+	g_adc_cali_en = (temp0 >> 1) & 0x0001;
+	g_o_slope_sign = (temp1 >> 5) & 0x0001;
+	g_o_slope = ((temp1 >> 6) & 0x0007) + ((temp1 >> 11) & 0x0007);
+	g_id = (temp1 >> 14) & 0x0001;
 
 	if (g_id == 0)
 		g_o_slope = 0;
 
 	if (g_adc_cali_en != 1) {
 		/* no cali, use default value */
-		g_adc_ge = 0;
-		g_adc_oe = 0;
-		/* g_o_vts = 608; */
-		g_o_vts = 352;
+		g_o_vts = 1600;
 		g_degc_cali = 50;
 		g_o_slope = 0;
 		g_o_slope_sign = 0;
+		pr_err("[pmic_cali_prepare] No thermal calibration data !!!");
 	}
 }
 
@@ -143,31 +127,29 @@ static kal_int32 thermal_cal_exec(kal_uint32 ret)
 {
 	kal_int32 t_current = 0;
 	kal_int32 y_curr = ret;
-	kal_int32 format_1 = 0;
-	kal_int32 format_2 = 0;
-	kal_int32 format_3 = 0;
-	kal_int32 format_4 = 0;
+	kal_int32 slope_data = 0;
+	kal_int32 VBE_T = 0;
 
 	if (ret == 0)
 		return 0;
 
-	format_1 = (g_degc_cali * 1000 / 2);
-	format_2 = (g_adc_ge + 1024) * (g_o_vts + 256) + g_adc_oe * 1024;
-	format_3 = (format_2 * 1200) / 1024 * 100 / 1024;
-	mtktspmic_dprintk("format1=%d, format2=%d, format3=%d\n", format_1, format_2, format_3);
+	VBE_T = ((g_o_vts * 1800) / 4096);
 
 	if (g_o_slope_sign == 0) {
-		/* format_4 = ((format_3 * 1000) / (164+g_o_slope));//unit = 0.001 degress */
-		/* format_4 = (y_curr*1000 - format_3)*100 / (164+g_o_slope); */
-		format_4 = (y_curr * 100 - format_3) * 1000 / (171 + g_o_slope);
+		slope_data = (y_curr - VBE_T) * 100 / (170 + g_o_slope);
 	} else {
-		/* format_4 = ((format_3 * 1000) / (164-g_o_slope)); */
-		/* format_4 = (y_curr*1000 - format_3)*100 / (164-g_o_slope); */
-		format_4 = (y_curr * 100 - format_3) * 1000 / (171 - g_o_slope);
+		slope_data = (y_curr - VBE_T) * 100 / (170 - g_o_slope);
 	}
-	format_4 = format_4 - (2 * format_4);
-	t_current = (format_1) + format_4;	/* unit = 0.001 degress */
-/* tspmic_dprintk("[mtktspmic_get_hw_temp] T_PMIC=%d\n",t_current); */
+
+	slope_data = slope_data - 2 * slope_data;
+
+	t_current = ((g_degc_cali / 2) + slope_data) * 1000;
+
+	mtktspmic_dprintk("[thermal_cal_exec] ret=%d, y_curr=%d\n", ret, y_curr);
+	mtktspmic_dprintk("[thermal_cal_exec] data =%d, slope_data=%d, VBE_T=%d\n",
+				(g_degc_cali / 2), slope_data, VBE_T);
+	mtktspmic_dprintk("[thermal_cal_exec] T_PMIC=%d\n", t_current);
+
 	return t_current;
 }
 
@@ -187,11 +169,9 @@ static int mtktspmic_get_hw_temp(void)
 
 	mtktspmic_dprintk("[mtktspmic_get_hw_temp] PMIC_IMM_GetOneChannel 4=%d, T=%d\n", temp, temp1);
 
-/* pmic_thermal_dump_reg(); // test */
-
-	if ((temp1 > 100000) || (temp1 < -30000)) {
-		pr_info("[Power/PMIC_Thermal] raw=%d, PMIC T=%d", temp, temp1);
-/* pmic_thermal_dump_reg(); */
+	if ((temp1 > 90000) || (temp1 < -30000)) {
+		pr_err("[Power/PMIC_Thermal] raw=%d, PMIC T=%d", temp, temp1);
+		/* pmic_thermal_dump_reg(); */
 	}
 
 	if ((temp1 > 150000) || (temp1 < -50000)) {
