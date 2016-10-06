@@ -99,9 +99,9 @@ static void pmic_cali_prepare(void)
 {
 	kal_uint32 temp0, temp1;
 
-	temp0 = pmic_read(0x622); /* efuse val between 160 to 175. */
-	temp1 = pmic_read(0x624); /* efuse val between 176 to 191. */
-	pr_info("Power/PMIC_Thermal: Reg(0x622)=0x%x, Reg(0x624)=0x%x\n", temp0, temp1);
+	temp0 = pmic_read(0x666); /* efuse val between 160 to 175. */
+	temp1 = pmic_read(0x668); /* efuse val between 176 to 191. */
+	pr_info("Power/PMIC_Thermal: Reg(0x666)=0x%x, Reg(0x668)=0x%x\n", temp0, temp1);
 
 	g_o_vts = ((temp1 & 0x001f) << 8) + ((temp0 >> 8) & 0x00ff);
 	g_degc_cali = (temp0 >> 2) & 0x003f;
