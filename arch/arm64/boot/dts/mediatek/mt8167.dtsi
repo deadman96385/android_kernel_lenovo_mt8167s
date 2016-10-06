@@ -183,12 +183,6 @@
 		compatible = "simple-bus";
 		ranges;
 
-		clk_null: clk_null {
-			compatible = "fixed-clock";
-			#clock-cells = <0>;
-			clock-frequency = <0>;
-		};
-
 		clk26m: clk26m {
 			compatible = "fixed-clock";
 			#clock-cells = <0>;
