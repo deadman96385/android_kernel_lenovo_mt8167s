@@ -805,11 +805,17 @@ static int mt8167_afe_i2s_prepare(struct snd_pcm_substream *substream,
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		clk_set_parent(afe->clocks[MT8167_CLK_I2S1_M_SEL], (rate % 8000) ?
+			afe->clocks[MT8167_CLK_AUD1] : afe->clocks[MT8167_CLK_AUD2]);
+
 		mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV1],
 				rate * 256, NULL, 0);
 
 		mt8167_afe_set_i2s_out_enable(afe, true);
 	} else {
+		clk_set_parent(afe->clocks[MT8167_CLK_I2S2_M_SEL], (rate % 8000) ?
+			afe->clocks[MT8167_CLK_AUD1] : afe->clocks[MT8167_CLK_AUD2]);
+
 		mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV2],
 				rate * 256, NULL, 0);
 
@@ -921,11 +927,17 @@ static int mt8167_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		clk_set_parent(afe->clocks[MT8167_CLK_I2S3_M_SEL], (rate % 8000) ?
+			afe->clocks[MT8167_CLK_AUD1] : afe->clocks[MT8167_CLK_AUD2]);
+
 		mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV3],
 				rate * 256, NULL, 0);
 
 		mt8167_afe_set_2nd_i2s_out_enable(afe, true);
 	} else {
+		clk_set_parent(afe->clocks[MT8167_CLK_I2S0_M_SEL], (rate % 8000) ?
+			afe->clocks[MT8167_CLK_AUD1] : afe->clocks[MT8167_CLK_AUD2]);
+
 		mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV0],
 				rate * 256, NULL, 0);
 
@@ -1226,10 +1238,13 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 		return 0;
 	}
 
-	if (rate % 8000)
+	if (rate % 8000) {
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
-	else
+		clk_set_parent(afe->clocks[MT8167_CLK_I2S4_M_SEL], afe->clocks[MT8167_CLK_AUD1]);
+	} else {
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
+		clk_set_parent(afe->clocks[MT8167_CLK_I2S4_M_SEL], afe->clocks[MT8167_CLK_AUD2]);
+	}
 
 	if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI)
 		mt8167_afe_dais_set_clks(afe,
@@ -1440,10 +1455,13 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 		return 0;
 	}
 
-	if (rate % 8000)
+	if (rate % 8000) {
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
-	else
+		clk_set_parent(afe->clocks[MT8167_CLK_I2S5_M_SEL], afe->clocks[MT8167_CLK_AUD1]);
+	} else {
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
+		clk_set_parent(afe->clocks[MT8167_CLK_I2S5_M_SEL], afe->clocks[MT8167_CLK_AUD2]);
+	}
 
 	mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV5], rate * 128,
 		afe->clocks[MT8167_CLK_APLL12_DIV5B], rate * channels * bit_width);
@@ -2384,6 +2402,15 @@ static const char *aud_clks[MT8167_CLK_NUM] = {
 	[MT8167_CLK_SPDIF_IN] =  "spdif_in",
 	[MT8167_CLK_ENGEN1] =  "engen1",
 	[MT8167_CLK_ENGEN2] =  "engen2",
+	[MT8167_CLK_AUD1] =  "aud1",
+	[MT8167_CLK_AUD2] =  "aud2",
+	[MT8167_CLK_I2S0_M_SEL] =  "i2s0_m_sel",
+	[MT8167_CLK_I2S1_M_SEL] =  "i2s1_m_sel",
+	[MT8167_CLK_I2S2_M_SEL] =  "i2s2_m_sel",
+	[MT8167_CLK_I2S3_M_SEL] =  "i2s3_m_sel",
+	[MT8167_CLK_I2S4_M_SEL] =  "i2s4_m_sel",
+	[MT8167_CLK_I2S5_M_SEL] =  "i2s5_m_sel",
+	[MT8167_CLK_SPDIF_B_SEL] =  "spdif_b_sel",
 };
 #endif
 
