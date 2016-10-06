@@ -496,8 +496,6 @@
 			compatible = "mediatek,mt8167-devapc";
 			reg = <0 0x10204000 0 0x1000>;
 			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&infracfg CLK_INFRA_DEVICE_APC>;
-			clock-names = "main";
 		};
 
 		systracker: systracker@1020b000 {
