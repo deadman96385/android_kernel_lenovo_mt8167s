@@ -18,6 +18,7 @@
 #include "mtk_power_throttle.h"
 #include "mt_hotplug_strategy.h"
 #include "mach/mtk_thermal.h"
+#include "mtk_ptp.h"
 
 static unsigned long clipped_freq;
 static unsigned int limited_max_ncpu;
@@ -251,6 +252,7 @@ static int mtk_cpufreq_thermal_notifier(struct notifier_block *nb,
 				    unsigned long event, void *data)
 {
 	struct cpufreq_policy *policy = data;
+	int ret;
 
 	pr_debug("%s %ld\n", __func__, event);
 
@@ -278,8 +280,15 @@ static int mtk_cpufreq_thermal_notifier(struct notifier_block *nb,
 	 * Only DVFS TLP feature enable, we can keep the max freq by CPUFREQ
 	 * GOVERNOR or Pref service.
 	 */
-	if ((policy->max != clipped_freq) && (clipped_freq >= policy->min))
+	if ((policy->max != clipped_freq) && (clipped_freq >= policy->min)) {
+		ret = is_ptp_initialized_done();
+		if (ret) {
+			pr_err("PTP is initializing. Cannot do thermal throttling, ret = %d\n", ret);
+			return NOTIFY_DONE;
+		}
+
 		cpufreq_verify_within_limits(policy, 0, clipped_freq);
+	}
 
 	return NOTIFY_OK;
 }

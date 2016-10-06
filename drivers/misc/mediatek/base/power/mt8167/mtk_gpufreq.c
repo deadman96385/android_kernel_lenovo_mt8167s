@@ -1193,11 +1193,12 @@ static void mt_gpufreq_clock_switch(unsigned int freq_new)
 
 static void mt_gpufreq_volt_switch(unsigned int volt_old, unsigned int volt_new)
 {
-	unsigned int delay_unit_us = 100;
+	/* unsigned int delay_unit_us = 100; */
 
 	gpufreq_dbg("@%s: volt_new = %d\n", __func__, volt_new);
 
-#ifdef VGPU_SET_BY_PMIC
+/* #ifdef VGPU_SET_BY_PMIC */
+#if 0
 	if (volt_new > volt_old)
 		regulator_set_voltage(mt_gpufreq_pmic->reg_vgpu,
 					volt_new*10, (PMIC_MAX_VGPU*10) + 125);
