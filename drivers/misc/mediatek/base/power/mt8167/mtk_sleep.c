@@ -131,8 +131,9 @@ static u32 slp_time = 30;
 #endif /* ENABLE_AUTO_SUSPEND_TEST */
 
 static u32 slp_spm_flags = {
-#if 0				/* normal suspend */
-	SPM_L2_DORMANT_DIS | SPM_VPROC_LOW_DIS
+#if 1				/* normal suspend */
+	SPM_L2_DORMANT_DIS | SPM_VPROC_LOW_DIS | SPM_INFRA_PDN_DIS | SPM_MCU_PDN_DIS |
+	SPM_DDRPHY_S1_DIS | SPM_26M_DIS
 #else				/* legacy suspend */
 	SPM_L2_DORMANT_DIS | SPM_VPROC_LOW_DIS | SPM_CPU_PDN_DIS | SPM_INFRA_PDN_DIS |
 	SPM_DDRPHY_S1_DIS | SPM_26M_DIS
@@ -143,7 +144,7 @@ static u32 slp_spm_flags = {
 #if SLP_SLEEP_DPIDLE_EN
 static u32 slp_spm_deepidle_flags = {
 #if 1				/* normal suspend */
-	SPM_INFRA_PDN_DIS | SPM_26M_OFF_DIS
+	SPM_INFRA_PDN_DIS | SPM_26M_OFF_DIS | SPM_MCU_PDN_DIS
 	/* SPM_BUS26M_DIS | SPM_MPLLOFF_DIS | SPM_FHC_SLEEP_DIS | SPM_26M_DIS */
 #else
 	SPM_CPU_PDN_DIS | SPM_DDRPHY_S1_DIS | SPM_VPROC_LOW_DIS | SPM_INFRA_PDN_DIS |
