@@ -1333,21 +1333,18 @@
 			compatible = "mediatek,met_smi";
 			reg = <0 0x14017000 0 0x1000>,  /* SMI_COMMON_EXT */
 			      <0 0x14016000 0 0x1000>,  /* LARB 0 */
-			      <0 0x16010000 0 0x1000>,  /* LARB 1 */
-			      <0 0x15001000 0 0x1000>,  /* LARB 2 */
-			      <0 0x17001000 0 0x1000>;  /* LARB 3 */
+			      <0 0x15001000 0 0x1000>,  /* LARB 1 */
+			      <0 0x16010000 0 0x1000>;  /* LARB 2 */
 
 			clocks = <&mmsys CLK_MM_SMI_COMMON>,
 				 <&mmsys CLK_MM_SMI_LARB0>,
-				 <&vdecsys CLK_VDEC_CKEN>,
-				 <&imgsys CLK_IMG_LARB2_SMI>,
-				 <&vencsys CLK_VENC_CKE1>;
+				 <&imgsys CLK_IMG_LARB1_SMI>,
+				 <&vdecsys CLK_VDEC_CKEN>;
 
 			clock-names = "smi-common",
 				      "smi-larb0",
-				      "vdec-larb1",
-				      "img-larb2",
-				      "venc-larb3";
+				      "img-larb1",
+				      "vdec-larb2";
 		};
 
 		imgsys: imgsys@15000000 {
