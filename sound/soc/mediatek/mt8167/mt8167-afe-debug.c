@@ -94,9 +94,12 @@ static const struct afe_dump_reg_attr afe_dump_regs[] = {
 	DUMP_REG_ENTRY(AFE_IRQ_CNT2),
 	DUMP_REG_ENTRY(AFE_MEMIF_PBUF_SIZE),
 	DUMP_REG_ENTRY(AFE_SGEN_CON0),
+	DUMP_REG_ENTRY(AFE_APLL1_TUNER_CFG),
+	DUMP_REG_ENTRY(AFE_APLL2_TUNER_CFG),
 };
 
 static const struct afe_dump_reg_attr hdmi_dump_regs[] = {
+	DUMP_REG_ENTRY(AUDIO_TOP_CON0),
 	DUMP_REG_ENTRY(AFE_DAC_CON0),
 	DUMP_REG_ENTRY(AFE_HDMI_OUT_CON0),
 	DUMP_REG_ENTRY(AFE_HDMI_CONN0),
@@ -108,9 +111,12 @@ static const struct afe_dump_reg_attr hdmi_dump_regs[] = {
 	DUMP_REG_ENTRY(AFE_IRQ_MCU_CON2),
 	DUMP_REG_ENTRY(AFE_IRQ_CNT5),
 	DUMP_REG_ENTRY(AFE_MEMIF_PBUF2_SIZE),
+	DUMP_REG_ENTRY(AFE_APLL1_TUNER_CFG),
+	DUMP_REG_ENTRY(AFE_APLL2_TUNER_CFG),
 };
 
 static const struct afe_dump_reg_attr tdmi_in_dump_regs[] = {
+	DUMP_REG_ENTRY(AUDIO_TOP_CON0),
 	DUMP_REG_ENTRY(AFE_DAC_CON0),
 	DUMP_REG_ENTRY(AFE_CONN_TDMIN_CON),
 	DUMP_REG_ENTRY(AFE_HDMI_IN_2CH_BASE),
@@ -121,6 +127,8 @@ static const struct afe_dump_reg_attr tdmi_in_dump_regs[] = {
 	DUMP_REG_ENTRY(AFE_IRQ_MCU_CON2),
 	DUMP_REG_ENTRY(AFE_IRQ_CNT10),
 	DUMP_REG_ENTRY(AFE_MEMIF_PBUF2_SIZE),
+	DUMP_REG_ENTRY(AFE_APLL1_TUNER_CFG),
+	DUMP_REG_ENTRY(AFE_APLL2_TUNER_CFG),
 };
 
 static ssize_t mt8167_afe_read_file(struct file *file, char __user *user_buf,
@@ -151,9 +159,6 @@ static ssize_t mt8167_afe_read_file(struct file *file, char __user *user_buf,
 			n += scnprintf(buf + n, count - n, "%s = 0x%x\n",
 				       afe_dump_regs[i].name, reg_value);
 	}
-
-	n += scnprintf(buf + n, count - n, "adda_afe_on_ref_cnt = %d\n",
-		       afe->adda_afe_on_ref_cnt);
 
 	mt8167_afe_disable_main_clk(afe);
 
