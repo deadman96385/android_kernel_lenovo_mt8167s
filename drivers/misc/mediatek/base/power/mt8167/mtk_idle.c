@@ -41,6 +41,7 @@
 #define IDLE_HAVE_PTP		0
 #define IDLE_HAVE_STD_TIMER	1
 #define IDLE_EN_LOG_DBG		0
+#define IDLE_CND_MTCMOS		1
 
 #include "mtk_spm.h"
 #include "mtk_spm_idle.h"
@@ -143,28 +144,30 @@ static int idle_switch[NR_TYPES] = {
 static u32 dpidle_condition_mask[NR_GRPS] = {
 	0x00000037, /* CG_CTRL0: */
 	0x8089B2FC, /* CG_CTRL1: */
-	0x00003F16, /* CG_CTRL2: */
-	0x0007EFFF, /* CG_MMSYS0: */
-	0x0000000C, /* CG_MMSYS1: */
+	0x017F7F16, /* CG_CTRL2: */
+	0x000430FD, /* CG_CTRL8: */
+	0x000F0203, /* CG_MMSYS0: */
+	0x003FC03C, /* CG_MMSYS1: */
 	0x000003E1, /* CG_IMGSYS: */
-	0x00000001, /* CG_MFGSYS: */
+	0x00000004, /* CG_MFGSYS: */
 	0x00000000, /* CG_AUDIO: */
-	0x00000000, /* CG_VDEC0: */
-	0x00000000, /* CG_VDEC1: */
+	0x00000001, /* CG_VDEC0: */
+	0x00000001, /* CG_VDEC1: */
 };
 
 #if IDLE_HAVE_SODI
 static u32 soidle_condition_mask[NR_GRPS] = {
 	0x00000026, /* CG_CTRL0: */
 	0x8089B2F8, /* CG_CTRL1: */
-	0x00003F06, /* CG_CTRL2: */
+	0x017F7F06, /* CG_CTRL2: */
+	0x000430FD, /* CG_CTRL8: */
 	0x00000200, /* CG_MMSYS0: */
-	0x00000000, /* CG_MMSYS1: */
+	0x003FC030, /* CG_MMSYS1: */
 	0x000003E1, /* CG_IMGSYS: */
-	0x00000001, /* CG_MFGSYS: */
+	0x00000004, /* CG_MFGSYS: */
 	0x00000000, /* CG_AUDIO: */
-	0x00000000, /* CG_VDEC0: */
-	0x00000000, /* CG_VDEC1: */
+	0x00000001, /* CG_VDEC0: */
+	0x00000001, /* CG_VDEC1: */
 };
 #endif /* IDLE_HAVE_SODI */
 
@@ -172,6 +175,7 @@ static u32 slidle_condition_mask[NR_GRPS] = {
 	0xFFFFFFFF, /* CG_CTRL0: */
 	0xFFFFFFFF, /* CG_CTRL1: */
 	0xFFFFFFFF, /* CG_CTRL2: */
+	0xFFFFFFFF, /* CG_CTRL8: */
 	0xFFFFFFFF, /* CG_MMSYS0: */
 	0xFFFFFFFF, /* CG_MMSYS1: */
 	0xFFFFFFFF, /* CG_IMGSYS: */
@@ -279,6 +283,7 @@ static void __iomem *vdecsys_base;	/* 0x16000000 */
 #define CLK_GATING_CTRL0		TOPCKGEN_REG(0x20)
 #define CLK_GATING_CTRL1		TOPCKGEN_REG(0x24)
 #define CLK_GATING_CTRL2		TOPCKGEN_REG(0x3c)
+#define CLK_GATING_CTRL8		TOPCKGEN_REG(0x70)
 #define SPM_PWR_STATUS			SCP_REG(0x60c)
 #define SPM_PWR_STATUS_2ND		SCP_REG(0x610)
 #define AUDIO_TOP_CON0			AUDIO_REG(0x00)
@@ -466,6 +471,7 @@ static void get_all_clock_state(u32 clks[NR_GRPS])
 		clks[CG_CTRL0] = ~idle_readl(CLK_GATING_CTRL0) ^ (~BIT(4));
 		clks[CG_CTRL1] = ~idle_readl(CLK_GATING_CTRL1);
 		clks[CG_CTRL2] = ~idle_readl(CLK_GATING_CTRL2);
+		clks[CG_CTRL8] = ~idle_readl(CLK_GATING_CTRL8);
 	}
 
 	if (sys_is_on(SYS_DIS) && is_valid_reg(mmsys_base)) {
@@ -473,6 +479,22 @@ static void get_all_clock_state(u32 clks[NR_GRPS])
 		clks[CG_MMSYS1] = ~idle_readl(MMSYS_CG_CON1);
 	}
 
+	if (is_valid_reg(audiosys_base))
+		clks[CG_AUDIO] = ~idle_readl(AUDIO_TOP_CON0);
+
+#if IDLE_CND_MTCMOS
+	if (sys_is_on(SYS_ISP))
+		clks[CG_IMGSYS] = 0xffffffff;
+
+	if (sys_is_on(SYS_MFG_ASYNC) && sys_is_on(SYS_MFG_2D) &&
+			sys_is_on(SYS_MFG_3D))
+		clks[CG_MFGSYS] = 0xffffffff;
+
+	if (sys_is_on(SYS_VDE)) {
+		clks[CG_VDEC0] = 0xffffffff;
+		clks[CG_VDEC1] = 0xffffffff;
+	}
+#else
 	if (sys_is_on(SYS_ISP) && is_valid_reg(imgsys_base))
 		clks[CG_IMGSYS] = ~idle_readl(IMG_CG_CON);
 
@@ -484,9 +506,7 @@ static void get_all_clock_state(u32 clks[NR_GRPS])
 		clks[CG_VDEC0] = idle_readl(VDEC_CKEN_SET);
 		clks[CG_VDEC1] = idle_readl(LARB_CKEN_SET);
 	}
-
-	if (is_valid_reg(audiosys_base))
-		clks[CG_AUDIO] = ~idle_readl(AUDIO_TOP_CON0);
+#endif
 }
 
 static bool clkmgr_idle_can_enter(u32 *condition_mask, u32 *block_mask)
@@ -511,6 +531,7 @@ static const char *grp_get_name(int id)
 		"CG_CTRL0",
 		"CG_CTRL1",
 		"CG_CTRL2",
+		"CG_CTRL8",
 		"CG_MMSYS0",
 		"CG_MMSYS1",
 		"CG_IMGSYS",
