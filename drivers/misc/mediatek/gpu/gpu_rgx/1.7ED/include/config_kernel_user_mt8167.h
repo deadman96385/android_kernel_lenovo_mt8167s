@@ -85,3 +85,4 @@
 #define MTK_USE_HW_APM
 #define MTK_CONFIG_OF
 #define ENABLE_COMMON_DVFS
+#define MTK_GPU_DVFS
