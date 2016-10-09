@@ -112,6 +112,7 @@ static DEFINE_SPINLOCK(LockEncHWCountLock);
 static DEFINE_SPINLOCK(DecISRCountLock);
 static DEFINE_SPINLOCK(EncISRCountLock);
 
+static struct clk *g_clk_venc;
 
 static VAL_EVENT_T DecHWLockEvent;	/* mutex : HWLockEventTimeoutLock */
 static VAL_EVENT_T EncHWLockEvent;	/* mutex : HWLockEventTimeoutLock */
@@ -250,6 +251,21 @@ struct platform_device *pvenclt_dev;
 #endif
 /*static int venc_enableIRQ(VAL_HW_LOCK_T *prHWLock);*/
 /*static int venc_disableIRQ(VAL_HW_LOCK_T *prHWLock);*/
+
+static struct platform_device *vcodec_get_pdev(char *dev_name)
+{
+	struct device_node *np;
+	struct platform_device *pdev;
+
+	np = of_find_compatible_node(NULL, NULL, dev_name);
+	if (np == NULL)
+		MODULE_MFV_LOGD("%s np find fail\n", dev_name);
+
+	pdev = of_find_device_by_node(np);
+
+	return pdev;
+}
+
 void vdec_power_on(void)
 {
 	mutex_lock(&VdecPWRLock);
@@ -302,10 +318,11 @@ void venc_power_on(void)
 
 #ifdef CONFIG_OF
 	MODULE_MFV_LOGD("venc_power_on D+\n");
-	mtk_smi_larb_clock_on(3, true);
+	mtk_smi_larb_clock_on(1, true);
 	#ifndef CONFIG_MACH_MT8167
 	mtk_smi_larb_clock_on(5, true);
 	#endif
+	clk_prepare_enable(g_clk_venc);
 	/* clk_prepare(clk_venc_clk);
 	 * clk_enable(clk_venc_clk);
 	 * clk_prepare(clk_venc_lt_clk);
@@ -337,11 +354,11 @@ void venc_power_off(void)
 		 * clk_disable(clk_venc_lt_clk);
 		 * clk_unprepare(clk_venc_lt_clk);
 		 */
-
+		clk_disable_unprepare(g_clk_venc);
 		#ifndef CONFIG_MACH_MT8167
 		mtk_smi_larb_clock_off(5, true);
 		#endif
-		mtk_smi_larb_clock_off(3, true);
+		mtk_smi_larb_clock_off(1, true);
 #else
 		disable_clock(MT_CG_VENC_VENC, "VENC");
 		disable_clock(MT_CG_VENC_LARB, "VENC");
@@ -1419,6 +1436,9 @@ static long vcodec_unlocked_ioctl(struct file *file, unsigned int cmd, unsigned 
 	case VCODEC_DEINITHWLOCK:
 	{
 		MODULE_MFV_LOGE("VCODEC_DEINITHWLOCK [EMPTY] + - tid = %d\n", current->pid);
+		MODULE_MFV_LOGD("[venc-clk] disable power/clock when deinithwlock\n");
+		venc_power_off();
+		break;
 		MODULE_MFV_LOGE("VCODEC_DEINITHWLOCK [EMPTY] - - tid = %d\n", current->pid);
 	}
 	break;
@@ -1988,6 +2008,10 @@ static long vcodec_unlocked_compat_ioctl(struct file *file, unsigned int cmd, un
 		}
 		break;
 
+	case VCODEC_INITHWLOCK:
+		MODULE_MFV_LOGD("[venc-clk] enable power/clock when inithwlock\n");
+		venc_power_on();
+		break;
 	default:
 		{
 			return vcodec_unlocked_ioctl(file, cmd, arg);
@@ -2269,8 +2293,12 @@ static const struct file_operations vcodec_fops = {
 static int vcodec_probe(struct platform_device *pdev)
 {
 	int ret;
+	struct platform_device *pVencDev;
 
 	MODULE_MFV_LOGD("+vcodec_probe\n");
+
+	pVencDev = vcodec_get_pdev("mediatek,mt8167-venc");
+	g_clk_venc = devm_clk_get(&pVencDev->dev, "img_venc");
 
 	mutex_lock(&DecEMILock);
 	gu4DecEMICounter = 0;
@@ -2478,6 +2506,17 @@ static int vcodec_remove(struct platform_device *pDev)
 	/*pm_runtime_disable(&pvenc_dev->dev);*/
 	/*pm_runtime_disable(&pvenclt_dev->dev);*/
 	MODULE_MFV_LOGD("vcodec_remove\n");
+
+#if CONFIG_OF
+	{
+		struct platform_device *pVencDev;
+
+		pVencDev = vcodec_get_pdev("mediatek,mt8167-venc");
+		devm_clk_put(&pVencDev->dev, g_clk_venc);
+		MODULE_MFV_LOGD("[venc-clk] put clk 0x%lx\n", (unsigned long int)g_clk_venc);
+	}
+#endif
+
 	return 0;
 }
 
