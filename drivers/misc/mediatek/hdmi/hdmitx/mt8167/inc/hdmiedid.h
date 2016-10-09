@@ -265,7 +265,7 @@ extern unsigned char hdmi_fgreadedid(unsigned char i1noedid);
 extern void vShowEdidInformation(void);
 extern void vShowEdidRawData(void);
 extern void vClearEdidInfo(void);
-extern void hdmi_AppGetEdidInfo(struct HDMI_EDID_INFO_T *pv_get_info);
+extern void hdmi_AppGetEdidInfo(HDMI_EDID_T *pv_get_info);
 extern unsigned char vCheckPcmBitSize(unsigned char ui1ChNumInx);
 
 extern unsigned char hdmi_check_edid_header(void);
