@@ -19,6 +19,7 @@
 #include <linux/platform_device.h>
 #include <linux/of_gpio.h>
 #include <linux/gpio.h>
+#include "mtk_auxadc.h"
 
 #define DEBUG_THREAD 1
 #define ACCDET_MULTI_KEY_FEATURE
@@ -39,7 +40,7 @@ unsigned int headsetdebounce;
 unsigned int accdet_eint_type;
 struct headset_mode_settings *cust_headset_settings;
 #define ACCDET_DEBUG(format, args...) pr_debug(format, ##args)
-#define ACCDET_INFO(format, args...) pr_debug(format, ##args)
+#define ACCDET_INFO(format, args...) pr_notice(format, ##args)
 #define ACCDET_ERROR(format, args...) pr_err(format, ##args)
 static struct switch_dev accdet_data;
 static struct input_dev *kpd_accdet_dev;
@@ -134,24 +135,6 @@ EXPORT_SYMBOL(accdet_state_reset);
 int accdet_get_cable_type(void)
 {
 	return cable_type;
-}
-
-void accdet_auxadc_switch(int enable)
-{
-		if (enable) {
-#ifndef ACCDET_28V_MODE
-			accdet_write(ACCDET_RSV, ACCDET_1V9_MODE_ON);
-#else
-			accdet_write(0x732, ACCDET_2V8_MODE_ON);
-#endif
-		} else {
-#ifndef ACCDET_28V_MODE
-			accdet_write(ACCDET_RSV, ACCDET_1V9_MODE_OFF);
-#else
-			accdet_write(0x732, 0);
-#endif
-
-		}
 }
 
 /*pmic wrap read and write func*/
@@ -270,7 +253,6 @@ static void accdet_eint_work_callback(struct work_struct *work)
 		eint_accdet_sync_flag = 0;
 		mutex_unlock(&accdet_eint_irq_sync_mutex);
 		del_timer_sync(&micbias_timer);
-		/*accdet_auxadc_switch(0);*/
 		disable_accdet();
 		headset_plug_out();
 	}
@@ -370,7 +352,7 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 
 #ifdef ACCDET_MULTI_KEY_FEATURE
 #define KEY_SAMPLE_PERIOD        60	/* ms */
-#define MULTIKEY_ADC_CHANNEL	 5
+#define MULTIKEY_ADC_CHANNEL	 15
 
 #define NO_KEY			 (0x0)
 #define UP_KEY			 (0x01)
@@ -459,12 +441,17 @@ static int multi_key_detection(void)
 	int m_key = 0;
 	int cur_key = 0;
 	int cali_voltage = 0;
+	int ret;
 
-	/* To be do: change to use AP AUXADC */
-	/* cali_voltage = PMIC_IMM_GetOneChannelValue(MULTIKEY_ADC_CHANNEL, 1, 1); */
+	ret = IMM_GetOneChannelValue_Cali(MULTIKEY_ADC_CHANNEL, &cali_voltage);
+	if (ret)
+		ACCDET_ERROR("[Accdet]get auxadc value fail, ret = %d\n", ret);
 
-	ACCDET_DEBUG("[Accdet]adc cali_voltage1 = %d mv\n", cali_voltage);
-	ACCDET_DEBUG("[Accdet]*********detect key.\n");
+	cali_voltage = cali_voltage / 1000; /* uV->mV */
+	cali_voltage = cali_voltage / 2; /* ACCDET 2 times gain */
+
+	ACCDET_INFO("[Accdet]adc cali_voltage1 = %d mv\n", cali_voltage);
+	ACCDET_INFO("[Accdet]*********detect key.\n");
 
 	m_key = cur_key = key_check(cali_voltage);
 
@@ -520,7 +507,6 @@ static inline int accdet_irq_handler(void)
 		clear_accdet_interrupt();
 #ifdef ACCDET_MULTI_KEY_FEATURE
 	if (accdet_status == MIC_BIAS) {
-		accdet_auxadc_switch(1);
 		accdet_write(ACCDET_PWM_WIDTH,
 				 REGISTER_VALUE(cust_headset_settings->pwm_width));
 		accdet_write(ACCDET_PWM_THRESH,
@@ -730,7 +716,6 @@ static inline void check_cable_type(void)
 				else
 					ACCDET_DEBUG("[Accdet] multi_key_detection: Headset has plugged out\n");
 				mutex_unlock(&accdet_eint_irq_sync_mutex);
-				accdet_auxadc_switch(0);
 				/* recover	pwm frequency and duty */
 				accdet_write(ACCDET_PWM_WIDTH,
 					REGISTER_VALUE(cust_headset_settings->pwm_width));
@@ -1176,25 +1161,6 @@ static int accdet_create_attr(struct device_driver *driver)
 }
 
 #endif
-void accdet_int_handler(void)
-{
-	int ret = 0;
-
-	ACCDET_DEBUG("[accdet_int_handler]....\n");
-	ret = accdet_irq_handler();
-	if (ret == 0)
-		ACCDET_DEBUG("[accdet_int_handler] don't finished\n");
-}
-
-void accdet_eint_int_handler(void)
-{
-	int ret = 0;
-
-	ACCDET_DEBUG("[accdet_eint_int_handler]....\n");
-	ret = accdet_irq_handler();
-	if (ret == 0)
-		ACCDET_DEBUG("[accdet_int_handler] don't finished\n");
-}
 
 int mt_accdet_probe(struct platform_device *dev)
 {
