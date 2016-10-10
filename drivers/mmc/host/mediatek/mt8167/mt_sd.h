@@ -38,7 +38,7 @@
 #endif
 
 #ifdef CONFIG_MTK_COMBO_SDIO_SLOT
-#include "mtk_wcn_cmb_stub.h"
+#include <mtk_wcn_cmb_stub.h>
 #endif
 
 #define MSDC_WQ_ERROR_TUNE
@@ -168,10 +168,6 @@ enum {
 
 typedef void (*sdio_irq_handler_t)(void *);  /* external irq handler */
 typedef void (*pm_callback_t)(pm_message_t state, void *data);
-
-#ifdef CONFIG_MTK_COMBO_COMM
-#include <mt-plat/mtk_wcn_cmb_stub.h>
-#endif
 
 #define MSDC_CD_PIN_EN      (1 << 0)  /* card detection pin is wired   */
 #define MSDC_WP_PIN_EN      (1 << 1)  /* write protection pin is wired */
