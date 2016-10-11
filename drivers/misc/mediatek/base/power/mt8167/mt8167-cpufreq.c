@@ -564,6 +564,7 @@ static int mtk_cpufreq_init(struct cpufreq_policy *policy)
 	}
 
 	cpufreq_for_each_valid_entry(pos, freq_table) {
+		rcu_read_lock();
 		freq = pos->frequency;
 		freq_long = freq * 1000;
 		opp = dev_pm_opp_find_freq_ceil(info->cpu_dev, &freq_long);
@@ -571,6 +572,7 @@ static int mtk_cpufreq_init(struct cpufreq_policy *policy)
 		opp_tbl_default[opp_idx].cpufreq_khz = freq;
 		opp_tbl_default[opp_idx].cpufreq_volt = (int)dev_pm_opp_get_voltage(opp);
 		opp_idx++;
+		rcu_read_unlock();
 	}
 	setup_power_table_tk();
 	dump_power_table();
