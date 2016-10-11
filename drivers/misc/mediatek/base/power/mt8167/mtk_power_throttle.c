@@ -300,8 +300,11 @@ static struct notifier_block thermal_cpufreq_notifier_block = {
 	.notifier_call = mtk_cpufreq_thermal_notifier,
 };
 
+static int power_table_ready;
 int setup_power_table_tk(void)
 {
+	int	ret;
+
 	init_mt_cpu_dvfs(&cpu_dvfs);
 
 	if (cpu_dvfs.opp_tbl[0].cpufreq_khz == 0)
@@ -310,7 +313,9 @@ int setup_power_table_tk(void)
 	cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
 					  CPUFREQ_POLICY_NOTIFIER);
 
-	return setup_power_table(&cpu_dvfs);
+	ret = setup_power_table(&cpu_dvfs);
+	power_table_ready = 1;
+	return ret;
 }
 
 void mt_cpufreq_thermal_protect(unsigned int limited_power)
@@ -320,6 +325,11 @@ void mt_cpufreq_thermal_protect(unsigned int limited_power)
 	int ncpu;
 	int found = 0;
 	int i;
+
+	if (power_table_ready == 0) {
+		pr_err("%s power_table_ready is not ready\n", __func__);
+		return;
+	}
 
 	p = &cpu_dvfs;
 
