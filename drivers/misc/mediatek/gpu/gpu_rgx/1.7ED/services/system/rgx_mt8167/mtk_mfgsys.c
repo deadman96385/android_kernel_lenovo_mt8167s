@@ -1355,6 +1355,11 @@ static int mtk_mfg_bind_device_resource(struct platform_device *pdev,
 	pm_runtime_enable(&pdev->dev);
 
 	mfg_base->pdev = pdev;
+	/*CJ, Fix, Me, it's workaround way to enable mfg power domain immediately*/
+	pr_err("pvr_trace mtk_enable_power_domain\n");
+	pm_runtime_get_sync(&mfg_base->mfg_async_pdev->dev);
+	pm_runtime_get_sync(&mfg_base->mfg_2d_pdev->dev);
+	pm_runtime_get_sync(&mfg_base->pdev->dev);
 	return 0;
 
 err_iounmap_reg_base:
