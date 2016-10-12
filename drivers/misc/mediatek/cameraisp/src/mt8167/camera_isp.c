@@ -6027,6 +6027,13 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 #endif
 
 	LOG_INF("isp Probe +");
+
+	/* Check platform_device parameters */
+	if (pDev == NULL) {
+		dev_err(&pDev->dev, "pDev is NULL");
+		return -ENXIO;
+	}
+
 #ifdef CONFIG_MTK_IOMMU
 	larb_node = of_parse_phandle(pDev->dev.of_node, "mediatek,smilarb", 0);
 	if (!larb_node)
@@ -6046,11 +6053,6 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 	}
 #endif
 
-	/* Check platform_device parameters */
-	if (pDev == NULL) {
-		dev_err(&pDev->dev, "pDev is NULL");
-		return -ENXIO;
-	}
 #ifdef CONFIG_OF
 	new_count = nr_camisp_devs + 1;
 	cam_isp_devs = krealloc(cam_isp_devs,

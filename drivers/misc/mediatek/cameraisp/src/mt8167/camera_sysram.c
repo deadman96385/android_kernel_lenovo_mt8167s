@@ -192,13 +192,15 @@ static void SYSRAM_LockUser(SYSRAM_USER_ENUM const User, MUINT32 const Size)
 	Sysram.AllocatedTbl |= (1 << User);
 	Sysram.AllocatedSize[User] = Size;
 	SYSRAM_SetUserTaskInfo(User);
-	/* Debug Log. */
+	/* Debug Log. Not used now*/
+	/*
 	if ((1 << User) & SysramLogUserMask) {
 		SYSRAM_USER_STRUCT * const pUserInfo = &Sysram.UserInfo[User];
 		LOG_MSG("[%s][%lu bytes]OK,Time(%lu.%06lu)",
 			SysramUserName[User],
 			Sysram.AllocatedSize[User], pUserInfo->TimeS, pUserInfo->TimeUS);
 	}
+	*/
 }
 
 /* ------------------------------------------------------------------------------ */
@@ -207,14 +209,14 @@ static void SYSRAM_UnlockUser(SYSRAM_USER_ENUM const User)
 	if (SYSRAM_UserIsUnlocked(User)) {
 		return;
 	}
-	/* Debug Log. */
+	/* Debug Log. Not used now*/
+	/*
 	if ((1 << User) & SysramLogUserMask) {
 		SYSRAM_USER_STRUCT * const pUserInfo = &Sysram.UserInfo[User];
 		MUINT32 Sec, USec;
 		MUINT64 Time64 = 0;
 
 		SYSRAM_GetTime(&Time64, &Sec, &USec);
-		/*  */
 		LOG_MSG("[%s][%lu bytes]Time(%lu.%06lu - %lu.%06lu)(%lu.%06lu)",
 			SysramUserName[User],
 			Sysram.AllocatedSize[User],
@@ -225,6 +227,8 @@ static void SYSRAM_UnlockUser(SYSRAM_USER_ENUM const User)
 			((MUINT32) (Time64 - pUserInfo->Time64)) / 1000,
 			((MUINT32) (Time64 - pUserInfo->Time64)) % 1000);
 	}
+	*/
+
 	/*  */
 	if (Sysram.TotalUserCount > 0) {
 		Sysram.TotalUserCount--;
