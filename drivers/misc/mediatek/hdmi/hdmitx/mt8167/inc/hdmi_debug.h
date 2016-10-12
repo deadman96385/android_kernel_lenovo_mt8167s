@@ -15,9 +15,6 @@
 #define _MT_HDMI_DEBUG_H_
 
 #ifdef CONFIG_MTK_INTERNAL_HDMI_SUPPORT
-#include "hdmitable.h"
-#include "hdmiedid.h"
-
 extern unsigned char _bHdcpOff;
 
 extern struct HDMI_AV_INFO_T _stAvdAVInfo;
@@ -33,7 +30,12 @@ extern void hdmi_force_plug_out(void);
 extern void hdmi_force_plug_in(void);
 extern unsigned char hdmi_hdcp_for_avmute;
 extern void mt_hdmi_show_info(char *pbuf);
-extern void mt_hdmi_debug_write(char *pbuf);
+extern void mt_hdmi_debug_write(const char *pbuf);
+extern void hdmi_read(unsigned long u2Reg, unsigned int *p4Data);
+extern void hdmi_write(unsigned long u2Reg, unsigned int u4Data);
+void hdmi_colordeep(unsigned char u1colorspace, unsigned char u1deepcolor);
+
+
 
 #endif
 #endif

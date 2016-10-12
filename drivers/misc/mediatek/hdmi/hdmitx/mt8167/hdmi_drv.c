@@ -1170,16 +1170,16 @@ void hdmi_read(unsigned long u2Reg, unsigned int *p4Data)
 		internal_hdmi_read(hdmi_reg[HDMI_SHELL] + u2Reg - 0x1401d000, p4Data);
 		break;
 
-	case 0x1100f000:
-		internal_hdmi_read(hdmi_reg[HDMI_DDC] + u2Reg - 0x1100f000, p4Data);
+	case 0x11011000:
+		internal_hdmi_read(hdmi_reg[HDMI_DDC] + u2Reg - 0x11011000, p4Data);
 		break;
 
-	case 0x10013000:
-		internal_hdmi_read(hdmi_reg[HDMI_CEC] + u2Reg - 0x10013000, p4Data);
+	case 0x1001a000:
+		internal_hdmi_read(hdmi_reg[HDMI_CEC] + u2Reg - 0x1001a000, p4Data);
 		break;
 
-	case 0x1000c000:
-		internal_hdmi_read(hdmi_ref_reg[AP_CCIF0] + u2Reg - 0x1000c000, p4Data);
+	case 0x10018000:
+		internal_hdmi_read(hdmi_ref_reg[AP_CCIF0] + u2Reg - 0x10018000, p4Data);
 		break;
 
 	case 0x10000000:
@@ -1198,8 +1198,8 @@ void hdmi_read(unsigned long u2Reg, unsigned int *p4Data)
 		internal_hdmi_read(hdmi_ref_reg[GPIO_REG] + u2Reg - 0x10005000, p4Data);
 		break;
 
-	case 0x1401c000:
-		internal_hdmi_read(hdmi_ref_reg[DPI1_REG] + u2Reg - 0x1401c000, p4Data);
+	case 0x14019000:
+		internal_hdmi_read(hdmi_ref_reg[DPI1_REG] + u2Reg - 0x14019000, p4Data);
 		break;
 
 	default:

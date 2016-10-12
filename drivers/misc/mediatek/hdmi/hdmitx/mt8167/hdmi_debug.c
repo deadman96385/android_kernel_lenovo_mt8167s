@@ -23,11 +23,11 @@
 #include "hdmi_ca.h"
 
 #define HDMI_ATTR_SPRINTF(fmt, arg...)  \
-do { \
-	temp_len = sprintf(buf, fmt, ##arg);	 \
-	buf += temp_len; \
-	len += temp_len; \
-	buf[0] = 0;\
+	do { \
+		pr_err(fmt, ##arg); \
+		temp_len = sprintf(buf, fmt, ##arg);	 \
+		buf += temp_len; \
+		len += temp_len; \
 } while (0)
 
 static enum HDMI_STATE mt_hdmi_get_state(void)
@@ -338,23 +338,43 @@ void mt_hdmi_show_edid_info(char *pbuf)
 
 
 
-void mt_hdmi_debug_write(char *pbuf)
+void mt_hdmi_debug_write(const char *pbuf)
 {
 	int var;
-	/* u32 reg; */
+	unsigned int  reg;
 	unsigned int hdcp_state;
-	/* unsigned int val; */
+	unsigned int val;
+	unsigned int vadr_regstart = 0;
+	unsigned int vadr_regend = 0;
 	char *buf;
 	int temp_len = 0;
 	int len = 0;
 	int ret;
 
-	buf = pbuf;
+	buf = (char *)pbuf;
 
 	if (strncmp(buf, "dbgtype:", 8) == 0) {
 		ret =	sscanf(buf + 8, "%x", &var);
 		hdmidrv_log_on = var;
 		pr_err("hdmidrv_log_on = 0x%08x\n", (unsigned int)hdmidrv_log_on);
+	} else if (strncmp(buf, "regw:", 5) == 0) {
+		ret = sscanf(buf + 5, "%x = %x", &reg, &val);
+		if (ret > 0) {
+			pr_err("w:0x%08x=0x%08x\n", reg, val);
+			hdmi_write(reg, val);
+		}
+	} else if (strncmp(buf, "regr:", 5) == 0) {
+		ret = sscanf(buf+5, "%x/%x", &vadr_regstart, &vadr_regend);
+		if (ret > 0) {
+			vadr_regend  &= 0x3ff;
+			HDMI_ATTR_SPRINTF("r:0x%08x/0x%08x\n", vadr_regstart, vadr_regend);
+			vadr_regend = vadr_regstart + vadr_regend;
+			while (vadr_regstart <= vadr_regend) {
+				hdmi_read(vadr_regstart, &val);
+				HDMI_ATTR_SPRINTF("0x%08x = 0x%08x\n", vadr_regstart, val);
+				vadr_regstart = vadr_regstart+4;
+			}
+		}
 	}
 
 	else if (strncmp(buf, "hdcp:", 5) == 0) {
@@ -415,6 +435,9 @@ void mt_hdmi_debug_write(char *pbuf)
 		    ("[hdmi] please connect TV,turn off box cec function, and keep TV and box power on\n");
 	} else if (strncmp(buf, "testmode:off", 12) == 0) {
 		HDMI_ATTR_SPRINTF("[hdmi] abist off for debug, please chang resolution again\n");
+	} else if (strncmp(buf, "deepcolor:", 10) == 0) {
+		ret = sscanf(buf + 10, "%x", &val);
+		hdmi_colordeep(1, (unsigned char)val);
 	} else if (strncmp(buf, "help", 4) == 0) {
 		HDMI_ATTR_SPRINTF("---hdmi debug system help---\n");
 		HDMI_ATTR_SPRINTF("please go in to sys/kernel/debug\n");
