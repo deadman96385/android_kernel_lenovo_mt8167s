@@ -513,8 +513,6 @@
 		ddrphy: ddrphy@10211000 {
 			compatible = "mediatek,mt8167-ddrphy", "mediatek,ddrphy";
 			reg = <0 0x10211000 0 0x1000>;
-			clocks = <&infracfg CLK_INFRA_DRAMC_F26M>;
-			clock-names = "dramc_f26m";
 		};
 
 		gce: gce@1020a000 {
