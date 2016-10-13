@@ -1412,11 +1412,13 @@
 
 			/* Camera Common Clock Framework (CCF) */
 			clocks = <&topckgen CLK_TOP_CAMTG_MM_SEL>,
+				 <&topckgen CLK_TOP_MIPI_26M_DBG>,
 				 <&topckgen CLK_TOP_CAM_MM>,
 				 <&topckgen CLK_TOP_USB_PHY48M>,
 				 <&topckgen CLK_TOP_UNIVPLL_D6>;
 
 			clock-names = "TOP_CAMTG_SEL",
+				      "TOP_CAM_MIPI_26M", /* MIPI CSI2 Calibration clk src */
 				      "TOP_CAMTG",
 				      "TOP_CAM_TG_48M",  /* 48M */
 				      "TOP_CAM_TG_208M";  /* 208M, divided in setTgPhase */
