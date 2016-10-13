@@ -138,12 +138,21 @@
 /**************************
  * GPU DVFS OPP table setting
  ***************************/
+#if 0 /* for E2 */
 #define GPU_DVFS_FREQ0	(598000) /* KHz */
 #define GPU_DVFS_FREQ1	(494000) /* KHz */
 #define GPU_DVFS_FREQ2	(445000) /* KHz */
 #define GPU_DVFS_FREQ3	(396500) /* KHz */
 #define GPU_DVFS_FREQ4	(299000) /* KHz */
 #define GPU_DVFS_FREQ5	(253500) /* KHz */
+#else /* for E1 */
+#define GPU_DVFS_FREQ0  (574000) /* KHz */
+#define GPU_DVFS_FREQ1  (468000) /* KHz */
+#define GPU_DVFS_FREQ2  (430000) /* KHz */
+#define GPU_DVFS_FREQ3  (390000) /* KHz */
+#define GPU_DVFS_FREQ4  (299000) /* KHz */
+#define GPU_DVFS_FREQ5  (253500) /* KHz */
+#endif
 
 #define GPUFREQ_LAST_FREQ_LEVEL	(GPU_DVFS_FREQ5)
 
@@ -153,7 +162,7 @@
 
 #define GPU_DVFS_PTPOD_DISABLE_VOLT	GPU_DVFS_VOLT2
 
-#define UNIVPLL_FREQ	(396000) /* KHz */
+#define UNIVPLL_FREQ	GPU_DVFS_FREQ3 /* KHz */
 /*****************************************
  * PMIC settle time (us), should not be changed
  ******************************************/
@@ -211,10 +220,9 @@
 	(((((old_volt) - (new_volt)) * EXTIC_SLEW_STEP) /  EXTIC_VOLT_STEP) / (slew_rate))	/* us */
 #endif
 /* efuse */
-#define GPUFREQ_EFUSE_INDEX		(8)
-#define EFUSE_MFG_SPD_BOND_SHIFT	(8)
-#define EFUSE_MFG_SPD_BOND_MASK		(0xF)
-#define FUNC_CODE_EFUSE_INDEX		(22)
+#define GPUFREQ_EFUSE_INDEX		(4)
+#define EFUSE_MFG_SPD_BOND_SHIFT	(22)
+#define EFUSE_MFG_SPD_BOND_MASK		(0x3)
 /*
  * LOG
  */
@@ -366,7 +374,6 @@ static unsigned int mt_gpufreq_opp_max_frequency;
 static unsigned int mt_gpufreq_opp_max_index;
 
 static unsigned int mt_gpufreq_dvfs_table_type;
-static unsigned int mt_gpufreq_dvfs_table_cid;
 
 /* static DEFINE_SPINLOCK(mt_gpufreq_lock); */
 static DEFINE_MUTEX(mt_gpufreq_lock);
@@ -417,24 +424,14 @@ static unsigned int mt_gpufreq_get_dvfs_table_type(void)
 {
 	unsigned int gpu_speed_bounding = 0;
 	unsigned int type = 0;
-	unsigned int func_code_0, func_code_1;
 
-#if 1	/*CJ, Fix it for efuse code*/
-	func_code_0 = (get_devinfo_with_index(FUNC_CODE_EFUSE_INDEX) >> 24) & 0xf;
-	func_code_1 = get_devinfo_with_index(FUNC_CODE_EFUSE_INDEX) & 0xf;
-	gpufreq_info("from efuse: function code 0 = 0x%x, function code 1 = 0x%x\n", func_code_0,
-			 func_code_1);
+	/* Read the gpu efuse data*/
+	gpu_speed_bounding = get_devinfo_with_index(4);
+	gpufreq_info("GPU other bounding from efuse = %x\n", gpu_speed_bounding);
 
-	if (func_code_1 == 0)
-		type = 0;
-	else if (func_code_1 == 1)
-		type = 1;
-	else /* if (func_code_1 == 2) */
-		type = 2;
 	gpu_speed_bounding = (get_devinfo_with_index(GPUFREQ_EFUSE_INDEX) >>
 				EFUSE_MFG_SPD_BOND_SHIFT) & EFUSE_MFG_SPD_BOND_MASK;
 	gpufreq_info("GPU frequency bounding from efuse = %x\n", gpu_speed_bounding);
-#endif
 
 	/* No efuse or free run? use clock-frequency from device tree to determine GPU table type! */
 	if (gpu_speed_bounding == 0) {
@@ -449,23 +446,24 @@ static unsigned int mt_gpufreq_get_dvfs_table_type(void)
 		node = of_find_matching_node(NULL, gpu_ids);
 		if (!node) {
 			gpufreq_err("@%s: find GPU node failed\n", __func__);
-			gpu_speed = 500;	/* default speed */
+			gpu_speed = 500000;	/* default speed */
 		} else {
 			if (!of_property_read_u32(node, "clock-frequency", &gpu_speed)) {
-				gpu_speed = gpu_speed / 1000 / 1000;	/* MHz */
+				gpu_speed = gpu_speed / 1000;	/* KHz */
 			} else {
 				gpufreq_err
 					("@%s: missing clock-frequency property, use default GPU level\n",
 					 __func__);
-				gpu_speed = 500;	/* default speed */
+				gpu_speed = 500000;	/* default speed */
 			}
 		}
 		gpufreq_info("GPU clock-frequency from DT = %d MHz\n", gpu_speed);
 
-		if (gpu_speed >= 600)
+		if (gpu_speed >= GPU_DVFS_FREQ0)
 			type = 2;	/* 600M */
-		else if (gpu_speed >= 500)
+		else if (gpu_speed >= GPU_DVFS_FREQ1)
 			type = 1;	/* 500M */
+
 #else
 		gpufreq_err("@%s: Cannot get GPU speed from DT!\n", __func__);
 		type = 0;
@@ -475,16 +473,17 @@ static unsigned int mt_gpufreq_get_dvfs_table_type(void)
 
 	switch (gpu_speed_bounding) {
 	case 0:
-		mt_gpufreq_dvfs_table_cid = 0;  /* free run */
+		type = 0;	/* free run */
 		break;
 	case 1:
-		type = 1;	/* 500M */
-	case 2:
 		type = 2;	/* 600M */
 		break;
+	case 2:
+		type = 1;	/* 500M */
+		break;
+	case 3:
 	default:
 		type = 0;	/* 400M */
-		break;
 	}
 
 	return type;
@@ -759,6 +758,11 @@ EXPORT_SYMBOL(mt_gpufreq_voltage_enable_set);
 
 void mt_gpufreq_enable_by_ptpod(void)
 {
+	if (mt_gpufreq_ready == false) {
+		gpufreq_warn("@%s: GPU DVFS not ready!\n", __func__);
+		return;
+	}
+
 	mt_gpufreq_voltage_enable_set(0);
 #ifdef MTK_GPU_SPM
 	if (mt_gpufreq_ptpod_disable)
@@ -767,6 +771,12 @@ void mt_gpufreq_enable_by_ptpod(void)
 
 	mt_gpufreq_ptpod_disable = false;
 	gpufreq_info("mt_gpufreq enabled by ptpod\n");
+
+	/* pmic auto mode: the variance of voltage is wide but saves more power. */
+	regulator_set_mode(mt_gpufreq_pmic->reg_vgpu, REGULATOR_MODE_NORMAL);
+	if (regulator_get_mode(mt_gpufreq_pmic->reg_vgpu) != REGULATOR_MODE_NORMAL)
+		pr_err("Vgpu should be REGULATOR_MODE_NORMAL(%d), but mode = %d\n",
+			REGULATOR_MODE_NORMAL, regulator_get_mode(mt_gpufreq_pmic->reg_vgpu));
 }
 EXPORT_SYMBOL(mt_gpufreq_enable_by_ptpod);
 
@@ -792,6 +802,13 @@ void mt_gpufreq_disable_by_ptpod(void)
 	mt_gpufreq_ptpod_disable = true;
 	gpufreq_info("mt_gpufreq disabled by ptpod\n");
 
+	/* pmic PWM mode: the variance of voltage is narrow but consumes more power. */
+	regulator_set_mode(mt_gpufreq_pmic->reg_vgpu, REGULATOR_MODE_FAST);
+
+	if (regulator_get_mode(mt_gpufreq_pmic->reg_vgpu) != REGULATOR_MODE_FAST)
+		pr_err("Vgpu should be REGULATOR_MODE_FAST(%d), but mode = %d\n",
+			REGULATOR_MODE_FAST, regulator_get_mode(mt_gpufreq_pmic->reg_vgpu));
+
 	for (i = 0; i < mt_gpufreqs_num; i++) {
 		/* VBoot = 0.85v for PTPOD */
 		target_idx = i;
@@ -805,6 +822,14 @@ void mt_gpufreq_disable_by_ptpod(void)
 	mt_gpufreq_target(target_idx);
 }
 EXPORT_SYMBOL(mt_gpufreq_disable_by_ptpod);
+
+
+bool mt_gpufreq_IsPowerOn(void)
+{
+	return (mt_gpufreq_volt_enable_state == 1);
+}
+EXPORT_SYMBOL(mt_gpufreq_IsPowerOn);
+
 
 /************************************************
  * API to switch back default voltage setting for GPU PTPOD disabled
