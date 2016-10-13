@@ -1,14 +1,9 @@
 &clkitg {
+	status = "disabled";
+
 	bring-up {
 		compatible = "mediatek,clk-bring-up";
 		clocks =
-			<&apmixedsys CLK_APMIXED_ARMPLL>,
-			<&apmixedsys CLK_APMIXED_MAINPLL>,
-			<&apmixedsys CLK_APMIXED_UNIVPLL>,
-			<&apmixedsys CLK_APMIXED_MMPLL>,
-			<&apmixedsys CLK_APMIXED_APLL1>,
-			<&apmixedsys CLK_APMIXED_APLL2>,
-			<&apmixedsys CLK_APMIXED_TVDPLL>,
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
@@ -48,12 +43,19 @@
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
-			<&topckgen CLK_TOP_RBIST>,
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
-			<&topckgen CLK_TOP_AES>,
+			<&clk26m>,
+			<&clk26m>,
+			<&clk26m>,
+			<&clk26m>,
+			<&clk26m>,
+			<&clk26m>,
+			<&clk26m>,
+			<&clk26m>,
+			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
