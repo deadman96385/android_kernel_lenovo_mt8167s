@@ -973,7 +973,6 @@ int ddp_dpi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 	pr_warn("DISP/DPI, ddp_dpi_power_on, s_isDpiPowerOn %d, s_isDpi1PowerOn %d\n",
 		s_isDpiPowerOn, s_isDpi1PowerOn);
 	if ((!s_isDpiPowerOn) && (module == DISP_MODULE_DPI0)) {
-		ddp_path_top_clock_on();
 #ifdef CONFIG_MTK_CLKMGR
 		enable_mux(MT_MUX_DPI0, "dpi0");
 		ret += enable_pll(LVDSPLL, "DPI0");
@@ -994,7 +993,6 @@ int ddp_dpi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 		s_isDpiPowerOn = true;
 	}
 	if ((!s_isDpi1PowerOn) && (module == DISP_MODULE_DPI1)) {
-		ddp_path_top_clock_on();
 #ifdef CONFIG_MTK_CLKMGR
 		ret += enable_clock(MT_CG_DISP1_DPI1_PIXEL, "DPI");
 		ret += enable_clock(MT_CG_DISP1_DPI1_ENGINE, "DPI");
@@ -1022,7 +1020,6 @@ int ddp_dpi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 		s_isDpiPowerOn, s_isDpi1PowerOn);
 	if ((s_isDpiPowerOn) && (module == DISP_MODULE_DPI0)) {
 		ddp_lvds_power_off(module, cmdq_handle);
-		ddp_path_top_clock_off();
 #ifdef CONFIG_MTK_CLKMGR
 		ret += disable_clock(MT_CG_DISP1_DPI_PIXEL, "DPI");
 		ret += disable_clock(MT_CG_DISP1_DPI_ENGINE, "DPI");
@@ -1042,7 +1039,6 @@ int ddp_dpi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 		s_isDpiPowerOn = false;
 	}
 	if ((s_isDpi1PowerOn) && (module == DISP_MODULE_DPI1)) {
-		ddp_path_top_clock_off();
 #ifdef CONFIG_MTK_CLKMGR
 
 		ret += disable_clock(MT_CG_DISP1_DPI1_PIXEL, "DPI");
