@@ -147,10 +147,12 @@ int disp_pwm_set_pwmmux(unsigned int clk_req)
 
 int disp_pwm_clksource_enable(int clk_req)
 {
-	return -1;
+	ddp_clk_prepare_enable(DISP_PWM_TOP);
+	return 0;
 }
 
 int disp_pwm_clksource_disable(int clk_req)
 {
-	return -1;
+	ddp_clk_disable(DISP_PWM_TOP);
+	return 0;
 }
