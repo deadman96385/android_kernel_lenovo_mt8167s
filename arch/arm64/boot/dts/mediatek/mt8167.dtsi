@@ -510,6 +510,15 @@
 			reg = <0 0x10206000 0 0x1000>;
 		};
 
+		xo: xo@10210000 {
+			compatible = "mediatek,mt8167-xo";
+			reg = <0 10210000 0 0x1000>;
+			clocks = <&topckgen CLK_TOP_BSI>,
+				 <&topckgen CLK_TOP_RG_BSI>;
+			clock-names = "bsi",
+				      "rgbsi";
+		};
+
 		ddrphy: ddrphy@10211000 {
 			compatible = "mediatek,mt8167-ddrphy", "mediatek,ddrphy";
 			reg = <0 0x10211000 0 0x1000>;
