@@ -1199,6 +1199,8 @@ PVRSRV_ERROR MTKMFGSystemInit(void)
 	ged_dvfs_gpu_freq_commit_fp = MTKCommitFreqIdx;
 #endif
 #endif
+	/* Set the CB for ptpod use */
+	mt_gpufreq_mfgclock_notify_registerCB(MTKEnableMfgClock, MTKDisableMfgClock);
 
 #endif /* ifdef MTK_GPU_DVFS */
 
@@ -1280,7 +1282,6 @@ IMG_VOID MTKMFGSystemDeInit(void)
 	}
 #endif
 }
-
 
 
 static int mtk_mfg_bind_device_resource(struct platform_device *pdev,

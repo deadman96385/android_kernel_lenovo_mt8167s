@@ -298,6 +298,14 @@ static struct mt_gpufreq_table_info mt_gpufreq_opp_tbl_e1_2[] = {
 };
 
 
+
+/**************************
+ * PTPOD enable/disable GPU power doamin
+ ***************************/
+static gpufreq_mfgclock_notify g_pGpufreq_mfgclock_enable_notify;
+static gpufreq_mfgclock_notify g_pGpufreq_mfgclock_disable_notify;
+
+
 /*
  * AEE (SRAM debug)
  */
@@ -773,6 +781,11 @@ void mt_gpufreq_enable_by_ptpod(void)
 	mt_gpufreq_ptpod_disable = false;
 	gpufreq_info("mt_gpufreq enabled by ptpod\n");
 
+	if (g_pGpufreq_mfgclock_disable_notify)
+		g_pGpufreq_mfgclock_disable_notify();
+	else
+		pr_err("mt_gpufreq_enable_by_ptpod: no callback!\n");
+
 	/* pmic auto mode: the variance of voltage is wide but saves more power. */
 	regulator_set_mode(mt_gpufreq_pmic->reg_vgpu, REGULATOR_MODE_NORMAL);
 	if (regulator_get_mode(mt_gpufreq_pmic->reg_vgpu) != REGULATOR_MODE_NORMAL)
@@ -803,6 +816,18 @@ void mt_gpufreq_disable_by_ptpod(void)
 	mt_gpufreq_ptpod_disable = true;
 	gpufreq_info("mt_gpufreq disabled by ptpod\n");
 
+	for (i = 0; i < mt_gpufreqs_num; i++) {
+		/* VBoot = 0.85v for PTPOD */
+		target_idx = i;
+		if (mt_gpufreqs_default[i].gpufreq_volt <= GPU_DVFS_PTPOD_DISABLE_VOLT)
+			break;
+	}
+
+	if (g_pGpufreq_mfgclock_enable_notify)
+		g_pGpufreq_mfgclock_enable_notify();
+	else
+		pr_err("mt_gpufreq_disable_by_ptpod: no callback!\n");
+
 	/* pmic PWM mode: the variance of voltage is narrow but consumes more power. */
 	regulator_set_mode(mt_gpufreq_pmic->reg_vgpu, REGULATOR_MODE_FAST);
 
@@ -810,12 +835,6 @@ void mt_gpufreq_disable_by_ptpod(void)
 		pr_err("Vgpu should be REGULATOR_MODE_FAST(%d), but mode = %d\n",
 			REGULATOR_MODE_FAST, regulator_get_mode(mt_gpufreq_pmic->reg_vgpu));
 
-	for (i = 0; i < mt_gpufreqs_num; i++) {
-		/* VBoot = 0.85v for PTPOD */
-		target_idx = i;
-		if (mt_gpufreqs_default[i].gpufreq_volt <= GPU_DVFS_PTPOD_DISABLE_VOLT)
-			break;
-	}
 
 	mt_gpufreq_ptpod_disable_idx = target_idx;
 
@@ -2064,6 +2083,17 @@ void mt_gpufreq_setvolt_registerCB(sampler_func pCB)
 	g_pVoltSampler = pCB;
 }
 EXPORT_SYMBOL(mt_gpufreq_setvolt_registerCB);
+
+/************************************************
+* for ptpod used to open gpu external/internal power.
+*************************************************/
+void mt_gpufreq_mfgclock_notify_registerCB(gpufreq_mfgclock_notify pEnableCB,
+					   gpufreq_mfgclock_notify pDisableCB)
+{
+	g_pGpufreq_mfgclock_enable_notify = pEnableCB;
+	g_pGpufreq_mfgclock_disable_notify = pDisableCB;
+}
+EXPORT_SYMBOL(mt_gpufreq_mfgclock_notify_registerCB);
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 /*********************************
