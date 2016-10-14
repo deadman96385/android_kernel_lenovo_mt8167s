@@ -503,7 +503,7 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 
 	set_pwrctrl_pcm_flags(pwrctrl, spm_flags);
 
-/*	spm_dpidle_before_wfi(); */
+	spm_dpidle_before_wfi();
 
 	lockdep_off();
 	spin_lock_irqsave(&__spm_lock, flags);
@@ -570,7 +570,7 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 
 	spin_unlock_irqrestore(&__spm_lock, flags);
 	lockdep_on();
-/*	spm_dpidle_after_wfi(); */
+	spm_dpidle_after_wfi();
 
 #if SPM_AEE_RR_REC
 	aee_rr_rec_deepidle_val(0);
