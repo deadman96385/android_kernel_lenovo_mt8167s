@@ -63,29 +63,19 @@ struct clk *clk_peri_therm;
 struct clk *clk_auxadc;
 #endif
 
+static DEFINE_SPINLOCK(thermal_spinlock);
 
-/* Workaround, it will remove after PTP driver ready. */
-#if 1
-/*
- * lock
- */
-static DEFINE_SPINLOCK(ptp_spinlock);
-
-void mt_ptp_lock(unsigned long *x)
+void mt_thermal_lock(unsigned long *x)
 {
-	spin_lock_irqsave(&ptp_spinlock, *x);
+	spin_lock_irqsave(&thermal_spinlock, *x);
 	/*return 0;*/
 };
-EXPORT_SYMBOL(mt_ptp_lock);
 
-void mt_ptp_unlock(unsigned long *x)
+void mt_thermal_unlock(unsigned long *x)
 {
-	spin_unlock_irqrestore(&ptp_spinlock, *x);
+	spin_unlock_irqrestore(&thermal_spinlock, *x);
 	/*return 0;*/
 };
-EXPORT_SYMBOL(mt_ptp_unlock);
-#endif
-
 
 /*==============*/
 /*Configurations*/
@@ -284,14 +274,8 @@ static struct task_struct *ktp_thread_handle;
 
 static int tc_mid_trip = -275000;
 
-static int CPU_TS_MCU1_T = 0, CPU_TS_MCU2_T;
-static int GPU_TS_MCU1_T = 0, GPU_TS_MCU2_T;
 static int SOC_TS_MCU1_T = 0, SOC_TS_MCU2_T = 0, SOC_TS_MCU3_T;
-#if 1
-static int CPU_TS_MCU1_R = 0, CPU_TS_MCU2_R;
-static int GPU_TS_MCU1_R = 0, GPU_TS_MCU2_R;
 static int SOC_TS_MCU1_R = 0, SOC_TS_MCU2_R = 0, SOC_TS_MCU3_R;
-#endif
 
 int last_abb_t;
 int last_CPU1_t;
@@ -340,23 +324,26 @@ static int temperature_switch;
 #define TS_MS_TO_NS(x) (x * 1000 * 1000)
 static struct hrtimer ts_tempinfo_hrtimer;
 
-
 #define tscpu_dprintk(fmt, args...)   \
 	do {                                    \
-		if (mtktscpu_debug_log) {                \
-			pr_debug("Power/CPU_Thermal" fmt, ##args); \
+		if (mtktscpu_debug_log & 0x4) {                \
+			pr_err("Power/CPU_Thermal" fmt, ##args); \
 		}                                   \
 	} while (0)
 
-#define tscpu_printk(fmt, args...) pr_debug("Power/CPU_Thermal" fmt, ##args)
+#define tscpu_printk(fmt, args...) \
+	do {                                    \
+		if (mtktscpu_debug_log & 0x2) {                \
+			pr_err("Power/CPU_Thermal" fmt, ##args); \
+		}                                   \
+	} while (0)
 
-static int mtktscpu_switch_bank(enum thermal_bank_name bank);
 static void tscpu_reset_thermal(void);
 static S32 temperature_to_raw_room(U32 ret);
 static void set_tc_trigger_hw_protect(int temperature, int temperature2);
 static void tscpu_config_all_tc_hw_protect(int temperature, int temperature2);
-static void thermal_initial_all_bank(void);
-static void read_each_bank_TS(enum thermal_bank_name bank_num);
+static void thermal_initial(void);
+static void read_each_TS(void);
 
 static int tscpu_register_thermal(void);
 static void tscpu_unregister_thermal(void);
@@ -443,10 +430,9 @@ static void set_adaptive_cpu_power_limit(unsigned int limit)
 	final_limit = MIN(adaptive_cpu_power_limit, static_cpu_power_limit);
 
 	if (prv_adp_cpu_pwr_lim != adaptive_cpu_power_limit) {
-		tscpu_dprintk("set_adaptive_cpu_power_limit %d, T=%d,%d,%d,%d,%d,%d\n",
-				(final_limit != 0x7FFFFFFF) ? final_limit : 0, CPU_TS_MCU1_T,
-				CPU_TS_MCU2_T, GPU_TS_MCU2_T, SOC_TS_MCU1_T, SOC_TS_MCU2_T,
-				SOC_TS_MCU3_T);
+		tscpu_dprintk("set_adaptive_cpu_power_limit %d, T=%d,%d,%d\n",
+				(final_limit != 0x7FFFFFFF) ? final_limit : 0,
+				SOC_TS_MCU1_T, SOC_TS_MCU2_T, SOC_TS_MCU3_T);
 
 		mt_cpufreq_thermal_protect((final_limit != 0x7FFFFFFF) ? final_limit : 0);
 	}
@@ -461,10 +447,9 @@ static void set_static_cpu_power_limit(unsigned int limit)
 	final_limit = MIN(adaptive_cpu_power_limit, static_cpu_power_limit);
 
 	if (prv_stc_cpu_pwr_lim != static_cpu_power_limit) {
-		pr_info("set_static_cpu_power_limit %d, T=%d,%d,%d,%d,%d,%d\n",
-				(final_limit != 0x7FFFFFFF) ? final_limit : 0, CPU_TS_MCU1_T,
-				CPU_TS_MCU2_T, GPU_TS_MCU2_T, SOC_TS_MCU1_T, SOC_TS_MCU2_T,
-				SOC_TS_MCU3_T);
+		pr_info("set_static_cpu_power_limit %d, T=%d,%d,%d\n",
+				(final_limit != 0x7FFFFFFF) ? final_limit : 0,
+				SOC_TS_MCU1_T, SOC_TS_MCU2_T, SOC_TS_MCU3_T);
 
 		mt_cpufreq_thermal_protect((final_limit != 0x7FFFFFFF) ? final_limit : 0);
 	}
@@ -619,21 +604,16 @@ void get_thermal_slope_intercept(struct TS_PTPOD *ts_info, enum thermal_bank_nam
 	tscpu_dprintk("get_thermal_slope_intercept\n");
 
 	switch (ts_bank) {
-	case THERMAL_BANK0:	/* CPU (TS_MCU1,TS_MCU2)            (TS1,2) */
-			if (CPU_TS_MCU1_T > CPU_TS_MCU2_T)
-				x_roomt = g_x_roomt[0];	/* TS_MCU1 */
-			else
-				x_roomt = g_x_roomt[1];	/* TS_MCU2 */
-			break;
-	case THERMAL_BANK1:	/* GPU (TS_MCU2)                                        (TS2) */
-			x_roomt = g_x_roomt[1];	/* TS_MCU2 */
-			break;
-	case THERMAL_BANK2:	/* SOC (TS_MCU3)    (TS3) */
-			x_roomt = g_x_roomt[2];	/* TS_MCU2 */
-			break;
-	default:		/* choose high temp */
-			x_roomt = g_x_roomt[1];
-			break;
+	case THERMAL_BANK0:
+		x_roomt = g_x_roomt[0];	/* CPU TS_MCU1 */
+		break;
+	case THERMAL_BANK1:
+		x_roomt = g_x_roomt[2]; /* GPU (TS_MCU3) */
+		break;
+	case THERMAL_BANK2:	/* MFG (TS_MCU2)*/
+	default:
+		x_roomt = g_x_roomt[1];
+		break;
 	}
 
 	temp0 = (10000 * 100000 / g_gain) * 15 / 18;
@@ -653,7 +633,6 @@ void get_thermal_slope_intercept(struct TS_PTPOD *ts_info, enum thermal_bank_nam
 		temp2 = temp1 * 10 / (165 - g_o_slope);
 
 	ts_ptpod.ts_BTS = (temp0 + temp2 - 250) * 4 / 10;
-
 
 	ts_info->ts_MTS = ts_ptpod.ts_MTS;
 	ts_info->ts_BTS = ts_ptpod.ts_BTS;
@@ -695,19 +674,19 @@ static void dump_spm_reg(void)
 }
 #endif
 
-
-static void thermal_interrupt_handler(int bank)
+static irqreturn_t thermal_interrupt_handler(int irq, void *dev_id)
 {
 	U32 ret = 0;
 	unsigned long flags;
 
-	mt_ptp_lock(&flags);
-
-	mtktscpu_switch_bank(bank);
+	mt_thermal_lock(&flags);
+	ret = DRV_Reg32(THERMINTST);
+	ret = ret & 0xF;
+	tscpu_printk("thermal_interrupt_handler : THERMINTST = 0x%x\n", ret);
 
 	ret = DRV_Reg32(TEMPMONINTSTS);
 	tscpu_printk("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
-	tscpu_printk("thermal_interrupt_handler,bank=0x%08x,ret=0x%08x\n", bank, ret);
+	tscpu_printk("thermal_interrupt_handler,ret=0x%08x\n", ret);
 	tscpu_printk("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n");
 
 	/* ret2 = DRV_Reg32(THERMINTST); */
@@ -737,9 +716,8 @@ static void thermal_interrupt_handler(int bank)
 #if MTK_TS_CPU_RT
 
 
-		tscpu_dprintk("THERMAL_tri_SPM_State1, T=%d,%d,%d,%d,%d,%d\n", CPU_TS_MCU1_T,
-				CPU_TS_MCU2_T, GPU_TS_MCU2_T, SOC_TS_MCU1_T, SOC_TS_MCU2_T,
-				SOC_TS_MCU3_T);
+		tscpu_dprintk("THERMAL_tri_SPM_State1, T=%d,%d,%d\n",
+				SOC_TS_MCU1_T, SOC_TS_MCU2_T, SOC_TS_MCU3_T);
 
 
 
@@ -749,30 +727,7 @@ static void thermal_interrupt_handler(int bank)
 	if (ret & THERMAL_tri_SPM_State2)
 		tscpu_dprintk("thermal_isr: Thermal state2 to trigger SPM state2\n");
 
-	mt_ptp_unlock(&flags);
-
-}
-
-static irqreturn_t thermal_all_bank_interrupt_handler(int irq, void *dev_id)
-{
-	U32 ret = 0;
-
-	/* tscpu_dprintk("thermal_all_bank_interrupt_handler\n"); */
-
-
-	ret = DRV_Reg32(THERMINTST);
-	ret = ret & 0xF;
-	tscpu_printk("thermal_all_bank_interrupt_handler : THERMINTST = 0x%x\n", ret);
-
-	if ((ret & 0x1) == 0)	/* check bit0 */
-		thermal_interrupt_handler(THERMAL_BANK0);
-
-	if ((ret & 0x2) == 0)	/* check bit1 */
-		thermal_interrupt_handler(THERMAL_BANK1);
-
-	if ((ret & 0x4) == 0)	/* check bit2 */
-		thermal_interrupt_handler(THERMAL_BANK2);
-
+	mt_thermal_unlock(&flags);
 
 	return IRQ_HANDLED;
 }
@@ -853,118 +808,12 @@ static void thermal_reset_and_initial(void)
 	/* THERMAL_WRAP_WR32(0x2, TEMPADCWRITECTRL);*/
 	/* enable auxadc mux write transaction */
 
-}
-
-/* Bank0 : CPU (TS_MCU1,TS_MCU2) (TS3, TS4) */
-static void thermal_enable_all_periodoc_sensing_point_Bank0(void)
-{
-	THERMAL_WRAP_WR32(0x00000003, TEMPMONCTL0);	/* enable periodoc temperature sensing point 0, point 1 */
-}
-
-/* Bank1 : GPU (TS_MCU3) (TS5), ABB (TS_ABB) */
-static void thermal_enable_all_periodoc_sensing_point_Bank1(void)
-{
-	THERMAL_WRAP_WR32(0x00000003, TEMPMONCTL0);	/* enable periodoc temperature sensing point 0, point 1 */
-}
-
-/* Bank2 : SoC (TS_MCU4,TS_MCU2,TS_MCU3) (TS1, TS4, TS5) */
-static void thermal_enable_all_periodoc_sensing_point_Bank2(void)
-{
-	/* enable periodoc temperature sensing point 0, point 1, point 2 */
-	THERMAL_WRAP_WR32(0x0000000F, TEMPMONCTL0);
-}
-
-
-static void thermal_config_Bank0_TS(void)
-{
-
 	THERMAL_WRAP_WR32(0x0, TEMPADCPNP0);
-
 	THERMAL_WRAP_WR32(0x1, TEMPADCPNP1);
-	/* this value will be stored to TEMPPNPMUXADDR (TEMPSPARE0) automatically by hw */
-
-	THERMAL_WRAP_WR32(TS_CON1_P, TEMPPNPMUXADDR);	/* AHB address for pnp sensor mux selection */
-
-	THERMAL_WRAP_WR32(0x3, TEMPADCWRITECTRL);
-	/*      enable periodoc temperature sensing point 0, point 1 */
-	/* THERMAL_WRAP_WR32(0x00000003, TEMPMONCTL0);*/
-}
-
-static void thermal_config_Bank1_TS(void)
-{
-	/* tscpu_dprintk( "thermal_config_Bank1_TS\n"); */
-
-	THERMAL_WRAP_WR32(0x0, TEMPADCPNP0);
-
-	THERMAL_WRAP_WR32(0x1, TEMPADCPNP1);
-
-	THERMAL_WRAP_WR32(TS_CON1_P, TEMPPNPMUXADDR);	/* AHB address for pnp sensor mux selection */
-
-	THERMAL_WRAP_WR32(0x3, TEMPADCWRITECTRL);
-
-}
-
-static void thermal_config_Bank2_TS(void)
-{
-
-	THERMAL_WRAP_WR32(0x0, TEMPADCPNP0);
-
-	THERMAL_WRAP_WR32(0x1, TEMPADCPNP1);
-
 	THERMAL_WRAP_WR32(0x2, TEMPADCPNP2);
-
 	THERMAL_WRAP_WR32(TS_CON1_P, TEMPPNPMUXADDR);	/* AHB address for pnp sensor mux selection */
-
 	THERMAL_WRAP_WR32(0x3, TEMPADCWRITECTRL);
-
-
 }
-
-
-
-static void thermal_config_TS_in_banks(enum thermal_bank_name bank_num)
-{
-	/* tscpu_dprintk( "thermal_config_TS_in_banks bank_num=%d\n",bank_num); */
-
-	switch (bank_num) {
-	case THERMAL_BANK0:	/* CPU(TS_MCU1 and TS_MCU2) */
-			thermal_config_Bank0_TS();
-			break;
-	case THERMAL_BANK1:	/* GPU (TS_MCU3), ABB(TS_ABB) */
-			thermal_config_Bank1_TS();
-			break;
-	case THERMAL_BANK2:	/* SOC(TS_MCU4,TS_MCU2,TS_MCU3) */
-			thermal_config_Bank2_TS();
-			break;
-	default:
-			thermal_config_Bank0_TS();	/* CPU(TS_MCU1 and TS_MCU2) */
-			break;
-	}
-}
-
-
-
-static void thermal_enable_all_periodoc_sensing_point(enum thermal_bank_name bank_num)
-{
-	/* tscpu_dprintk( "thermal_config_TS_in_banks bank_num=%d\n",bank_num); */
-
-	switch (bank_num) {
-	case THERMAL_BANK0:	/* CPU(TS_MCU1 and TS_MCU2) */
-			thermal_enable_all_periodoc_sensing_point_Bank0();
-			break;
-	case THERMAL_BANK1:	/* GPU (TS_MCU3), ABB(TS_ABB) */
-			thermal_enable_all_periodoc_sensing_point_Bank1();
-			break;
-	case THERMAL_BANK2:	/* SOC(TS_MCU4,TS_MCU2,TS_MCU3) */
-			thermal_enable_all_periodoc_sensing_point_Bank2();
-			break;
-	default:
-			thermal_enable_all_periodoc_sensing_point_Bank0();
-			break;
-	}
-}
-
-
 
 #if 0
 static void set_tc_trigger_hw_protect_test(int temp_hot, int temp_normal, int temp_low, int loffset)
@@ -1467,45 +1316,11 @@ int get_immediate_abb_temp_wrap(void)
 	return curr_temp;
 }
 
-int get_immediate_cpu_wrap(void)
-{
-	int curr_temp;
-
-	curr_temp = MAX(CPU_TS_MCU1_T, CPU_TS_MCU2_T);
-
-	tscpu_dprintk("get_immediate_cpu_wrap curr_temp=%d\n", curr_temp);
-
-	return curr_temp;
-}
-
-int get_immediate_gpu_wrap(void)
-{
-	int curr_temp;
-
-	curr_temp = GPU_TS_MCU2_T;
-
-	tscpu_dprintk("get_immediate_gpu_wrap curr_temp=%d\n", curr_temp);
-
-	return curr_temp;
-}
-
-int get_immediate_soc_wrap(void)
-{
-	int curr_temp;
-
-	curr_temp = MAX(SOC_TS_MCU1_T, SOC_TS_MCU2_T);
-	curr_temp = MAX(SOC_TS_MCU3_T, curr_temp);
-
-	tscpu_dprintk("get_immediate_soc_wrap curr_temp=%d\n", curr_temp);
-
-	return curr_temp;
-}
-
 int get_immediate_ts1_wrap(void)
 {
 	int curr_temp;
 
-	curr_temp = CPU_TS_MCU1_T;
+	curr_temp = SOC_TS_MCU1_T;
 	tscpu_dprintk("get_immediate_ts1_wrap curr_temp=%d\n", curr_temp);
 
 	return curr_temp;
@@ -1515,7 +1330,7 @@ int get_immediate_ts2_wrap(void)
 {
 	int curr_temp;
 
-	curr_temp = GPU_TS_MCU2_T;
+	curr_temp = SOC_TS_MCU2_T;
 	tscpu_dprintk("get_immediate_ts2_wrap curr_temp=%d\n", curr_temp);
 
 	return curr_temp;
@@ -1531,31 +1346,10 @@ int get_immediate_ts3_wrap(void)
 	return curr_temp;
 }
 
-int get_immediate_ts4_wrap(void)
-{
-	int curr_temp;
-
-	curr_temp = MAX(CPU_TS_MCU2_T, SOC_TS_MCU2_T);
-	tscpu_dprintk("get_immediate_ts4_wrap curr_temp=%d\n", curr_temp);
-
-	return curr_temp;
-}
-
-int get_immediate_ts5_wrap(void)
-{
-	int curr_temp;
-
-	curr_temp = MAX(GPU_TS_MCU2_T, SOC_TS_MCU3_T);
-	tscpu_dprintk("get_immediate_ts5_wrap curr_temp=%d\n", curr_temp);
-
-	return curr_temp;
-}
-
 static int read_tc_raw_and_temp(u32 *tempmsr_name, enum thermal_sensor_name ts_name,
 		int *ts_raw)
 {
 	int temp = 0, raw = 0;
-
 
 	/*tscpu_dprintk("read_tc_raw_temp,tempmsr_name=0x%x,ts_num=%d\n",tempmsr_name,ts_name); */
 
@@ -1568,63 +1362,26 @@ static int read_tc_raw_and_temp(u32 *tempmsr_name, enum thermal_sensor_name ts_n
 	return temp * 100;
 }
 
-static void read_each_bank_TS(enum thermal_bank_name bank_num)
+static void read_each_TS(void)
 {
-
-	/* tscpu_dprintk("read_each_bank_TS,bank_num=%d\n",bank_num); */
-
-	switch (bank_num) {
-	case THERMAL_BANK0:
-			/* Bank0 : CPU (TS_MCU1) */
-			CPU_TS_MCU1_T =
-				read_tc_raw_and_temp((u32 *)TEMPMSR0, THERMAL_SENSOR1, &CPU_TS_MCU1_R);
-			CPU_TS_MCU2_T =
-				read_tc_raw_and_temp((u32 *)TEMPMSR1, THERMAL_SENSOR2, &CPU_TS_MCU2_R);
-			break;
-	case THERMAL_BANK1:
-			/* Bank1 : GPU (TS_MCU2) */
-			GPU_TS_MCU1_T =
-				read_tc_raw_and_temp((u32 *)TEMPMSR0, THERMAL_SENSOR1, &GPU_TS_MCU1_R);
-			GPU_TS_MCU2_T =
-				read_tc_raw_and_temp((u32 *)TEMPMSR1, THERMAL_SENSOR2, &GPU_TS_MCU2_R);
-			break;
-	case THERMAL_BANK2:
-			/* Bank2 : SOC (TS_MCU3) */
-			SOC_TS_MCU1_T =
-				read_tc_raw_and_temp((u32 *)TEMPMSR0, THERMAL_SENSOR1, &SOC_TS_MCU1_R);
-			SOC_TS_MCU2_T =
-				read_tc_raw_and_temp((u32 *)TEMPMSR1, THERMAL_SENSOR2, &SOC_TS_MCU2_R);
-			SOC_TS_MCU3_T =
-				read_tc_raw_and_temp((u32 *)TEMPMSR2, THERMAL_SENSOR3, &SOC_TS_MCU3_R);
-
-			break;
-	default:
-			/* Bank0 : CPU (TS_MCU1,TS_MCU2) */
-			CPU_TS_MCU1_T =
-				read_tc_raw_and_temp((u32 *)TEMPMSR0, THERMAL_SENSOR1, &CPU_TS_MCU1_R);
-			CPU_TS_MCU2_T =
-				read_tc_raw_and_temp((u32 *)TEMPMSR1, THERMAL_SENSOR2, &CPU_TS_MCU2_R);
-			break;
-	}
+	SOC_TS_MCU1_T =
+		read_tc_raw_and_temp((u32 *)TEMPMSR0, THERMAL_SENSOR1, &SOC_TS_MCU1_R);
+	SOC_TS_MCU2_T =
+		read_tc_raw_and_temp((u32 *)TEMPMSR1, THERMAL_SENSOR2, &SOC_TS_MCU2_R);
+	SOC_TS_MCU3_T =
+		read_tc_raw_and_temp((u32 *)TEMPMSR2, THERMAL_SENSOR3, &SOC_TS_MCU3_R);
 
 }
 
 
-static void read_all_bank_temperature(void)
+static void read_all_temperature(void)
 {
-	int i = 0;
 	unsigned long flags;
-	/* tscpu_dprintk("read_all_bank_temperature\n"); */
+	/* tscpu_dprintk("read_all_temperature\n"); */
 
-
-	mt_ptp_lock(&flags);
-
-	for (i = 0; i < THERMAL_BANK_NUM; i++) {
-		mtktscpu_switch_bank(i);
-		read_each_bank_TS(i);
-	}
-
-	mt_ptp_unlock(&flags);
+	mt_thermal_lock(&flags);
+	read_each_TS();
+	mt_thermal_unlock(&flags);
 }
 
 
@@ -1633,28 +1390,14 @@ static int tscpu_get_temp(struct thermal_zone_device *thermal, int *t)
 #if MTK_TS_CPU_SW_FILTER == 1
 	int ret = 0;
 	int curr_temp;
-
 	int temp_temp;
-	int bank0_T;
-	int bank1_T;
-	int bank2_T;
 
 	static int last_cpu_real_temp;
 
-	bank0_T = MAX(CPU_TS_MCU1_T, CPU_TS_MCU2_T);
-	bank1_T = GPU_TS_MCU2_T;
-	bank2_T = MAX(SOC_TS_MCU1_T, SOC_TS_MCU2_T);
-	bank2_T = MAX(bank2_T, SOC_TS_MCU3_T);
+	curr_temp = MAX(MAX(SOC_TS_MCU1_T, SOC_TS_MCU2_T), SOC_TS_MCU3_T);
 
-	curr_temp = MAX(bank0_T, bank1_T);
-	curr_temp = MAX(curr_temp, bank2_T);
-
-
-
-	tscpu_dprintk("\n tscpu_update_tempinfo, T=%d,%d,%d,%d,%d,%d\n", CPU_TS_MCU1_T,
-			CPU_TS_MCU2_T, GPU_TS_MCU2_T, SOC_TS_MCU1_T, SOC_TS_MCU2_T, SOC_TS_MCU3_T);
-
-
+	tscpu_dprintk("\n tscpu_update_tempinfo, T=%d,%d,%d\n",
+			SOC_TS_MCU1_T, SOC_TS_MCU2_T, SOC_TS_MCU3_T);
 
 	if ((curr_temp > (trip_temp[0] - 15000)) || (curr_temp < -30000) || (curr_temp > 85000))
 		tscpu_printk("CPU T=%d\n", curr_temp);
@@ -1734,33 +1477,6 @@ static int tscpu_get_temp(struct thermal_zone_device *thermal, int *t)
 	tscpu_dprintk("tscpu_get_temp, current temp =%d\n", curr_temp);
 	return ret;
 }
-
-
-int tscpu_get_temp_by_bank(enum thermal_bank_name ts_bank)
-{
-	int bank_T = 0;
-
-	/* tscpu_dprintk("tscpu_get_temp_by_bank,bank=%d\n",ts_bank); */
-
-	if (ts_bank == THERMAL_BANK0) {
-		bank_T = MAX(CPU_TS_MCU1_T, CPU_TS_MCU2_T);
-	} else if (ts_bank == THERMAL_BANK1) {
-		bank_T = GPU_TS_MCU2_T;
-	} else if (ts_bank == THERMAL_BANK2) {
-		bank_T = MAX(SOC_TS_MCU1_T, SOC_TS_MCU2_T);
-		bank_T = MAX(bank_T, SOC_TS_MCU3_T);
-	}
-#if 0
-	tscpu_dprintk("\n\n");
-	tscpu_dprintk("Bank 0 : CPU  (TS_MCU1 = %d,TS_MCU2 = %d)\n", CPU_TS_MCU1_T,	CPU_TS_MCU2_T);
-	tscpu_dprintk("Bank 1 : GPU  (TS_MCU3 = %d)\n", GPU_TS_MCU3_T);
-	tscpu_dprintk("Bank 2 : SOC  (TS_MCU4 = %d,TS_MCU2 = %d,TS_MCU3 = %d)\n", SOC_TS_MCU4_T,
-			SOC_TS_MCU2_T, SOC_TS_MCU3_T);
-#endif
-
-	return bank_T;
-}
-
 
 static int tscpu_bind(struct thermal_zone_device *thermal, struct thermal_cooling_device *cdev)
 {
@@ -3356,24 +3072,18 @@ static void tscpu_unregister_thermal(void)
 /* pause ALL periodoc temperature sensing point */
 static void thermal_pause_all_periodoc_temp_sensing(void)
 {
-	int i = 0;
 	unsigned long flags;
 	int temp;
 
 	/* tscpu_printk("thermal_pause_all_periodoc_temp_sensing\n"); */
 
-	mt_ptp_lock(&flags);
+	mt_thermal_lock(&flags);
 
-	/*config bank0,1,2 */
-	for (i = 0; i < THERMAL_BANK_NUM; i++) {
+	temp = DRV_Reg32(TEMPMSRCTL1);
+	/* set bit8=bit1=bit2=bit3=1 to pause sensing point 0,1,2,3 */
+	DRV_WriteReg32(TEMPMSRCTL1, (temp | 0x10E));
 
-		mtktscpu_switch_bank(i);
-		temp = DRV_Reg32(TEMPMSRCTL1);
-		/* set bit8=bit1=bit2=bit3=1 to pause sensing point 0,1,2,3 */
-		DRV_WriteReg32(TEMPMSRCTL1, (temp | 0x10E));
-	}
-
-	mt_ptp_unlock(&flags);
+	mt_thermal_unlock(&flags);
 
 }
 
@@ -3381,62 +3091,37 @@ static void thermal_pause_all_periodoc_temp_sensing(void)
 /* release ALL periodoc temperature sensing point */
 static void thermal_release_all_periodoc_temp_sensing(void)
 {
-	int i = 0;
 	unsigned long flags;
 	int temp;
 
 	/* tscpu_printk("thermal_release_all_periodoc_temp_sensing\n"); */
 
-	mt_ptp_lock(&flags);
-
-	/*config bank0,1,2 */
-	for (i = 0; i < THERMAL_BANK_NUM; i++) {
-
-		mtktscpu_switch_bank(i);
-		temp = DRV_Reg32(TEMPMSRCTL1);
-		/* set bit1=bit2=bit3=0 to release sensing point 0,1,2 */
-		DRV_WriteReg32(TEMPMSRCTL1, ((temp & (~0x10E))));
-	}
-
-	mt_ptp_unlock(&flags);
-
+	mt_thermal_lock(&flags);
+	temp = DRV_Reg32(TEMPMSRCTL1);
+	/* set bit1=bit2=bit3=0 to release sensing point 0,1,2 */
+	DRV_WriteReg32(TEMPMSRCTL1, ((temp & (~0x10E))));
+	mt_thermal_unlock(&flags);
 }
 
 
 /* disable ALL periodoc temperature sensing point */
 static void thermal_disable_all_periodoc_temp_sensing(void)
 {
-	int i = 0;
 	unsigned long flags;
 
 	/* tscpu_printk("thermal_disable_all_periodoc_temp_sensing\n"); */
 
-	mt_ptp_lock(&flags);
-
-	/*config bank0,1,2 */
-	for (i = 0; i < THERMAL_BANK_NUM; i++) {
-
-		mtktscpu_switch_bank(i);
-		/* tscpu_printk("thermal_disable_all_periodoc_temp_sensing:Bank_%d\n",i); */
-		THERMAL_WRAP_WR32(0x00000000, TEMPMONCTL0);
-	}
-
-	mt_ptp_unlock(&flags);
+	mt_thermal_lock(&flags);
+	THERMAL_WRAP_WR32(0x00000000, TEMPMONCTL0);
+	mt_thermal_unlock(&flags);
 
 }
 
 static void tscpu_clear_all_temp(void)
 {
-	CPU_TS_MCU1_T = 0;
-	CPU_TS_MCU2_T = 0;
-	GPU_TS_MCU1_T = 0;
-	GPU_TS_MCU2_T = 0;
 	SOC_TS_MCU1_T = 0;
 	SOC_TS_MCU2_T = 0;
 	SOC_TS_MCU3_T = 0;
-
-
-
 }
 
 /*tscpu_thermal_suspend spend 1000us~1310us*/
@@ -3527,13 +3212,13 @@ static int tscpu_thermal_resume(struct platform_device *dev)
 		}
 		thermal_disable_all_periodoc_temp_sensing();	/* TEMPMONCTL0 */
 
-		thermal_initial_all_bank();
+		thermal_initial();
 
 		thermal_release_all_periodoc_temp_sensing();	/* must release before start */
 
 		tscpu_clear_all_temp();
 
-		read_all_bank_temperature();
+		read_all_temperature();
 		/*tscpu_config_all_tc_hw_protect(trip_temp[0], tc_mid_trip);*/
 
 	}
@@ -3557,14 +3242,6 @@ static int ktp_thread(void *arg)
 {
 	int max_temp = 0;
 
-	int bank0_T;
-	int bank1_T;
-	int bank2_T;
-	/* int bank3_T; */
-	int curr_temp1;
-	int curr_temp2;
-
-
 	struct sched_param param = {.sched_priority = 98 };
 
 	sched_setscheduler(current, SCHED_FIFO, &param);
@@ -3583,15 +3260,7 @@ static int ktp_thread(void *arg)
 		if (kthread_should_stop())
 			break;
 
-
-		bank0_T = MAX(CPU_TS_MCU1_T, CPU_TS_MCU2_T);
-		bank1_T = GPU_TS_MCU2_T;
-		bank2_T = MAX(SOC_TS_MCU1_T, SOC_TS_MCU2_T);
-		bank2_T = MAX(bank2_T, SOC_TS_MCU3_T);
-
-		curr_temp1 = MAX(bank0_T, bank1_T);
-		curr_temp2 = MAX(bank2_T, curr_temp1);
-		max_temp = curr_temp2;
+		max_temp = MAX(MAX(SOC_TS_MCU1_T, SOC_TS_MCU2_T), SOC_TS_MCU3_T);
 
 		tscpu_printk("ktp_thread temp=%d\n", max_temp);
 		/* trip_temp[1] should be shutdown point... */
@@ -3856,42 +3525,14 @@ static const struct file_operations mtktscpu_fastpoll_fops = {
 };
 #endif
 
-
-static int mtktscpu_switch_bank(enum thermal_bank_name bank)
+static void thermal_initial(void)
 {
-	/* tscpu_dprintk( "mtktscpu_switch_bank =bank=%d\n",bank); */
-
-	switch (bank) {
-	case THERMAL_BANK0:	/* CPU (TS_MCU1,TS_MCU2)          (TS3, TS4) */
-			thermal_clrl(PTPCORESEL, 0xF);	/* bank0 */
-			break;
-	case THERMAL_BANK1:	/* GPU (TS_MCU3)                                  (TS5) */
-			thermal_clrl(PTPCORESEL, 0xF);
-			thermal_setl(PTPCORESEL, 0x1);	/* bank1 */
-			break;
-	case THERMAL_BANK2:	/* SOC (TS_MCU4,TS_MCU2,TS_MCU3)  (TS1, TS4, TS5) */
-			thermal_clrl(PTPCORESEL, 0xF);
-			thermal_setl(PTPCORESEL, 0x2);	/* bank2 */
-			break;
-	default:
-			thermal_clrl(PTPCORESEL, 0xF);	/* bank0 */
-			break;
-	}
-	return 0;
-}
-
-
-
-static void thermal_initial_all_bank(void)
-{
-	int i = 0;
 	unsigned long flags;
 	UINT32 temp = 0;
-	/* tscpu_printk("thermal_initial_all_bank,THERMAL_BANK_NUM=%d\n",THERMAL_BANK_NUM); */
 
 	/* tscpu_thermal_clock_on(); */
 
-	mt_ptp_lock(&flags);
+	mt_thermal_lock(&flags);
 
 	/* AuxADC Initialization,ref MT6592_AUXADC.doc  TODO: check this line */
 	temp = DRV_Reg32(AUXADC_CON0_V);	/* Auto set enable for CH11 */
@@ -3899,29 +3540,20 @@ static void thermal_initial_all_bank(void)
 	THERMAL_WRAP_WR32(temp, AUXADC_CON0_V);	/* disable auxadc channel 11 synchronous mode */
 	THERMAL_WRAP_WR32(0x800, AUXADC_CON1_CLR_V);	/* disable auxadc channel 11 immediate mode */
 
-
-	for (i = 0; i < THERMAL_BANK_NUM; i++) {
-		mtktscpu_switch_bank(i);
-		thermal_reset_and_initial();
-		thermal_config_TS_in_banks(i);
-	}
+	thermal_reset_and_initial();
 
 	/* enable auxadc channel 11 immediate mode */
 	THERMAL_WRAP_WR32(0x800, AUXADC_CON1_SET_V);
 
-	for (i = 0; i < THERMAL_BANK_NUM; i++) {
-		mtktscpu_switch_bank(i);
-		thermal_enable_all_periodoc_sensing_point(i);
-	}
+	THERMAL_WRAP_WR32(0x0000000F, TEMPMONCTL0);
 
-	mt_ptp_unlock(&flags);
+	mt_thermal_unlock(&flags);
 
 }
 
 
 static void tscpu_config_all_tc_hw_protect(int temperature, int temperature2)
 {
-	int i = 0;
 	unsigned long flags;
 
 	tscpu_dprintk("tscpu_config_all_tc_hw_protect,temperature=%d,temperature2=%d,\n",
@@ -3942,17 +3574,11 @@ static void tscpu_config_all_tc_hw_protect(int temperature, int temperature2)
 			(end.tv_usec - begin.tv_usec));
 #endif
 
-	mt_ptp_lock(&flags);
+	mt_thermal_lock(&flags);
 
+	set_tc_trigger_hw_protect(temperature, temperature2);	/* Move thermal HW protection ahead... */
 
-	for (i = 0; i < THERMAL_BANK_NUM; i++) {
-
-		mtktscpu_switch_bank(i);
-
-		set_tc_trigger_hw_protect(temperature, temperature2);	/* Move thermal HW protection ahead... */
-	}
-
-	mt_ptp_unlock(&flags);
+	mt_thermal_unlock(&flags);
 }
 
 static void tscpu_reset_thermal(void)
@@ -3974,20 +3600,14 @@ static void tscpu_reset_thermal(void)
 
 static void tscpu_fast_initial_sw_workaround(void)
 {
-	int i = 0;
 	unsigned long flags;
 	/* tscpu_printk("tscpu_fast_initial_sw_workaround\n"); */
 
 	/* tscpu_thermal_clock_on(); */
 
-	mt_ptp_lock(&flags);
-
-	for (i = 0; i < THERMAL_BANK_NUM; i++) {
-		mtktscpu_switch_bank(i);
-		thermal_fast_init();
-	}
-
-	mt_ptp_unlock(&flags);
+	mt_thermal_lock(&flags);
+	thermal_fast_init();
+	mt_thermal_unlock(&flags);
 
 }
 
@@ -4026,7 +3646,7 @@ static enum hrtimer_restart tscpu_update_tempinfo(struct hrtimer *timer)
 	/* tscpu_printk("tscpu_update_tempinfo\n"); */
 
 	if (g_tc_resume == 0) {
-		read_all_bank_temperature();
+		read_all_temperature();
 		if (resume_ok) {
 			tscpu_config_all_tc_hw_protect(trip_temp[0], tc_mid_trip);
 			resume_ok = 0;
@@ -4040,8 +3660,8 @@ static enum hrtimer_restart tscpu_update_tempinfo(struct hrtimer *timer)
 #if THERMAL_DRV_UPDATE_TEMP_DIRECT_TO_MET
 
 	tscpu_met_lock(&flags);
-	a_tscpu_all_temp[0] = CPU_TS_MCU1_T;	/* temp of TS_MCU1 */
-	a_tscpu_all_temp[1] = GPU_TS_MCU2_T;	/* temp of TS_MCU2 */
+	a_tscpu_all_temp[0] = SOC_TS_MCU1_T;	/* temp of TS_MCU1 */
+	a_tscpu_all_temp[1] = SOC_TS_MCU2_T;	/* temp of TS_MCU2 */
 	a_tscpu_all_temp[2] = SOC_TS_MCU3_T;	/* temp of TS_MCU3 */
 	tscpu_met_unlock(&flags);
 
@@ -4143,7 +3763,7 @@ void tscpu_release_tc(void)
 		}
 		thermal_disable_all_periodoc_temp_sensing();	/* TEMPMONCTL0 */
 
-		thermal_initial_all_bank();
+		thermal_initial();
 
 		thermal_release_all_periodoc_temp_sensing();	/* must release before start */
 
@@ -4444,11 +4064,11 @@ static int tscpu_thermal_probe(struct platform_device *pdev)
 	tscpu_dprintk(KERN_CRIT "cnt = %d, %d\n", cnt, __LINE__);
 
 	/*Normal initial */
-	thermal_initial_all_bank();
+	thermal_initial();
 
 	thermal_release_all_periodoc_temp_sensing();	/* TEMPMSRCTL1 must release before start */
 
-	read_all_bank_temperature();
+	read_all_temperature();
 
 	tscpu_update_temperature_timer_init();
 
@@ -4470,13 +4090,13 @@ static int tscpu_thermal_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_OF
 	err =
-		request_irq(thermal_irq_number, thermal_all_bank_interrupt_handler, IRQF_TRIGGER_LOW,
+		request_irq(thermal_irq_number, thermal_interrupt_handler, IRQF_TRIGGER_LOW,
 				THERMAL_NAME, NULL);
 	if (err)
 		tscpu_printk("tscpu_init IRQ register fail\n");
 #else
 	err =
-		request_irq(THERM_CTRL_IRQ_BIT_ID, thermal_all_bank_interrupt_handler, IRQF_TRIGGER_LOW,
+		request_irq(THERM_CTRL_IRQ_BIT_ID, thermal_interrupt_handler, IRQF_TRIGGER_LOW,
 				THERMAL_NAME, NULL);
 	if (err)
 		tscpu_printk("tscpu_init IRQ register fail\n");
