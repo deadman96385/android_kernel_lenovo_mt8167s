@@ -315,7 +315,7 @@ static const struct file_operations mt8167_afe_tdm_in_fops = {
 	.llseek = default_llseek,
 };
 
-static const struct mt8167_afe_debug_fs afe_debug_fs[] = {
+static const struct mt8167_afe_debug_fs afe_debug_fs[MT8167_AFE_DEBUGFS_NUM] = {
 	{"mtksocaudio", &mt8167_afe_fops},
 	{"mtksochdmiaudio", &mt8167_afe_hdmi_fops},
 	{"mtksoctdminaudio", &mt8167_afe_tdm_in_fops},
@@ -343,6 +343,9 @@ void mt8167_afe_cleanup_debugfs(struct mtk_afe *afe)
 {
 #ifdef CONFIG_DEBUG_FS
 	int i;
+
+	if (!afe)
+		return;
 
 	for (i = 0; i < MT8167_AFE_DEBUGFS_NUM; i++)
 		debugfs_remove(afe->debugfs_dentry[i]);
