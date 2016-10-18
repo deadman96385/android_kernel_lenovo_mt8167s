@@ -160,9 +160,9 @@ static u32 soidle_condition_mask[NR_GRPS] = {
 	0x00000026, /* CG_CTRL0: */
 	0x8089B2F8, /* CG_CTRL1: */
 	0x017F7F06, /* CG_CTRL2: */
-	0x000430FD, /* CG_CTRL8: */
+	0x000430ED, /* CG_CTRL8: */
 	0x00000200, /* CG_MMSYS0: */
-	0x003FC030, /* CG_MMSYS1: */
+	0x003F0000, /* CG_MMSYS1: */
 	0x000003E1, /* CG_IMGSYS: */
 	0x00000004, /* CG_MFGSYS: */
 	0x00000000, /* CG_AUDIO: */
