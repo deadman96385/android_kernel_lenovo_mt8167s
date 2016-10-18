@@ -515,16 +515,12 @@ static int mt8167_codec_clk_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_PRE_PMU:
 		/* CLKLDO power on */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON01, BIT(20), BIT(20));
-		/* Select CLK from PLL */
-		snd_soc_update_bits(codec, AUDIO_CODEC_CON03, BIT(19), BIT(19));
 		/* Audio Codec CLK on */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON03, BIT(30), BIT(30));
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		/* Audio Codec CLK off */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON03, BIT(30), 0x0);
-		/* Select CLK from DCXO */
-		snd_soc_update_bits(codec, AUDIO_CODEC_CON03, BIT(19), 0x0);
 		/* CLKLDO power off */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON01, BIT(20), 0x0);
 		break;
@@ -1764,10 +1760,6 @@ static const struct file_operations mt8167_codec_debug_ops = {
 static void mt8167_codec_init_regs(struct mt8167_codec_priv *codec_data)
 {
 	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
-
-	/* Select CLK from PLL */
-	snd_soc_update_bits(codec_data->codec,
-		AUDIO_CODEC_CON03, BIT(19), BIT(19));
 
 	/* disable chopper of uplink */
 	snd_soc_update_bits(codec_data->codec,
