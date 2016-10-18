@@ -7680,18 +7680,7 @@ int primary_display_enable_path_cg(int enable)
 		ddp_clk_disable(DISP0_DISP_RDMA0);
 
 		ddp_clk_disable(DISP_PWM);
-
-		/*ddp_clk_disable(DISP0_MUTEX_32K); */
-		ddp_clk_disable(DISP0_SMI_LARB0);
-		ddp_clk_disable(DISP0_SMI_COMMON);
-
-		/*ddp_clk_disable(DISP0_MUTEX_32K); */
-		ddp_clk_disable(DISP0_SMI_LARB0);
-		ddp_clk_disable(DISP0_SMI_COMMON);
-		/*ddp_clk_disable(DISP_MTCMOS_CLK);*/
-		/*ddp_clk_unprepare(DISP_MTCMOS_CLK);*/
 #endif
-
 	} else {
 #ifdef CONFIG_MTK_CLKMGR
 		ret += enable_clock(MT_CG_DISP1_DSI_ENGINE, "DSI0");
@@ -7727,14 +7716,6 @@ int primary_display_enable_path_cg(int enable)
 		ret += ddp_clk_enable(DISP0_DISP_RDMA0);
 
 		ret += ddp_clk_enable(DISP_PWM);
-
-		/*ret += ddp_clk_enable(DISP0_MUTEX_32K); */
-		ret += ddp_clk_enable(DISP0_SMI_LARB0);
-		ret += ddp_clk_enable(DISP0_SMI_COMMON);
-
-		/*ret += ddp_clk_enable(DISP0_MUTEX_32K); */
-		ret += ddp_clk_enable(DISP0_SMI_LARB0);
-		ret += ddp_clk_enable(DISP0_SMI_COMMON);
 #endif
 	}
 
