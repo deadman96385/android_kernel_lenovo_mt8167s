@@ -51,6 +51,7 @@ extern unsigned int gResetOVLInAALTrigger;
 extern unsigned int gDisableOVLTF;
 
 extern unsigned int gDumpMemoutCmdq;
+extern unsigned int force_sec;
 
 unsigned int ddp_dump_reg_to_buf(unsigned int start_module, unsigned long *addr);
 unsigned int ddp_dump_lcm_param_to_buf(unsigned int start_module, unsigned long *addr);
