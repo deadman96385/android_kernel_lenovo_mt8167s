@@ -554,10 +554,10 @@ static const char * const *get_all_clk_names(void)
 		"aud_dac_predis",
 		"aud_tml",
 		/* mfgcfg_clks */
-		"mfgcfg_baxi",
-		"mfgcfg_bmem",
-		"mfgcfg_bg3d",
-		"mfgcfg_b26m",
+		"mfg_baxi",
+		"mfg_bmem",
+		"mfg_bg3d",
+		"mfg_b26m",
 		/* mm_clks */
 		"mm_smi_common",
 		"mm_smi_larb0",
