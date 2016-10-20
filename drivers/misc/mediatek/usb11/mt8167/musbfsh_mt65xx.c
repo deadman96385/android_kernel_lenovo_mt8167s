@@ -578,6 +578,7 @@ static int __init mt_usb11_probe(struct platform_device *pdev)
 #ifdef CONFIG_OF
 	pdev->dev.dma_mask = &mt_usb11_dmamask;
 	pdev->dev.coherent_dma_mask = mt_usb11_dmamask;
+	arch_setup_dma_ops(&musbfsh->dev, 0, mt_usb11_dmamask, NULL, 0);
 #endif
 
 	glue->dev = &pdev->dev;

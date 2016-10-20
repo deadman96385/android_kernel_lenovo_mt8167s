@@ -73,6 +73,22 @@ struct musbfsh_ep;
 #include <cust_gpio_usage.h>
 #endif
 
+#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+extern int mtk11_host_qmu_concurrent;
+extern int mtk11_host_qmu_pipe_msk;
+extern int mtk11_host_qmu_max_active_isoc_gpd;
+extern int mtk11_host_qmu_max_number_of_pkts;
+extern int mtk11_qmu_dbg_level;	/* refer to musb_core.c */
+extern int mtk11_qmu_max_gpd_num;
+/*extern struct musb_hw_ep *mtk11_qmu_isoc_ep;*/
+extern int mtk11_isoc_ep_start_idx;
+extern int mtk11_isoc_ep_gpd_count;
+#endif
+
+extern int musbfsh_host_dynamic_fifo;
+extern int musbfsh_host_dynamic_fifo_usage_msk;
+
+
 #define MT_USB1_IRQ_ID                      (105)
 #define USB1_BASE                   0xF1270000
 
@@ -185,6 +201,7 @@ struct musbfsh_hw_ep {
 	struct musbfsh_qh *out_qh;
 	u8 rx_reinit;
 	u8 tx_reinit;
+	u8 type;
 };
 
 
@@ -256,7 +273,9 @@ struct musbfsh {
 	u16 int_rx;
 	u16 int_tx;
 	u8 int_dma;
-
+#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	u32 int_queue;
+#endif
 	int nIrq;
 	unsigned irq_wake:1;
 
