@@ -49,7 +49,7 @@
  * SODI enable.
  * turned off for FPGA and bringup
  */
-/* #define MTK_FB_SODI_SUPPORT */
+#define MTK_FB_SODI_SUPPORT
 
 /**
  * SODI defeature.
@@ -72,7 +72,7 @@
  * Enable idle screen low power mode.
  * turned off for FPGA and bringup
  */
-/* #define MTK_DISP_IDLE_LP */
+#define MTK_DISP_IDLE_LP
 
 /**
  * Enable Multipass support.
