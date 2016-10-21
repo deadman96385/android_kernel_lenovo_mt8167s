@@ -132,8 +132,7 @@ static u32 slp_time = 30;
 
 static u32 slp_spm_flags = {
 #if 1				/* normal suspend */
-	SPM_L2_DORMANT_DIS | SPM_VPROC_LOW_DIS | SPM_INFRA_PDN_DIS | SPM_MCU_PDN_DIS |
-	SPM_DDRPHY_S1_DIS | SPM_26M_DIS
+	SPM_L2_DORMANT_DIS | SPM_VPROC_LOW_DIS | SPM_MCU_PDN_DIS
 #else				/* legacy suspend */
 	SPM_L2_DORMANT_DIS | SPM_VPROC_LOW_DIS | SPM_CPU_PDN_DIS | SPM_INFRA_PDN_DIS |
 	SPM_DDRPHY_S1_DIS | SPM_26M_DIS
