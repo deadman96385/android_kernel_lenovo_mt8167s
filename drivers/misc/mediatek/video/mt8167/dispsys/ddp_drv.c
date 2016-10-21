@@ -403,7 +403,7 @@ int ddp_clk_enable(enum eDDP_CLK_ID id)
 #ifndef CONFIG_FPGA_EARLY_PORTING	/* CCF not ready */
 	int ret = 0;
 
-	ret = clk_enable(dispsys_dev->disp_clk[id]);
+	ret = clk_prepare_enable(dispsys_dev->disp_clk[id]);
 	if (ret)
 		pr_err("DISPSYS CLK enable failed: errno %d\n", ret);
 
@@ -419,7 +419,7 @@ int ddp_clk_disable(enum eDDP_CLK_ID id)
 #ifndef CONFIG_FPGA_EARLY_PORTING	/* CCF not ready */
 	int ret = 0;
 
-	clk_disable(dispsys_dev->disp_clk[id]);
+	clk_disable_unprepare(dispsys_dev->disp_clk[id]);
 	return ret;
 #endif
 #endif
@@ -598,13 +598,6 @@ static int disp_probe(struct platform_device *pdev)
 		if (IS_ERR(dispsys_dev->disp_clk[i]))
 			DDPERR("%s:%d, DISPSYS get %d,%s clock error!!!\n",
 			       __FILE__, __LINE__, i, disp_clk_name[i]);
-		else {
-			switch (i) {
-			default:
-				ddp_clk_prepare(i);
-				break;
-			}
-		}
 	}
 #endif
 #endif
@@ -779,15 +772,6 @@ static int __init disp_init(void)
 
 static void __exit disp_exit(void)
 {
-#ifndef CONFIG_MTK_CLKMGR
-#ifndef CONFIG_FPGA_EARLY_PORTING
-	int i = 0;
-
-	for (i = 0; i < MAX_DISP_CLK_CNT; i++)
-		ddp_clk_unprepare(i);
-#endif
-#endif
-
 	platform_driver_unregister(&dispsys_of_driver);
 }
 
