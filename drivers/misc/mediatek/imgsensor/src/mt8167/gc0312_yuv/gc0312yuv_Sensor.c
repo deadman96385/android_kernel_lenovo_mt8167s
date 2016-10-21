@@ -1166,6 +1166,167 @@ UINT32 GC0312Control(MSDK_SCENARIO_ID_ENUM ScenarioId,
 	return TRUE;
 }				/* GC0312Control() */
 
+BOOL GC0312_set_Edge(UINT16 para)
+{
+
+	switch (para) {
+	case ISP_EDGE_MIDDLE:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0x95, 0x44);
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	case ISP_EDGE_HIGH:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0x95, 0x99);
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	case ISP_EDGE_LOW:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0x95, 0x00);
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	default:
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+BOOL GC0312_set_HUE(UINT16 para)
+{
+
+	switch (para) {
+	case ISP_HUE_MIDDLE:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0x7a, 0x80);
+		GC0312_write_cmos_sensor(0x7b, 0x80);
+		GC0312_write_cmos_sensor(0x7c, 0x80);
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	case ISP_HUE_HIGH:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0x7a, 0x88);
+		GC0312_write_cmos_sensor(0x7b, 0x88);
+		GC0312_write_cmos_sensor(0x7c, 0x80);
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	case ISP_HUE_LOW:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0x7a, 0x80);
+		GC0312_write_cmos_sensor(0x7b, 0x80);
+		GC0312_write_cmos_sensor(0x7c, 0x88);
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+
+	default:
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+BOOL GC0312_set_Brightness(UINT16 para)
+{
+
+	switch (para) {
+	case ISP_BRIGHT_MIDDLE:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0xd5, 0x00);
+		GC0312_write_cmos_sensor(0xfe, 0x01);
+		GC0312_write_cmos_sensor(0x13, 0x37);  /*39  20160406*/
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	case ISP_BRIGHT_HIGH:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0xd5, 0x10);
+		GC0312_write_cmos_sensor(0xfe, 0x01);
+		GC0312_write_cmos_sensor(0x13, 0x60);
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	case ISP_BRIGHT_LOW:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0xd5, 0xf8);
+		GC0312_write_cmos_sensor(0xfe, 0x01);
+		GC0312_write_cmos_sensor(0x13, 0x30);
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	default:
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+BOOL GC0312_set_Contrast(UINT16 para)
+{
+
+	switch (para) {
+	case ISP_CONTRAST_MIDDLE:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0xd3, 0x40);  /*42  20160406*/
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	case ISP_CONTRAST_HIGH:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0xd3, 0x50);
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	case ISP_CONTRAST_LOW:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0xd3, 0x30);
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	default:
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+BOOL GC0312_set_Saturation(UINT16 para)
+{
+
+	switch (para) {
+	case ISP_SAT_MIDDLE:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0xd1, 0x2c);  /*30  20160406*/
+		GC0312_write_cmos_sensor(0xd2, 0x28);  /*2a  20160406*/
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	case ISP_SAT_HIGH:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0xd1, 0x40);
+		GC0312_write_cmos_sensor(0xd2, 0x40);
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	case ISP_SAT_LOW:
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		GC0312_write_cmos_sensor(0xd1, 0x20);
+		GC0312_write_cmos_sensor(0xd2, 0x20);
+		GC0312_write_cmos_sensor(0xfe, 0x00);
+		break;
+
+	default:
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
 BOOL GC0312_set_param_wb(UINT16 para)
 {
 
@@ -1389,6 +1550,21 @@ UINT32 GC0312YUVSetVideoMode(UINT16 u2FrameRate)	/* lanking add */
 UINT32 GC0312YUVSensorSetting(FEATURE_ID iCmd, UINT16 iPara)
 {
 	switch (iCmd) {
+	case FID_ISP_EDGE:
+		GC0312_set_Edge(iPara);
+		break;
+	case FID_ISP_HUE:
+		GC0312_set_HUE(iPara);
+		break;
+	case FID_ISP_BRIGHT:
+		GC0312_set_Brightness(iPara);
+		break;
+	case FID_ISP_CONTRAST:
+		GC0312_set_Contrast(iPara);
+		break;
+	case FID_ISP_SAT:
+		GC0312_set_Saturation(iPara);
+		break;
 	case FID_AWB_MODE:
 		GC0312_set_param_wb(iPara);
 		break;
