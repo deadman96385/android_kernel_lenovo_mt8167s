@@ -234,9 +234,9 @@
 #define gpufreq_warn(fmt, args...)	\
 	pr_warn(fmt, ##args)
 #define gpufreq_info(fmt, args...)	\
-	pr_warn(fmt, ##args)
+	pr_debug(fmt, ##args)
 #define gpufreq_dbg(fmt, args...)	\
-	pr_warn(fmt, ##args)
+	pr_debug(fmt, ##args)
 #define gpufreq_ver(fmt, args...)	\
 	pr_debug(fmt, ##args)
 #else
@@ -347,7 +347,7 @@ static unsigned int g_limited_min_id;
 
 /*CJ Fix Me*/
 static bool mt_gpufreq_debug;
-static bool mt_gpufreq_pause = true;
+static bool mt_gpufreq_pause;
 static bool mt_gpufreq_keep_max_frequency_state;
 static bool mt_gpufreq_keep_opp_frequency_state;
 #if 1
