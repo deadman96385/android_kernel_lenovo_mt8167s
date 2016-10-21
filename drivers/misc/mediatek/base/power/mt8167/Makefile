@@ -21,6 +21,7 @@ obj-$(CONFIG_MACH_MT8167) += mtk_power_throttle.o
 obj-$(CONFIG_MACH_MT8167) += mtk_spm.o
 obj-$(CONFIG_MACH_MT8167) += mtk_spm_internal.o
 obj-$(CONFIG_MACH_MT8167) += mtk_sleep.o
+obj-$(CONFIG_MACH_MT8167) += mtk_spm_pcm.o
 obj-$(CONFIG_MACH_MT8167) += mtk_spm_sleep.o
 obj-$(CONFIG_MACH_MT8167) += mtk_spm_dpidle.o
 obj-$(CONFIG_MACH_MT8167) += mtk_spm_sodi.o
