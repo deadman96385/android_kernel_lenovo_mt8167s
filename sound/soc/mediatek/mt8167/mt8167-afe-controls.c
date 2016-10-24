@@ -84,6 +84,10 @@ enum {
 	AP_LOOPBACK_DMIC_TO_HP,
 	AP_LOOPBACK_HEADSET_MIC_TO_SPK,
 	AP_LOOPBACK_HEADSET_MIC_TO_HP,
+	AP_LOOPBACK_DUAL_AMIC_TO_SPK,
+	AP_LOOPBACK_DUAL_AMIC_TO_HP,
+	AP_LOOPBACK_DUAL_DMIC_TO_SPK,
+	AP_LOOPBACK_DUAL_DMIC_TO_HP,
 };
 
 
@@ -140,6 +144,10 @@ static const char *const ap_loopback_func[] = {
 	ENUM_TO_STR(AP_LOOPBACK_DMIC_TO_HP),
 	ENUM_TO_STR(AP_LOOPBACK_HEADSET_MIC_TO_SPK),
 	ENUM_TO_STR(AP_LOOPBACK_HEADSET_MIC_TO_HP),
+	ENUM_TO_STR(AP_LOOPBACK_DUAL_AMIC_TO_SPK),
+	ENUM_TO_STR(AP_LOOPBACK_DUAL_AMIC_TO_HP),
+	ENUM_TO_STR(AP_LOOPBACK_DUAL_DMIC_TO_SPK),
+	ENUM_TO_STR(AP_LOOPBACK_DUAL_DMIC_TO_HP),
 };
 
 static int mt8167_afe_sgen_get(struct snd_kcontrol *kcontrol,
@@ -336,10 +344,26 @@ static int mt8167_afe_ap_loopback_put(struct snd_kcontrol *kcontrol,
 		return 0;
 
 	if (data->loopback_type != AP_LOOPBACK_NONE) {
-		/* IO3 disconnect with O03 */
-		regmap_update_bits(afe->regmap, AFE_CONN1, 1 << 19, 0 << 19);
-		/* IO4 disconnect with O04 */
-		regmap_update_bits(afe->regmap, AFE_CONN2, 1 << 4, 0 << 4);
+		if (val == AP_LOOPBACK_AMIC_TO_SPK ||
+		    val == AP_LOOPBACK_AMIC_TO_HP ||
+		    val == AP_LOOPBACK_DMIC_TO_SPK ||
+		    val == AP_LOOPBACK_DMIC_TO_HP) {
+			/* disconnect I03 <-> O03, I03 <-> O04 */
+			regmap_update_bits(afe->regmap, AFE_CONN1,
+					   AFE_CONN1_I03_O03_S,
+					   0);
+			regmap_update_bits(afe->regmap, AFE_CONN2,
+					   AFE_CONN2_I03_O04_S,
+					   0);
+		} else {
+			/* disconnect I03 <-> O03, I04 <-> O04 */
+			regmap_update_bits(afe->regmap, AFE_CONN1,
+					   AFE_CONN1_I03_O03_S,
+					   0);
+			regmap_update_bits(afe->regmap, AFE_CONN2,
+					   AFE_CONN2_I04_O04_S,
+					   0);
+		}
 
 		regmap_update_bits(afe->regmap, AFE_ADDA_UL_DL_CON0, 0x1, 0x0);
 		regmap_update_bits(afe->regmap, AFE_ADDA_DL_SRC2_CON0, 0x1, 0x0);
@@ -360,7 +384,9 @@ static int mt8167_afe_ap_loopback_put(struct snd_kcontrol *kcontrol,
 		pm_runtime_get_sync(afe->dev);
 
 		if (val == AP_LOOPBACK_DMIC_TO_SPK ||
-		    val == AP_LOOPBACK_DMIC_TO_HP) {
+		    val == AP_LOOPBACK_DMIC_TO_HP ||
+		    val == AP_LOOPBACK_DUAL_DMIC_TO_HP ||
+		    val == AP_LOOPBACK_DUAL_DMIC_TO_HP) {
 			sample_rate = 32000;
 		}
 
@@ -370,10 +396,27 @@ static int mt8167_afe_ap_loopback_put(struct snd_kcontrol *kcontrol,
 		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
 		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_ADC);
 
-		/* IO3 connect with O03 */
-		regmap_update_bits(afe->regmap, AFE_CONN1, 1 << 19, 1 << 19);
-		/* IO4 connect with O04 */
-		regmap_update_bits(afe->regmap, AFE_CONN2, 1 << 4, 1 << 4);
+		if (val == AP_LOOPBACK_AMIC_TO_SPK ||
+		    val == AP_LOOPBACK_AMIC_TO_HP ||
+		    val == AP_LOOPBACK_DMIC_TO_SPK ||
+		    val == AP_LOOPBACK_DMIC_TO_HP) {
+			/* connect I03 <-> O03, I03 <-> O04 */
+			regmap_update_bits(afe->regmap, AFE_CONN1,
+					   AFE_CONN1_I03_O03_S,
+					   AFE_CONN1_I03_O03_S);
+			regmap_update_bits(afe->regmap, AFE_CONN2,
+					   AFE_CONN2_I03_O04_S,
+					   AFE_CONN2_I03_O04_S);
+		} else {
+			/* connect I03 <-> O03, I04 <-> O04 */
+			regmap_update_bits(afe->regmap, AFE_CONN1,
+					   AFE_CONN1_I03_O03_S,
+					   AFE_CONN1_I03_O03_S);
+			regmap_update_bits(afe->regmap, AFE_CONN2,
+					   AFE_CONN2_I04_O04_S,
+					   AFE_CONN2_I04_O04_S);
+		}
+
 		/* 16 bit by default */
 		regmap_update_bits(afe->regmap, AFE_CONN_24BIT,
 				AFE_CONN_24BIT_O03 | AFE_CONN_24BIT_O04, 0);
