@@ -86,6 +86,7 @@ size_t hdmi_cec_on;
 size_t hdmi_cecinit;
 size_t hdmi_hdmiinit;
 size_t hdmi_powerenable;
+size_t hdmi_clockenable;
 
 size_t hdmi_TmrValue[MAX_HDMI_TMR_NUMBER] = { 0 };
 
@@ -938,14 +939,20 @@ static void hdmi_clock_enable(bool bEnable)
 	if (bEnable) {
 		HDMI_DRV_LOG("Enable hdmi clocks\n");
 		for (i = 0; i < HDMI_SEL_CLOCK_NUM; i++) {
-			clk_prepare(hdmi_ref_clock[i]);
-			clk_enable(hdmi_ref_clock[i]);
+			if ((i != INFRA_SYS_CLK_DDC)
+				&& (i != INFRA_SYS_CEC_26M) && (i != INFRA_SYS_CEC_32K)) {
+				clk_prepare(hdmi_ref_clock[i]);
+				clk_enable(hdmi_ref_clock[i]);
+			}
 		}
 	} else {
 		HDMI_DRV_LOG("Disable hdmi clocks\n");
 		for (i = HDMI_SEL_CLOCK_NUM - 1; i >= 0; i--) {
-			clk_disable(hdmi_ref_clock[i]);
-			clk_unprepare(hdmi_ref_clock[i]);
+			if ((i != INFRA_SYS_CLK_DDC)
+				&& (i != INFRA_SYS_CEC_26M) && (i != INFRA_SYS_CEC_32K)) {
+				clk_disable(hdmi_ref_clock[i]);
+				clk_unprepare(hdmi_ref_clock[i]);
+			}
 		}
 	}
 }
@@ -1016,7 +1023,12 @@ int hdmi_internal_power_on(void)
 	}
 
 	hdmi_powerenable = 1;
-	hdmi_clock_enable(true);
+	if (hdmi_cec_on == 0) {
+		clk_prepare(hdmi_ref_clock[INFRA_SYS_CEC_26M]);
+		clk_enable(hdmi_ref_clock[INFRA_SYS_CEC_26M]);
+	}
+	clk_prepare(hdmi_ref_clock[INFRA_SYS_CLK_DDC]);
+	clk_enable(hdmi_ref_clock[INFRA_SYS_CLK_DDC]);
 #if defined(MHL_BRIDGE_SUPPORT)
 	mhl_bridge_drv->power_on();
 #endif
@@ -1098,7 +1110,11 @@ void hdmi_internal_power_off(void)
 		gpio_set_value(hdmi_power_control_pin, 0);
 	}
 
-	hdmi_clock_enable(false);
+	if (hdmi_clockenable == 1) {
+		HDMI_PLUG_LOG("hdmi irq for clock:hdmi plug out\n");
+		hdmi_clockenable = 0;
+		hdmi_clock_enable(false);
+	}
 	if (r_hdmi_timer.function)
 		del_timer_sync(&r_hdmi_timer);
 	memset((void *)&r_hdmi_timer, 0, sizeof(r_hdmi_timer));
@@ -1546,17 +1562,32 @@ static void vPlugDetectService(enum HDMI_CTRL_STATE_T e_state)
 	case HDMI_STATE_HOT_PLUG_OUT:
 		vClearEdidInfo();
 		vHDCPReset();
+		if (hdmi_clockenable == 1) {
+			HDMI_PLUG_LOG("hdmi irq for clock:hdmi plug out\n");
+			hdmi_clockenable = 0;
+			hdmi_clock_enable(false);
+		}
 		bData = HDMI_PLUG_OUT;
 
 		break;
 
 	case HDMI_STATE_HOT_PLUGIN_AND_POWER_ON:
+		if (hdmi_clockenable == 0) {
+			HDMI_PLUG_LOG("hdmi irq for clock:hdmi plug in and power on\n");
+			hdmi_clockenable = 1;
+			hdmi_clock_enable(true);
+		}
 		hdmi_checkedid(0);
 		bData = HDMI_PLUG_IN_AND_SINK_POWER_ON;
 
 		break;
 
 	case HDMI_STATE_HOT_PLUG_IN_ONLY:
+		if (hdmi_clockenable == 0) {
+			HDMI_PLUG_LOG("hdmi irq for clock:hdmi plug in only\n");
+			hdmi_clockenable = 1;
+			hdmi_clock_enable(true);
+		}
 		vClearEdidInfo();
 		vHDCPReset();
 		hdmi_checkedid(0);
