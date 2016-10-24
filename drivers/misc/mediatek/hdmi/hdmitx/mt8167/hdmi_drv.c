@@ -1166,8 +1166,8 @@ void hdmi_colordeep(unsigned char u1colorspace, unsigned char u1deepcolor)
 void hdmi_read(unsigned long u2Reg, unsigned int *p4Data)
 {
 	switch (u2Reg & 0x1ffff000) {
-	case 0x1401d000:
-		internal_hdmi_read(hdmi_reg[HDMI_SHELL] + u2Reg - 0x1401d000, p4Data);
+	case 0x1401b000:
+		internal_hdmi_read(hdmi_reg[HDMI_SHELL] + u2Reg - 0x1401b000, p4Data);
 		break;
 
 	case 0x11011000:
@@ -1213,7 +1213,7 @@ void hdmi_write(unsigned long u2Reg, unsigned int u4Data)
 	switch (u2Reg & 0x1ffff000) {
 	case 0x1401b000:
 #if (defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT) && defined(CONFIG_MTK_HDMI_HDCP_SUPPORT))
-		vCaHDMIWriteReg(u2Reg - 0x1401d000, u4Data);
+		vCaHDMIWriteReg(u2Reg - 0x1401b000, u4Data);
 #else
 		internal_hdmi_write(hdmi_reg[HDMI_SHELL] + u2Reg - 0x1401b000, u4Data);
 #endif

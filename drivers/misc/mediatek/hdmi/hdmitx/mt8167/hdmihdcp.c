@@ -17,7 +17,7 @@
 #include "hdmihdcp.h"
 #include "hdmi_ctrl.h"
 #include "hdmiddc.h"
-#if (defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT) && defined(CONFIG_MTK_HDMI_HDCP_SUPPORT))
+#if (defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT))
 #include "hdmi_ca.h"
 #endif
 #include <linux/types.h>
@@ -741,6 +741,7 @@ void HdcpService(enum HDCP_CTRL_STATE_T e_hdcp_state)
 	if (_bHdcpOff == 1) {
 		HDMI_HDCP_LOG("_bHdcpOff==1\n");
 		vSetHDCPState(HDCP_RECEIVER_NOT_READY);
+		vCaHDCPOffState(TRUE, false);
 		vHDMIAVUnMute();
 		/* vWriteHdmiIntMask(0xff); */
 	}
@@ -775,6 +776,9 @@ void HdcpService(enum HDCP_CTRL_STATE_T e_hdcp_state)
 		vSetSharedInfo(SI_HDMI_HDCP_RESULT, 0);
 
 		if (!fgDDCDataRead(RX_ID, RX_REG_BCAPS, 1, &bTemp)) {
+#if defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT)
+			vCaHDCPFailState(TRUE, HDCP_INIT_AUTHENTICATION);
+#endif
 			vSetHDCPTimeOut(HDCP_WAIT_300MS_TIMEOUT);
 			break;
 		}
@@ -794,6 +798,9 @@ void HdcpService(enum HDCP_CTRL_STATE_T e_hdcp_state)
 			    && (HDMI_AKSV[3] == 0)) {
 				vSetHDCPState(HDCP_RECEIVER_NOT_READY);
 				vSendHdmiCmd(HDMI_HDCP_PROTOCAL_CMD);
+#if defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT)
+				vCaHDCPFailState(TRUE, HDCP_RECEIVER_NOT_READY);
+#endif
 				break;
 			}
 		} else {
@@ -844,6 +851,9 @@ void HdcpService(enum HDCP_CTRL_STATE_T e_hdcp_state)
 		} else {
 			vSetHDCPState(HDCP_RE_DO_AUTHENTICATION);
 			vSendHdmiCmd(HDMI_HDCP_PROTOCAL_CMD);
+#if defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT)
+			vCaHDCPFailState(TRUE, HDCP_WAIT_R0);
+#endif
 			break;
 		}
 
@@ -862,6 +872,9 @@ void HdcpService(enum HDCP_CTRL_STATE_T e_hdcp_state)
 		} else {
 			vSetHDCPState(HDCP_RE_COMPARE_R0);
 			vSendHdmiCmd(HDMI_HDCP_PROTOCAL_CMD);
+#if defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT)
+			vCaHDCPFailState(TRUE, HDCP_COMPARE_R0);
+#endif
 			_bReCompRiCount = 0;
 		}
 		break;
@@ -873,6 +886,9 @@ void HdcpService(enum HDCP_CTRL_STATE_T e_hdcp_state)
 			vSetHDCPState(HDCP_RE_DO_AUTHENTICATION);
 			vSendHdmiCmd(HDMI_HDCP_PROTOCAL_CMD);
 			_bReCompRiCount = 0;
+#if defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT)
+			vCaHDCPFailState(TRUE, HDCP_RE_COMPARE_R0);
+#endif
 		} else {
 			if (fgCompareRi() == TRUE) {
 				vMiAnUpdateOrFix(FALSE);
@@ -910,10 +926,12 @@ void HdcpService(enum HDCP_CTRL_STATE_T e_hdcp_state)
 		if ((bTemp & RX_BIT_ADDR_READY)) {
 			_bReCheckReadyBit = 0;
 			vSetHDCPState(HDCP_READ_KSV_LIST);
+			vSendHdmiCmd(HDMI_HDCP_PROTOCAL_CMD);
 		} else if (_bReCheckReadyBit > HDCP_CHECK_KSV_LIST_RDY_RETRY_COUNT) {
 			vSetHDCPState(HDCP_RE_DO_AUTHENTICATION);
 			vSendHdmiCmd(HDMI_HDCP_PROTOCAL_CMD);
 			_bReCheckReadyBit = 0;
+			break;
 		} else {
 			_bReCheckReadyBit++;
 			vSetHDCPState(HDCP_WAIT_KSV_LIST);
@@ -945,8 +963,8 @@ void HdcpService(enum HDCP_CTRL_STATE_T e_hdcp_state)
 
 	case HDCP_WAIT_RI:
 		HDMI_HDCP_LOG("HDCP_WAIT_RI\n");
-		vHDMIAVUnMute();
-
+		/* vHDMIAVUnMute(); */
+		pr_err("[hdcp]hdcp1.x pass\n");
 		bMask = bReadHdmiIntMask();
 		/* vWriteHdmiIntMask(0xfd); */
 		break;
@@ -970,6 +988,9 @@ void HdcpService(enum HDCP_CTRL_STATE_T e_hdcp_state)
 			_bReCompRiCount = 0;
 			vSetHDCPState(HDCP_RE_COMPARE_RI);
 			vSendHdmiCmd(HDMI_HDCP_PROTOCAL_CMD);
+#if defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT)
+			vCaHDCPFailState(TRUE, HDCP_CHECK_LINK_INTEGRITY);
+#endif
 		}
 		break;
 
@@ -980,6 +1001,9 @@ void HdcpService(enum HDCP_CTRL_STATE_T e_hdcp_state)
 			vSetHDCPState(HDCP_RE_DO_AUTHENTICATION);
 			vSendHdmiCmd(HDMI_HDCP_PROTOCAL_CMD);
 			_bReCompRiCount = 0;
+#if defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT)
+			vCaHDCPFailState(TRUE, HDCP_RE_COMPARE_RI);
+#endif
 		} else {
 			if (fgCompareRi() == TRUE) {
 				_bReCompRiCount = 0;
@@ -1005,7 +1029,7 @@ void HdcpService(enum HDCP_CTRL_STATE_T e_hdcp_state)
 
 	case HDCP_RE_DO_AUTHENTICATION:
 		HDMI_HDCP_LOG("HDCP_RE_DO_AUTHENTICATION\n");
-		vHDMIAVMute();
+		/*vHDMIAVMute();*/
 		vHDCPReset();
 		if (i4SharedInfo(SI_HDMI_RECEIVER_STATUS) != HDMI_PLUG_IN_AND_SINK_POWER_ON) {
 			vSetHDCPState(HDCP_RECEIVER_NOT_READY);
