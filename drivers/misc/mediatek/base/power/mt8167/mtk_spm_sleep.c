@@ -423,6 +423,20 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 		goto RESTORE_IRQ;
 	}
 
+#if CONFIG_SUPPORT_PCM_ALLINONE
+	if (!__spm_is_pcm_loaded())
+		__spm_init_pcm_AllInOne(pcmdesc);
+
+	__spm_init_event_vector(pcmdesc);
+
+	__spm_set_power_control(pwrctrl);
+
+	__spm_set_wakeup_event(pwrctrl);
+
+	spm_kick_pcm_to_run(pwrctrl);
+
+	__spm_set_pcm_cmd(PCM_CMD_SUSPEND_PCM);
+#else
 	__spm_reset_and_init_pcm(pcmdesc);
 
 	__spm_kick_im_to_fetch(pcmdesc);
@@ -436,6 +450,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	__spm_set_wakeup_event(pwrctrl);
 
 	spm_kick_pcm_to_run(pwrctrl);
+#endif
 
 #if SPM_AEE_RR_REC
 	aee_rr_rec_spm_suspend_val(aee_rr_curr_spm_suspend_val() | (1 << SPM_SUSPEND_ENTER_WFI));

@@ -245,6 +245,7 @@ void __spm_set_wakeup_event(const struct pwr_ctrl *pwrctrl)
 	spm_write(SPM_SLEEP_ISR_MASK, isr | ISRM_RET_IRQ_AUX);
 }
 
+#if !CONFIG_SUPPORT_PCM_ALLINONE
 void __spm_kick_pcm_to_run(const struct pwr_ctrl *pwrctrl)
 {
 	u32 con0;
@@ -271,6 +272,18 @@ void __spm_kick_pcm_to_run(const struct pwr_ctrl *pwrctrl)
 	spm_write(SPM_PCM_CON0, con0 | CON0_CFG_KEY | CON0_PCM_KICK);
 	spm_write(SPM_PCM_CON0, con0 | CON0_CFG_KEY);
 }
+#else
+void __spm_kick_pcm_to_run(const struct pwr_ctrl *pwrctrl)
+{
+	/* set PCM flags and data */
+	spm_write(SPM_PCM_FLAGS, pwrctrl->pcm_flags);
+	spm_write(SPM_PCM_RESERVE, pwrctrl->pcm_reserve);
+
+	/* lock Infra DCM when PCM runs */
+	spm_write(SPM_CLK_CON, (spm_read(SPM_CLK_CON) & ~CC_LOCK_INFRA_DCM) |
+		  (pwrctrl->infra_dcm_lock ? CC_LOCK_INFRA_DCM : 0));
+}
+#endif
 
 void __spm_get_wakeup_status(struct wake_status *wakesta)
 {
@@ -298,12 +311,17 @@ void __spm_get_wakeup_status(struct wake_status *wakesta)
 
 	/* get ISR status */
 	wakesta->isr = spm_read(SPM_SLEEP_ISR_STATUS);
+
+	/* get apsrc enter times */
+	wakesta->apsrc_cnt = spm_read(SPM_PCM_RESERVE7);
 }
 
 void __spm_clean_after_wakeup(void)
 {
 	/* disable r0 and r7 to control power */
+#if !CONFIG_SUPPORT_PCM_ALLINONE
 	spm_write(SPM_PCM_PWR_IO_EN, 0);
+#endif
 
 	/* clean CPU wakeup event */
 	spm_write(SPM_SLEEP_CPU_WAKEUP_EVENT, 0);
@@ -364,8 +382,8 @@ wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
 		}
 	}
 
-	spm_warn("wake up by%s, timer_out = %u, r13 = 0x%x, debug_flag = 0x%x\n",
-		  buf, wakesta->timer_out, wakesta->r13, wakesta->debug_flag);
+	spm_warn("wake up by%s, timer_out = %u, r13 = 0x%x, debug_flag = 0x%x, apsrc_cnt = 0x%x\n",
+		  buf, wakesta->timer_out, wakesta->r13, wakesta->debug_flag, wakesta->apsrc_cnt);
 
 	spm_warn(
 		  "r12 = 0x%x, raw_sta = 0x%x, idle_sta = 0x%x, event_reg = 0x%x, isr = 0x%x\n",
@@ -374,6 +392,50 @@ wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
 
 	return wr;
 }
+
+#if CONFIG_SUPPORT_PCM_ALLINONE
+static unsigned int spm_is_pcm_loaded;
+static void __spm_set_pcm_loaded(void)
+{
+	spm_is_pcm_loaded = 1;
+}
+
+unsigned int __spm_is_pcm_loaded(void)
+{
+	return spm_is_pcm_loaded;
+}
+
+void __spm_init_pcm_AllInOne(const struct pcm_desc *pcmdesc)
+{
+	u32 con0;
+
+	__spm_reset_and_init_pcm(pcmdesc);
+
+	__spm_kick_im_to_fetch(pcmdesc);
+
+	__spm_init_pcm_register();
+
+	/* init register to match PCM expectation */
+	spm_write(SPM_PCM_MAS_PAUSE_MASK, 0xffffffff);
+	spm_write(SPM_PCM_REG_DATA_INI, 0);
+	/* spm_write(SPM_CLK_CON, spm_read(SPM_CLK_CON) & ~CC_DISABLE_DORM_PWR); */
+
+	/* enable r0 and r7 to control power */
+	spm_write(SPM_PCM_PWR_IO_EN, PCM_PWRIO_EN_R0 | PCM_PWRIO_EN_R7);
+
+	/* kick PCM to run (only toggle PCM_KICK) */
+	con0 = spm_read(SPM_PCM_CON0) & ~(CON0_IM_KICK | CON0_PCM_KICK);
+	spm_write(SPM_PCM_CON0, con0 | CON0_CFG_KEY | CON0_PCM_KICK);
+	spm_write(SPM_PCM_CON0, con0 | CON0_CFG_KEY);
+
+	__spm_set_pcm_loaded();
+}
+
+void __spm_set_pcm_cmd(unsigned int cmd)
+{
+	spm_write(SPM_PCM_RESERVE, (spm_read(SPM_PCM_RESERVE) & ~PCM_CMD_MASK) | cmd);
+}
+#endif
 
 /* Pwrap API */
 enum {
