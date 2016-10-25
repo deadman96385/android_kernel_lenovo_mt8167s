@@ -30,7 +30,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
 #include "musbhsdma.h"
-/*#include <mach/upmu_common.h>*/
+#include <mt-plat/upmu_common.h>
 /*#include <mach/mt_pm_ldo.h>*/
 /*#include <mach/mt_clkmgr.h>*/
 /*#include <mach/emi_mpu.h>*/
@@ -365,14 +365,12 @@ void do_connection_work(struct work_struct *data)
 
 	if (!mtk_musb->power && (usb_in == true)) {
 		/* enable usb */
-		#if !defined(CONFIG_POWER_EXT)
 		if (!wake_lock_active(&mtk_musb->usb_lock)) {
 			wake_lock(&mtk_musb->usb_lock);
 			DBG(0, "lock\n");
 		} else {
 			DBG(0, "already lock\n");
 		}
-		#endif
 		/* note this already put SOFTCON */
 		musb_start(mtk_musb);
 
@@ -380,14 +378,12 @@ void do_connection_work(struct work_struct *data)
 	else if (mtk_musb->power && (usb_in == false)) {
 		/* disable usb */
 		musb_stop(mtk_musb);
-		#if !defined(CONFIG_POWER_EXT)
 		if (wake_lock_active(&mtk_musb->usb_lock)) {
 			DBG(0, "unlock\n");
 			wake_unlock(&mtk_musb->usb_lock);
 		} else {
 			DBG(0, "lock not active\n");
 		}
-		#endif
 
 	} else
 		DBG(0, "do nothing, usb_in:%d, power:%d\n",
@@ -456,7 +452,7 @@ static bool musb_hal_is_vbus_exist(void)
 	DBG(0, "force on");
 	vbus_exist = true;
 #else
-#if 0
+#if 1
 #ifdef CONFIG_POWER_EXT
 	vbus_exist = upmu_get_rgs_chrdet();
 #else
@@ -467,7 +463,7 @@ static bool musb_hal_is_vbus_exist(void)
 	DBG(0, "skip PMIC API first, force on");
 #endif
 #endif
-
+	DBG(0, "vbus_exist:%d\n", vbus_exist);
 	return vbus_exist;
 
 }
