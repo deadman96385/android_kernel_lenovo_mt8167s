@@ -1068,47 +1068,41 @@ void vDisableDsdConfig(void)
 
 void vSetHdmiI2SChNum(unsigned char bChNum, unsigned char bChMapping)
 {
-	unsigned char bData, bData1, bData2, bData3;
+	unsigned char bData;
 
 	HDMI_AUDIO_FUNC();
-	if (bChNum == 2) {
+	if (bChNum == 2)
 		bData = 0x04;	/* 2ch data */
-		bData1 = 0x50;	/* data0 */
-	} else if ((bChNum == 3) || (bChNum == 4)) {
+	else if ((bChNum == 3) || (bChNum == 4)) {
 		if ((bChNum == 4) && (bChMapping == 0x08))
 			bData = 0x14;	/* 4ch data */
 		else
 			bData = 0x0c;	/* 4ch data */
 
-		bData1 = 0x50;	/* data0 */
 	} else if ((bChNum == 6) || (bChNum == 5)) {
-		if ((bChNum == 6) && (bChMapping == 0x0E)) {
+		if ((bChNum == 6) && (bChMapping == 0x0E))
 			bData = 0x3C;	/* 6.0 ch data */
-			bData1 = 0x50;	/* data0 */
-		} else {
+		else
 			bData = 0x1C;	/* 5.1ch data, 5/0ch */
-			bData1 = 0x50;	/* data0 */
-		}
-	} else if (bChNum == 8) {
+
+	} else if (bChNum == 8)
 		bData = 0x3C;	/* 7.1ch data */
-		bData1 = 0x50;	/* data0 */
-	} else if (bChNum == 7) {
+	else if (bChNum == 7)
 		bData = 0x3C;	/* 6.1ch data */
-		bData1 = 0x50;	/* data0 */
-	} else {
+	else
 		bData = 0x04;	/* 2ch data */
-		bData1 = 0x50;	/* data0 */
-	}
-
-	bData2 = 0xc6;
-	bData3 = 0xfa;
-
-	vWriteByteHdmiGRL(GRL_CH_SW0, bData1);
-	vWriteByteHdmiGRL(GRL_CH_SW1, bData2);
-	vWriteByteHdmiGRL(GRL_CH_SW2, bData3);
 	vWriteByteHdmiGRL(GRL_I2S_UV, bData);
 
-	/* vDisableDsdConfig(); */
+	/* Don't swap the audio channel ,just use the default value
+	* bData1 = 0x84;
+	* bData2 = 0xc6;
+	* bData3 = 0xfa;
+
+	* vWriteByteHdmiGRL(GRL_CH_SW0, bData1);
+	* vWriteByteHdmiGRL(GRL_CH_SW1, bData2);
+	* vWriteByteHdmiGRL(GRL_CH_SW2, bData3);
+	* vDisableDsdConfig();
+	*/
 
 }
 
