@@ -354,7 +354,7 @@ int dcm_infra_rate(unsigned full, unsigned int sfel)
 	return 0;
 }
 
-#define TOPBUS_DCMCTL_SETTING		0x57
+#define TOPBUS_DCMCTL_SETTING		0x17
 #define BUSDCM_APB_TOG			0x01
 
 int dcm_infra(ENUM_INFRA_DCM on)
