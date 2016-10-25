@@ -430,7 +430,7 @@ static void set_adaptive_cpu_power_limit(unsigned int limit)
 	final_limit = MIN(adaptive_cpu_power_limit, static_cpu_power_limit);
 
 	if (prv_adp_cpu_pwr_lim != adaptive_cpu_power_limit) {
-		tscpu_dprintk("set_adaptive_cpu_power_limit %d, T=%d,%d,%d\n",
+		tscpu_printk("set_adaptive_cpu_power_limit %d, T=%d,%d,%d\n",
 				(final_limit != 0x7FFFFFFF) ? final_limit : 0,
 				SOC_TS_MCU1_T, SOC_TS_MCU2_T, SOC_TS_MCU3_T);
 
@@ -508,10 +508,20 @@ int tscpu_thermal_clock_off(void)
 #else
 void tscpu_thermal_clock_on(void)
 {
+	int ret = 0;
 	pr_debug("tscpu_thermal_clock_on\n");
-	clk_prepare(clk_auxadc);
+	ret = clk_prepare(clk_auxadc);
+	if (!ret) {
+		dump_stack();
+		pr_err("Prepare auxadc clock fail!!!");
+	}
 	clk_enable(clk_auxadc);
-	clk_prepare(clk_peri_therm);
+
+	ret = clk_prepare(clk_peri_therm);
+	if (!ret) {
+		dump_stack();
+		pr_err("Prepare thermal clock fail!!!");
+	}
 	clk_enable(clk_peri_therm);
 }
 
@@ -1054,7 +1064,7 @@ EXPORT_SYMBOL(mtk_cpufreq_register);
 static int init_cooler(void)
 {
 	int i;
-	int num = CPU_COOLER_NUM;	/* 700~4000, 92 */
+	int num = CPU_COOLER_NUM;	/* 200~3500, 8167 */
 
 	cl_dev_state = kzalloc((num) * sizeof(unsigned int), GFP_KERNEL);
 	if (cl_dev_state == NULL)
@@ -1069,7 +1079,7 @@ static int init_cooler(void)
 		return -ENOMEM;
 
 	for (i = 0; i < num; i++)
-		sprintf(cooler_name + (i * 20), "cpu%02d", i);	/* using index=>0=700,1=800 ~ 33=4000 */
+		sprintf(cooler_name + (i * 20), "cpu%02d", i);	/* using index=>0=200,1=800 ~ 33=3500 */
 
 	Num_of_OPP = num;	/* CPU COOLER COUNT, not CPU OPP count */
 	return 0;
@@ -1396,7 +1406,7 @@ static int tscpu_get_temp(struct thermal_zone_device *thermal, int *t)
 
 	curr_temp = MAX(MAX(SOC_TS_MCU1_T, SOC_TS_MCU2_T), SOC_TS_MCU3_T);
 
-	tscpu_dprintk("\n tscpu_update_tempinfo, T=%d,%d,%d\n",
+	tscpu_printk("\n tscpu_update_tempinfo, T=%d,%d,%d\n",
 			SOC_TS_MCU1_T, SOC_TS_MCU2_T, SOC_TS_MCU3_T);
 
 	if ((curr_temp > (trip_temp[0] - 15000)) || (curr_temp < -30000) || (curr_temp > 85000))
@@ -1643,9 +1653,19 @@ static int tscpu_set_power_consumption_state(void)
 				tscpu_printk("previous_opp=%d, now_opp=%d\n", previous_step, i);
 				previous_step = i;
 				mtktscpu_limited_dmips = tscpu_cpu_dmips[previous_step];
+
+				if (!mtk_gpu_power) {
+					pr_err("%s GPU POWER NOT READY!!", __func__);
+					/* GPU freq = 299000, power = 548 */
+					power = (i * 100) + 200 - 548;
+					pr_err("%s cpu_power=%d\n", __func__, power);
+					set_static_cpu_power_limit(power);
+					return -ENOMEM;
+				}
+
 				if (Num_of_GPU_OPP == 3) {
 					power =
-						(i * 100 + 700) - mtk_gpu_power[Num_of_GPU_OPP -
+						(i * 100 + 200) - mtk_gpu_power[Num_of_GPU_OPP -
 						1].gpufreq_power;
 					set_static_cpu_power_limit(power);
 					set_static_gpu_power_limit(mtk_gpu_power
@@ -1657,7 +1677,7 @@ static int tscpu_set_power_consumption_state(void)
 						 mtk_gpu_power[Num_of_GPU_OPP - 1].gpufreq_power,
 						 power);
 				} else if (Num_of_GPU_OPP == 2) {
-					power = (i * 100 + 700) - mtk_gpu_power[1].gpufreq_power;
+					power = (i * 100 + 200) - mtk_gpu_power[1].gpufreq_power;
 					set_static_cpu_power_limit(power);
 					set_static_gpu_power_limit(mtk_gpu_power[1].gpufreq_power);
 					tscpu_dprintk
@@ -1669,14 +1689,14 @@ static int tscpu_set_power_consumption_state(void)
 					/* 1016mW,GPU 700Mhz,1.1V */
 					power = (i * 100 + 700) - 653;
 #else
-					power = (i * 100 + 700) - mtk_gpu_power[0].gpufreq_power;
+					power = (i * 100 + 200) - mtk_gpu_power[0].gpufreq_power;
 #endif
 					set_static_cpu_power_limit(power);
 					tscpu_dprintk
 						("Num_of_GPU_OPP=%d, gpufreq_power=%d, power=%d\n",
 						 Num_of_GPU_OPP, mtk_gpu_power[0].gpufreq_power, power);
 				} else {	/* TODO: fix this, temp solution, this project has over 5 GPU OPP... */
-					power = (i * 100 + 700);
+					power = (i * 100 + 200);
 					set_static_cpu_power_limit(power);
 					tscpu_dprintk
 						("Num_of_GPU_OPP=%d, gpufreq_power=%d, power=%d\n",
