@@ -50,6 +50,7 @@ struct mtk_cpu_dvfs_info {
 	struct regulator *sram_reg;
 	struct clk *cpu_clk;
 	struct clk *inter_clk;
+	struct clk *arm_clk;
 	struct thermal_cooling_device *cdev;
 	struct mutex lock;
 	struct notifier_block opp_nb;
@@ -250,7 +251,6 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
 {
 	struct cpufreq_frequency_table *freq_table = policy->freq_table;
 	struct clk *cpu_clk = policy->clk;
-	struct clk *armpll = clk_get_parent(cpu_clk);
 	struct mtk_cpu_dvfs_info *info = policy->driver_data;
 	struct device *cpu_dev = info->cpu_dev;
 	struct dev_pm_opp *opp;
@@ -309,18 +309,18 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
 	}
 
 	/* Set the original PLL to target rate. */
-	ret = clk_set_rate(armpll, freq_hz);
+	ret = clk_set_rate(info->arm_clk, freq_hz);
 	if (ret) {
 		pr_err("cpu%d: failed to scale cpu clock rate!\n",
 		       policy->cpu);
-		clk_set_parent(cpu_clk, armpll);
+		clk_set_parent(cpu_clk, info->arm_clk);
 		mtk_cpufreq_set_voltage(info, old_vproc);
 		mutex_unlock(&info->lock);
 		return ret;
 	}
 
 	/* Set parent of CPU clock back to the original PLL. */
-	ret = clk_set_parent(cpu_clk, armpll);
+	ret = clk_set_parent(cpu_clk, info->arm_clk);
 	if (ret) {
 		pr_err("cpu%d: failed to re-parent cpu clock!\n",
 		       policy->cpu);
@@ -340,8 +340,8 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
 			pr_err("cpu%d: failed to scale down voltage!\n",
 			       policy->cpu);
 			clk_set_parent(cpu_clk, info->inter_clk);
-			clk_set_rate(armpll, old_freq_hz);
-			clk_set_parent(cpu_clk, armpll);
+			clk_set_rate(info->arm_clk, old_freq_hz);
+			clk_set_parent(cpu_clk, info->arm_clk);
 			mutex_unlock(&info->lock);
 			return ret;
 		}
@@ -409,6 +409,7 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
 	struct regulator *sram_reg = ERR_PTR(-ENODEV);
 	struct clk *cpu_clk = ERR_PTR(-ENODEV);
 	struct clk *inter_clk = ERR_PTR(-ENODEV);
+	struct clk *arm_clk = ERR_PTR(-ENODEV);
 	struct dev_pm_opp *opp;
 	unsigned long rate;
 	int ret;
@@ -430,7 +431,6 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
 		ret = PTR_ERR(cpu_clk);
 		return ret;
 	}
-
 	clk_prepare_enable(cpu_clk);
 
 	inter_clk = clk_get(cpu_dev, "intermediate");
@@ -445,6 +445,20 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
 		ret = PTR_ERR(inter_clk);
 		goto out_free_resources;
 	}
+
+	arm_clk = clk_get(cpu_dev, "armpll");
+	if (IS_ERR(arm_clk)) {
+		if (PTR_ERR(arm_clk) == -EPROBE_DEFER)
+			pr_warn("armpll clk for cpu%d not ready, retry.\n",
+				cpu);
+		else
+			pr_err("failed to get armpll clk for cpu%d\n",
+			       cpu);
+
+		ret = PTR_ERR(arm_clk);
+		goto out_free_resources;
+	}
+	clk_prepare_enable(arm_clk);
 
 	proc_reg = regulator_get_optional(cpu_dev, "proc");
 	if (IS_ERR(proc_reg)) {
@@ -506,6 +520,7 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
 	info->sram_reg = IS_ERR(sram_reg) ? NULL : sram_reg;
 	info->cpu_clk = cpu_clk;
 	info->inter_clk = inter_clk;
+	info->arm_clk = arm_clk;
 	info->opp_freq = clk_get_rate(cpu_clk);
 
 	mutex_init(&info->lock);
@@ -532,6 +547,10 @@ out_free_resources:
 	}
 	if (!IS_ERR(inter_clk))
 		clk_put(inter_clk);
+	if (!IS_ERR(arm_clk)) {
+		clk_disable_unprepare(arm_clk);
+		clk_put(arm_clk);
+	}
 
 	return ret;
 }
@@ -548,6 +567,10 @@ static void mtk_cpu_dvfs_info_release(struct mtk_cpu_dvfs_info *info)
 	}
 	if (!IS_ERR(info->inter_clk))
 		clk_put(info->inter_clk);
+	if (!IS_ERR(info->arm_clk)) {
+		clk_disable_unprepare(info->arm_clk);
+		clk_put(info->arm_clk);
+	}
 
 	dev_pm_opp_of_cpumask_remove_table(&info->cpus);
 }
