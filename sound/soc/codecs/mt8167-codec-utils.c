@@ -43,6 +43,11 @@ static const struct reg_setting mt8167_codec_cali_setup_regs[] = {
 		.val = 0x0,
 	},
 	{
+		.reg = AUDIO_TOP_CON0,
+		.mask = BIT(2),
+		.val = 0x0,
+	},
+	{
 		.reg = AFE_MEMIF_PBUF_SIZE,
 		.mask = GENMASK(17, 16),
 		.val = 0x0,
@@ -117,9 +122,29 @@ static const struct reg_setting mt8167_codec_cali_setup_regs[] = {
 		.mask = BIT(0),
 		.val = BIT(0),
 	},
+	{ /* ADA_HPLO_TO_AUXADC */
+		.reg = AUDIO_CODEC_CON02,
+		.mask = BIT(15),
+		.val = BIT(15),
+	},
+	{ /* ADA_HPRO_TO_AUXADC */
+		.reg = AUDIO_CODEC_CON02,
+		.mask = BIT(14),
+		.val = BIT(14),
+	},
 };
 
 static const struct reg_setting mt8167_codec_cali_cleanup_regs[] = {
+	{ /* ADA_HPLO_TO_AUXADC */
+		.reg = AUDIO_CODEC_CON02,
+		.mask = BIT(15),
+		.val = 0x0,
+	},
+	{ /* ADA_HPRO_TO_AUXADC */
+		.reg = AUDIO_CODEC_CON02,
+		.mask = 0x0,
+		.val = BIT(14),
+	},
 	{
 		.reg = AFE_DAC_CON0,
 		.mask = BIT(1),
@@ -144,6 +169,11 @@ static const struct reg_setting mt8167_codec_cali_cleanup_regs[] = {
 		.reg = AFE_DAC_CON0,
 		.mask = BIT(0),
 		.val = 0x0,
+	},
+	{
+		.reg = AUDIO_TOP_CON0,
+		.mask = BIT(2),
+		.val = BIT(2),
 	},
 	{
 		.reg = AUDIO_TOP_CON0,
@@ -229,6 +259,11 @@ static const struct reg_setting mt8167_codec_cali_disable_regs[] = {
 	{
 		.reg = AUDIO_CODEC_CON02,
 		.mask = BIT(27) | BIT(17) | BIT(16),
+		.val = 0x0,
+	},
+	{
+		.reg = ABB_AFE_CON0,
+		.mask = BIT(0),
 		.val = 0x0,
 	},
 };
@@ -320,6 +355,7 @@ static uint32_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
 	int32_t auxadc_on_val = 0;
 	int32_t auxadc_off_val = 0;
 	int32_t auxadc_val_sum = 0;
+	int32_t auxadc_val_avg = 0;
 	int32_t count = 0;
 	int32_t countlimit = 5;
 #endif
@@ -328,9 +364,11 @@ static uint32_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
 
 	mt8167_codec_setup_cali_path(codec, &dma_buf);
 
+	usleep_range(10 * 1000, 15 * 1000);
+
 #ifdef CONFIG_MTK_AUXADC
 	IMM_GetOneChannelValue_Cali(auxadc_channel, &auxadc_off_val);
-	dev_dbg(codec->dev, "%s auxadc_off_val: 0x%x\n",
+	dev_dbg(codec->dev, "%s auxadc_off_val: %d\n",
 		__func__, auxadc_off_val);
 #endif
 
@@ -346,7 +384,13 @@ static uint32_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
 			__func__, auxadc_on_val, auxadc_val_sum);
 	}
 
-	cali_val = (auxadc_val_sum / countlimit) - auxadc_off_val;
+	auxadc_val_avg = auxadc_val_sum / countlimit;
+
+	if (auxadc_val_avg >= auxadc_off_val)
+		cali_val = auxadc_val_avg - auxadc_off_val;
+	else
+		cali_val = auxadc_off_val - auxadc_val_avg;
+
 	cali_val = cali_val/1000; /* mV */
 #endif
 
@@ -378,6 +422,9 @@ int mt8167_codec_get_hpl_cali_val(struct snd_soc_codec *codec,
 {
 	*dc_offset = mt8167_codec_get_hp_cali_val(codec, AUXADC_CH_AU_HPL);
 	*dccomp_val = mt8167_codec_conv_dc_offset_to_comp_val(*dc_offset);
+
+	dev_dbg(codec->dev, "%s dc_offset %d, dccomp_val %d\n",
+		__func__, *dc_offset, *dccomp_val);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(mt8167_codec_get_hpl_cali_val);
@@ -387,6 +434,9 @@ int mt8167_codec_get_hpr_cali_val(struct snd_soc_codec *codec,
 {
 	*dc_offset = mt8167_codec_get_hp_cali_val(codec, AUXADC_CH_AU_HPR);
 	*dccomp_val = mt8167_codec_conv_dc_offset_to_comp_val(*dc_offset);
+
+	dev_dbg(codec->dev, "%s dc_offset %d, dccomp_val %d\n",
+		__func__, *dc_offset, *dccomp_val);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(mt8167_codec_get_hpr_cali_val);

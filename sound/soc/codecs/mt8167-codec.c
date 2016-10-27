@@ -1008,10 +1008,6 @@ static int mt8167_codec_hpl_dc_comp_get(struct snd_kcontrol *kcontrol,
 		codec_data->is_lch_dc_calibrated = true;
 	}
 	ucontrol->value.integer.value[0] = codec_data->lch_dc_offset;
-
-#if 1 /* use temp value until hp calibration is ready */
-	ucontrol->value.integer.value[0] = 2048;
-#endif
 	return 0;
 }
 
@@ -1047,10 +1043,6 @@ static int mt8167_codec_hpr_dc_comp_get(struct snd_kcontrol *kcontrol,
 		codec_data->is_rch_dc_calibrated = true;
 	}
 	ucontrol->value.integer.value[0] = codec_data->rch_dc_offset;
-
-#if 1 /* use temp value until hp calibration is ready */
-	ucontrol->value.integer.value[0] = 2048;
-#endif
 	return 0;
 }
 
