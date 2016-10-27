@@ -81,7 +81,7 @@ static struct timer_list r_cec_timer;
 static uint32_t gHDMI_CHK_INTERVAL = 10;
 static uint32_t gCEC_CHK_INTERVAL = 20;
 
-size_t hdmidrv_log_on = 0x37f;
+size_t hdmidrv_log_on = hdmialllog;
 size_t hdmi_cec_on;
 size_t hdmi_cecinit;
 size_t hdmi_hdmiinit;
