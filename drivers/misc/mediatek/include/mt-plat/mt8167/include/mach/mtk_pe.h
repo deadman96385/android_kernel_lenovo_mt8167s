@@ -23,6 +23,10 @@
 #define TA_AC_CHARGING_CURRENT	CHARGE_CURRENT_2200_00_MA
 #define TA_9V_SUPPORT
 
+/* Ichg threshold for leaving PE+/PE+20 */
+#define PEP20_ICHG_LEAVE_THRESHOLD 1000 /* mA */
+#define PEP_ICHG_LEAVE_THRESHOLD 1000 /* mA */
+
 #undef V_CHARGER_MAX
 #ifdef TA_9V_SUPPORT
 #define V_CHARGER_MAX 10500				/*10.5 V*/
