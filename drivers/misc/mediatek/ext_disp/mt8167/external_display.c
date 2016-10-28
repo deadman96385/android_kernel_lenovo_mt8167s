@@ -51,6 +51,14 @@
 #include "disp_session.h"
 #include "display_recorder.h"
 #include "extd_info.h"
+#include "mtkfb_fence.h"
+#include "ion_drv.h"
+#include "mtk_ion.h"
+
+#include "tz_cross/trustzone.h"
+#include "tz_cross/ta_mem.h"
+#include "trustzone/kree/system.h"
+#include "trustzone/kree/mem.h"
 
 int ext_disp_use_cmdq;
 int ext_disp_use_m4u;
@@ -71,15 +79,27 @@ struct ext_disp_path_context {
 	struct mutex lock;
 	struct mutex vsync_lock;
 	struct cmdqRecStruct *cmdq_handle_config;
+	struct cmdqRecStruct *cmdq_handle_ovl2mem_config;
 	struct cmdqRecStruct *cmdq_handle_trigger;
 	disp_path_handle dpmgr_handle;
 	disp_path_handle ovl2mem_path_handle;
+
+	struct disp_internal_buffer_info *decouple_buffer_info[DISP_INTERNAL_BUFFER_COUNT];
+	unsigned int dc_buf[DISP_INTERNAL_BUFFER_COUNT];
+	unsigned int dc_sec_buf[DISP_INTERNAL_BUFFER_COUNT];
+	unsigned int dc_buf_id;
+	struct WDMA_CONFIG_STRUCT decouple_wdma_config;
+	struct RDMA_CONFIG_STRUCT decouple_rdma_config;
+
+	cmdqBackupSlotHandle ovl_address;
+	cmdqBackupSlotHandle wdma_info;
 };
 
 #define pgc	_get_context()
 
 LCM_PARAMS extd_lcm_params;
 int enable_ut;
+disp_path_handle ovl2mem_path_handle;
 
 static struct ext_disp_path_context *_get_context(void)
 {
@@ -101,8 +121,14 @@ enum EXT_DISP_PATH_MODE ext_disp_path_get_mode(unsigned int session)
 
 void ext_disp_path_set_mode(enum EXT_DISP_PATH_MODE mode, unsigned int session)
 {
+	/* there is not ovl1 */
+	if (mode == EXTD_DIRECT_LINK_MODE)
+		mode = EXTD_RDMA_DPI_MODE;
+
+	EXT_DISP_LOG("ext_disp_path_set_mode: %d\n", mode);
 	ext_disp_mode = mode;
-	init_roi = (mode == EXTD_DIRECT_LINK_MODE ? 1 : 0);
+	pgc->mode = mode;
+	init_roi = (mode <= EXTD_DECOUPLE_MODE ? 1 : 0);
 }
 
 static void _ext_disp_path_lock(void)
@@ -231,14 +257,6 @@ static int _should_insert_wait_frame_done_token(void)
 	return ext_disp_cmdq_enabled() ? 1 : 0;
 }
 
-static int _should_trigger_interface(void)
-{
-	if (pgc->mode == EXTD_DECOUPLE_MODE)
-		return 0;
-	else
-		return 1;
-}
-
 static int _should_config_ovl_input(void)
 {
 	/* should extend this when display path dynamic switch is ready */
@@ -340,14 +358,220 @@ static int _build_path_direct_link(void)
 	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_DONE);
 	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_START);
 
+	EXT_DISP_LOG("build direct link finished\n");
 	return ret;
 }
 
+#ifdef SVP_UNIT_TEST
+KREE_SESSION_HANDLE display_secure_memory_session_handle(void)
+{
+	static KREE_SESSION_HANDLE disp_secure_memory_session;
+
+	/* TODO: the race condition here is not taken into consideration. */
+	if (!disp_secure_memory_session) {
+		TZ_RESULT ret;
+
+		ret = KREE_CreateSession(TZ_TA_MEM_UUID, &disp_secure_memory_session);
+		if (ret != TZ_RESULT_SUCCESS) {
+			EXT_DISP_ERR("KREE_CreateSession fail, ret=%d\n", ret);
+			return 0;
+		}
+	}
+	EXT_DISP_LOG("disp_secure_memory_session_handle() session = %x\n",
+	(unsigned int)disp_secure_memory_session);
+
+	return disp_secure_memory_session;
+}
+
+KREE_SECUREMEM_HANDLE allocate_decouple_sec_buffer(unsigned int buffer_size)
+{
+	TZ_RESULT ret;
+	KREE_SECUREMEM_HANDLE mem_handle;
+
+	/* allocate secure buffer by tz api */
+	ret = KREE_AllocSecurechunkmemWithTag(display_secure_memory_session_handle(),
+						&mem_handle, 0, buffer_size, "disp");
+	if (ret != TZ_RESULT_SUCCESS) {
+		EXT_DISP_ERR("KREE_AllocSecurechunkmemWithTag fail, ret = %d\n", ret);
+		return -1;
+	}
+	EXT_DISP_LOG("KREE_AllocSecurechunkmemWithTag handle = 0x%x\n", mem_handle);
+
+	return mem_handle;
+}
+
+KREE_SECUREMEM_HANDLE free_decouple_sec_buffer(KREE_SECUREMEM_HANDLE mem_handle)
+{
+	TZ_RESULT ret;
+
+	ret = KREE_UnreferenceSecurechunkmem(display_secure_memory_session_handle(), mem_handle);
+
+	if (ret != TZ_RESULT_SUCCESS)
+		EXT_DISP_ERR("KREE_UnreferenceSecurechunkmem fail, ret = %d\n", ret);
+
+	EXT_DISP_LOG("KREE_UnreferenceSecurechunkmem handle = 0x%x\n", mem_handle);
+
+	return ret;
+	}
+#endif
+
+static int ext_init_decouple_buffers(void)
+{
+	int i = 0;
+	int height = 1080;
+	int width = 1920;
+	int bpp = 3;
+	int buffer_size = width * height * bpp;
+
+	if (pgc->decouple_buffer_info[0])
+		return 0;
+
+	for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
+		pgc->decouple_buffer_info[i] = allocat_decouple_buffer(buffer_size);
+		if (pgc->decouple_buffer_info[i] != NULL) {
+			pgc->dc_buf[i] = pgc->decouple_buffer_info[i]->mva;
+			EXT_DISP_LOG("extd alloc decouple buffer: 0x%x\n", pgc->dc_buf[i]);
+		}
+	}
+
+#ifdef SVP_UNIT_TEST
+	for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
+		pgc->dc_sec_buf[i] = allocate_decouple_sec_buffer(buffer_size);
+		EXT_DISP_LOG("extd alloc decouple secure buffer: 0x%x\n", pgc->dc_sec_buf[i]);
+	}
+#endif
+
+	pgc->decouple_rdma_config.height = ext_disp_get_height();
+	pgc->decouple_rdma_config.width = ext_disp_get_width();
+	pgc->decouple_rdma_config.idx = 0;
+	pgc->decouple_rdma_config.inputFormat = eRGB888;
+	pgc->decouple_rdma_config.pitch = width * DP_COLOR_BITS_PER_PIXEL(eRGB888) / 8;
+	pgc->decouple_rdma_config.security = DISP_NORMAL_BUFFER;
+
+	pgc->decouple_wdma_config.dstAddress = pgc->dc_buf[pgc->dc_buf_id];
+	pgc->decouple_wdma_config.srcHeight = ext_disp_get_height();
+	pgc->decouple_wdma_config.srcWidth = ext_disp_get_width();
+	pgc->decouple_wdma_config.clipX = 0;
+	pgc->decouple_wdma_config.clipY = 0;
+	pgc->decouple_wdma_config.clipHeight = ext_disp_get_height();
+	pgc->decouple_wdma_config.clipWidth = ext_disp_get_width();
+	pgc->decouple_wdma_config.outputFormat = eRGB888;
+	pgc->decouple_wdma_config.useSpecifiedAlpha = 1;
+	pgc->decouple_wdma_config.alpha = 0xFF;
+	pgc->decouple_wdma_config.dstPitch = ext_disp_get_width() * DP_COLOR_BITS_PER_PIXEL(eRGB888) / 8;
+
+	return 0;
+}
+
+static int ext_deinit_decouple_buffer(void)
+{
+	int i = 0;
+
+	for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
+		if (pgc->decouple_buffer_info[i]) {
+			ion_free(pgc->decouple_buffer_info[i]->client, pgc->decouple_buffer_info[i]->handle);
+			kfree(pgc->decouple_buffer_info[i]);
+			pgc->decouple_buffer_info[i] = NULL;
+		}
+	}
+
+	return 0;
+}
+
+static int _build_path_ovl_to_wdma(void)
+{
+	int ret = 0;
+	static bool is_path_exist;
+
+	ext_init_decouple_buffers();
+
+	if (is_path_exist) {
+		pgc->ovl2mem_path_handle = ovl2mem_path_handle;
+		goto build_end;
+	}
+
+#ifdef CONFIG_FOR_SOURCE_PQ
+	pgc->ovl2mem_path_handle = dpmgr_create_path(DDP_SCENARIO_PRIMARY_DITHER_MEMOUT,
+						     pgc->cmdq_handle_ovl2mem_config);
+#else
+	pgc->ovl2mem_path_handle = dpmgr_create_path(DDP_SCENARIO_PRIMARY_OVL_MEMOUT,
+						     pgc->cmdq_handle_ovl2mem_config);
+#endif
+
+	ovl2mem_path_handle = pgc->ovl2mem_path_handle;
+
+	dpmgr_enable_event(pgc->ovl2mem_path_handle, DISP_PATH_EVENT_FRAME_COMPLETE);
+	dpmgr_enable_event(pgc->ovl2mem_path_handle, DISP_PATH_EVENT_FRAME_START);
+
+	if (pgc->ovl2mem_path_handle) {
+		EXT_DISP_LOG("dpmgr create ovl memout path SUCCESS\n");
+	} else {
+		EXT_DISP_LOG("dpmgr create path FAIL\n");
+		return -1;
+	}
+	dpmgr_path_set_video_mode(pgc->ovl2mem_path_handle, 0);
+	dpmgr_path_init(pgc->ovl2mem_path_handle, CMDQ_DISABLE);
+	is_path_exist = true;
+
+build_end:
+	EXT_DISP_LOG("build ovl to wdma path finished\n");
+	return ret;
+}
 
 static int _build_path_decouple(void)
 {
-	return 0;
+	int ret = 0;
+
+	enum DISP_MODULE_ENUM dst_module = 0;
+
+	pgc->mode = EXTD_DECOUPLE_MODE;
+
+	pgc->dpmgr_handle = dpmgr_create_path(DDP_SCENARIO_SUB_RDMA1_DISP, pgc->cmdq_handle_config);
+	if (pgc->dpmgr_handle)
+		EXT_DISP_LOG("dpmgr create path SUCCESS(%p)\n", pgc->dpmgr_handle);
+	else {
+		EXT_DISP_LOG("dpmgr create path FAIL\n");
+		return -1;
+	}
+
+	dst_module = _get_dst_module_by_lcm(pgc->dpmgr_handle);
+	dpmgr_path_set_dst_module(pgc->dpmgr_handle, dst_module);
+	EXT_DISP_LOG("dpmgr set dst module FINISHED(%s)\n", ddp_get_module_name(dst_module));
+
+	{
+#ifdef MTK_FB_RDMA1_SUPPORT
+#ifdef CONFIG_MTK_M4U
+
+		M4U_PORT_STRUCT sPort;
+
+		sPort.ePortID = M4U_PORT_DISP_RDMA1;
+		sPort.Virtuality = ext_disp_use_m4u;
+		sPort.Security = 0;
+		sPort.Distance = 1;
+		sPort.Direction = 0;
+		ret = m4u_config_port(&sPort);
+		if (ret == 0) {
+			EXT_DISP_LOG("config M4U Port %s to %s SUCCESS\n", ddp_get_module_name(DISP_MODULE_RDMA1),
+				ext_disp_use_m4u ? "virtual" : "physical");
+		} else {
+			EXT_DISP_LOG("config M4U Port %s to %s FAIL(ret=%d)\n", ddp_get_module_name(DISP_MODULE_RDMA1),
+				ext_disp_use_m4u ? "virtual" : "physical", ret);
+			return -1;
+		}
+#endif /* CONFIG_MTK_M4U */
+#endif
+	}
+
+	dpmgr_set_lcm_utils(pgc->dpmgr_handle, NULL);
+	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC);
+	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_DONE);
+
+	_build_path_ovl_to_wdma();
+
+	EXT_DISP_LOG("build decouple finished\n");
+	return ret;
 }
+
 
 static int _build_path_single_layer(void)
 {
@@ -562,6 +786,7 @@ static int _convert_disp_input_to_rdma(struct RDMA_CONFIG_STRUCT *dst, struct di
 	dst->width = src->src_width;
 	dst->height = src->src_height;
 	dst->pitch = src->src_pitch * Bpp;
+	dst->security = DISP_NORMAL_BUFFER;
 
 	return ret;
 }
@@ -644,6 +869,9 @@ static int _convert_disp_input_to_ovl(struct OVL_CONFIG_STRUCT *dst, struct disp
 		EXT_DISP_ERR("unknown source = %d", src->buffer_source);
 		dst->source = OVL_LAYER_SOURCE_MEM;
 	}
+
+	EXT_DISP_LOG("extd convert input to ovl: layer%d en%d w%d h%d pitch%d addr0x%lx\n",
+			dst->layer, dst->layer_en, dst->dst_w, dst->dst_h, dst->src_pitch, dst->addr);
 
 	return ret;
 }
@@ -757,11 +985,23 @@ int ext_disp_init(char *lcm_name, unsigned int session)
 #endif
 	ret = cmdqRecCreate(CMDQ_SCENARIO_MHL_DISP, &(pgc->cmdq_handle_config));
 	if (ret) {
-		EXT_DISP_LOG("cmdqRecCreate FAIL, ret=%d\n", ret);
+		EXT_DISP_LOG("cmdqRecCreate CMDQ_SCENARIO_MHL_DISP FAIL, ret=%d\n", ret);
 		ret = EXT_DISP_STATUS_ERROR;
 		goto done;
-	} else
+	} else {
 		EXT_DISP_LOG("cmdqRecCreate SUCCESS, g_cmdq_handle=%p\n", pgc->cmdq_handle_config);
+	}
+
+	/* use the same scenario with primary */
+	ret = cmdqRecCreate(CMDQ_SCENARIO_PRIMARY_MEMOUT, &(pgc->cmdq_handle_ovl2mem_config));
+	if (ret != 0) {
+		EXT_DISP_LOG("cmdqRecCreate CMDQ_SCENARIO_PRIMARY_MEMOUT FAIL, ret=%d\n", ret);
+		ret = EXT_DISP_STATUS_ERROR;
+		goto done;
+	}
+
+	init_cmdq_slots(&(pgc->ovl_address), 4, 0);
+	init_cmdq_slots(&(pgc->wdma_info), 2, 0);
 
 	if (ext_disp_mode == EXTD_DIRECT_LINK_MODE)
 		_build_path_direct_link();
@@ -842,7 +1082,10 @@ int ext_disp_deinit(unsigned int session)
 	dpmgr_destroy_path(pgc->dpmgr_handle, NULL);
 
 	cmdqRecDestroy(pgc->cmdq_handle_config);
+	cmdqRecDestroy(pgc->cmdq_handle_ovl2mem_config);
 	cmdqRecDestroy(pgc->cmdq_handle_trigger);
+
+	ext_deinit_decouple_buffer();
 
 	pgc->state = EXTD_DEINIT;
 
@@ -960,6 +1203,54 @@ int ext_disp_resume(unsigned int session)
 	return ret;
 }
 
+static int ext_disp_trigger_ovl_to_memory(disp_path_handle disp_handle, struct cmdqRecStruct *cmdq_handle,
+			   fence_release_callback callback, unsigned int data, int blocking)
+{
+	EXT_DISP_LOG("start trigger ovl to mem --- extd\n");
+	dpmgr_wdma_path_force_power_on();
+	dpmgr_path_trigger(disp_handle, cmdq_handle, ext_disp_cmdq_enabled());
+	cmdqRecWaitNoClear(cmdq_handle, CMDQ_EVENT_DISP_WDMA0_EOF);
+
+	if (blocking)
+		cmdqRecFlush(cmdq_handle);
+	else
+		cmdqRecFlushAsyncCallback(cmdq_handle, (CmdqAsyncFlushCB) callback, data);
+	cmdqRecReset(cmdq_handle);
+	cmdqRecWait(cmdq_handle, CMDQ_EVENT_DISP_WDMA0_EOF);
+	return 0;
+}
+
+
+unsigned int ovl_curr_addr[EXTD_OVERLAY_CNT];
+static int _ovl_fence_release_callback(uint32_t userdata)
+{
+	int i;
+	int fence_idx = 0;
+	int secure = 0;
+	unsigned int addr = 0;
+
+	EXT_DISP_LOG("extd ovl->wdma frame done\n");
+	cmdqBackupReadSlot(pgc->wdma_info, 0, &(secure));
+	cmdqBackupReadSlot(pgc->wdma_info, 1, &(addr));
+	pgc->decouple_rdma_config.security = secure;
+	pgc->decouple_rdma_config.height = ext_disp_get_height();
+	pgc->decouple_rdma_config.width = ext_disp_get_width();
+	pgc->decouple_rdma_config.address = addr;
+	_config_rdma_input_data(&pgc->decouple_rdma_config, pgc->dpmgr_handle, pgc->cmdq_handle_config);
+	_ext_disp_trigger(0, NULL, 0);
+
+	pgc->dc_buf_id++;
+	pgc->dc_buf_id %= DISP_INTERNAL_BUFFER_COUNT;
+
+	for (i = 0; i < EXTD_OVERLAY_CNT; i++) {
+		cmdqBackupReadSlot(pgc->ovl_address, i, &ovl_curr_addr[i]);
+		fence_idx = disp_sync_find_fence_idx_by_addr(pgc->session, i, ovl_curr_addr[i]);
+		mtkfb_release_fence(pgc->session, i, fence_idx+1);
+	}
+
+	return 0;
+}
+
 int ext_disp_trigger(int blocking, void *callback, unsigned int userdata, unsigned int session)
 {
 	int ret = 0;
@@ -974,14 +1265,17 @@ int ext_disp_trigger(int blocking, void *callback, unsigned int userdata, unsign
 
 	_ext_disp_path_lock();
 
-	if (_should_trigger_interface()) {
+	if (pgc->mode == EXTD_DECOUPLE_MODE) {
+		/* because primary secure ovl->wdma use sync */
+		ext_disp_trigger_ovl_to_memory(pgc->ovl2mem_path_handle, pgc->cmdq_handle_ovl2mem_config, NULL, 0, 1);
+		_ovl_fence_release_callback(0);
+	} else {
 		if (DISP_SESSION_TYPE(session) == DISP_SESSION_EXTERNAL && DISP_SESSION_DEV(session) == DEV_MHL + 1)
 			_ext_disp_trigger(blocking, callback, userdata);
 		else if (DISP_SESSION_TYPE(session) == DISP_SESSION_EXTERNAL
 			&& DISP_SESSION_DEV(session) == DEV_EINK + 1)
 			_ext_disp_trigger_EPD(blocking, callback, userdata);
-	} else
-		dpmgr_path_trigger(pgc->ovl2mem_path_handle, NULL, ext_disp_use_cmdq);
+	}
 
 	pgc->state = EXTD_RESUME;
 	_ext_disp_path_unlock();
@@ -1043,6 +1337,8 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 	int ret = 0;
 	int i = 0;
 	int config_layer_id = 0;
+	disp_path_handle disp_handle;
+	struct cmdqRecStruct *cmdq_handle;
 #ifdef MTK_FB_RDMA1_SUPPORT
 #ifdef CONFIG_MTK_M4U
 	M4U_PORT_STRUCT sPort;
@@ -1059,13 +1355,24 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 		return -2;
 	}
 
+	EXT_DISP_LOG("ext_disp_config_input_multiple, pgc->ovl2mem_path_handle = 0x%p\n", pgc->ovl2mem_path_handle);
+
 	_ext_disp_path_lock();
 
+	if (pgc->mode == EXTD_DECOUPLE_MODE) {
+		disp_handle = pgc->ovl2mem_path_handle;
+		cmdq_handle = pgc->cmdq_handle_ovl2mem_config;
+	} else {
+		disp_handle = pgc->dpmgr_handle;
+		cmdq_handle = pgc->cmdq_handle_config;
+	}
+
 	/* all dirty should be cleared in dpmgr_path_get_last_config() */
-	data_config = dpmgr_path_get_last_config(pgc->dpmgr_handle);
+	data_config = dpmgr_path_get_last_config(disp_handle);
 
 	/* hope we can use only 1 input struct for input config, just set layer number */
 	if (_should_config_ovl_input()) {
+		EXT_DISP_LOG("extd input ovl\n");
 		for (i = 0; i < input->config_layer_num; i++) {
 			config_layer_id = input->config[i].layer_id;
 			ret = _convert_disp_input_to_ovl(&(data_config->ovl_config[config_layer_id]),
@@ -1080,11 +1387,13 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 				data_config->dst_w = extd_lcm_params.dpi.width;
 				data_config->dst_h = extd_lcm_params.dpi.height;
 				data_config->dst_dirty = 1;
-				data_config->rdma_config.address = 0;
+				/* data_config->rdma_config.address = 0; */
 			}
 			data_config->ovl_dirty = 1;
 			pgc->need_trigger_overlay = 1;
 		}
+		data_config->ovl_dirty = 1;
+		data_config->dst_dirty = 1;
 	} else {
 		struct OVL_CONFIG_STRUCT ovl_config;
 
@@ -1116,17 +1425,43 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 	}
 
 	if (_should_wait_path_idle())
-		dpmgr_wait_event_timeout(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_DONE, HZ / 2);
+		dpmgr_wait_event_timeout(disp_handle, DISP_PATH_EVENT_FRAME_DONE, HZ / 2);
 
 	memcpy(&(data_config->dispif_config), &extd_lcm_params, sizeof(LCM_PARAMS));
-	ret = dpmgr_path_config(pgc->dpmgr_handle, data_config,
-				ext_disp_cmdq_enabled() ? pgc->cmdq_handle_config : NULL);
+	ret = dpmgr_path_config(disp_handle, data_config,
+				ext_disp_cmdq_enabled() ? cmdq_handle : NULL);
 
+	if (pgc->mode == EXTD_DECOUPLE_MODE) {
+		pgc->decouple_wdma_config.dstAddress = pgc->dc_buf[pgc->dc_buf_id];
+		pgc->decouple_wdma_config.security = DISP_NORMAL_BUFFER;
+		pgc->decouple_wdma_config.srcHeight = data_config->dst_h;
+		pgc->decouple_wdma_config.srcWidth = data_config->dst_w;
+		pgc->decouple_wdma_config.clipHeight = data_config->dst_h;
+		pgc->decouple_wdma_config.clipWidth = data_config->dst_w;
+		pgc->decouple_wdma_config.dstPitch = data_config->dst_w * DP_COLOR_BITS_PER_PIXEL(eRGB888) / 8;
+
+		for (i = 0; i < EXTD_OVERLAY_CNT; i++) {
+			if (data_config->ovl_config[i].layer_en &&
+			    (data_config->ovl_config[i].security == DISP_SECURE_BUFFER)) {
+				pgc->decouple_wdma_config.dstAddress = pgc->dc_sec_buf[pgc->dc_buf_id];
+				pgc->decouple_wdma_config.security = DISP_SECURE_BUFFER;
+				break;
+			}
+		}
+
+		cmdqRecBackupUpdateSlot(cmdq_handle, pgc->wdma_info, 0, pgc->decouple_wdma_config.security);
+		cmdqRecBackupUpdateSlot(cmdq_handle, pgc->wdma_info, 1, pgc->decouple_wdma_config.dstAddress);
+		_config_wdma_output(&pgc->decouple_wdma_config, disp_handle,
+			    ext_disp_cmdq_enabled() ? cmdq_handle : NULL);
+
+		for (i = 0; i < EXTD_OVERLAY_CNT; i++)
+			cmdqRecBackupRegisterToSlot(cmdq_handle, pgc->ovl_address,
+										i, 0x14007f40 + 0x20*i);
+	}
 	/* this is used for decouple mode, to indicate whether we need to trigger ovl */
 	/* pgc->need_trigger_overlay = 1; */
-	init_roi = 0;
+	/* init_roi = 0; */
 
-	_ext_disp_path_unlock();
 	if (data_config->ovl_dirty) {
 		EXT_DISP_LOG("config_input_multiple idx:%d -w:%d, h:%d, pitch:%d\n",
 				idx, data_config->ovl_config[0].src_w, data_config->ovl_config[0].src_h,
@@ -1136,6 +1471,7 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 				idx, data_config->rdma_config.width, data_config->rdma_config.height,
 				data_config->rdma_config.pitch, data_config->rdma_config.address);
 	}
+	_ext_disp_path_unlock();
 
 	return ret;
 }
@@ -1165,12 +1501,12 @@ int ext_disp_is_sleepd(void)
 
 int ext_disp_get_width(void)
 {
-	return 0;
+	return extd_lcm_params.dpi.width;
 }
 
 int ext_disp_get_height(void)
 {
-	return 0;
+	return extd_lcm_params.dpi.height;
 }
 
 unsigned int ext_disp_get_sess_id(void)
@@ -1215,10 +1551,14 @@ int ext_disp_switch_cmdq(enum CMDQ_SWITCH use_cmdq)
 
 void ext_disp_get_curr_addr(unsigned long *input_curr_addr, int module)
 {
-	if (module == 1)
-		ovl_get_address(DISP_MODULE_OVL1, input_curr_addr);
-	else
+	int i;
+
+	if (module == 1) {
+		for (i = 0; i < EXTD_OVERLAY_CNT; i++)
+			input_curr_addr[i] = 0;
+	} else {
 		dpmgr_get_input_address(pgc->dpmgr_handle, input_curr_addr);
+	}
 }
 
 int ext_disp_factory_test(int mode, void *config)
@@ -1295,11 +1635,9 @@ int ext_disp_path_change(enum EXTD_OVL_REQ_STATUS action, unsigned int session)
 			pgc->ovl_req_state = EXTD_OVL_SUB_REQ;
 			break;
 		case EXTD_OVL_REMOVE_REQ:
-			if (DISP_SESSION_DEV(session) != DEV_EINK + 1) {
-				dpmgr_remove_ovl1_sub(pgc->dpmgr_handle, pgc->cmdq_handle_config);
-				ext_disp_path_set_mode(EXTD_RDMA_DPI_MODE, session);
-				pgc->ovl_req_state = EXTD_OVL_REMOVE_REQ;
-			}
+			ext_disp_path_set_mode(EXTD_DIRECT_LINK_MODE, session);
+			mtkfb_release_session_fence(pgc->session);
+			pgc->ovl_req_state = EXTD_OVL_REMOVE_REQ;
 			break;
 		case EXTD_OVL_REMOVING:
 			pgc->ovl_req_state = EXTD_OVL_REMOVING;
@@ -1308,11 +1646,9 @@ int ext_disp_path_change(enum EXTD_OVL_REQ_STATUS action, unsigned int session)
 			pgc->ovl_req_state = EXTD_OVL_REMOVED;
 			break;
 		case EXTD_OVL_INSERT_REQ:
-			if (ext_disp_mode != EXTD_DIRECT_LINK_MODE) {
-				dpmgr_insert_ovl1_sub(pgc->dpmgr_handle, pgc->cmdq_handle_config);
-				ext_disp_path_set_mode(EXTD_DIRECT_LINK_MODE, session);
-				pgc->ovl_req_state = EXTD_OVL_INSERT_REQ;
-			}
+			_build_path_ovl_to_wdma();
+			ext_disp_path_set_mode(EXTD_DECOUPLE_MODE, session);
+			pgc->ovl_req_state = EXTD_OVL_INSERT_REQ;
 			break;
 		case EXTD_OVL_INSERTED:
 			pgc->ovl_req_state = EXTD_OVL_INSERTED;

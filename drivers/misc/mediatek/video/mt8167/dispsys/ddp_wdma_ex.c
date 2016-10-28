@@ -165,9 +165,9 @@ void wdma_calc_ultra(unsigned int idx, unsigned int width, unsigned int height, 
 	unsigned int blank_overhead = 115;	/* it is 1.15, need to divide 100 later */
 	unsigned int rdma_fifo_width = 16;	/* in unit of byte */
 	/* bpp is defined by disp_wdma's output format */
-	unsigned int pre_ultra_low_time;	/* in unit of 0.5 us */
-	unsigned int ultra_low_time;	/* in unit of 0.5 us */
-	unsigned int ultra_high_time = 0;	/* in unit of 0.5 us */
+	unsigned int pre_ultra_low_time = 2;	/* in unit of 0.5 us */
+	unsigned int ultra_low_time = 4;	/* in unit of 0.5 us */
+	unsigned int ultra_high_time = 5;	/* in unit of 0.5 us */
 
 	/* working variables */
 	unsigned int consume_levels_per_sec;
@@ -204,16 +204,19 @@ void wdma_calc_ultra(unsigned int idx, unsigned int width, unsigned int height, 
 	pre_ultra_high_ofs = 1;
 	ultra_high_ofs = ultra_high_level - ultra_low_level;
 
+	/*
 	ultra_low_level = 0x86;
 	ultra_low_ofs = 0x35;
 	pre_ultra_high_ofs = 1;
 	ultra_high_ofs = 0x1b;
+	*/
+
 	/*
 	 * write ultra_high_ofs, pre_ultra_high_ofs, ultra_low_ofs,
 	 * pre_ultra_low_ofs=pre_ultra_low_level into register DISP_WDMA_BUF_CON2
 	 */
-	/* DISP_REG_SET(handle,idx*DISP_WDMA_INDEX_OFFSET+DISP_REG_WDMA_BUF_CON2, */
-	/* ultra_low_level|(ultra_low_ofs<<8)|(pre_ultra_high_ofs<<16)|(ultra_high_ofs<<24)); */
+	DISP_REG_SET(handle, idx*DISP_WDMA_INDEX_OFFSET + DISP_REG_WDMA_BUF_CON2,
+		ultra_low_level|(ultra_low_ofs<<8)|(pre_ultra_high_ofs<<16)|(ultra_high_ofs<<24));
 
 	/* TODO: set ultra/pre-ultra by resolution and format */
 	/*
@@ -222,7 +225,7 @@ void wdma_calc_ultra(unsigned int idx, unsigned int width, unsigned int height, 
 	   UYVY: FHD=0x22011283, HD=0x0f0108c8, qHD=0x080104e1
 	   RGB:  FHD=0x35011b44, HD=0x17010bad, qHD=0x0c0107d1
 	 */
-	DISP_REG_SET(handle, idx*DISP_WDMA_INDEX_OFFSET+DISP_REG_WDMA_BUF_CON2, 0x1B010E22);
+	/* DISP_REG_SET(handle, idx*DISP_WDMA_INDEX_OFFSET+DISP_REG_WDMA_BUF_CON2, 0x35011b44); */
 	DISP_REG_SET(handle, idx*DISP_WDMA_INDEX_OFFSET+DISP_REG_WDMA_BUF_CON1, 0xD0100080);
 
 	DDPDBG("pre_ultra_low_level  = 0x%03x = %d\n", pre_ultra_low_level, pre_ultra_low_level);
@@ -256,10 +259,10 @@ static int wdma_config(enum DISP_MODULE_ENUM module,
 	size_t size = dstPitch * clipHeight;
 
 /* #if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) && defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT) */
-	DDPDBG("module %s, src(w=%d,h=%d), clip(x=%d,y=%d,w=%d,h=%d),out_fmt=%s,dst_address=0x%lx,dst_p=%d,\n",
+	DDPMSG("module %s, src(w=%d,h=%d), clip(x=%d,y=%d,w=%d,h=%d),out_fmt=%s,dst_address=0x%lx,dst_p=%d,\n",
 		ddp_get_module_name(module), srcWidth, srcHeight, clipX, clipY, clipWidth, clipHeight,
 		fmt_string(out_format), dstAddress, dstPitch);
-	DDPDBG("spific_alfa=%d,alpa=%d,handle=0x%p,sec%d\n", useSpecifiedAlpha, alpha, handle, sec);
+	DDPMSG("spific_alfa=%d,alpa=%d,handle=0x%p,sec%d\n", useSpecifiedAlpha, alpha, handle, sec);
 /* #endif */
 	/* should use OVL alpha instead of sw config */
 	DISP_REG_SET(handle, idx_offst + DISP_REG_WDMA_SRC_SIZE, srcHeight << 16 | srcWidth);
@@ -477,7 +480,7 @@ static int wdma_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_conf
 				    disp_addr_convert(idx_offst + DISP_REG_WDMA_FLOW_CTRL_DBG), 1,
 				    0x1);
 			DISP_REG_SET(handle, idx_offst + DISP_REG_WDMA_RST, 0x0);	/* trigger soft reset */
-			DDPDBG("wdma%d warm reset done\n", wdma_idx);
+			DDPMSG("wdma%d warm reset done\n", wdma_idx);
 		}
 	}
 
@@ -485,21 +488,18 @@ static int wdma_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_conf
 
 	if (config->security == DISP_SECURE_BUFFER) {
 		cmdqRecSetSecure(handle, 1);
-
-		/* set engine as sec */
 		cmdqRecSecureEnablePortSecurity(handle, (1LL << cmdq_engine));
 		cmdqRecSecureEnableDAPC(handle, (1LL << cmdq_engine));
-		if (wdma_is_sec[wdma_idx] == 0)
-			DDPMSG("[SVP] switch wdma%d to sec\n", wdma_idx);
-		wdma_is_sec[wdma_idx] = 1;
+		if (wdma_is_sec[wdma_idx] == 0) {
+			pr_err("[SVP] switch wdma%d to sec\n", wdma_idx);
+			wdma_is_sec[wdma_idx] = 1;
+		}
 	} else {
-		if (wdma_is_sec[wdma_idx] && !primary_display_is_ovl1to2_handle(handle)) {
-			/* wdma is in sec stat, we need to switch it to nonsec */
+		if (wdma_is_sec[wdma_idx] == 1) {
 			struct cmdqRecStruct *nonsec_switch_handle;
 			int ret;
 
-			ret =
-			    cmdqRecCreate(CMDQ_SCENARIO_DISP_PRIMARY_DISABLE_SECURE_PATH,
+			ret = cmdqRecCreate(CMDQ_SCENARIO_DISP_PRIMARY_DISABLE_SECURE_PATH,
 					  &(nonsec_switch_handle));
 			if (ret)
 				DDPAEE("[SVP]fail to create disable handle %s ret=%d\n",
@@ -508,15 +508,13 @@ static int wdma_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_conf
 			cmdqRecReset(nonsec_switch_handle);
 			_cmdq_insert_wait_frame_done_token_mira(nonsec_switch_handle);
 			cmdqRecSetSecure(nonsec_switch_handle, 1);
-
-			/*in fact, dapc/port_sec will be disabled by cmdq */
 			cmdqRecSecureEnablePortSecurity(nonsec_switch_handle, (1LL << cmdq_engine));
 			cmdqRecSecureEnableDAPC(nonsec_switch_handle, (1LL << cmdq_engine));
 			cmdqRecFlush(nonsec_switch_handle);
 			cmdqRecDestroy(nonsec_switch_handle);
-			DDPMSG("[SVP] switch wdma%d to nonsec\n", wdma_idx);
+			pr_err("[SVP] switch wdma%d to nonsec\n", wdma_idx);
+			wdma_is_sec[wdma_idx] = 0;
 		}
-		wdma_is_sec[wdma_idx] = 0;
 	}
 
 	if (wdma_check_input_param(config) == 0)

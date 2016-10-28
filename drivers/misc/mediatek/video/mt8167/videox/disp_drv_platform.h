@@ -125,6 +125,10 @@
 #define MTK_FB_DFO_DISABLE
 /* #define DFO_USE_NEW_API */
 
+/**
+ * Use internal secure buffer for test.
+ */
+#define SVP_UNIT_TEST
 
 /************************Display Capabilies****************************/
 /* These configurations should not be changed. */

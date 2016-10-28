@@ -1425,7 +1425,7 @@ static int set_primary_buffer(struct disp_session_input_config *input)
 					      input->config[i].next_buff_idx, mva_offset,
 					      input->config[i].frm_sequence);
 			fence_msg_len += sprintf(fence_msg_buf + fence_msg_len,
-						 "S+/PL%d/e%d/id%d/%dx%d(%d,%d)(%d,%d)/%s/%d/0x%08lx/mva0x%08lx/sec%d",
+						 "S+/PL%d/e%d/id%d/%dx%d(%d,%d)(%d,%d)/%s/%d/0x%08lx/mva0x%08lx/sec%d\n",
 						 input->config[i].layer_id, input->config[i].layer_enable,
 						 input->config[i].next_buff_idx, input->config[i].src_width,
 						 input->config[i].src_height, input->config[i].src_offset_x,
@@ -1919,10 +1919,11 @@ static enum DISP_MODE select_session_mode(struct disp_session_config *session_in
 			/* DL-->DCm (SingleDisplay: just enter ExternalDisplay) */
 			if (final_mode != DISP_SESSION_DECOUPLE_MIRROR_MODE)
 				final_mode = DISP_SESSION_DECOUPLE_MIRROR_MODE;
-
+			DISPMSG("Change session mode to decouple mirror\n");
 #if defined(OVL_MULTIPASS_SUPPORT) || defined(OVL_TIME_SHARING)
 		} else if (session_info->mode == DISP_SESSION_DECOUPLE_MODE) {
 			final_mode = DISP_SESSION_DECOUPLE_MODE;
+			DISPMSG("Change session mode to decouple\n");
 #endif
 		} else {
 			DISPERR("invalid HWC session mode %d\n", session_info->mode);
@@ -1934,6 +1935,8 @@ static enum DISP_MODE select_session_mode(struct disp_session_config *session_in
 int set_session_mode(struct disp_session_config *config_info, int force)
 {
 	int ret = 0;
+
+	DISPDBG("set_session_mode: 0x%x -- %d\n", config_info->session_id, config_info->mode);
 
 	config_info->mode = select_session_mode(config_info);
 
@@ -2046,7 +2049,7 @@ long mtk_disp_mgr_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int ret = -1;
 
-	/*printk("mtk_disp_mgr_ioctl, cmd=%s, arg=0x%08lx\n", _session_ioctl_spy(cmd), arg);*/
+	/* DISPMSG("mtk_disp_mgr_ioctl, cmd=%s, arg=0x%08lx\n", _session_ioctl_spy(cmd), arg); */
 
 	switch (cmd) {
 	case DISP_IOCTL_CREATE_SESSION:

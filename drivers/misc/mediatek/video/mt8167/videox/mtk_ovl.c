@@ -409,6 +409,11 @@ void ovl2mem_wait_done(void)
 		atomic_read(&g_trigger_ticket), atomic_read(&g_release_ticket));
 }
 
+int ovl2mem_init(unsigned int session)
+{
+	return 0;
+}
+
 int ovl2mem_deinit(void)
 {
 	int ret = -1;

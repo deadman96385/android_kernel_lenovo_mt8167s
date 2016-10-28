@@ -612,7 +612,7 @@ static int rdma_config(enum DISP_MODULE_ENUM module,
 	DDPMSG("RDMAConfig idx %d, mode %d, address 0x%lx, inputformat %s, pitch %u, width %u, height %u,sec%d\n",
 		idx, mode, address, rdma_intput_format_name(inputFormat, input_swap), pitch, width, height, sec);
 #else
-	DDPDBG("RDMAConfig idx %d, mode %d, address 0x%lx, inputformat %s, pitch %u, width %u, height %u,sec%d\n",
+	DDPMSG("RDMAConfig idx %d, mode %d, address 0x%lx, inputformat %s, pitch %u, width %u, height %u,sec%d\n",
 		idx, mode, address, rdma_intput_format_name(inputFormat, input_swap), pitch, width, height, sec);
 #endif
 	if ((width > RDMA_MAX_WIDTH) || (height > RDMA_MAX_HEIGHT))
@@ -874,9 +874,10 @@ static int setup_rdma_sec(enum DISP_MODULE_ENUM module, struct disp_ddp_path_con
 			cmdqRecSecureEnablePortSecurity(handle, (1LL << cmdq_engine));
 			/* cmdqRecSecureEnableDAPC(handle, (1LL << cmdq_engine)); */
 
-			if (rdma_is_sec[rdma_idx] == 0)
-				DDPMSG("[SVP] switch rdma%d to sec\n", rdma_idx);
-			rdma_is_sec[rdma_idx] = 1;
+			if (rdma_is_sec[rdma_idx] == 0) {
+				pr_err("[SVP] switch rdma%d to sec\n", rdma_idx);
+				rdma_is_sec[rdma_idx] = 1;
+			}
 		} else {
 			if (rdma_is_sec[rdma_idx]) {
 				/* rdma is in sec stat, we need to switch it to nonsec */
@@ -905,9 +906,9 @@ static int setup_rdma_sec(enum DISP_MODULE_ENUM module, struct disp_ddp_path_con
 
 				cmdqRecFlush(nonsec_switch_handle);
 				cmdqRecDestroy(nonsec_switch_handle);
-				DDPMSG("[SVP] switch rdma%d to nonsec done\n", rdma_idx);
+				pr_err("[SVP] switch rdma%d to nonsec done\n", rdma_idx);
+				rdma_is_sec[rdma_idx] = 0;
 			}
-			rdma_is_sec[rdma_idx] = 0;
 		}
 	}
 	return 0;

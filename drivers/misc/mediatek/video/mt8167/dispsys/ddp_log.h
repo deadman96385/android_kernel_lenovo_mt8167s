@@ -159,14 +159,14 @@ extern unsigned int gEnableUartLog;
 	do {                                       \
 		DISP_LOG_I(fmt, ##args);                \
 		if (g_mobilelog) \
-			pr_debug("[DDP/"LOG_TAG"]"fmt, ##args); \
+			pr_err("[DDP/"LOG_TAG"]"fmt, ##args); \
 	} while (0)
 
 #define DDPERR(fmt, args...)                   \
 	do {                                       \
 		DISP_LOG_E(fmt, ##args);                \
 		if (g_mobilelog) \
-			pr_debug("[DDP/"LOG_TAG"]"fmt, ##args); \
+			pr_err("[DDP/"LOG_TAG"]"fmt, ##args); \
 	} while (0)
 
 #define DDPDUMP(fmt, ...)                        \
