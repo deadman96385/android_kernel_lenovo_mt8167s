@@ -39,4 +39,5 @@ extern void spm_output_sleep_option(void);
 /* record last wakesta */
 extern u32 spm_get_last_wakeup_src(void);
 extern u32 spm_get_last_wakeup_misc(void);
+extern bool mt_xo_has_ext_crystal(void);
 #endif
