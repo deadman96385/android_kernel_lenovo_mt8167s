@@ -18,7 +18,6 @@
 #include "mt8167-afe-regs.h"
 #include "mt8167-afe-util.h"
 #include <sound/soc.h>
-#include <linux/pm_runtime.h>
 
 
 #define ENUM_TO_STR(enum) #enum
@@ -376,13 +375,9 @@ static int mt8167_afe_ap_loopback_put(struct snd_kcontrol *kcontrol,
 		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
 		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_ADC);
 		mt8167_afe_disable_main_clk(afe);
-
-		pm_runtime_put(afe->dev);
 	}
 
 	if (val != AP_LOOPBACK_NONE) {
-		pm_runtime_get_sync(afe->dev);
-
 		if (val == AP_LOOPBACK_DMIC_TO_SPK ||
 		    val == AP_LOOPBACK_DMIC_TO_HP ||
 		    val == AP_LOOPBACK_DUAL_DMIC_TO_HP ||
