@@ -1127,34 +1127,32 @@ static void thermal_cal_prepare(void)
 {
 	U32 temp0 = 0, temp1 = 0, temp2 = 0;
 
-	/* temp0 = DRV_Reg32(0x10009184); */
-	/* temp1 = DRV_Reg32(0x10009180); */
-	/* temp2 = DRV_Reg32(0x10009188); */
-
 	temp0 = get_devinfo_with_index(61);
 	temp1 = get_devinfo_with_index(60);
 	temp2 = get_devinfo_with_index(62);
 
+	calefuse1 = temp1; /* 0x10009180 */
+	calefuse2 = temp0; /* 0x10009184 */
+	calefuse3 = temp2; /* 0x10009188 */
 
-	tscpu_dprintk("[calibration] devinfo idx7=0x%x, idx8=0x%x, idx9=0x%x\n", temp1, temp0,
-			temp2);
+	tscpu_dprintk("[calibration] devinfo id 60=0x%x, id 61=0x%x, id 62=0x%x\n", temp1, temp0, temp2);
 	/* mtktscpu_dprintk("thermal_cal_prepare\n"); */
 
-	g_adc_ge_t = ((temp0 & 0xFFC00000) >> 22);	/* ADC_GE_T    [9:0] *(0x10206184)[31:22] */
-	g_adc_oe_t = ((temp0 & 0x003FF000) >> 12);	/* ADC_OE_T    [9:0] *(0x10206184)[21:12] */
+	g_adc_ge_t = ((temp0 & 0xFFC00000) >> 22);	/* ADC_GE_T    [9:0] *(0x10009184)[31:22] */
+	g_adc_oe_t = ((temp0 & 0x003FF000) >> 12);	/* ADC_OE_T    [9:0] *(0x10009184)[21:12] */
 
-	g_o_vtsmcu1 = (temp1 & 0x03FE0000) >> 17;	/* O_VTSMCU1    (9b) *(0x10206180)[25:17] */
-	g_o_vtsmcu2 = (temp1 & 0x0001FF00) >> 8;	/* O_VTSMCU2    (9b) *(0x10206180)[16:8] */
-	g_o_vtsmcu3 = (temp0 & 0x000001FF);	/* O_VTSMCU3    (9b) *(0x10206184)[8:0] */
-	g_o_vtsmcu4 = (temp2 & 0xFF800000) >> 23;	/* O_VTSMCU4    (9b) *(0x10206188)[31:23] */
-	g_o_vtsabb = (temp2 & 0x007FC000) >> 14;	/* O_VTSABB     (9b) *(0x10206188)[22:14] */
+	g_o_vtsmcu1 = (temp1 & 0x03FE0000) >> 17;	/* O_VTSMCU1    (9b) *(0x10009180)[25:17] */
+	g_o_vtsmcu2 = (temp1 & 0x0001FF00) >> 8;	/* O_VTSMCU2    (9b) *(0x10009180)[16:8] */
+	g_o_vtsmcu3 = (temp2 & 0xFF800000) >> 23;	/* O_VTSMCU3    (9b) *(0x10009188)[31:23] */
+	g_o_vtsmcu4 = (temp2 & 0x007FC000) >> 14;	/* O_VTSMCU4    (9b) *(0x10009188)[22:14] */
+	g_o_vtsabb  = (temp0 & 0x00000FF8) >> 3;	/* O_VTSABB     (9b) *(0x10009184)[11:3] */
 
-	g_degc_cali = (temp1 & 0x0000007E) >> 1;	/* DEGC_cali    (6b) *(0x10206180)[6:1] */
-	g_adc_cali_en_t = (temp1 & 0x00000001);	/* ADC_CALI_EN_T(1b) *(0x10206180)[0] */
-	g_o_slope_sign = (temp1 & 0x00000080) >> 7;	/* O_SLOPE_SIGN (1b) *(0x10206180)[7] */
-	g_o_slope = (temp1 & 0xFC000000) >> 26;	/* O_SLOPE      (6b) *(0x10206180)[31:26] */
+	g_degc_cali = (temp1 & 0x0000007E) >> 1;	/* DEGC_cali    (6b) *(0x10009180)[6:1] */
+	g_adc_cali_en_t = (temp1 & 0x00000001);		/* ADC_CALI_EN_T(1b) *(0x10009180)[0] */
+	g_o_slope_sign = (temp1 & 0x00000080) >> 7;	/* O_SLOPE_SIGN (1b) *(0x10009180)[7] */
+	g_o_slope = (temp1 & 0xFC000000) >> 26;		/* O_SLOPE      (6b) *(0x10009180)[31:26] */
 
-	g_id = (temp0 & 0x00000200) >> 9;	/* ID           (1b) *(0x10206184)[9] */
+	g_id = (temp0 & 0x00000004) >> 2;		/* ID           (1b) *(0x10009184)[2] */
 
 	if (g_id == 0)
 		g_o_slope = 0;
@@ -1361,13 +1359,13 @@ static int read_tc_raw_and_temp(u32 *tempmsr_name, enum thermal_sensor_name ts_n
 {
 	int temp = 0, raw = 0;
 
-	/*tscpu_dprintk("read_tc_raw_temp,tempmsr_name=0x%x,ts_num=%d\n",tempmsr_name,ts_name); */
+	tscpu_dprintk("read_tc_raw_temp,tempmsr_name=0x%x,ts_num=%d\n", *tempmsr_name, ts_name);
 
 	raw = (tempmsr_name != 0) ? (DRV_Reg32((tempmsr_name)) & 0x0fff) : 0;
 	temp = (tempmsr_name != 0) ? raw_to_temperature_roomt(raw, ts_name) : 0;
 
 	*ts_raw = raw;
-	/*tscpu_dprintk("read_tc_raw_temp,ts_raw=%d,temp=%d\n",*ts_raw,temp*100); */
+	tscpu_dprintk("read_tc_raw_temp,ts_raw=%d,temp=%d\n", raw, temp);
 
 	return temp * 100;
 }
