@@ -98,10 +98,9 @@ static bool gSpm_sodi_en = 1;
 
 #if REDUCE_SODI_LOG
 static unsigned long int sodi_logout_prev_time;
-static int memPllCG_prev_status = 1;	/* 1:CG, 0:pwrdn */
 static unsigned int sodi_cnt, timeout_cnt;
 static unsigned int refresh_cnt, not_refresh_cnt;
-static unsigned int by_cldma_cnt, by_conn2ap_count;
+static unsigned int by_conn2ap_count;
 
 static const char *sodi_wakesrc_str[32] = {
 	[0] = "SPM_MERGE",
@@ -188,7 +187,6 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	struct pcm_desc *pcmdesc = __spm_sodi.pcmdesc;
 	struct pwr_ctrl *pwrctrl = __spm_sodi.pwrctrl;
 #if REDUCE_SODI_LOG
-	int vcore_status = 0;	/* 0:disable, 1:HPM, 2:LPM */
 	unsigned long int sodi_logout_curr_time = 0;
 	int need_log_out = 0;
 #endif
@@ -284,9 +282,8 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	__spm_clean_after_wakeup();
 
 #if REDUCE_SODI_LOG == 0
-	sodi_debug("emi-selfrefrsh cnt = %d, pcm_flag = 0x%x, SPM_PCM_RESERVE2 = 0x%x, %s\n",
-		   spm_read(SPM_PCM_PASR_DPD_3), spm_read(SPM_PCM_FLAGS),
-		   spm_read(SPM_PCM_RESERVE2), pcmdesc->version);
+	sodi_debug("pcm_flag = 0x%x, %s\n",
+		   spm_read(SPM_PCM_FLAGS), pcmdesc->version);
 
 	wr = __spm_output_wake_reason(&wakesta, pcmdesc, false);
 	if (wr == WR_PCM_ASSERT) {
@@ -299,9 +296,9 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 #else
 	sodi_logout_curr_time = idle_get_current_time_ms();
 
-	if (wakesta.assert_pc != 0 || wakesta.r12 == 0) {
+	if (wakesta.assert_pc != 0) {
 		need_log_out = 1;
-	} else if (wakesta.r12 == 0) {
+	} else if (wakesta.r12 == 0 && wakesta.debug_flag != 0x4000) {
 		need_log_out = 2;
 	} else if ((wakesta.r12 & (WAKE_SRC_GPT | WAKE_SRC_CONN2AP)) == 0) {
 		/* not wakeup by GPT, CONN2AP and CLDMA_WDT */
@@ -317,33 +314,18 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 			by_conn2ap_count++;
 	} else if ((sodi_logout_curr_time - sodi_logout_prev_time) > SODI_LOGOUT_INTERVAL_CRITERIA) {
 		need_log_out = 5;
-	} else {		/* check CG/pwrdn status is changed */
-
-		int mem_status = 0;
-
-		/* check mempll CG/pwrdn status change */
-		if (((spm_read(SPM_PCM_FLAGS) & 0x40) != 0)
-		    || ((spm_read(SPM_PCM_RESERVE2) & 0x80) != 0)) {
-			mem_status = 1;
-		}
-
-		if (memPllCG_prev_status != mem_status) {
-			memPllCG_prev_status = mem_status;
-			need_log_out = 6;
-		}
 	}
 
 	if (need_log_out) {
 		sodi_logout_prev_time = sodi_logout_curr_time;
 
-		if (wakesta.assert_pc != 0 || wakesta.r12 == 0) {
-			sodi_warn("Warning: %s, self-refrsh = %d, pcm_flag = 0x%x, PCM_RSV2 = 0x%x, vcore_status = %d\n",
+		if (need_log_out == 1 || need_log_out == 2) {
+			sodi_warn("Warning: %s, self-refrsh = %d, pcm_flag = 0x%x\n",
 			     (wakesta.assert_pc != 0) ? "wakeup by SPM assert" : "not wakeup by SPM",
-			     spm_read(SPM_PCM_PASR_DPD_3), spm_read(SPM_PCM_FLAGS),
-			     spm_read(SPM_PCM_RESERVE2), vcore_status);
-			sodi_warn("sodi_cnt =%d, self-refresh_cnt = %d, , spm_pc = 0x%0x, r13 = 0x%x, debug_flag = 0x%x\n",
+			     wakesta.apsrc_cnt, spm_read(SPM_PCM_FLAGS));
+			sodi_warn("sodi_cnt =%d, self-refresh_cnt = %d, spm_pc = 0x%0x, r13 = 0x%x, debug_flag = 0x%x\n",
 			     sodi_cnt, refresh_cnt, wakesta.assert_pc,
-			      wakesta.r13, wakesta.debug_flag);
+			     wakesta.r13, wakesta.debug_flag);
 			sodi_warn("r12 = 0x%x, raw_sta = 0x%x, idle_sta = 0x%x, event_reg = 0x%x, isr = 0x%x, %s\n",
 				 wakesta.r12, wakesta.raw_sta, wakesta.idle_sta,
 				 wakesta.event_reg, wakesta.isr, pcmdesc->version);
@@ -372,16 +354,15 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 			}
 			WARN_ON(strlen(buf) >= LOG_BUF_SIZE);
 
-			sodi_debug("%d, wakeup by %s, self-refresh=%d, pcm_flag=0x%x, pcm_rsv2=0x%x, vcore=%d, debug_flag = 0x%x, timer_out=%u\n",
+			sodi_debug("%d, wakeup by %s, self-refresh=%d, pcm_flag=0x%x, debug_flag = 0x%x, timer_out=%u\n",
 			     need_log_out, buf,
-			     spm_read(SPM_PCM_PASR_DPD_3),
-			     spm_read(SPM_PCM_FLAGS), spm_read(SPM_PCM_RESERVE2),
-			     vcore_status, wakesta.debug_flag, wakesta.timer_out);
+			     wakesta.apsrc_cnt,
+			     spm_read(SPM_PCM_FLAGS), wakesta.debug_flag, wakesta.timer_out);
 
-			sodi_debug("sodi_cnt=%u, not_refresh_cnt=%u, refresh_cnt=%u, avg_refresh_cnt=%u, timeout_cnt=%u, cldma_cnt=%u, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n",
+			sodi_debug("sodi_cnt=%u, not_refresh_cnt=%u, refresh_cnt=%u, avg_refresh_cnt=%u, timeout_cnt=%u, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x\n",
 			     sodi_cnt, not_refresh_cnt, refresh_cnt,
 			     (refresh_cnt / ((sodi_cnt - not_refresh_cnt) ? (sodi_cnt - not_refresh_cnt) : 1)),
-			     timeout_cnt, by_cldma_cnt,
+			     timeout_cnt,
 			     wakesta.r12, wakesta.r13,
 			     wakesta.raw_sta, wakesta.idle_sta, wakesta.event_reg, wakesta.isr);
 		}
@@ -389,18 +370,19 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 		sodi_cnt = 0;
 		refresh_cnt = 0;
 		not_refresh_cnt = 0;
-		by_cldma_cnt = 0;
 		timeout_cnt = 0;
 	} else {
 		sodi_cnt++;
-		refresh_cnt += spm_read(SPM_PCM_PASR_DPD_3);
+		refresh_cnt += wakesta.apsrc_cnt;
 
-		if (spm_read(SPM_PCM_PASR_DPD_3) == 0)
+		if (wakesta.apsrc_cnt == 0)
 			not_refresh_cnt++;
 
 		if (wakesta.timer_out <= SODI_LOGOUT_TIMEOUT_CRITERA)
 			timeout_cnt++;
 	}
+
+	spm_write(SPM_PCM_RESERVE7, 0);
 #endif
 
 #if SPM_AEE_RR_REC
