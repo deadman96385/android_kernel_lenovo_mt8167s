@@ -119,7 +119,7 @@ int mtk11_qmu_max_gpd_num;
 int mtk11_isoc_ep_start_idx = 4;
 int mtk11_isoc_ep_gpd_count = 3000;
 int mtk11_host_qmu_concurrent = 1;
-int mtk11_host_qmu_pipe_msk = (PIPE_ISOCHRONOUS + 1) | (PIPE_BULK + 1) /*| (PIPE_INTERRUPT+ 1) */;
+int mtk11_host_qmu_pipe_msk = (PIPE_ISOCHRONOUS + 1);/* | (PIPE_BULK + 1) | (PIPE_INTERRUPT+ 1) */;
 int mtk11_host_qmu_max_active_isoc_gpd;
 int mtk11_host_qmu_max_number_of_pkts;
 

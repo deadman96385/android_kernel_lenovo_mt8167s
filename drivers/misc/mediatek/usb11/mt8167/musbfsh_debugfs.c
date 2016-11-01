@@ -31,10 +31,11 @@
 #include <linux/init.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
+#include <linux/string.h>
 
 #include <linux/uaccess.h>
 
-
+#include "musbfsh_mt65xx.h"
 #include "musbfsh_core.h"
 #include <linux/usb/ch9.h>
 
@@ -300,6 +301,240 @@ static const struct file_operations musbfsh_test_mode_fops = {
 	  .release = single_release,
 };
 
+static inline int my_isspace(char c)
+{
+	return (c == ' ' || c == '\t' || c == '\n' || c == '\12');
+}
+
+static inline int my_isupper(char c)
+{
+	return (c >= 'A' && c <= 'Z');
+}
+
+static inline int my_isalpha(char c)
+{
+	return ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'));
+}
+
+static inline int my_isdigit(char c)
+{
+	return (c >= '0' && c <= '9');
+}
+
+static unsigned my_strtoul(const char *nptr, char **endptr, unsigned int base)
+{
+	const char *s = nptr;
+	unsigned long acc;
+	int c;
+	unsigned long cutoff;
+	int neg = 0, any, cutlim;
+
+	do {
+		c = *s++;
+	} while (my_isspace(c));
+	if (c == '-') {
+		neg = 1;
+		c = *s++;
+	} else if (c == '+')
+		c = *s++;
+
+	if ((base == 0 || base == 16) &&
+		c == '0' && (*s == 'x' || *s == 'X')) {
+		c = s[1];
+		s += 2;
+		base = 16;
+	} else if ((base == 0 || base == 2) &&
+			c == '0' && (*s == 'b' || *s == 'B')) {
+		c = s[1];
+		s += 2;
+		base = 2;
+	}
+	if (base == 0)
+		base = c == '0' ? 8 : 10;
+
+	cutoff = (unsigned long)ULONG_MAX / (unsigned long)base;
+	cutlim = (unsigned long)ULONG_MAX % (unsigned long)base;
+
+	for (acc = 0, any = 0;; c = *s++) {
+		if (my_isdigit(c))
+			c -= '0';
+		else if (my_isalpha(c))
+			c -= my_isupper(c) ? 'A' - 10 : 'a' - 10;
+		else
+			break;
+
+		if (c >= base)
+			break;
+		if ((any < 0 || acc > cutoff || acc == cutoff) && c > cutlim)
+			any = -1;
+		else {
+			any = 1;
+			acc *= base;
+			acc += c;
+		}
+	}
+	if (any < 0)
+		acc = ULONG_MAX;
+	else if (neg)
+		acc = -acc;
+
+	if (endptr != 0)
+		*endptr = (char *)(any ? s - 1 : nptr);
+
+	return acc;
+}
+
+static int musbfsh_regw_show(struct seq_file *s, void *unused)
+{
+	INFO("%s -> Called\n", __func__);
+
+	pr_warn("Uage:\n");
+	pr_warn("Mac Write: echo mac:addr:data > regw\n");
+	pr_warn("Phy Write: echo phy:addr:data > regw\n");
+
+	return 0;
+}
+
+static int musbfsh_regw_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, musbfsh_regw_show, inode->i_private);
+}
+
+static ssize_t musbfsh_regw_mode_write(struct file *file,
+				    const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct musbfsh *musbfsh = s->private;
+	char			buf[20];
+	u8 is_mac = 0;
+	char *tmp1 = NULL;
+	char *tmp2 = NULL;
+	unsigned offset = 0;
+	u8 data = 0;
+
+	memset(buf, 0x00, sizeof(buf));
+
+	pr_warn("%s -> Called\n", __func__);
+
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if ((!strncmp(buf, "MAC", 3)) || (!strncmp(buf, "mac", 3)))
+		is_mac = 1;
+	else if ((!strncmp(buf, "PHY", 3)) || (!strncmp(buf, "phy", 3)))
+		is_mac = 0;
+	else
+		return -EFAULT;
+
+	tmp1 = strchr(buf, ':');
+	if (tmp1 == NULL)
+		return -EFAULT;
+	tmp1++;
+	if (strlen(tmp1) == 0)
+		return -EFAULT;
+
+	tmp2 = strrchr(buf, ':');
+	if (tmp2 == NULL)
+		return -EFAULT;
+	tmp2++;
+	if (strlen(tmp2) == 0)
+		return -EFAULT;
+
+
+	offset = my_strtoul(tmp1, NULL, 0);
+	data = my_strtoul(tmp2, NULL, 0);
+
+	if (is_mac == 1) {
+		pr_warn("Mac base adddr 0x%lx, Write %d[%d]\n", (unsigned long)musbfsh->mregs, offset, data);
+		musbfsh_writeb(musbfsh->mregs, offset, data);
+	} else {
+		pr_warn("Phy base adddr 0x%lx, Write %d[%d]\n",
+		(unsigned long)((void __iomem *)(musbfsh_Device->phy_reg_base + 0x900)), offset, data);
+		USB11PHY_WRITE8(offset, data);
+	}
+
+	return count;
+}
+
+static const struct file_operations musbfsh_regw_fops = {
+	.open = musbfsh_regw_open,
+	.write = musbfsh_regw_mode_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int musbfsh_regr_show(struct seq_file *s, void *unused)
+{
+	INFO("%s -> Called\n", __func__);
+
+	pr_warn("Uage:\n");
+	pr_warn("Mac Read: echo mac:addr > regr\n");
+	pr_warn("Phy Read: echo phy:addr > regr\n");
+
+	return 0;
+}
+
+static int musbfsh_regr_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, musbfsh_regr_show, inode->i_private);
+}
+
+static ssize_t musbfsh_regr_mode_write(struct file *file,
+				    const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct musbfsh *musbfsh = s->private;
+	char			buf[20];
+	u8 is_mac = 0;
+	char *tmp = NULL;
+	unsigned offset = 0;
+
+	memset(buf, 0x00, sizeof(buf));
+
+	pr_warn("%s -> Called\n", __func__);
+
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if ((!strncmp(buf, "MAC", 3)) || (!strncmp(buf, "mac", 3)))
+		is_mac = 1;
+	else if ((!strncmp(buf, "PHY", 3)) || (!strncmp(buf, "phy", 3)))
+		is_mac = 0;
+	else
+		return -EFAULT;
+
+	tmp = strrchr(buf, ':');
+
+	if (tmp == NULL)
+		return -EFAULT;
+
+	tmp++;
+
+	if (strlen(tmp) == 0)
+		return -EFAULT;
+
+	offset = my_strtoul(tmp, NULL, 0);
+
+	if (is_mac == 1)
+		pr_warn("Read Mac base adddr 0x%lx, Read %d[%d]\n",
+			(unsigned long)musbfsh->mregs, offset, musbfsh_readb(musbfsh->mregs, offset));
+	else
+		pr_warn("Read Phy base adddr 0x%lx, Read %d[%d]\n",
+			(unsigned long)((void __iomem *)(musbfsh_Device->phy_reg_base + 0x900)), offset,
+			USB11PHY_READ8(offset));
+
+	return count;
+}
+
+static const struct file_operations musbfsh_regr_fops = {
+	.open = musbfsh_regr_open,
+	.write = musbfsh_regr_mode_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
 int musbfsh_init_debugfs(struct musbfsh *musbfsh)
 {
 	struct dentry *root;
@@ -326,6 +561,19 @@ int musbfsh_init_debugfs(struct musbfsh *musbfsh)
 		ret = -ENOMEM;
 		goto err1;
 	}
+
+	file = debugfs_create_file("regw", S_IRUGO | S_IWUSR, root, musbfsh, &musbfsh_regw_fops);
+	if (!file) {
+		ret = -ENOMEM;
+		goto err1;
+	}
+
+	file = debugfs_create_file("regr", S_IRUGO | S_IWUSR, root, musbfsh, &musbfsh_regr_fops);
+	if (!file) {
+		ret = -ENOMEM;
+		goto err1;
+	}
+
 	INFO("musbfsh_init_debugfs 2\n");
 
 	musbfsh_debugfs_root = root;
