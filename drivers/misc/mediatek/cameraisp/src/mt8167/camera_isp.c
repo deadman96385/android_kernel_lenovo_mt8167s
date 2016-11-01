@@ -4455,6 +4455,7 @@ static long ISP_ioctl(struct file *pFile, MUINT32 Cmd, unsigned long Param)
 	ISP_READ_IRQ_STRUCT ReadIrq;
 	ISP_CLEAR_IRQ_STRUCT ClearIrq;
 	ISP_USER_INFO_STRUCT *pUserInfo;
+	ISP_DEBUG_PRINT_STRUCT UserLog;
 	MUINT32 wakelock_ctrl = 0;
 	/* ////////////////////////////// */
 	/* cam 3 */
@@ -4474,6 +4475,18 @@ static long ISP_ioctl(struct file *pFile, MUINT32 Cmd, unsigned long Param)
 	pUserInfo = (ISP_USER_INFO_STRUCT *) (pFile->private_data);
 
 	switch (Cmd) {
+	case ISP_USER_PRINT_CTRL:
+		{
+			if (copy_from_user(&UserLog, (void __user *)Param, sizeof(ISP_DEBUG_PRINT_STRUCT)) == 0) {
+				LOG_INF("[IMem_Drv] %s", UserLog.logbuf);
+			} else {
+				LOG_ERR("copy_from_user failed");
+				Ret = -EFAULT;
+			}
+
+			break;
+		}
+
 	case ISP_WAKELOCK_CTRL:
 		{
 			if (copy_from_user(&wakelock_ctrl, (void __user *)Param, sizeof(MUINT32)) !=
@@ -4782,6 +4795,7 @@ static long ISP_ioctl(struct file *pFile, MUINT32 Cmd, unsigned long Param)
 #endif
 			break;
 		}
+
 #ifdef ISP_KERNEL_MOTIFY_SINGAL_TEST
 
 	case ISP_SET_USER_PID:
@@ -5274,6 +5288,15 @@ static long ISP_ioctl_compat(struct file *filp, unsigned int cmd, unsigned long 
 		return -ENOTTY;
 
 	switch (cmd) {
+
+	case COMPAT_ISP_USER_PRINT_CTRL:
+	{
+		ret =
+			filp->f_op->unlocked_ioctl(filp, ISP_USER_PRINT_CTRL,
+						   (unsigned long)compat_ptr(arg));
+		return ret;
+	}
+
 	case COMPAT_ISP_READ_REGISTER:
 		{
 			compat_ISP_REG_IO_STRUCT __user *data32;

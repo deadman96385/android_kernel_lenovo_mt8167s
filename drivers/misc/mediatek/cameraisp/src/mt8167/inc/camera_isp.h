@@ -360,6 +360,11 @@ typedef struct {
 	signed int *data_ptr;
 } ISP_REF_CNT_CTRL_STRUCT;
 
+typedef struct {
+	char logbuf[1024];  /* pointer to log buf */
+	int logsize;
+} ISP_DEBUG_PRINT_STRUCT;
+
 
 /********************************************************************************************
  pass1 real time buffer control use cq0c
@@ -442,6 +447,11 @@ typedef struct {
 } compat_ISP_REF_CNT_CTRL_STRUCT;
 
 
+typedef struct {
+	char logbuf[1024];  /* pointer to log buf */
+	int logsize;
+} compat_ISP_DEBUG_PRINT_STRUCT;
+
 #endif
 /*  */
 /********************************************************************************************
@@ -458,17 +468,18 @@ typedef enum {
 	ISP_CMD_READ_REG,	/* Read register from driver */
 	ISP_CMD_WRITE_REG,	/* Write register to driver */
 	ISP_CMD_HOLD_TIME,
-	ISP_CMD_HOLD_REG,	/* Hold reg write to hw, on/off */
-	ISP_CMD_WAIT_IRQ,	/* Wait IRQ */
-	ISP_CMD_READ_IRQ,	/* Read IRQ */
-	ISP_CMD_CLEAR_IRQ,	/* Clear IRQ */
-	ISP_CMD_DUMP_REG,	/* Dump ISP registers , for debug usage */
-	ISP_CMD_SET_USER_PID,	/* for signal */
-	ISP_CMD_RT_BUF_CTRL,	/* for pass buffer control */
-	ISP_CMD_REF_CNT,	/* get imem reference count */
-	ISP_CMD_DEBUG_FLAG,	/* Dump message level */
-	ISP_CMD_WAKELOCK_CTRL,	/* isp wakelock control */
-	ISP_CMD_SENSOR_FREQ_CTRL	/* sensor frequence control */
+	ISP_CMD_HOLD_REG,       /* Hold reg write to hw, on/off */
+	ISP_CMD_WAIT_IRQ,       /* Wait IRQ */
+	ISP_CMD_READ_IRQ,       /* Read IRQ */
+	ISP_CMD_CLEAR_IRQ,      /* Clear IRQ */
+	ISP_CMD_DUMP_REG,       /* Dump ISP registers , for debug usage */
+	ISP_CMD_SET_USER_PID,   /* for signal */
+	ISP_CMD_RT_BUF_CTRL,   /* for pass buffer control */
+	ISP_CMD_REF_CNT,        /* get imem reference count */
+	ISP_CMD_DEBUG_FLAG,      /* Dump message level */
+	ISP_CMD_WAKELOCK_CTRL,   /* isp wakelock control */
+	ISP_CMD_SENSOR_FREQ_CTRL,  /* sensor frequence control */
+	ISP_CMD_USER_PRINT      /* for imem user log */
 } ISP_CMD_ENUM;
 /*  */
 #define ISP_RESET           _IO(ISP_MAGIC, ISP_CMD_RESET)
@@ -487,6 +498,7 @@ typedef enum {
 #define ISP_DEBUG_FLAG      _IOW(ISP_MAGIC, ISP_CMD_DEBUG_FLAG,    unsigned long)
 #define ISP_WAKELOCK_CTRL   _IOWR(ISP_MAGIC, ISP_CMD_WAKELOCK_CTRL, unsigned long)
 #define ISP_SENSOR_FREQ_CTRL  _IOW(ISP_MAGIC, ISP_CMD_SENSOR_FREQ_CTRL, unsigned long)
+#define ISP_USER_PRINT_CTRL _IOWR(ISP_MAGIC, ISP_CMD_USER_PRINT, ISP_DEBUG_PRINT_STRUCT)
 
 #ifdef CONFIG_COMPAT
 #define COMPAT_ISP_READ_REGISTER    _IOWR(ISP_MAGIC, ISP_CMD_READ_REG,      compat_ISP_REG_IO_STRUCT)
@@ -497,6 +509,7 @@ typedef enum {
 #define COMPAT_ISP_DEBUG_FLAG       _IOW(ISP_MAGIC, ISP_CMD_DEBUG_FLAG,    compat_uptr_t)
 #define COMPAT_ISP_WAKELOCK_CTRL    _IOWR(ISP_MAGIC, ISP_CMD_WAKELOCK_CTRL, compat_uptr_t)
 #define COMPAT_ISP_SENSOR_FREQ_CTRL  _IOW(ISP_MAGIC, ISP_CMD_SENSOR_FREQ_CTRL, compat_uptr_t)
+#define COMPAT_ISP_USER_PRINT_CTRL _IOWR(ISP_MAGIC, ISP_CMD_USER_PRINT, compat_ISP_DEBUG_PRINT_STRUCT)
 #endif
 
 /*  */
