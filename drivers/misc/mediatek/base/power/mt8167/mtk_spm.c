@@ -228,7 +228,6 @@ static void spm_register_init(void)
 static int __init spm_module_init(void)
 {
 	int r = 0;
-	u32 capcode, xtal_capcode;
 	/* This following setting is moved to LK by WDT init, because of DTS init level issue */
 #if 0
 	struct wd_api *wd_api;
@@ -267,31 +266,6 @@ static int __init spm_module_init(void)
 #ifdef SPM_VCORE_EN
 	spm_go_to_vcore_dvfs(SPM_VCORE_DVFS_EN, 0);
 #endif
-
-	/* Read XO cap code */
-	capcode = get_devinfo_with_index(8); /* 10009264[31] */
-	if ((capcode >> 31) & 0x1) {
-		xtal_capcode = (capcode >> 24) & 0x7F; /* 10009264[30:24] */
-		if ((capcode >> 23) & 0x1) { /* 10009264[23] */
-			if ((capcode >> 22) & 0x1) /* 10009264[22] */
-				xtal_capcode -= ((capcode >> 16) & 0x3F); /* 10009264[21:16] */
-			else
-				xtal_capcode += ((capcode >> 16) & 0x3F);
-		}
-
-		if ((capcode >> 15) & 0x1) { /* 10009264[15] */
-			if ((capcode >> 14) & 0x1) /* 10009264[14] */
-				xtal_capcode -= ((capcode >> 8) & 0x3F); /* 10009264[13:8] */
-			else
-				xtal_capcode += ((capcode >> 8) & 0x3F);
-		}
-
-		/* TODO: write into SPM register */
-	} else {
-		spm_err("XO cap code efuse is unavailable! use default value 0x24\n");
-		xtal_capcode = 0x24;
-		spm_write(SPM_PCM_RESERVE8, 0x24);
-	}
 
 	return r;
 }
