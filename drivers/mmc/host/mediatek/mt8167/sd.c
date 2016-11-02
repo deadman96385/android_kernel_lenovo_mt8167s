@@ -615,7 +615,7 @@ void msdc_set_smpl_all(struct msdc_host *host, u32 clock_mode)
 /*host doesn't need the clock on*/
 void msdc_gate_clock(struct msdc_host *host)
 {
-	clk_disable_unprepare(host->clock_control);
+	clk_disable(host->clock_control);
 }
 
 /* host does need the clock on */
@@ -623,7 +623,7 @@ void msdc_ungate_clock(struct msdc_host *host)
 {
 	void __iomem *base = host->base;
 
-	clk_prepare_enable(host->clock_control);
+	clk_enable(host->clock_control);
 	while (!(MSDC_READ32(MSDC_CFG) & MSDC_CFG_CKSTB))
 		cpu_relax();
 }
