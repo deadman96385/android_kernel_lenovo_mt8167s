@@ -48,6 +48,7 @@ extern void usb11_exit(void);
 extern void enable_mcu_clock(bool enable);
 extern void enable_phy_clock(bool enable);
 extern struct clk *icusb_clk;
+extern struct clk *usb_clk;
 #ifdef CONFIG_OF
 extern struct musbfsh *musbfsh_Device;
 #endif

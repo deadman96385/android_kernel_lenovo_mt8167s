@@ -376,6 +376,7 @@ void mt65xx_usb11_clock_enable(bool enable)
 			enable_phy_clock(enable);
 			INFO("[Flow][USB]enable usb11 clock ++\r\n");
 			enable_mcu_clock(true);
+			clk_enable(usb_clk);
 			clk_enable(icusb_clk);
 			clock_enabled = true;
 		}
@@ -386,6 +387,7 @@ void mt65xx_usb11_clock_enable(bool enable)
 		} else {
 			INFO("[Flow][USB]disable usb11 clock --\r\n");
 			clk_disable(icusb_clk);
+			clk_disable(usb_clk);
 			enable_mcu_clock(false);
 			enable_phy_clock(enable);
 			clock_enabled = false;
