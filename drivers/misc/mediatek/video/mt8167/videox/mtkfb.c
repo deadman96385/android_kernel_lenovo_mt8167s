@@ -1587,6 +1587,7 @@ static int mtkfb_compat_ioctl(struct fb_info *info, unsigned int cmd, unsigned l
 	case COMPAT_MTKFB_SET_VIDEO_LAYERS:
 	{
 		struct compat_fb_overlay_layer compat_layerInfo[VIDEO_LAYER_COUNT];
+		struct compat_fb_overlay_layer *info = compat_layerInfo;
 
 		MTKFB_LOG(" mtkfb_compat_ioctl():MTKFB_SET_VIDEO_LAYERS\n");
 
@@ -1602,7 +1603,7 @@ static int mtkfb_compat_ioctl(struct fb_info *info, unsigned int cmd, unsigned l
 			memset((void *)&session_input, 0, sizeof(session_input));
 
 			for (i = 0; i < VIDEO_LAYER_COUNT; ++i) {
-				compat_convert(&compat_layerInfo[i], &layerInfo);
+				compat_convert(info + i, &layerInfo);
 				if (layerInfo.layer_id >= OVL_LAYER_NUM) {
 					DDPAEE
 					    ("COMPAT_MTKFB_SET_VIDEO_LAYERS, layer_id invalid=%d\n",
