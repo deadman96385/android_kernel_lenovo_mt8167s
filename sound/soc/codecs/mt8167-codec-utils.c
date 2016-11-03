@@ -346,10 +346,10 @@ static int mt8167_codec_disable_cali_path(struct snd_soc_codec *codec)
 			ARRAY_SIZE(mt8167_codec_cali_disable_regs));
 }
 
-static uint32_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
+static int32_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
 	uint32_t auxadc_channel)
 {
-	uint32_t cali_val = 0;
+	int32_t cali_val = 0;
 	struct snd_dma_buffer dma_buf;
 #ifdef CONFIG_MTK_AUXADC
 	int32_t auxadc_on_val = 0;
@@ -386,10 +386,7 @@ static uint32_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
 
 	auxadc_val_avg = auxadc_val_sum / countlimit;
 
-	if (auxadc_val_avg >= auxadc_off_val)
-		cali_val = auxadc_val_avg - auxadc_off_val;
-	else
-		cali_val = auxadc_off_val - auxadc_val_avg;
+	cali_val = auxadc_off_val - auxadc_val_avg;
 
 	cali_val = cali_val/1000; /* mV */
 #endif
@@ -400,9 +397,18 @@ static uint32_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
 	return cali_val;
 }
 
-uint32_t mt8167_codec_conv_dc_offset_to_comp_val(uint32_t dc_offset)
+uint32_t mt8167_codec_conv_dc_offset_to_comp_val(int32_t dc_offset)
 {
 	uint32_t dccomp_val = 0;
+	bool invert = false;
+
+	if (!dc_offset)
+		return 0;
+
+	if (dc_offset > 0)
+		invert = true;
+	else
+		dc_offset *= (-1);
 
 	/* transform to 1.8V scale */
 	dc_offset = (dc_offset * 18) / 10;
@@ -413,12 +419,16 @@ uint32_t mt8167_codec_conv_dc_offset_to_comp_val(uint32_t dc_offset)
 	 */
 	dccomp_val = dc_offset * 18;
 
+	/* two's complement to change the direction of dc compensation value */
+	if (invert)
+		dccomp_val = 0xFFFFFFFF - dccomp_val + 1;
+
 	return dccomp_val;
 }
 EXPORT_SYMBOL_GPL(mt8167_codec_conv_dc_offset_to_comp_val);
 
 int mt8167_codec_get_hpl_cali_val(struct snd_soc_codec *codec,
-	uint32_t *dccomp_val, uint32_t *dc_offset)
+	uint32_t *dccomp_val, int32_t *dc_offset)
 {
 	*dc_offset = mt8167_codec_get_hp_cali_val(codec, AUXADC_CH_AU_HPL);
 	*dccomp_val = mt8167_codec_conv_dc_offset_to_comp_val(*dc_offset);
@@ -430,7 +440,7 @@ int mt8167_codec_get_hpl_cali_val(struct snd_soc_codec *codec,
 EXPORT_SYMBOL_GPL(mt8167_codec_get_hpl_cali_val);
 
 int mt8167_codec_get_hpr_cali_val(struct snd_soc_codec *codec,
-	uint32_t *dccomp_val, uint32_t *dc_offset)
+	uint32_t *dccomp_val, int32_t *dc_offset)
 {
 	*dc_offset = mt8167_codec_get_hp_cali_val(codec, AUXADC_CH_AU_HPR);
 	*dccomp_val = mt8167_codec_conv_dc_offset_to_comp_val(*dc_offset);
