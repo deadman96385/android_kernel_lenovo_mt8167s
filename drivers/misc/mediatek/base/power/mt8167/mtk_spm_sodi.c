@@ -224,8 +224,6 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	if (!__spm_is_pcm_loaded())
 		__spm_init_pcm_AllInOne(pcmdesc);
 
-	__spm_init_event_vector(pcmdesc);
-
 	/* Display set SPM_PCM_SRC_REQ[0]=1'b1 to force DRAM not enter self-refresh mode */
 	if ((spm_read(SPM_PCM_SRC_REQ) & 0x00000001))
 		pwrctrl->pcm_apsrc_req = 1;

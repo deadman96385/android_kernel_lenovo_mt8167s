@@ -289,8 +289,6 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 	if (!__spm_is_pcm_loaded())
 		__spm_init_pcm_AllInOne(pcmdesc);
 
-	__spm_init_event_vector(pcmdesc);
-
 	__spm_set_power_control(pwrctrl);
 
 	__spm_set_wakeup_event(pwrctrl);
@@ -421,8 +419,6 @@ wake_reason_t spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data)
 		last_wr = WR_UART_BUSY;
 		goto RESTORE_IRQ;
 	}
-
-	__spm_init_event_vector(pcmdesc);
 
 	__spm_set_power_control(pwrctrl);
 

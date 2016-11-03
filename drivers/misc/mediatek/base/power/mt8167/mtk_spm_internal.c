@@ -415,6 +415,8 @@ void __spm_init_pcm_AllInOne(const struct pcm_desc *pcmdesc)
 
 	__spm_init_pcm_register();
 
+	__spm_init_event_vector(pcmdesc);
+
 	/* init register to match PCM expectation */
 	spm_write(SPM_PCM_MAS_PAUSE_MASK, 0xffffffff);
 	spm_write(SPM_PCM_REG_DATA_INI, 0);
