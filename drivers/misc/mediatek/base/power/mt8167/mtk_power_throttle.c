@@ -129,13 +129,15 @@ static void _power_calculation(struct mt_cpu_dvfs *p, int oppidx, int ncpu)
 	int ref_freq, ref_volt;
 	int	p_dynamic = 0, p_leakage = 0;
 	int possible_cpu = NR_MAX_CPU;
+	int	temp;
 
 	ref_freq  = CA35_REF_FREQ;
 	ref_volt  = CA35_REF_VOLT;
 
 	p_dynamic = CA35_4CORE_REF_POWER;
 
-	p_leakage = mt_spower_get_leakage(MT_SPOWER_CA7, p->opp_tbl[oppidx].cpufreq_volt / 1000, 65);
+	temp = get_immediate_ts1_wrap() / 1000;
+	p_leakage = mt_spower_get_leakage(MT_SPOWER_CA7, p->opp_tbl[oppidx].cpufreq_volt / 1000, temp);
 
 	p_dynamic = p_dynamic *
 	(p->opp_tbl[oppidx].cpufreq_khz / 1000) / (ref_freq / 1000) *

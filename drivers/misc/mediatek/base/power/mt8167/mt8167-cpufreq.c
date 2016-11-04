@@ -660,6 +660,7 @@ static int mtk_cpufreq_init(struct cpufreq_policy *policy)
 		opp_idx++;
 		rcu_read_unlock();
 	}
+	mt_spower_init();
 	setup_power_table_tk();
 	dump_power_table();
 
