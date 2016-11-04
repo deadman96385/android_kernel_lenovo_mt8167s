@@ -48,7 +48,8 @@ extern void __iomem *auxadc_efuse_base;
 
 #define MT_PDN_PERI_AUXADC MT_CG_PERI_AUXADC
 
-#define AUXADC_NODE "mediatek,mt8167-auxadc"
+#define AUXADC_NODE		"mediatek,mt8167-auxadc"
+#define AUXADC_APMIX_NODE	"mediatek,mt8167-apmixedsys"
 
 #define AUXADC_CON0             (AUXADC_BASE + 0x000)
 #define AUXADC_CON1             (AUXADC_BASE + 0x004)
@@ -69,6 +70,7 @@ extern void __iomem *auxadc_efuse_base;
 #define TP_CMD_ADDR_X			0x0005
 
 #define AUXADC_CON_RTP			(APMIXED_BASE + 0x0404)
-#define AUXADC_CLOCK_BY_SPM
+#define AUXADC_TS_X_BUFFER		(APMIXED_BASE + 0x0600)
+#define AUXADC_CLK_CTR
 #endif   /*_MTK_ADC_HW_H*/
 
