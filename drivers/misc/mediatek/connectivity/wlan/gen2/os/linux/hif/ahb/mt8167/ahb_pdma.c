@@ -474,7 +474,6 @@ static VOID HifGdmaRegDump(IN void *HifInfoSrc)
 	regVal2 = HIF_DMAR_READL(HifInfo, 0x50);
 	regVal3 = HIF_DMAR_READL(HifInfo, 0x54);
 	DBGLOG(INIT, INFO, "HIF dir=%u, debug 0x50=%u, debug 0x54: %u\n", regVal1, regVal2, regVal3);
-	DBGLOG(INIT, INFO, "GDMA> clock status = 0x%x\n", *(volatile unsigned int *)0xF0000024);
 }
 
 /*----------------------------------------------------------------------------*/
