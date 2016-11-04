@@ -282,7 +282,8 @@ int disp_create_session(struct disp_session_config *config)
 		session_cnt[idx] = 1;
 		DISPDBG("New session(0x%x)\n", session);
 #if defined(OVL_TIME_SHARING)
-		ext_session_id = session;
+		if (DISP_SESSION_TYPE(session) != DISP_SESSION_EXTERNAL)
+			ext_session_id = session;
 		if (session == MAKE_DISP_SESSION(DISP_SESSION_MEMORY, 2))
 			ovl2mem_setlayernum(4);
 #endif
