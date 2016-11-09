@@ -14,12 +14,7 @@
 #ifndef _MT8167_M4U_REG_H__
 #define _MT8167_M4U_REG_H__
 
-#ifdef CONFIG_MTK_GPU_SAPPHIRE_LITE
-#define M4U_INHOUSE_GPU_EN  1
-#else
-/*other's GPU has its own iommu*/
 #define M4U_INHOUSE_GPU_EN  0
-#endif
 
 #if M4U_INHOUSE_GPU_EN
 #define TOTAL_M4U_NUM     2
