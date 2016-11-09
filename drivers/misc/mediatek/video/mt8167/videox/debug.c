@@ -592,9 +592,11 @@ void _debug_fps_meter(unsigned long mva, unsigned long va, unsigned int w, unsig
 }
 #endif
 
+static char dbg_buf[1024];
 static void process_dbg_opt(const char *opt)
 {
 	int ret = 0;
+	char *buf = dbg_buf + strlen(dbg_buf);
 
 	if (strncmp(opt, "dsipattern", 10) == 0) {
 		char *p = (char *)opt + 11;
@@ -724,10 +726,8 @@ static void process_dbg_opt(const char *opt)
 		unsigned long addr = 0;
 		unsigned long val = 0;
 
-		ret = kstrtoul(p, 16, &addr);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-		ret = kstrtoul(p + 1, 16, &val);
+		STR_CONVERT(&p, &addr, ul);
+		STR_CONVERT(&p, &val, ul);
 		if (ret)
 			pr_err("DISP/%s: errno %d\n", __func__, ret);
 
@@ -740,10 +740,7 @@ static void process_dbg_opt(const char *opt)
 		char *p = (char *)opt + 5;
 		unsigned long addr = 0;
 
-		ret = kstrtoul(p, 16, (unsigned long int *)&addr);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &addr, ul);
 		if (addr)
 			pr_debug("Read register 0x%lx: 0x%08x\n", addr, INREG32(addr));
 		else
@@ -757,19 +754,13 @@ static void process_dbg_opt(const char *opt)
 		char *p = (char *)opt + 6;
 		unsigned long int option = 0;
 
-		ret = kstrtoul(p, 16, (unsigned long int *)&option);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &option, uint);
 		dprec_handle_option((int)option);
 	} else if (strncmp(opt, "cmdq", 4) == 0) {
 		char *p = (char *)opt + 5;
 		unsigned long int option = 0;
 
-		ret = kstrtoul(p, 16, &option);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &option, uint);
 		if (option)
 			primary_display_switch_cmdq_cpu(CMDQ_ENABLE);
 		else
@@ -778,10 +769,7 @@ static void process_dbg_opt(const char *opt)
 		char *p = (char *)opt + 9;
 		unsigned long int maxlayer = 0;
 
-		ret = kstrtoul(p, 10, &maxlayer);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &maxlayer, uint);
 		if (maxlayer)
 			primary_display_set_max_layer((int)maxlayer);
 		else
@@ -792,10 +780,7 @@ static void process_dbg_opt(const char *opt)
 		char *p = (char *)opt + 10;
 		unsigned long int enable = 0;
 
-		ret = kstrtoul(p, 10, &enable);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &enable, uint);
 		primary_display_esd_check_enable((int)enable);
 	} else if (strncmp(opt, "cmd:", 4) == 0) {
 		char *p = (char *)opt + 4;
@@ -803,10 +788,7 @@ static void process_dbg_opt(const char *opt)
 		int lcm_cmd[5];
 		unsigned int cmd_num = 1;
 
-		ret = kstrtoul(p, 5, &value);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &value, uint);
 		lcm_cmd[0] = (int)value;
 		primary_display_set_cmd(lcm_cmd, cmd_num);
 	} else if (strncmp(opt, "esd_recovery", 12) == 0) {
@@ -842,10 +824,7 @@ static void process_dbg_opt(const char *opt)
 		char *p = (char *)opt + 2;
 		unsigned long int enable = 0;
 
-		ret = kstrtoul(p, 10, &enable);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &enable, uint);
 		primary_display_enable_path_cg((int)enable);
 	} else if (strncmp(opt, "ovl2mem:", 8) == 0) {
 		if (strncmp(opt + 8, "on", 2) == 0)
@@ -855,66 +834,45 @@ static void process_dbg_opt(const char *opt)
 	} else if (strncmp(opt, "dump_layer:", 11) == 0) {
 		if (strncmp(opt + 11, "on", 2) == 0) {
 			char *p = (char *)opt + 14;
-			unsigned long int temp;
 
-			ret = kstrtoul(p, 10, &temp);
-			gCapturePriLayerDownX = (int)temp;
-			if (ret)
-				pr_err("DISP/%s: errno %d\n", __func__, ret);
-			ret = kstrtoul(p + 1, 10, (unsigned long int *)&temp);
-			gCapturePriLayerDownY = (int)temp;
-			if (ret)
-				pr_err("DISP/%s: errno %d\n", __func__, ret);
-			ret = kstrtoul(p + 1, 10, (unsigned long int *)&temp);
-			gCapturePriLayerNum = (int)temp;
-			if (ret)
-				pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+			STR_CONVERT(&p, &gCapturePriLayerDownX, uint);
+			STR_CONVERT(&p, &gCapturePriLayerDownY, uint);
+			STR_CONVERT(&p, &gCapturePriLayerNum, uint);
 
 			gCapturePriLayerEnable = 1;
 			if (gCapturePriLayerDownX == 0)
 				gCapturePriLayerDownX = 20;
 			if (gCapturePriLayerDownY == 0)
 				gCapturePriLayerDownY = 20;
-			pr_debug("dump_layer En %d DownX %d DownY %d,Num %d",
+			pr_err("dump_layer En %d DownX %d DownY %d,Num %d",
 				 gCapturePriLayerEnable, gCapturePriLayerDownX,
 				 gCapturePriLayerDownY, gCapturePriLayerNum);
 
 		} else if (strncmp(opt + 11, "off", 3) == 0) {
 			gCapturePriLayerEnable = 0;
 			gCapturePriLayerNum = OVL_LAYER_NUM;
-			pr_debug("dump_layer En %d\n", gCapturePriLayerEnable);
+			pr_err("dump_layer En %d\n", gCapturePriLayerEnable);
 		}
 	} else if (strncmp(opt, "dump_decouple:", 14) == 0) {
 		if (strncmp(opt + 14, "on", 2) == 0) {
 			char *p = (char *)opt + 17;
-			unsigned long int temp;
 
-			ret = kstrtoul(p, 10, &temp);
-			gCapturePriLayerDownX = (int)temp;
-			if (ret)
-				pr_err("DISP/%s: errno %d\n", __func__, ret);
-			ret = kstrtoul(p + 1, 10, &temp);
-			gCapturePriLayerDownY = (int)temp;
-			if (ret)
-				pr_err("DISP/%s: errno %d\n", __func__, ret);
-			ret = kstrtoul(p + 1, 10, &temp);
-			gCapturePriLayerNum = (int)temp;
-			if (ret)
-				pr_err("DISP/%s: errno %d\n", __func__, ret);
+			STR_CONVERT(&p, &gCapturePriLayerDownX, uint);
+			STR_CONVERT(&p, &gCapturePriLayerDownY, uint);
+			STR_CONVERT(&p, &gCapturePriLayerNum, uint);
 
 			gCaptureWdmaLayerEnable = 1;
 			if (gCapturePriLayerDownX == 0)
 				gCapturePriLayerDownX = 20;
 			if (gCapturePriLayerDownY == 0)
 				gCapturePriLayerDownY = 20;
-			pr_debug("dump_decouple En %d DownX %d DownY %d,Num %d",
+			pr_err("dump_decouple En %d DownX %d DownY %d,Num %d",
 				 gCaptureWdmaLayerEnable, gCapturePriLayerDownX,
 				 gCapturePriLayerDownY, gCapturePriLayerNum);
 
 		} else if (strncmp(opt + 14, "off", 3) == 0) {
 			gCaptureWdmaLayerEnable = 0;
-			pr_debug("dump_decouple En %d\n", gCaptureWdmaLayerEnable);
+			pr_err("dump_decouple En %d\n", gCaptureWdmaLayerEnable);
 		}
 	} else if (strncmp(opt, "bkl:", 4) == 0) {
 		char *p = (char *)opt + 4;

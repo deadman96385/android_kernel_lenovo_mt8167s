@@ -188,11 +188,7 @@ static void process_dbg_opt(const char *opt)
 	if (strncmp(opt, "regr:", 5) == 0) {
 		unsigned long addr = 0;
 
-		p = (char *)opt + 5;
-		ret = kstrtoul(p, 16, (unsigned long int *)&addr);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &addr, ul);
 		if (is_reg_addr_valid(1, addr) == 1) {	/* (addr >= 0xf0000000U && addr <= 0xff000000U) */
 			unsigned int regVal = DISP_REG_GET(addr);
 
@@ -206,15 +202,8 @@ static void process_dbg_opt(const char *opt)
 		unsigned long addr = 0;
 		unsigned long val = 0;
 
-		p = (char *)opt + 5;
-		ret = kstrtoul(p, 16, (unsigned long int *)&addr);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-		ret = kstrtoul(p + 1, 16, (unsigned long int *)&val);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
-
+		STR_CONVERT(&p, &addr, ul);
+		STR_CONVERT(&p, &val, ul);
 		if (is_reg_addr_valid(1, addr) == 1) {	/* (addr >= 0xf0000000U && addr <= 0xff000000U) */
 			unsigned int regVal;
 
@@ -228,19 +217,13 @@ static void process_dbg_opt(const char *opt)
 		}
 	} else if (strncmp(opt, "rdma_ultra:", 11) == 0) {
 		p = (char *)opt + 11;
-		ret = kstrtoul(p, 16, &gRDMAUltraSetting);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &gRDMAUltraSetting, uint);
 		DISP_CPU_REG_SET(DISP_REG_RDMA_MEM_GMC_SETTING_0, gRDMAUltraSetting);
 		sprintf(buf, "rdma_ultra, gRDMAUltraSetting=0x%x, reg=0x%x\n",
 			(unsigned int)gRDMAUltraSetting, DISP_REG_GET(DISP_REG_RDMA_MEM_GMC_SETTING_0));
 	} else if (strncmp(opt, "rdma_fifo:", 10) == 0) {
 		p = (char *)opt + 10;
-		ret = kstrtoul(p, 16, &gRDMAFIFOLen);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &gRDMAFIFOLen, uint);
 		DISP_CPU_REG_SET_FIELD(FIFO_CON_FLD_OUTPUT_VALID_FIFO_THRESHOLD,
 				       DISP_REG_RDMA_FIFO_CON, gRDMAFIFOLen);
 		sprintf(buf, "rdma_fifo, gRDMAFIFOLen=0x%x, reg=0x%x\n",
@@ -251,10 +234,7 @@ static void process_dbg_opt(const char *opt)
 		unsigned long reg_pa = 0;
 
 		p = (char *)opt + 7;
-		ret = kstrtoul(p, 16, (unsigned long int *)&reg_pa);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &reg_pa, ul);
 		if (reg_pa < 0x10000000 || reg_pa > 0x18000000) {
 			sprintf(buf, "g_regr, invalid pa=0x%lx\n", reg_pa);
 		} else {
@@ -275,17 +255,11 @@ static void process_dbg_opt(const char *opt)
 		unsigned long reg_pa = 0;
 
 		p = (char *)opt + 7;
-		ret = kstrtoul(p, 16, (unsigned long int *)&reg_pa);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &reg_pa, ul);
 		if (reg_pa < 0x10000000 || reg_pa > 0x18000000) {
 			sprintf(buf, "g_regw, invalid pa=0x%lx\n", reg_pa);
 		} else {
-			ret = kstrtoul(p + 1, 16, &val);
-			if (ret)
-				pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+			STR_CONVERT(&p, &val, uint);
 			reg_va = (unsigned long)ioremap_nocache(reg_pa, sizeof(unsigned long));
 			reg_va_before = DISP_REG_GET(reg_va);
 			DISP_CPU_REG_SET(reg_va, val);
@@ -302,10 +276,7 @@ static void process_dbg_opt(const char *opt)
 		unsigned long int enable = 0;
 
 		p = (char *)opt + 8;
-		ret = kstrtoul(p, 10, &enable);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &enable, uint);
 		if (enable)
 			dbg_log_level = 1;
 		else
@@ -316,10 +287,7 @@ static void process_dbg_opt(const char *opt)
 		unsigned long int enable = 0;
 
 		p = (char *)opt + 8;
-		ret = kstrtoul(p, 10, &enable);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &enable, uint);
 		if (enable)
 			irq_log_level = 1;
 		else
@@ -332,9 +300,7 @@ static void process_dbg_opt(const char *opt)
 		int rdma1_mode = 0;
 
 		p = (char *)opt + 7;
-		ret = kstrtoul(p, 10, &met_on);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
+		STR_CONVERT(&p, &met_on, uint);
 		if (strncmp(p, "1", 1) == 0)
 			met_on = 1;
 
@@ -347,10 +313,7 @@ static void process_dbg_opt(const char *opt)
 		unsigned long level = 0;
 
 		p = (char *)opt + 10;
-		ret = kstrtoul(p, 10, (unsigned long int *)&level);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &level, ul);
 		if (level) {
 			disp_bls_set_backlight(level);
 			sprintf(buf, "backlight: %d\n", (int) level);
@@ -361,10 +324,7 @@ static void process_dbg_opt(const char *opt)
 		unsigned long int level = 0;
 
 		p = (char *)opt + 5;
-		ret = kstrtoul(p, 10, &level);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &level, uint);
 		if (level) {
 			disp_pwm_id_t pwm_id = DISP_PWM0;
 
@@ -377,12 +337,7 @@ static void process_dbg_opt(const char *opt)
 			goto Error;
 		}
 	} else if (strncmp(opt, "aal_dbg:", 8) == 0) {
-		unsigned long int tmp;
-
-		ret = kstrtoul(opt + 8, 10, &tmp);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-		aal_dbg_en = (int)tmp;
+		STR_CONVERT(&p, &aal_dbg_en, int);
 		sprintf(buf, "aal_dbg_en = 0x%x\n", aal_dbg_en);
 	} else if (strncmp(opt, "aal_test:", 9) == 0) {
 		aal_test(opt + 9, buf);
@@ -392,10 +347,7 @@ static void process_dbg_opt(const char *opt)
 		unsigned long int module = 0;
 
 		p = (char *)opt + 9;
-		ret = kstrtoul(p, 10, &module);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &module, uint);
 		DDPMSG("process_dbg_opt, module=%d\n", (unsigned int)module);
 		if (module < DISP_MODULE_NUM) {
 			ddp_dump_reg(module);
@@ -409,10 +361,7 @@ static void process_dbg_opt(const char *opt)
 		unsigned long int mutex_idx = 0;
 
 		p = (char *)opt + 10;
-		ret = kstrtoul(p, 10, &mutex_idx);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
-
+		STR_CONVERT(&p, &mutex_idx, uint);
 		DDPMSG("process_dbg_opt, path mutex=%d\n", (unsigned int)mutex_idx);
 		dpmgr_debug_path_status((unsigned int)mutex_idx);
 		sprintf(buf, "dump_path: %d\n", (unsigned int)mutex_idx);
