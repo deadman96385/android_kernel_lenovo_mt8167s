@@ -1354,6 +1354,9 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	    (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM))
 		regmap_update_bits(afe->regmap, AFE_I2S_CON1,
 			   AFE_I2S_CON1_TDMOUT_MUX_MASK, AFE_I2S_CON1_TDMOUT_TO_PAD);
+
+	be->prepared[stream] = true;
+
 	return 0;
 }
 
@@ -1515,6 +1518,8 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 
 	regmap_update_bits(afe->regmap, AFE_TDM_IN_CON1,
 			   ~(u32)AFE_TDM_IN_CON1_EN, val);
+
+	be->prepared[stream] = true;
 
 	return 0;
 }
