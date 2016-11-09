@@ -394,6 +394,7 @@ void do_connection_work(struct work_struct *data)
 
 void mt_usb_connect(void)
 {
+#ifndef CONFIG_MTK_MUSB_SW_WITCH_MODE
 	if (!mtk_musb) {
 		DBG(0, "mtk_musb = NULL\n");
 		return;
@@ -402,11 +403,12 @@ void mt_usb_connect(void)
 	DBG(0, "issue work\n");
 	queue_delayed_work(mtk_musb->st_wq, &connection_work, 0);
 	DBG(0, "[MUSB] USB connect\n");
-
+#endif
 }
 
 void mt_usb_disconnect(void)
 {
+#ifndef CONFIG_MTK_MUSB_SW_WITCH_MODE
 	if (!mtk_musb) {
 		DBG(0, "mtk_musb = NULL\n");
 		return;
@@ -415,6 +417,7 @@ void mt_usb_disconnect(void)
 	DBG(0, "issue work\n");
 	queue_delayed_work(mtk_musb->st_wq, &connection_work, 0);
 	DBG(0, "[MUSB] USB disconnect\n");
+#endif
 }
 
 static void do_connect_rescue_work(struct work_struct *work)
@@ -467,6 +470,33 @@ static bool musb_hal_is_vbus_exist(void)
 	return vbus_exist;
 
 }
+
+#ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE
+static void mt_usb20_sw_connect(void)
+{
+	if (!mtk_musb) {
+		DBG(0, "mtk_musb = NULL\n");
+		return;
+	}
+	/* issue connection work */
+	DBG(0, "issue work\n");
+	queue_delayed_work(mtk_musb->st_wq, &connection_work, 0);
+	DBG(0, "[MUSB] USB connect\n");
+}
+
+static void mt_usb20_sw_disconnect(void)
+{
+	if (!mtk_musb) {
+		DBG(0, "mtk_musb = NULL\n");
+		return;
+	}
+	/* issue connection work */
+	DBG(0, "issue work\n");
+	queue_delayed_work(mtk_musb->st_wq, &connection_work, 0);
+	DBG(0, "[MUSB] USB disconnect\n");
+
+}
+#endif
 
 DEFINE_MUTEX(cable_connected_lock);
 /* be aware this could not be used in non-sleep context */
@@ -940,6 +970,48 @@ static ssize_t mt_usb_show_uart_path(struct device *dev, struct device_attribute
 }
 
 DEVICE_ATTR(uartpath,  0444, mt_usb_show_uart_path, NULL);
+#endif
+
+#ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE
+static bool device_mode;
+static bool host_mode;
+
+static ssize_t mt_usb_store_swmode(struct device *dev, struct device_attribute *attr,
+						   const char *buf, size_t count)
+{
+	if (count >= 6 && !strncmp(buf, "device", 6)) {
+		if (!device_mode && !host_mode) {
+			DBG(0, "switch to device mode\n");
+			mt_usb20_sw_connect();
+			device_mode = true;
+		}
+	}
+
+	if (count >= 4 && !strncmp(buf, "host", 4)) {
+		if (!device_mode && !host_mode) {
+			DBG(0, "switch to host mode\n");
+			musb_id_pin_sw_work(true);
+			host_mode = true;
+		}
+	}
+
+	if (count >= 4 && !strncmp(buf, "idle", 4)) {
+		if (device_mode) {
+			DBG(0, "switch to dev->idle mode\n");
+			mt_usb20_sw_disconnect();
+			device_mode = false;
+		} else if (host_mode) {
+			DBG(0, "switch to host->idle mode\n");
+			musb_id_pin_sw_work(false);
+			host_mode = false;
+		} else
+			DBG(0, "do nothing\n");
+	}
+
+	return count;
+}
+
+DEVICE_ATTR(swmode, 0220, NULL, mt_usb_store_swmode);
 #endif
 
 #ifdef FPGA_PLATFORM
