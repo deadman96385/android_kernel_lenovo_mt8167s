@@ -13,6 +13,8 @@
 
 #include "accdet.h"
 #include <upmu_common.h>
+#include <linux/mfd/syscon.h>
+#include <linux/regmap.h>
 #include <linux/timer.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
@@ -30,6 +32,7 @@
 
 #define REGISTER_VALUE(x)   (x - 1)
 void __iomem *accdet_base;
+struct regmap *apmix_regmap;
 static int button_press_debounce = 0x400;
 int cur_key;
 struct head_dts_data accdet_dts_data;
@@ -943,6 +946,8 @@ void accdet_get_dts_data(void)
 	#else
 	int three_key[4];
 	#endif
+	int ret;
+	unsigned int val;
 
 	ACCDET_INFO("[ACCDET]Start accdet_get_dts_data");
 	node = of_find_matching_node(node, accdet_of_match);
@@ -975,6 +980,20 @@ void accdet_get_dts_data(void)
 	} else {
 		ACCDET_ERROR("[Accdet]%s can't find compatible dts node\n", __func__);
 	}
+
+	/* Adjust micbias1 voltage depends on dts data */
+	ACCDET_INFO("accdet_dts_data.mic_mode_vol = %d\n", accdet_dts_data.mic_mode_vol);
+	ret = regmap_update_bits(apmix_regmap, AUDIO_CODEC_CON01, 0x7 << 22, (accdet_dts_data.mic_mode_vol) << 22);
+	if (ret) {
+		ACCDET_ERROR("Failed to update register AUDIO_CODEC_CON01: %d\n", ret);
+		return;
+	}
+	ret = regmap_read(apmix_regmap, AUDIO_CODEC_CON01, &val);
+	if (ret) {
+		ACCDET_ERROR("Failed to read AUDIO_CODEC_CON01 value: %d\n", ret);
+		return;
+	}
+	ACCDET_INFO("AUDIO_CODEC_CON01  = 0x%x\n", val);
 }
 
 static inline void accdet_init(void)
@@ -1184,6 +1203,15 @@ int mt_accdet_probe(struct platform_device *dev)
 		ret = PTR_ERR(accdet_base);
 		return ret;
 	}
+
+	apmix_regmap = syscon_regmap_lookup_by_phandle(dev->dev.of_node, "mediatek,apmixedsys-regmap");
+	if (IS_ERR(apmix_regmap)) {
+		ACCDET_ERROR("%s failed to get regmap of syscon node %s\n",
+		__func__, "mediatek,apmixedsys-regmap");
+		ret = PTR_ERR(apmix_regmap);
+		return ret;
+	}
+	ACCDET_INFO("%s: found regmap of syscon node %s\n", __func__, "mediatek,apmixedsys-regmap");
 
 	/*
 	 * below register accdet as switch class
