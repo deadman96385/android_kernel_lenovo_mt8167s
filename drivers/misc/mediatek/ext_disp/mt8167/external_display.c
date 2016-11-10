@@ -54,6 +54,7 @@
 #include "mtkfb_fence.h"
 #include "ion_drv.h"
 #include "mtk_ion.h"
+#include "ddp_dpi.h"
 
 #include "tz_cross/trustzone.h"
 #include "tz_cross/ta_mem.h"
@@ -90,9 +91,11 @@ struct ext_disp_path_context {
 	unsigned int dc_buf_id;
 	struct WDMA_CONFIG_STRUCT decouple_wdma_config;
 	struct RDMA_CONFIG_STRUCT decouple_rdma_config;
+	bool is_interlace;
 
 	cmdqBackupSlotHandle ovl_address;
 	cmdqBackupSlotHandle wdma_info;
+	cmdqBackupSlotHandle rdma_info;
 };
 
 #define pgc	_get_context()
@@ -787,6 +790,10 @@ static int _convert_disp_input_to_rdma(struct RDMA_CONFIG_STRUCT *dst, struct di
 	dst->height = src->src_height;
 	dst->pitch = src->src_pitch * Bpp;
 	dst->security = DISP_NORMAL_BUFFER;
+	if (pgc->is_interlace) {
+		dst->is_interlace = true;
+		dst->is_top_filed = ddp_dpi_is_top_filed(DISP_MODULE_DPI1);
+	}
 
 	return ret;
 }
@@ -1002,6 +1009,7 @@ int ext_disp_init(char *lcm_name, unsigned int session)
 
 	init_cmdq_slots(&(pgc->ovl_address), 4, 0);
 	init_cmdq_slots(&(pgc->wdma_info), 2, 0);
+	init_cmdq_slots(&(pgc->rdma_info), 1, 0);
 
 	if (ext_disp_mode == EXTD_DIRECT_LINK_MODE)
 		_build_path_direct_link();
@@ -1233,9 +1241,14 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 	cmdqBackupReadSlot(pgc->wdma_info, 0, &(secure));
 	cmdqBackupReadSlot(pgc->wdma_info, 1, &(addr));
 	pgc->decouple_rdma_config.security = secure;
-	pgc->decouple_rdma_config.height = ext_disp_get_height();
-	pgc->decouple_rdma_config.width = ext_disp_get_width();
 	pgc->decouple_rdma_config.address = addr;
+	pgc->decouple_rdma_config.width = ext_disp_get_width();
+	pgc->decouple_rdma_config.height = ext_disp_get_height();
+	pgc->decouple_rdma_config.pitch = ext_disp_get_width() * 3;
+	if (pgc->is_interlace) {
+		pgc->decouple_rdma_config.is_interlace = true;
+		pgc->decouple_rdma_config.is_top_filed = ddp_dpi_is_top_filed(DISP_MODULE_DPI1);
+	}
 	_config_rdma_input_data(&pgc->decouple_rdma_config, pgc->dpmgr_handle, pgc->cmdq_handle_config);
 	_ext_disp_trigger(0, NULL, 0);
 
@@ -1245,11 +1258,23 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 	for (i = 0; i < EXTD_OVERLAY_CNT; i++) {
 		cmdqBackupReadSlot(pgc->ovl_address, i, &ovl_curr_addr[i]);
 		fence_idx = disp_sync_find_fence_idx_by_addr(pgc->session, i, ovl_curr_addr[i]);
-		mtkfb_release_fence(pgc->session, i, fence_idx+1);
+		mtkfb_release_fence(pgc->session, i, fence_idx + 1);
 	}
 
 	return 0;
 }
+
+static int _rdma_fence_release_callback(uint32_t userdata)
+{
+	int fence_idx;
+
+	/* need consider interlace support */
+	cmdqBackupReadSlot(pgc->rdma_info, 0, &(fence_idx));
+	mtkfb_release_fence(pgc->session, 0, fence_idx - 1);
+
+	return 0;
+}
+
 
 int ext_disp_trigger(int blocking, void *callback, unsigned int userdata, unsigned int session)
 {
@@ -1271,7 +1296,7 @@ int ext_disp_trigger(int blocking, void *callback, unsigned int userdata, unsign
 		_ovl_fence_release_callback(0);
 	} else {
 		if (DISP_SESSION_TYPE(session) == DISP_SESSION_EXTERNAL && DISP_SESSION_DEV(session) == DEV_MHL + 1)
-			_ext_disp_trigger(blocking, callback, userdata);
+			_ext_disp_trigger(blocking, _rdma_fence_release_callback, userdata);
 		else if (DISP_SESSION_TYPE(session) == DISP_SESSION_EXTERNAL
 			&& DISP_SESSION_DEV(session) == DEV_EINK + 1)
 			_ext_disp_trigger_EPD(blocking, callback, userdata);
@@ -1332,6 +1357,20 @@ int ext_disp_suspend_trigger(void *callback, unsigned int userdata, unsigned int
 	return ret;
 }
 
+static void ext_check_is_interlace_output(struct disp_ddp_path_config *config)
+{
+#if defined(CONFIG_MTK_HDMI_SUPPORT)
+	/* should make sure HDMI_VIDEO_RESOLUTION and DPI_VIDEO_RESOLUTION is sync */
+	if ((config->dispif_config.dpi.dpi_clock == HDMI_VIDEO_1920x1080i_60Hz) ||
+		(config->dispif_config.dpi.dpi_clock == HDMI_VIDEO_1920x1080i_50Hz) ||
+		(config->dispif_config.dpi.dpi_clock == HDMI_VIDEO_1920x1080i3d_60Hz) ||
+		(config->dispif_config.dpi.dpi_clock == HDMI_VIDEO_1920x1080i3d_60Hz))
+		pgc->is_interlace = true;
+	else
+		pgc->is_interlace = false;
+#endif
+}
+
 int ext_disp_config_input_multiple(struct disp_session_input_config *input, int idx, unsigned int session)
 {
 	int ret = 0;
@@ -1369,6 +1408,8 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 
 	/* all dirty should be cleared in dpmgr_path_get_last_config() */
 	data_config = dpmgr_path_get_last_config(disp_handle);
+	memcpy(&(data_config->dispif_config), &extd_lcm_params, sizeof(LCM_PARAMS));
+	ext_check_is_interlace_output(data_config);
 
 	/* hope we can use only 1 input struct for input config, just set layer number */
 	if (_should_config_ovl_input()) {
@@ -1380,8 +1421,6 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 			dprec_mmp_dump_ovl_layer(&(data_config->ovl_config[config_layer_id]), config_layer_id, 2);
 
 			if (init_roi == 1) {
-				memcpy(&(data_config->dispif_config), &extd_lcm_params, sizeof(LCM_PARAMS));
-
 				EXT_DISP_LOG("set dest w:%d, h:%d\n",
 						extd_lcm_params.dpi.width, extd_lcm_params.dpi.height);
 				data_config->dst_w = extd_lcm_params.dpi.width;
@@ -1396,6 +1435,7 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 		data_config->dst_dirty = 1;
 	} else {
 		struct OVL_CONFIG_STRUCT ovl_config;
+		struct disp_sync_info *layer_info = NULL;
 
 		_convert_disp_input_to_ovl(&ovl_config, &(input->config[i]));
 		dprec_mmp_dump_ovl_layer(&ovl_config, input->config[i].layer_id, 2);
@@ -1405,6 +1445,9 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 			data_config->rdma_dirty = 1;
 			pgc->need_trigger_overlay = 1;
 		}
+
+		layer_info = _get_sync_info(pgc->session, 0);
+		cmdqRecBackupUpdateSlot(cmdq_handle, pgc->rdma_info, 0, layer_info->fence_idx);
 
 		if (pgc->ovl_req_state == EXTD_OVL_REMOVE_REQ) {
 			EXT_DISP_LOG("config M4U Port DISP_MODULE_RDMA1\n");
@@ -1427,7 +1470,6 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 	if (_should_wait_path_idle())
 		dpmgr_wait_event_timeout(disp_handle, DISP_PATH_EVENT_FRAME_DONE, HZ / 2);
 
-	memcpy(&(data_config->dispif_config), &extd_lcm_params, sizeof(LCM_PARAMS));
 	ret = dpmgr_path_config(disp_handle, data_config,
 				ext_disp_cmdq_enabled() ? cmdq_handle : NULL);
 
@@ -1553,12 +1595,11 @@ void ext_disp_get_curr_addr(unsigned long *input_curr_addr, int module)
 {
 	int i;
 
-	if (module == 1) {
-		for (i = 0; i < EXTD_OVERLAY_CNT; i++)
-			input_curr_addr[i] = 0;
-	} else {
-		dpmgr_get_input_address(pgc->dpmgr_handle, input_curr_addr);
-	}
+	/* fence release use cmdq callback, this just no need */
+	for (i = 0; i < EXTD_OVERLAY_CNT; i++)
+		input_curr_addr[i] = 0;
+
+	return;
 }
 
 int ext_disp_factory_test(int mode, void *config)
