@@ -1061,8 +1061,13 @@ int ddp_dpi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 
 bool ddp_dpi_is_top_filed(enum DISP_MODULE_ENUM module)
 {
+	unsigned int status;
+
 	if (module == DISP_MODULE_DPI1) {
-		if (DPI_REG[DPI_IDX(module)]->STATUS.FIELD == 0)
+		status = INREG32(&DPI_REG[DPI_IDX(module)]->STATUS);
+		if (status & (1<<20))
+			return false;
+		else
 			return true;
 	}
 
