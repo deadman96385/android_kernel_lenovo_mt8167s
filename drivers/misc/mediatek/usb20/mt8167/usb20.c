@@ -259,6 +259,9 @@ static void mt_usb_enable(struct musb *musb)
 		*/
 
 	mdelay(10);
+	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	mt_usb_clock_prepare();
+	#endif
 
 	usb_phy_recover();
 
@@ -285,6 +288,9 @@ static void mt_usb_disable(struct musb *musb)
 		*/
 
 	usb_phy_savecurrent();
+	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	mt_usb_clock_unprepare();
+	#endif
 
 	/* update musb->power & mtk_usb_power in the same time */
 	mtk_usb_power = false;
@@ -315,6 +321,35 @@ bool mt_usb_is_device(void)
 
 	return !mtk_musb->is_host;
 }
+
+#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+void mt_usb_clock_prepare(void)
+{
+	int retval = 0;
+
+	DBG(0, "usb_power = %d\n", mtk_usb_power);
+	retval = clk_prepare(usbpll_clk);
+	if (retval)
+		DBG(0, KERN_WARNING "prepare fail\n");
+	retval = clk_prepare(usb_clk);
+	if (retval)
+		DBG(0, KERN_WARNING "prepare fail\n");
+
+	retval = clk_prepare(usbmcu_clk);
+	if (retval)
+		DBG(0, KERN_WARNING "prepare fail\n");
+}
+
+void mt_usb_clock_unprepare(void)
+{
+	DBG(0, "usb_power = %d\n", mtk_usb_power);
+
+	clk_unprepare(usbmcu_clk);
+	clk_unprepare(usb_clk);
+	clk_unprepare(usbpll_clk);
+}
+
+#endif
 
 #define CONN_WORK_DELAY 50
 static struct delayed_work connection_work;
@@ -1421,6 +1456,10 @@ static int mt_usb_probe(struct platform_device *pdev)
 	ret = device_create_file(&pdev->dev, &dev_attr_rx);
 	ret = device_create_file(&pdev->dev, &dev_attr_uartpath);
 #endif
+#ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE
+	ret = device_create_file(&pdev->dev, &dev_attr_swmode);
+#endif
+
 
 	if (ret) {
 		dev_err(&pdev->dev, "failed to create musb device\n");
@@ -1480,6 +1519,7 @@ static int mt_usb_dts_probe(struct platform_device *pdev)
 		DBG(0, KERN_WARNING "cannot get usbpll clock\n");
 		return PTR_ERR(usbpll_clk);
 	}
+	#ifndef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
 	DBG(0, KERN_WARNING "get usbpll clock ok, prepare it\n");
 	retval = clk_prepare(usbpll_clk);
 	if (retval == 0) {
@@ -1488,12 +1528,14 @@ static int mt_usb_dts_probe(struct platform_device *pdev)
 		DBG(0, KERN_WARNING "prepare fail\n");
 		return retval;
 	}
+	#endif
 
 	usb_clk = devm_clk_get(&pdev->dev, "usb");
 	if (IS_ERR(usb_clk)) {
 		DBG(0, KERN_WARNING "cannot get usb clock\n");
 		return PTR_ERR(usb_clk);
 	}
+	#ifndef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
 	DBG(0, KERN_WARNING "get usb clock ok, prepare it\n");
 	retval = clk_prepare(usb_clk);
 	if (retval == 0) {
@@ -1502,12 +1544,14 @@ static int mt_usb_dts_probe(struct platform_device *pdev)
 		DBG(0, KERN_WARNING "prepare fail\n");
 		return retval;
 	}
+	#endif
 
 	usbmcu_clk = devm_clk_get(&pdev->dev, "usbmcu");
 	if (IS_ERR(usbmcu_clk)) {
 		DBG(0, KERN_WARNING "cannot get usbmcu clock\n");
 		return PTR_ERR(usbmcu_clk);
 	}
+	#ifndef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
 	DBG(0, KERN_WARNING "get usbmcu clock ok, prepare it\n");
 	retval = clk_prepare(usbmcu_clk);
 	if (retval == 0) {
@@ -1516,12 +1560,14 @@ static int mt_usb_dts_probe(struct platform_device *pdev)
 		DBG(0, KERN_WARNING "prepare fail\n");
 		return retval;
 	}
+	#endif
 
 	icusb_clk = devm_clk_get(&pdev->dev, "icusb");
 	if (IS_ERR(icusb_clk)) {
 		DBG(0, KERN_WARNING "cannot get icusb clock\n");
 		return PTR_ERR(icusb_clk);
 	}
+	#ifndef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
 	DBG(0, KERN_WARNING "get icusb clock ok, prepare it\n");
 	retval = clk_prepare(icusb_clk);
 	if (retval == 0) {
@@ -1530,6 +1576,7 @@ static int mt_usb_dts_probe(struct platform_device *pdev)
 		DBG(0, KERN_WARNING "prepare fail\n");
 		return retval;
 	}
+	#endif
 #endif
 	DBG(0, "[U2]usb20 dts probe\n");
 	mt_usb_device.dev.of_node = pdev->dev.of_node;
