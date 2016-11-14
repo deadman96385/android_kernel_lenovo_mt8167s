@@ -71,6 +71,6 @@ extern void __iomem *auxadc_efuse_base;
 
 #define AUXADC_CON_RTP			(APMIXED_BASE + 0x0404)
 #define AUXADC_TS_X_BUFFER		(APMIXED_BASE + 0x0600)
-#define AUXADC_CLK_CTR
+#define AUXADC_SPM
 #endif   /*_MTK_ADC_HW_H*/
 
