@@ -94,6 +94,11 @@
 #include <mt-plat/mtk_smi.h>
 /*#include <mach/mt_freqhopping.h>*/
 
+#include "tz_cross/trustzone.h"
+#include "tz_cross/ta_mem.h"
+#include "trustzone/kree/system.h"
+#include "trustzone/kree/mem.h"
+
 unsigned int is_hwc_enabled;
 static int is_hwc_update_frame;
 unsigned int gEnableLowPowerFeature;
@@ -2100,6 +2105,101 @@ out:
 	cmdqRecDestroy(cmdq_wait_handle);
 }
 
+static KREE_SESSION_HANDLE secure_memory_session_handle(void)
+{
+	static KREE_SESSION_HANDLE disp_secure_memory_session;
+
+	/* TODO: the race condition here is not taken into consideration. */
+	if (!disp_secure_memory_session) {
+		TZ_RESULT ret;
+
+		ret = KREE_CreateSession(TZ_TA_MEM_UUID, &disp_secure_memory_session);
+		if (ret != TZ_RESULT_SUCCESS) {
+			DISPERR("KREE_CreateSession fail, ret=%d\n", ret);
+			return 0;
+		}
+	}
+	DISPMSG("disp_secure_memory_session_handle() session = %x\n",
+	(unsigned int)disp_secure_memory_session);
+
+	return disp_secure_memory_session;
+}
+
+static KREE_SECUREMEM_HANDLE allocate_decouple_sec_buffer(unsigned int buffer_size)
+{
+	TZ_RESULT ret;
+	KREE_SECUREMEM_HANDLE mem_handle;
+
+	/* allocate secure buffer by tz api */
+	ret = KREE_AllocSecurechunkmemWithTag(secure_memory_session_handle(),
+						&mem_handle, 0, buffer_size, "disp");
+	if (ret != TZ_RESULT_SUCCESS) {
+		DISPERR("KREE_AllocSecurechunkmemWithTag fail, ret = %d\n", ret);
+		return -1;
+	}
+	DISPMSG("KREE_AllocSecurechunkmemWithTag handle = 0x%x\n", mem_handle);
+
+	return mem_handle;
+}
+
+static KREE_SECUREMEM_HANDLE free_decouple_sec_buffer(KREE_SECUREMEM_HANDLE mem_handle)
+{
+	TZ_RESULT ret;
+
+	ret = KREE_UnreferenceSecurechunkmem(secure_memory_session_handle(), mem_handle);
+
+	if (ret != TZ_RESULT_SUCCESS)
+		DISPERR("KREE_UnreferenceSecurechunkmem fail, ret = %d\n", ret);
+
+	DISPMSG("KREE_UnreferenceSecurechunkmem handle = 0x%x\n", mem_handle);
+
+	return ret;
+}
+
+int alloc_sec_buffer(int size)
+{
+	return (int)allocate_decouple_sec_buffer(size);
+}
+
+int free_sec_buffer(unsigned int handle)
+{
+	return (int)free_decouple_sec_buffer(handle);
+}
+
+static int primary_alloc_sec_buffer(void)
+{
+	int i;
+	int height = 1080;
+	int width = 1920;
+	int bpp = 3;
+	int buffer_size = width * height * bpp;
+
+	if (pgc->session_buf[0])
+		return 0;
+
+	for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
+		pgc->session_buf[i] = alloc_sec_buffer(buffer_size);
+		DISPMSG("primary alloc decouple secure buffer: 0x%x\n", pgc->session_buf[i]);
+	}
+
+	return 0;
+}
+
+static int primary_free_sec_buffer(void)
+{
+	int i = 0;
+
+	if (!pgc->session_buf[0])
+		return 0;
+
+	for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
+		free_sec_buffer(pgc->session_buf[i]);
+		DISPMSG("primary free decouple secure buffer: 0x%x\n", pgc->session_buf[i]);
+		pgc->session_buf[i] = 0;
+	}
+
+	return 0;
+}
 
 static unsigned int _get_switch_dc_buffer(void)
 {
@@ -6954,6 +7054,11 @@ int primary_display_config_input_multiple(struct disp_session_input_config *sess
 		cmdq_handle = pgc->cmdq_handle_config;
 	}
 
+	if (primary_display_is_secure_path(DISP_SESSION_PRIMARY))
+		primary_alloc_sec_buffer();
+	else
+		primary_free_sec_buffer();
+
 	if (_should_config_ovl_input())
 		_config_ovl_input(session_input, disp_handle, cmdq_handle);
 	else
@@ -7675,17 +7780,9 @@ int primary_display_force_set_vsync_fps(unsigned int fps)
 	return ret;
 }
 
+/* not use, driver alloc secure buffer */
 int primary_display_insert_session_buf(struct disp_session_buf_info *session_buf_info)
 {
-	int i = 0;
-	unsigned int *session_buf;
-
-	session_buf = pgc->session_buf;
-	pgc->session_buf_id = 0;
-	for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
-		session_buf[i] = session_buf_info->buf_hnd[i];
-		DISPMSG("%s buf_hnd[%d] = 0x%x\n", __func__, i, session_buf_info->buf_hnd[i]);
-	}
 	return 0;
 }
 

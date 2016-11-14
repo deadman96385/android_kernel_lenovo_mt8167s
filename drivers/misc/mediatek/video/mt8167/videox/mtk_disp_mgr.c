@@ -1478,11 +1478,12 @@ static int set_primary_buffer(struct disp_session_input_config *input)
 
 int _ioctl_set_input_buffer(unsigned long arg)
 {
-	int ret = 0;
+	int ret = 0, i;
 	void __user *argp = (void __user *)arg;
 	unsigned int session_id = 0;
 	struct disp_session_input_config *session_input;
 	struct disp_session_sync_info *session_info;
+	static long int secure_handle;
 
 	session_input = kmalloc(sizeof(*session_input), GFP_KERNEL);
 	if (!session_input)
@@ -1498,6 +1499,22 @@ int _ioctl_set_input_buffer(unsigned long arg)
 
 	if (session_info)
 		dprec_start(&session_info->event_setinput, 0, session_input->config_layer_num);
+
+	if (force_sec) {
+		for (i = 0; i < session_input->config_layer_num; i++) {
+			if (session_input->config[i].layer_id == 0) {
+				session_input->config[i].security = DISP_SECURE_BUFFER;
+				if (secure_handle == 0)
+					secure_handle = alloc_sec_buffer(1920*1080*4);
+				session_input->config[i].src_phy_addr = (void *)secure_handle;
+			}
+		}
+	} else {
+		if (secure_handle) {
+			free_sec_buffer(secure_handle);
+			secure_handle = 0;
+		}
+	}
 
 	DISPPR_FENCE("S+/%s%d/count%d\n", disp_session_mode_spy(session_id),
 		     DISP_SESSION_DEV(session_id), session_input->config_layer_num);

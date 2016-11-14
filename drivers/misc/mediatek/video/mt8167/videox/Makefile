@@ -33,6 +33,7 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/include/     \
              -I$(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)/include/mach/ \
              -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM) \
              -I$(srctree)/drivers/misc/mediatek/smi/ \
+			 -I$(srctree)/drivers/misc/mediatek/include/mt-plat/trustzone  \
              -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
 
 ccflags-$(CONFIG_MTK_LCM) += -I$(srctree)/drivers/misc/mediatek/lcm/inc
