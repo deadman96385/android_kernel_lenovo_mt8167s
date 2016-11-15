@@ -28,6 +28,10 @@
 #include "mt6392-codec.h"
 #endif
 
+#define HP_CALI_ITEMS    (HP_CALI_NUMS * HP_PGA_GAIN_NUMS)
+#define HP_DC_OFFSET_MAX (100)
+#define HP_DC_OFFSET_MIN (-100)
+
 enum regmap_module_id {
 	REGMAP_AFE = 0,
 	REGMAP_APMIXEDSYS,
@@ -56,10 +60,10 @@ struct mt8167_codec_priv {
 	struct snd_soc_codec *codec;
 	struct regmap *regmap;
 	struct regmap *regmap_modules[REGMAP_NUMS];
-	uint32_t lch_dccomp_val; /* L-ch DC compensation value */
-	uint32_t rch_dccomp_val; /* R-ch DC compensation value */
-	int32_t lch_dc_offset; /* L-ch DC offset value */
-	int32_t rch_dc_offset; /* R-ch DC offset value */
+	uint32_t lch_dccomp_val[HP_CALI_NUMS][HP_PGA_GAIN_NUMS];
+	uint32_t rch_dccomp_val[HP_CALI_NUMS][HP_PGA_GAIN_NUMS];
+	long lch_dc_offset[HP_CALI_NUMS][HP_PGA_GAIN_NUMS];
+	long rch_dc_offset[HP_CALI_NUMS][HP_PGA_GAIN_NUMS];
 	bool is_lch_dc_calibrated;
 	bool is_rch_dc_calibrated;
 	uint32_t pga_gain[PGA_GAIN_MAX];
@@ -67,25 +71,19 @@ struct mt8167_codec_priv {
 	uint32_t loopback_type;
 	bool dl_en;
 	struct clk *clk;
+#ifdef TIMESTAMP_INFO
+	uint64_t latency_cali_ldac_to_op;
+	uint64_t latency_cali_rdac_to_op;
+	uint64_t stamp_ldac_on;
+	uint64_t stamp_rdac_on;
+	uint64_t stamp_op_on;
+#endif
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs;
 #endif
 };
 
 #define MT8167_CODEC_NAME "mt8167-codec"
-
-static int mt8167_codec_startup(struct snd_pcm_substream *substream,
-			struct snd_soc_dai *codec_dai)
-{
-	dev_dbg(codec_dai->codec->dev, "%s\n", __func__);
-	return 0;
-}
-
-static void mt8167_codec_shutdown(struct snd_pcm_substream *substream,
-			struct snd_soc_dai *codec_dai)
-{
-	dev_dbg(codec_dai->codec->dev, "%s\n", __func__);
-}
 
 struct mt8167_codec_rate {
 	unsigned int rate;
@@ -201,39 +199,17 @@ static int mt8167_codec_setup_dl_rate(struct snd_soc_dai *codec_dai, int rate)
 	return 0;
 }
 
-static int mt8167_codec_valid_new_dc_comp(
-			struct mt8167_codec_priv *codec_data)
-{
-	/* toggle DC status */
-	if (snd_soc_read(codec_data->codec, ABB_AFE_CON11) &
-			ABB_AFE_CON11_DC_CTRL_STATUS)
-		snd_soc_update_bits(codec_data->codec,
-			ABB_AFE_CON11,
-			ABB_AFE_CON11_DC_CTRL, 0);
-	else
-		snd_soc_update_bits(codec_data->codec,
-			ABB_AFE_CON11,
-			ABB_AFE_CON11_DC_CTRL, ABB_AFE_CON11_DC_CTRL);
-
-	return 0;
-}
-
 static void mt8167_codec_setup_dc_comp(struct snd_soc_dai *codec_dai)
 {
-	struct mt8167_codec_priv *codec_data =
-			snd_soc_codec_get_drvdata(codec_dai->codec);
+	struct snd_soc_codec *codec = codec_dai->codec;
 
 	/*  L-ch DC compensation value */
-	snd_soc_update_bits(codec_data->codec,
-			ABB_AFE_CON3, GENMASK(15, 0),
-			codec_data->lch_dccomp_val);
+	snd_soc_update_bits(codec, ABB_AFE_CON3, GENMASK(15, 0), 0);
 	/*  R-ch DC compensation value */
-	snd_soc_update_bits(codec_data->codec,
-			ABB_AFE_CON4, GENMASK(15, 0),
-			codec_data->rch_dccomp_val);
+	snd_soc_update_bits(codec, ABB_AFE_CON4, GENMASK(15, 0), 0);
 	/* DC compensation enable */
-	snd_soc_update_bits(codec_data->codec, ABB_AFE_CON10, 0x1, 0x1);
-	mt8167_codec_valid_new_dc_comp(codec_data);
+	snd_soc_update_bits(codec, ABB_AFE_CON10, 0x1, 0x1);
+	mt8167_codec_valid_new_dc_comp(codec);
 }
 
 static int mt8167_codec_hw_params(struct snd_pcm_substream *substream,
@@ -257,72 +233,8 @@ static int mt8167_codec_hw_params(struct snd_pcm_substream *substream,
 	return ret;
 }
 
-static int mt8167_codec_hw_free(struct snd_pcm_substream *substream,
-			struct snd_soc_dai *codec_dai)
-{
-	dev_dbg(codec_dai->codec->dev, "%s\n", __func__);
-	return 0;
-}
-
-static int mt8167_codec_prepare(struct snd_pcm_substream *substream,
-			struct snd_soc_dai *codec_dai)
-{
-	dev_dbg(codec_dai->codec->dev, "%s\n", __func__);
-	return 0;
-}
-
-static int mt8167_codec_dl_ul_enable(struct snd_pcm_substream *substream,
-		struct snd_soc_dai *codec_dai)
-{
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		snd_soc_update_bits(codec_dai->codec,
-			ABB_AFE_CON0, BIT(1), BIT(1));
-	else if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		snd_soc_update_bits(codec_dai->codec,
-			ABB_AFE_CON0, BIT(0), BIT(0));
-
-	return 0;
-}
-
-static int mt8167_codec_dl_ul_disable(struct snd_pcm_substream *substream,
-		struct snd_soc_dai *codec_dai)
-{
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		snd_soc_update_bits(codec_dai->codec,
-			ABB_AFE_CON0, BIT(1), 0x0);
-	else if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		snd_soc_update_bits(codec_dai->codec,
-			ABB_AFE_CON0, BIT(0), 0x0);
-
-	return 0;
-}
-
-static int mt8167_codec_trigger(struct snd_pcm_substream *substream,
-			int command,
-			struct snd_soc_dai *codec_dai)
-{
-	switch (command) {
-	case SNDRV_PCM_TRIGGER_START:
-	case SNDRV_PCM_TRIGGER_RESUME:
-		mt8167_codec_dl_ul_enable(substream, codec_dai);
-		break;
-	case SNDRV_PCM_TRIGGER_STOP:
-	case SNDRV_PCM_TRIGGER_SUSPEND:
-		mt8167_codec_dl_ul_disable(substream, codec_dai);
-		break;
-	}
-	dev_dbg(codec_dai->codec->dev, "%s command = %d\n ",
-			__func__, command);
-	return 0;
-}
-
 static const struct snd_soc_dai_ops mt8167_codec_aif_dai_ops = {
-	.startup = mt8167_codec_startup,
-	.shutdown = mt8167_codec_shutdown,
 	.hw_params = mt8167_codec_hw_params,
-	.hw_free = mt8167_codec_hw_free,
-	.prepare = mt8167_codec_prepare,
-	.trigger = mt8167_codec_trigger,
 };
 
 #define MT8167_CODEC_DL_RATES SNDRV_PCM_RATE_8000_48000
@@ -348,6 +260,7 @@ static struct snd_soc_dai_driver mt8167_codec_dai = {
 	},
 };
 
+/* DMIC */
 static int mt8167_codec_dmic_event(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
@@ -389,13 +302,147 @@ static int mt8167_codec_dmic_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
-static int mt8167_codec_left_audio_amp_event(struct snd_soc_dapm_widget *w,
+/* AIF TX */
+static int mt8167_codec_aif_tx_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+
+	dev_dbg(codec->dev, "%s, event %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		snd_soc_update_bits(codec, ABB_AFE_CON0, BIT(1), BIT(1));
+		break;
+	case SND_SOC_DAPM_PRE_PMD:
+		snd_soc_update_bits(codec, ABB_AFE_CON0, BIT(1), 0x0);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/* AIF RX */
+static int mt8167_codec_aif_rx_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+
+	dev_dbg(codec->dev, "%s, event %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		snd_soc_update_bits(codec, ABB_AFE_CON0, 0x1, 0x1);
+		break;
+	case SND_SOC_DAPM_PRE_PMD:
+		snd_soc_update_bits(codec, ABB_AFE_CON0, 0x1, 0x0);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/* Left DAC */
+static int mt8167_codec_left_audio_dac_event(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
 	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
 	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
 
-	dev_dbg(codec->dev, "%s, event %d\n", __func__, event);
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		mt8167_codec_update_dc_comp(codec,
+			HP_LEFT,
+			codec_data->lch_dccomp_val[HP_CALI_VCM_TO_DAC][0],
+			codec_data->rch_dccomp_val[HP_CALI_VCM_TO_DAC][0]);
+		break;
+	case SND_SOC_DAPM_POST_PMU:
+#ifdef TIMESTAMP_INFO
+		codec_data->stamp_ldac_on = sched_clock();
+#endif
+		/* ramp down after DAC on */
+		mt8167_codec_dc_offset_ramp(codec_data->codec,
+			HP_CALI_VCM_TO_DAC, HP_LEFT, HP_ON_SEQ,
+			codec_data->lch_dccomp_val,
+			codec_data->rch_dccomp_val,
+			codec_data->pga_gain[HP_L_PGA_GAIN],
+			codec_data->pga_gain[HP_R_PGA_GAIN]);
+		break;
+	case SND_SOC_DAPM_PRE_PMD:
+		/* ramp up before DAC off */
+		mt8167_codec_dc_offset_ramp(codec_data->codec,
+			HP_CALI_VCM_TO_DAC, HP_LEFT, HP_OFF_SEQ,
+			codec_data->lch_dccomp_val,
+			codec_data->rch_dccomp_val,
+			codec_data->pga_gain[HP_L_PGA_GAIN],
+			codec_data->pga_gain[HP_R_PGA_GAIN]);
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		mt8167_codec_update_dc_comp(codec,
+			HP_LEFT, 0, 0);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/* Right DAC */
+static int mt8167_codec_right_audio_dac_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		mt8167_codec_update_dc_comp(codec,
+			HP_RIGHT,
+			codec_data->lch_dccomp_val[HP_CALI_VCM_TO_DAC][0],
+			codec_data->rch_dccomp_val[HP_CALI_VCM_TO_DAC][0]);
+		break;
+	case SND_SOC_DAPM_POST_PMU:
+#ifdef TIMESTAMP_INFO
+		codec_data->stamp_rdac_on = sched_clock();
+#endif
+		/* ramp down after DAC on */
+		mt8167_codec_dc_offset_ramp(codec_data->codec,
+			HP_CALI_VCM_TO_DAC, HP_RIGHT, HP_ON_SEQ,
+			codec_data->lch_dccomp_val,
+			codec_data->rch_dccomp_val,
+			codec_data->pga_gain[HP_L_PGA_GAIN],
+			codec_data->pga_gain[HP_R_PGA_GAIN]);
+		break;
+	case SND_SOC_DAPM_PRE_PMD:
+		/* ramp up before DAC off */
+		mt8167_codec_dc_offset_ramp(codec_data->codec,
+			HP_CALI_VCM_TO_DAC, HP_RIGHT, HP_OFF_SEQ,
+			codec_data->lch_dccomp_val,
+			codec_data->rch_dccomp_val,
+			codec_data->pga_gain[HP_L_PGA_GAIN],
+			codec_data->pga_gain[HP_R_PGA_GAIN]);
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		mt8167_codec_update_dc_comp(codec,
+			HP_RIGHT, 0, 0);
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/* Left Audio Amp */
+static int mt8167_codec_left_audio_amp_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
@@ -406,19 +453,6 @@ static int mt8167_codec_left_audio_amp_event(struct snd_soc_dapm_widget *w,
 		/* set to small gain for depop sequence */
 		snd_soc_update_bits(codec,
 			AUDIO_CODEC_CON01, GENMASK(2, 0), 0x0);
-		/* disable input short (left audio amp only) */
-		snd_soc_update_bits(codec, AUDIO_CODEC_CON02,
-			AUDIO_CODEC_CON02_ABUF_INSHORT, 0x0);
-		break;
-	case SND_SOC_DAPM_POST_PMD:
-		/* enable input short to prevent signal leakage from L-DAC */
-		snd_soc_update_bits(codec, AUDIO_CODEC_CON02,
-			AUDIO_CODEC_CON02_ABUF_INSHORT,
-			AUDIO_CODEC_CON02_ABUF_INSHORT);
-		/* restore gain */
-		snd_soc_update_bits(codec, AUDIO_CODEC_CON01,
-				GENMASK(2, 0),
-				codec_data->pga_gain[HP_L_PGA_GAIN]);
 		break;
 	default:
 		break;
@@ -427,13 +461,12 @@ static int mt8167_codec_left_audio_amp_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+/* Right Audio Amp */
 static int mt8167_codec_right_audio_amp_event(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
 	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
 	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
-
-	dev_dbg(codec->dev, "%s, event %d\n", __func__, event);
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
@@ -445,12 +478,6 @@ static int mt8167_codec_right_audio_amp_event(struct snd_soc_dapm_widget *w,
 		snd_soc_update_bits(codec,
 			AUDIO_CODEC_CON01, GENMASK(5, 3), 0x0);
 		break;
-	case SND_SOC_DAPM_POST_PMD:
-		/* restore gain */
-		snd_soc_update_bits(codec,
-			AUDIO_CODEC_CON01, GENMASK(5, 3),
-			(codec_data->pga_gain[HP_R_PGA_GAIN]) << 3);
-		break;
 	default:
 		break;
 	}
@@ -458,13 +485,12 @@ static int mt8167_codec_right_audio_amp_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+/* Voice Amp */
 static int mt8167_codec_voice_amp_event(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
 	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
 	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
-
-	dev_dbg(codec->dev, "%s, event %d\n", __func__, event);
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
@@ -477,7 +503,7 @@ static int mt8167_codec_voice_amp_event(struct snd_soc_dapm_widget *w,
 			AUDIO_CODEC_CON02, GENMASK(12, 9), 0x0);
 		break;
 	case SND_SOC_DAPM_POST_PMU:
-		/* restore gain (fade in ?) */
+		/* restore gain */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON02,
 			GENMASK(12, 9),
 			(codec_data->pga_gain[LOUT_PGA_GAIN]) << 9);
@@ -487,7 +513,7 @@ static int mt8167_codec_voice_amp_event(struct snd_soc_dapm_widget *w,
 		codec_data->pga_gain[LOUT_PGA_GAIN] =
 			(snd_soc_read(codec, AUDIO_CODEC_CON02) &
 				GENMASK(12, 9)) >> 9;
-		/* set to small gain for depop sequence (fade out ?) */
+		/* set to small gain for depop sequence */
 		snd_soc_update_bits(codec,
 				AUDIO_CODEC_CON02, GENMASK(12, 9), 0x0);
 		break;
@@ -643,43 +669,52 @@ static void mt8167_codec_hp_depop_cleanup(
 static void mt8167_codec_hp_depop_enable(
 			struct mt8167_codec_priv *codec_data)
 {
-	/* store gain */
-	codec_data->pga_gain[HP_L_PGA_GAIN] =
-		snd_soc_read(codec_data->codec, AUDIO_CODEC_CON01) &
-			GENMASK(2, 0);
-	codec_data->pga_gain[HP_R_PGA_GAIN] =
-		(snd_soc_read(codec_data->codec, AUDIO_CODEC_CON01) &
-			GENMASK(5, 3)) >> 3;
-	/* set to small gain for depop sequence */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON01, GENMASK(2, 0), 0x0);
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON01, GENMASK(5, 3), 0x0);
-	/* Reset HP Pre-charge function */
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
-			BIT(28), 0x0);
-	/* Enable the depop mux of HP drivers */
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
-			BIT(25), BIT(25));
 	/* Enable depop VCM gen */
 	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
 			BIT(22), BIT(22));
+	/* Enable the depop mux of HP drivers */
+	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
+			BIT(25), BIT(25));
+
+	/* ramp down before OP off */
+	mt8167_codec_dc_offset_ramp(codec_data->codec,
+		HP_CALI_OP_TO_VCM, HP_LEFT_RIGHT, HP_OFF_SEQ,
+		codec_data->lch_dccomp_val,
+		codec_data->rch_dccomp_val,
+		codec_data->pga_gain[HP_L_PGA_GAIN],
+		codec_data->pga_gain[HP_R_PGA_GAIN]);
+
+	/* Reset HP Pre-charge function */
+	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
+			BIT(28), 0x0);
 }
 
 /* POST_PMU */
 static void mt8167_codec_hp_depop_disable(
 			struct mt8167_codec_priv *codec_data)
 {
-	/* HP Pre-charge function release */
-	usleep_range(10000, 11000);
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
-			BIT(28), BIT(28));
-	/* Disable the depop mux of HP drivers */
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
-			BIT(25), 0x0);
-	/* Disable the depop VCM gen */
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
-			BIT(22), 0x0);
+#ifdef TIMESTAMP_INFO
+	uint64_t latency_ldac_to_op = 0;
+	uint64_t latency_rdac_to_op = 0;
+
+	codec_data->stamp_op_on = sched_clock();
+
+	latency_ldac_to_op =
+		codec_data->stamp_op_on - codec_data->stamp_ldac_on;
+
+	latency_rdac_to_op =
+		codec_data->stamp_op_on - codec_data->stamp_rdac_on;
+
+	dev_dbg(codec_data->codec->dev,
+		"latency_ldac_to_op %llu us, latency_rdac_to_op %llu us\n",
+		latency_ldac_to_op/1000, latency_rdac_to_op/1000);
+
+	dev_dbg(codec_data->codec->dev,
+		"latency_cali_ldac_to_op %llu us, latency_cali_rdac_to_op %llu us\n",
+		codec_data->latency_cali_ldac_to_op/1000,
+		codec_data->latency_cali_rdac_to_op/1000);
+#endif
+
 	/* restore gain */
 	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON01,
 			GENMASK(2, 0),
@@ -687,8 +722,28 @@ static void mt8167_codec_hp_depop_disable(
 	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON01,
 			GENMASK(5, 3),
 			(codec_data->pga_gain[HP_R_PGA_GAIN]) << 3);
+
+	/* HP Pre-charge function release */
+	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
+			BIT(28), BIT(28));
+
+	/* ramp up after OP on */
+	mt8167_codec_dc_offset_ramp(codec_data->codec,
+		HP_CALI_OP_TO_VCM, HP_LEFT_RIGHT, HP_ON_SEQ,
+		codec_data->lch_dccomp_val,
+		codec_data->rch_dccomp_val,
+		codec_data->pga_gain[HP_L_PGA_GAIN],
+		codec_data->pga_gain[HP_R_PGA_GAIN]);
+
+	/* Disable the depop mux of HP drivers */
+	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
+			BIT(25), 0x0);
+	/* Disable the depop VCM gen */
+	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
+			BIT(22), 0x0);
 }
 
+/* HP Depop VCM */
 static int mt8167_codec_depop_vcm_event(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
@@ -991,78 +1046,6 @@ static int mt8167_codec_pga_gain_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-/* HPL Calibration */
-static int mt8167_codec_hpl_dc_comp_get(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct mt8167_codec_priv *codec_data =
-			snd_soc_component_get_drvdata(component);
-
-	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
-
-	if (!codec_data->is_lch_dc_calibrated) {
-		mt8167_codec_get_hpl_cali_val(codec_data->codec,
-			&codec_data->lch_dccomp_val,
-			&codec_data->lch_dc_offset);
-		codec_data->is_lch_dc_calibrated = true;
-	}
-	ucontrol->value.integer.value[0] = codec_data->lch_dc_offset;
-	return 0;
-}
-
-static int mt8167_codec_hpl_dc_comp_put(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct mt8167_codec_priv *codec_data =
-			snd_soc_component_get_drvdata(component);
-
-	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
-
-	codec_data->lch_dc_offset = ucontrol->value.integer.value[0];
-	codec_data->lch_dccomp_val =
-		mt8167_codec_conv_dc_offset_to_comp_val(
-			codec_data->lch_dc_offset);
-	return 0;
-}
-
-/* HPR Calibration */
-static int mt8167_codec_hpr_dc_comp_get(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct mt8167_codec_priv *codec_data =
-			snd_soc_component_get_drvdata(component);
-
-	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
-	if (!codec_data->is_rch_dc_calibrated) {
-		mt8167_codec_get_hpr_cali_val(codec_data->codec,
-			&codec_data->rch_dccomp_val,
-			&codec_data->rch_dc_offset);
-		codec_data->is_rch_dc_calibrated = true;
-	}
-	ucontrol->value.integer.value[0] = codec_data->rch_dc_offset;
-	return 0;
-}
-
-static int mt8167_codec_hpr_dc_comp_put(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
-	struct mt8167_codec_priv *codec_data =
-			snd_soc_component_get_drvdata(component);
-
-	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
-
-	codec_data->rch_dc_offset = ucontrol->value.integer.value[0];
-	codec_data->rch_dccomp_val =
-		mt8167_codec_conv_dc_offset_to_comp_val(
-			codec_data->rch_dc_offset);
-
-	return 0;
-}
-
 /* UL to DL loopback (Codec_Loopback_Select) */
 #define ENUM_TO_STR(enum) #enum
 static const char * const mt8167_codec_loopback_text[] = {
@@ -1166,6 +1149,99 @@ static int mt8167_codec_dl_switch_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+/* HP DC Offsets */
+static int mt8167_codec_hp_dc_offsets_info(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = HP_CALI_ITEMS * 2;
+	uinfo->value.integer.min = HP_DC_OFFSET_MIN;
+	uinfo->value.integer.max = HP_DC_OFFSET_MAX;
+	return 0;
+}
+
+static int mt8167_codec_hp_dc_offsets_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+		snd_soc_component_get_drvdata(component);
+	long *lch_dc_offsets = (long *) codec_data->lch_dc_offset;
+	long *rch_dc_offsets = (long *) codec_data->rch_dc_offset;
+
+	/* left channel calibration */
+	if (!codec_data->is_lch_dc_calibrated) {
+#ifdef TIMESTAMP_INFO
+		codec_data->latency_cali_ldac_to_op =
+#endif
+		mt8167_codec_get_hp_cali_comp_val(codec_data->codec,
+			codec_data->lch_dccomp_val,
+			codec_data->lch_dc_offset,
+			HP_LEFT);
+
+		codec_data->is_lch_dc_calibrated = true;
+	}
+
+	/* right channel calibration */
+	if (!codec_data->is_rch_dc_calibrated) {
+#ifdef TIMESTAMP_INFO
+		codec_data->latency_cali_rdac_to_op =
+#endif
+		mt8167_codec_get_hp_cali_comp_val(codec_data->codec,
+			codec_data->rch_dccomp_val,
+			codec_data->rch_dc_offset,
+			HP_RIGHT);
+
+		codec_data->is_rch_dc_calibrated = true;
+	}
+
+	/* left channel */
+	memcpy(ucontrol->value.integer.value,
+		lch_dc_offsets,
+		HP_CALI_ITEMS * sizeof(long));
+
+	/* right channel */
+	memcpy(ucontrol->value.integer.value + HP_CALI_ITEMS,
+		rch_dc_offsets,
+		HP_CALI_ITEMS * sizeof(long));
+
+	return 0;
+}
+
+static int mt8167_codec_hp_dc_offsets_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+		snd_soc_component_get_drvdata(component);
+	long *lch_dc_offsets = (long *) codec_data->lch_dc_offset;
+	long *rch_dc_offsets = (long *) codec_data->rch_dc_offset;
+
+	/* left channel */
+	memcpy(lch_dc_offsets,
+		ucontrol->value.integer.value,
+		HP_CALI_ITEMS * sizeof(long));
+	mt8167_codec_gather_comp_val(codec_data->codec,
+		codec_data->lch_dccomp_val, codec_data->lch_dc_offset);
+
+	/* right channel */
+	memcpy(rch_dc_offsets,
+		ucontrol->value.integer.value + HP_CALI_ITEMS,
+		HP_CALI_ITEMS * sizeof(long));
+	mt8167_codec_gather_comp_val(codec_data->codec,
+		codec_data->rch_dccomp_val, codec_data->rch_dc_offset);
+
+	return 0;
+}
+
+#define MT8167_CODEC_CONTROL(xname, xhandler_info, xhandler_get, xhandler_put)\
+{\
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = (xname),\
+	.info = xhandler_info,\
+	.get = xhandler_get,\
+	.put = xhandler_put,\
+}
+
 static const struct snd_kcontrol_new mt8167_codec_controls[] = {
 	/* DL Audio amplifier gain adjustment */
 	SOC_DOUBLE_TLV("Audio Amp Playback Volume",
@@ -1204,15 +1280,6 @@ static const struct snd_kcontrol_new mt8167_codec_controls[] = {
 		mt8167_codec_pga_gain_enums[UL_R_PGA_GAIN],
 		mt8167_codec_pga_gain_get,
 		mt8167_codec_pga_gain_put),
-	/* HP calibration */
-	SOC_SINGLE_EXT("Audio HPL Offset",
-		SND_SOC_NOPM, 0, 0x8000, 0,
-		mt8167_codec_hpl_dc_comp_get,
-		mt8167_codec_hpl_dc_comp_put),
-	SOC_SINGLE_EXT("Audio HPR Offset",
-		SND_SOC_NOPM, 0, 0x8000, 0,
-		mt8167_codec_hpr_dc_comp_get,
-		mt8167_codec_hpr_dc_comp_put),
 	/* UL to DL loopback */
 	SOC_ENUM_EXT("Codec_Loopback_Select",
 		mt8167_codec_loopback_enum,
@@ -1223,6 +1290,11 @@ static const struct snd_kcontrol_new mt8167_codec_controls[] = {
 		mt8167_codec_dl_switch_enum,
 		mt8167_codec_dl_switch_get,
 		mt8167_codec_dl_switch_put),
+	/* HP DC Offsets */
+	MT8167_CODEC_CONTROL("HP DC Offsets",
+		mt8167_codec_hp_dc_offsets_info,
+		mt8167_codec_hp_dc_offsets_get,
+		mt8167_codec_hp_dc_offsets_put),
 };
 
 /* Left PGA Mux/Right PGA Mux */
@@ -1295,12 +1367,26 @@ static const struct snd_kcontrol_new mt8167_codec_sdm_tone_gen_ctrl =
 
 static const struct snd_soc_dapm_widget mt8167_codec_dapm_widgets[] = {
 	/* stream domain */
-	SND_SOC_DAPM_AIF_OUT("AIF TX", "Capture", 0, SND_SOC_NOPM, 0, 0),
-	SND_SOC_DAPM_AIF_IN("AIF RX", "Playback", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_OUT_E("AIF TX", "Capture", 0, SND_SOC_NOPM, 0, 0,
+			mt8167_codec_aif_tx_event,
+			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+	SND_SOC_DAPM_AIF_IN_E("AIF RX", "Playback", 0, SND_SOC_NOPM, 0, 0,
+			mt8167_codec_aif_rx_event,
+			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
 	SND_SOC_DAPM_ADC("Left ADC", NULL, AUDIO_CODEC_CON00, 23, 0),
 	SND_SOC_DAPM_ADC("Right ADC", NULL, AUDIO_CODEC_CON00, 5, 0),
-	SND_SOC_DAPM_DAC("Left DAC", NULL, AUDIO_CODEC_CON01, 15, 0),
-	SND_SOC_DAPM_DAC("Right DAC", NULL, AUDIO_CODEC_CON01, 14, 0),
+	SND_SOC_DAPM_DAC_E("Left DAC", NULL, AUDIO_CODEC_CON01, 15, 0,
+			mt8167_codec_left_audio_dac_event,
+			SND_SOC_DAPM_PRE_PMU |
+			SND_SOC_DAPM_POST_PMU |
+			SND_SOC_DAPM_PRE_PMD |
+			SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_DAC_E("Right DAC", NULL, AUDIO_CODEC_CON01, 14, 0,
+			mt8167_codec_right_audio_dac_event,
+			SND_SOC_DAPM_PRE_PMU |
+			SND_SOC_DAPM_POST_PMU |
+			SND_SOC_DAPM_PRE_PMD |
+			SND_SOC_DAPM_POST_PMD),
 
 	/* path domain */
 	SND_SOC_DAPM_MUX("Left PGA Mux", SND_SOC_NOPM, 0, 0,
@@ -1319,11 +1405,11 @@ static const struct snd_soc_dapm_widget mt8167_codec_dapm_widgets[] = {
 	SND_SOC_DAPM_PGA_S("Left Audio Amp", 1,
 			AUDIO_CODEC_CON01, 12, 0,
 			mt8167_codec_left_audio_amp_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_PRE_PMU),
 	SND_SOC_DAPM_PGA_S("Right Audio Amp", 1,
 			AUDIO_CODEC_CON01, 11, 0,
 			mt8167_codec_right_audio_amp_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_PRE_PMU),
 	SND_SOC_DAPM_PGA_S("HP Depop VCM", 2, SND_SOC_NOPM, 0, 0,
 		mt8167_codec_depop_vcm_event,
 		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
@@ -1507,11 +1593,9 @@ static int afe_reg_read(void *context, unsigned int reg, unsigned int *val)
 	if (!(codec_data && codec_data->regmap_modules[REGMAP_AFE]))
 		return -1;
 
-	dev_dbg(codec_data->codec->dev, "%s reg 0x%x\n",
-		__func__, reg);
-
 	ret = regmap_read(codec_data->regmap_modules[REGMAP_AFE],
 			(reg & (~AFE_OFFSET)), val);
+
 	return ret;
 }
 
@@ -1524,11 +1608,9 @@ static int afe_reg_write(void *context, unsigned int reg, unsigned int val)
 	if (!(codec_data && codec_data->regmap_modules[REGMAP_AFE]))
 		return -1;
 
-	dev_dbg(codec_data->codec->dev, "%s reg 0x%x, val 0x%x\n",
-		__func__, reg, val);
-
 	ret = regmap_write(codec_data->regmap_modules[REGMAP_AFE],
 			(reg & (~AFE_OFFSET)), val);
+
 	return ret;
 }
 
@@ -1549,8 +1631,10 @@ static int apmixedsys_reg_read(void *context,
 
 	if (!(codec_data && codec_data->regmap_modules[REGMAP_APMIXEDSYS]))
 		return -1;
+
 	ret = regmap_read(codec_data->regmap_modules[REGMAP_APMIXEDSYS],
 			(reg & (~APMIXED_OFFSET)), val);
+
 	return ret;
 }
 
@@ -1563,8 +1647,10 @@ static int apmixedsys_reg_write(void *context,
 
 	if (!(codec_data && codec_data->regmap_modules[REGMAP_APMIXEDSYS]))
 		return -1;
+
 	ret = regmap_write(codec_data->regmap_modules[REGMAP_APMIXEDSYS],
 			(reg & (~APMIXED_OFFSET)), val);
+
 	return ret;
 }
 
@@ -1587,11 +1673,9 @@ static int pwrap_reg_read(void *context,
 	if (!(codec_data && codec_data->regmap_modules[REGMAP_PWRAP]))
 		return -1;
 
-	dev_dbg(codec_data->codec->dev, "%s reg 0x%x\n",
-		__func__, reg);
-
 	ret = regmap_read(codec_data->regmap_modules[REGMAP_PWRAP],
 			(reg & (~PMIC_OFFSET)), val);
+
 	return ret;
 }
 
@@ -1605,11 +1689,9 @@ static int pwrap_reg_write(void *context,
 	if (!(codec_data && codec_data->regmap_modules[REGMAP_PWRAP]))
 		return -1;
 
-	dev_dbg(codec_data->codec->dev, "%s reg 0x%x, val 0x%x\n",
-		__func__, reg, val);
-
 	ret = regmap_write(codec_data->regmap_modules[REGMAP_PWRAP],
 			(reg & (~PMIC_OFFSET)), val);
+
 	return ret;
 }
 
@@ -1849,7 +1931,7 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 	int ret = 0;
 	int i;
 
-	for (i = 0 ; i < REGMAP_NUMS ; i++) {
+	for (i = 0; i < REGMAP_NUMS; i++) {
 		codec_data->regmap_modules[i] = mt8167_codec_get_regmap_from_dt(
 				modules_dt_regmap_str[i],
 				codec_data);
@@ -1943,34 +2025,11 @@ static int mt8167_codec_resume(struct snd_soc_codec *codec)
 	return clk_prepare_enable(codec_data->clk);
 }
 
-static int mt8167_codec_set_bias_level(struct snd_soc_codec *codec,
-			enum snd_soc_bias_level level)
-{
-	dev_dbg(codec->dev, "%s curr bias_level %d, set bias_level: %d\n",
-		__func__, snd_soc_codec_get_bias_level(codec), level);
-
-	switch (snd_soc_codec_get_bias_level(codec)) {
-	case SND_SOC_BIAS_OFF:
-		break;
-	case SND_SOC_BIAS_STANDBY:
-		break;
-	case SND_SOC_BIAS_PREPARE:
-		break;
-	case SND_SOC_BIAS_ON:
-		break;
-	default:
-		break;
-	}
-
-	return 0;
-}
-
 static struct snd_soc_codec_driver mt8167_codec_driver = {
 	.probe = mt8167_codec_probe,
 	.remove = mt8167_codec_remove,
 	.suspend = mt8167_codec_suspend,
 	.resume = mt8167_codec_resume,
-	.set_bias_level = mt8167_codec_set_bias_level,
 	.controls = mt8167_codec_controls,
 	.num_controls = ARRAY_SIZE(mt8167_codec_controls),
 	.dapm_widgets = mt8167_codec_dapm_widgets,

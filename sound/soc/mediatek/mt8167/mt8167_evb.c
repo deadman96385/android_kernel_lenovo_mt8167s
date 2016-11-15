@@ -238,6 +238,14 @@ static const struct snd_soc_dapm_route mt8167_evb_audio_map[] = {
 	/* use external spk amp via AU_LOL */
 	{"LINEOUT Ext Amp", "Switch", "AU_LOL"},
 	{"Ext Spk Amp", NULL, "LINEOUT Ext Amp"},
+
+	/* ADDA clock - Uplink */
+	{"AIF TX", NULL, "AFE_CLK"},
+	{"AIF TX", NULL, "AD_CLK"},
+
+	/* ADDA clock - Downlink */
+	{"AIF RX", NULL, "AFE_CLK"},
+	{"AIF RX", NULL, "DA_CLK"},
 };
 
 /* Digital audio interface glue - connects codec <---> CPU */

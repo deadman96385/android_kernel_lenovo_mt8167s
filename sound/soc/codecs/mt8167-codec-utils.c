@@ -25,6 +25,116 @@
 #include "mtk_auxadc.h"
 #endif
 
+/*
+ * dc compensation value = dc offset (mV) * SDM gain / (Vout / 2)
+ *
+ * Vout = DAC output swing * Gbuf
+ * Vdac = DAC output swing = 2 * 1.7 * 0.8 * Gsdm
+ *
+ * Gbuf    : -2 dB -> 10^(-2/20) = 0.79433
+ * Gbuf    :  0 dB -> 10^( 0/20) = 1.00000
+ * Gbuf    :  2 dB -> 10^( 2/20) = 1.25892
+ * Gbuf    :  4 dB -> 10^( 4/20) = 1.58489
+ * Gbuf    :  6 dB -> 10^( 6/20) = 1.99526
+ * Gbuf    :  8 dB -> 10^( 8/20) = 2.51188
+ * Gbuf    : 10 dB -> 10^(10/20) = 3.16227
+ * Gbuf    : 12 dB -> 10^(12/20) = 3.98107
+ *
+ * SDM gain: 16 bits (1 sign bit & 15 bits for 32768 steps)
+ * Gsdm    : 0x28/0x40
+ *
+ * DAC path (Vdac):
+ *   dc compensation value = dc offset * 32768 / (0.85) / 1000
+ *                         = dc_offset * 38.55
+ * Total path (Vout):
+ * (Gbuf: -2 dB)
+ *   dc compensation value = dc offset * 32768 / (0.6751805) / 1000
+ *                         = dc_offset * 48.53
+ *
+ * (Gbuf: 0 dB)
+ *   dc compensation value = dc offset * 32768 / (0.85) / 1000
+ *                         = dc_offset * 38.55
+ *
+ * (Gbuf: 2 dB)
+ *   dc compensation value = dc offset * 32768 / (1.070082) / 1000
+ *                         = dc_offset * 30.62
+ *
+ * (Gbuf: 4 dB)
+ *   dc compensation value = dc offset * 32768 / (1.3471565) / 1000
+ *                         = dc_offset * 24.32
+ *
+ * (Gbuf: 6 dB)
+ *   dc compensation value = dc offset * 32768 / (1.695971) / 1000
+ *                         = dc_offset * 19.32
+ *
+ * (Gbuf: 8 dB)
+ *   dc compensation value = dc offset * 32768 / (2.135098) / 1000
+ *                         = dc_offset * 15.34
+ *
+ * (Gbuf: 10 dB)
+ *   dc compensation value = dc_offset * 32768 / (2.6879295) / 1000
+ *                         = dc_offset * 12.19
+ *
+ * (Gbuf: 12 dB)
+ *   dc compensation value = dc offset * 32768 / (3.3839095) / 1000
+ *                         = dc_offset * 9.68
+ *
+ */
+
+/*
+ * total path (Vout)
+ * (Gbuf: -2 dB): 100 mV * 48.53
+ * -2dB, dB0, 2dB, 4dB, 6dB, 7dB, 10dB, 12dB
+ */
+static const uint32_t dc_comp_coeff_map[] = {
+	4853, 3855, 3062, 2432, 1932, 1534, 1219, 968,
+};
+
+/* dac path (Vdac): 500 mV * 38.55 */
+#define DC_COMP_COEFF_VDAC (0x4B4B)
+
+/*
+ * ramp step size (dc compensation value)
+ * DAC path (Vdac):
+ *   dc compensation value = dc offset * 38.55
+ *
+ * 10uF, 22uF: 50 mV * 38.55 = 0x787
+ * 33uF, 47uF: 16 mV * 38.55 = 0x282
+ *
+ */
+static const uint16_t ramp_vcm_to_dac_step_size_map[] = {
+	0x787, 0x787, 0x282, 0x282,
+};
+
+/*
+ * ramp time per step for different cap value (us)
+ * 10uF, 22uF: 2000
+ * 33uF, 47uF:  666
+ */
+static const unsigned long ramp_vcm_to_dac_step_time_map[] = {
+	2000, 2000, 666, 666,
+};
+
+/*
+ * total path (Gbuf: -2 dB): 0.08 mV * 48.53 = 4
+ * total path (Gbuf:  0 dB): 0.08 mV * 38.55 = 3
+ * total path (Gbuf:  2 dB): 0.08 mV * 30.62 = 2
+ * total path (Gbuf:  4 dB): 0.08 mV * 24.32 = 2
+ * total path (Gbuf:  6 dB): 0.08 mV * 19.32 = 2
+ * total path (Gbuf:  8 dB): 0.08 mV * 15.34 = 1
+ * total path (Gbuf: 10 dB): 0.08 mV * 12.19 = 1
+ * total path (Gbuf: 12 dB): 0.08 mV *  9.68 = 1
+ */
+static const uint16_t ramp_op_to_vcm_step[] = {
+	4, 3, 2, 2, 2, 1, 1, 1,
+};
+
+/* ramp time per step (us) */
+#define RAMP_OP_TO_VCM_STEP_TIME (75)
+
+/* stable time for dac on or dac off (us) */
+#define DAC_STABLE_TIME (20000)
+
 enum auxadc_channel_id {
 	AUXADC_CH_AU_HPL = 7,
 	AUXADC_CH_AU_HPR,
@@ -142,8 +252,8 @@ static const struct reg_setting mt8167_codec_cali_cleanup_regs[] = {
 	},
 	{ /* ADA_HPRO_TO_AUXADC */
 		.reg = AUDIO_CODEC_CON02,
-		.mask = 0x0,
-		.val = BIT(14),
+		.mask = BIT(14),
+		.val = 0x0,
 	},
 	{
 		.reg = AFE_DAC_CON0,
@@ -182,7 +292,7 @@ static const struct reg_setting mt8167_codec_cali_cleanup_regs[] = {
 	},
 };
 
-static const struct reg_setting mt8167_codec_cali_enable_regs[] = {
+static const struct reg_setting mt8167_codec_cali_enable_vcm_to_dac_regs[] = {
 	{ /* dl_rate (44.1khz) */
 		.reg = ABB_AFE_CON1,
 		.mask = GENMASK(3, 0),
@@ -233,6 +343,19 @@ static const struct reg_setting mt8167_codec_cali_enable_regs[] = {
 		.mask = BIT(15) | BIT(14) | BIT(13) | BIT(12) | BIT(11),
 		.val = BIT(15) | BIT(14) | BIT(13) | BIT(12) | BIT(11),
 	},
+};
+
+static const struct reg_setting mt8167_codec_cali_enable_dac_to_op_regs[] = {
+	{
+		.reg = AUDIO_CODEC_CON01,
+		.mask = GENMASK(2, 0),
+		.val = 0x0,
+	},
+	{
+		.reg = AUDIO_CODEC_CON01,
+		.mask = GENMASK(5, 3),
+		.val = 0x0,
+	},
 	{
 		.reg = AUDIO_CODEC_CON02,
 		.mask = BIT(28) | BIT(25) | BIT(22),
@@ -266,6 +389,16 @@ static const struct reg_setting mt8167_codec_cali_disable_regs[] = {
 		.mask = BIT(0),
 		.val = 0x0,
 	},
+	{
+		.reg = AUDIO_CODEC_CON01,
+		.mask = GENMASK(2, 0),
+		.val = 0x0,
+	},
+	{
+		.reg = AUDIO_CODEC_CON01,
+		.mask = GENMASK(5, 3),
+		.val = 0x0,
+	},
 };
 
 static int mt8167_codec_apply_reg_setting(struct snd_soc_codec *codec,
@@ -273,7 +406,7 @@ static int mt8167_codec_apply_reg_setting(struct snd_soc_codec *codec,
 {
 	int i;
 
-	for (i = 0 ; i < reg_nums ; i++)
+	for (i = 0; i < reg_nums; i++)
 		snd_soc_update_bits(codec,
 			regs[i].reg, regs[i].mask, regs[i].val);
 
@@ -330,12 +463,22 @@ static int mt8167_codec_cleanup_cali_path(struct snd_soc_codec *codec,
 	return ret;
 }
 
-static int mt8167_codec_enable_cali_path(struct snd_soc_codec *codec)
+static int mt8167_codec_enable_cali_path(struct snd_soc_codec *codec,
+	enum hp_cali_step_id step)
 {
 	/* enable */
-	return mt8167_codec_apply_reg_setting(codec,
-			mt8167_codec_cali_enable_regs,
-			ARRAY_SIZE(mt8167_codec_cali_enable_regs));
+	switch (step) {
+	case HP_CALI_VCM_TO_DAC:
+		return mt8167_codec_apply_reg_setting(codec,
+			mt8167_codec_cali_enable_vcm_to_dac_regs,
+			ARRAY_SIZE(mt8167_codec_cali_enable_vcm_to_dac_regs));
+	case HP_CALI_DAC_TO_OP:
+		return mt8167_codec_apply_reg_setting(codec,
+			mt8167_codec_cali_enable_dac_to_op_regs,
+			ARRAY_SIZE(mt8167_codec_cali_enable_dac_to_op_regs));
+	default:
+		return 0;
+	}
 }
 
 static int mt8167_codec_disable_cali_path(struct snd_soc_codec *codec)
@@ -346,58 +489,354 @@ static int mt8167_codec_disable_cali_path(struct snd_soc_codec *codec)
 			ARRAY_SIZE(mt8167_codec_cali_disable_regs));
 }
 
-static int32_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
-	uint32_t auxadc_channel)
+static uint32_t mt8167_codec_get_hp_cap_index(struct snd_soc_codec *codec)
 {
-	int32_t cali_val = 0;
-	struct snd_dma_buffer dma_buf;
-#ifdef CONFIG_MTK_AUXADC
-	int32_t auxadc_on_val = 0;
-	int32_t auxadc_off_val = 0;
-	int32_t auxadc_val_sum = 0;
-	int32_t auxadc_val_avg = 0;
-	int32_t count = 0;
-	int32_t countlimit = 5;
-#endif
+	return (snd_soc_read(codec, AUDIO_CODEC_CON02) &
+			GENMASK(20, 19)) >> 19;
+}
 
-	dev_dbg(codec->dev, "%s\n", __func__);
+static unsigned long mt8167_codec_ramp_vcm_to_dac_step(
+	struct snd_soc_codec *codec)
+{
+	uint32_t index = mt8167_codec_get_hp_cap_index(codec);
 
-	mt8167_codec_setup_cali_path(codec, &dma_buf);
+	return ramp_vcm_to_dac_step_size_map[index];
+}
 
-	usleep_range(10 * 1000, 15 * 1000);
+static unsigned long mt8167_codec_ramp_vcm_to_dac_step_time(
+	struct snd_soc_codec *codec)
+{
+	uint32_t index = mt8167_codec_get_hp_cap_index(codec);
 
-#ifdef CONFIG_MTK_AUXADC
-	IMM_GetOneChannelValue_Cali(auxadc_channel, &auxadc_off_val);
-	dev_dbg(codec->dev, "%s auxadc_off_val: %d\n",
-		__func__, auxadc_off_val);
-#endif
+	return ramp_vcm_to_dac_step_time_map[index];
+}
 
-	mt8167_codec_enable_cali_path(codec);
+int mt8167_codec_valid_new_dc_comp(struct snd_soc_codec *codec)
+{
+	/* toggle DC status */
+	if (snd_soc_read(codec, ABB_AFE_CON11) &
+			ABB_AFE_CON11_DC_CTRL_STATUS)
+		snd_soc_update_bits(codec,
+			ABB_AFE_CON11,
+			ABB_AFE_CON11_DC_CTRL, 0);
+	else
+		snd_soc_update_bits(codec,
+			ABB_AFE_CON11,
+			ABB_AFE_CON11_DC_CTRL, ABB_AFE_CON11_DC_CTRL);
 
-	usleep_range(10 * 1000, 15 * 1000);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(mt8167_codec_valid_new_dc_comp);
 
-#ifdef CONFIG_MTK_AUXADC
-	for (count = 0 ; count < countlimit ; count++) {
-		IMM_GetOneChannelValue_Cali(auxadc_channel, &auxadc_on_val);
-		auxadc_val_sum += auxadc_on_val;
-		dev_dbg(codec->dev, "%s auxadc_on_val: %d, auxadc_val_sum: %d\n",
-			__func__, auxadc_on_val, auxadc_val_sum);
+void mt8167_codec_update_dc_comp(struct snd_soc_codec *codec,
+	enum hp_channel_id cid,
+	uint32_t lch_dccomp_val, uint32_t rch_dccomp_val)
+{
+	if (cid & HP_LEFT) {
+		/*  L-ch DC compensation value */
+		snd_soc_update_bits(codec,
+			ABB_AFE_CON3, GENMASK(15, 0),
+			lch_dccomp_val);
 	}
 
-	auxadc_val_avg = auxadc_val_sum / countlimit;
+	if (cid & HP_RIGHT) {
+		/*  R-ch DC compensation value */
+		snd_soc_update_bits(codec,
+			ABB_AFE_CON4, GENMASK(15, 0),
+			rch_dccomp_val);
+	}
 
-	cali_val = auxadc_off_val - auxadc_val_avg;
+	mt8167_codec_valid_new_dc_comp(codec);
+}
+EXPORT_SYMBOL_GPL(mt8167_codec_update_dc_comp);
 
-	cali_val = cali_val/1000; /* mV */
+static bool mt8167_codec_ramp_one_step(struct snd_soc_codec *codec,
+	int16_t dc_comp_begin, int16_t dc_comp_end,
+	uint16_t step, int32_t *dc_comp_cur)
+{
+	if (dc_comp_begin == dc_comp_end)
+		return true; /* ramping done */
+
+	if (dc_comp_cur == NULL)
+		return true;
+
+	if (step == 0)
+		return true;
+
+	*dc_comp_cur = dc_comp_begin;
+
+	if (*dc_comp_cur < dc_comp_end) {
+		*dc_comp_cur += step;
+		if (*dc_comp_cur > dc_comp_end) {
+			*dc_comp_cur = dc_comp_end;
+			return true;
+		}
+	} else {
+		*dc_comp_cur -= step;
+		if (*dc_comp_cur < dc_comp_end) {
+			*dc_comp_cur = dc_comp_end;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/* ramping for dc compensation value */
+void mt8167_codec_dc_offset_ramp(struct snd_soc_codec *codec,
+	enum hp_cali_step_id sid, enum hp_channel_id cid,
+	enum hp_sequence_id seq_id,
+	uint32_t lch_dccomp[HP_CALI_NUMS][HP_PGA_GAIN_NUMS],
+	uint32_t rch_dccomp[HP_CALI_NUMS][HP_PGA_GAIN_NUMS],
+	uint32_t lpga_index, uint32_t rpga_index)
+{
+	bool hp_ramp_done = false;
+	bool lch_ramp_done = false;
+	bool rch_ramp_done = false;
+
+	int32_t lch_dccomp_cur = 0;
+	int32_t rch_dccomp_cur = 0;
+	int32_t lch_dccomp_target = 0;
+	int32_t rch_dccomp_target = 0;
+
+	uint16_t lch_step = 0;
+	uint16_t rch_step = 0;
+	unsigned long step_time = 0;
+
+	if (sid == HP_CALI_VCM_TO_DAC) {
+		if (seq_id == HP_ON_SEQ) {
+			/* ramp down */
+			lch_dccomp_cur = lch_dccomp[sid][lpga_index];
+			rch_dccomp_cur = rch_dccomp[sid][rpga_index];
+			lch_dccomp_target = lch_dccomp[sid+1][lpga_index];
+			rch_dccomp_target = rch_dccomp[sid+1][rpga_index];
+		} else {
+			/* ramp up */
+			lch_dccomp_cur = lch_dccomp[sid+1][lpga_index];
+			rch_dccomp_cur = rch_dccomp[sid+1][rpga_index];
+			lch_dccomp_target = lch_dccomp[sid][lpga_index];
+			rch_dccomp_target = rch_dccomp[sid][rpga_index];
+		}
+		lch_step = mt8167_codec_ramp_vcm_to_dac_step(codec);
+		rch_step = mt8167_codec_ramp_vcm_to_dac_step(codec);
+		step_time = mt8167_codec_ramp_vcm_to_dac_step_time(codec);
+	} else if (sid == HP_CALI_OP_TO_VCM) {
+		if (seq_id == HP_ON_SEQ) {
+			/* ramp up */
+			lch_dccomp_cur = lch_dccomp[sid-1][lpga_index];
+			rch_dccomp_cur = rch_dccomp[sid-1][rpga_index];
+			lch_dccomp_target = lch_dccomp[sid][lpga_index];
+			rch_dccomp_target = rch_dccomp[sid][rpga_index];
+		} else {
+			/* ramp down */
+			lch_dccomp_cur = lch_dccomp[sid][lpga_index];
+			rch_dccomp_cur = rch_dccomp[sid][rpga_index];
+			lch_dccomp_target = lch_dccomp[sid-1][lpga_index];
+			rch_dccomp_target = rch_dccomp[sid-1][rpga_index];
+		}
+		lch_step = ramp_op_to_vcm_step[lpga_index];
+		rch_step = ramp_op_to_vcm_step[rpga_index];
+		step_time = RAMP_OP_TO_VCM_STEP_TIME;
+	}
+
+	while (!hp_ramp_done) {
+		lch_ramp_done = mt8167_codec_ramp_one_step(codec,
+			lch_dccomp_cur,
+			lch_dccomp_target,
+			lch_step, &lch_dccomp_cur);
+
+		rch_ramp_done = mt8167_codec_ramp_one_step(codec,
+			rch_dccomp_cur,
+			rch_dccomp_target,
+			rch_step, &rch_dccomp_cur);
+
+		if (lch_ramp_done && rch_ramp_done)
+			hp_ramp_done = true;
+
+		mt8167_codec_update_dc_comp(codec,
+			cid, lch_dccomp_cur, rch_dccomp_cur);
+
+		usleep_range(step_time, step_time + 1);
+	}
+}
+EXPORT_SYMBOL_GPL(mt8167_codec_dc_offset_ramp);
+
+/* get voltage of AU_HPL/AU_HPR from AUXADC */
+static int32_t mt8167_codec_query_avg_voltage(struct snd_soc_codec *codec,
+	uint32_t auxadc_channel)
+{
+	int32_t auxadc_val_cur = 0;
+	int32_t auxadc_val_min = 0;
+	int32_t auxadc_val_max = 0;
+	int64_t auxadc_val_sum = 0;
+	int32_t auxadc_val_avg = 0;
+	int32_t count = 0;
+	const int32_t countlimit = 22;
+
+	for (count = 0; count < countlimit; count++) {
+#ifdef CONFIG_MTK_AUXADC
+		IMM_GetOneChannelValue_Cali(auxadc_channel,
+			&auxadc_val_cur);
 #endif
+		if (!auxadc_val_min)
+			auxadc_val_min = auxadc_val_cur;
 
-	mt8167_codec_disable_cali_path(codec);
-	mt8167_codec_cleanup_cali_path(codec, &dma_buf);
+		if (auxadc_val_cur >= auxadc_val_max)
+			auxadc_val_max = auxadc_val_cur;
+		if (auxadc_val_cur <= auxadc_val_min)
+			auxadc_val_min = auxadc_val_cur;
+
+		auxadc_val_sum += auxadc_val_cur;
+
+		dev_dbg(codec->dev, "%s auxadc_val_cur: %d, auxadc_val_sum: %lld\n",
+			__func__, auxadc_val_cur, auxadc_val_sum);
+	}
+
+	auxadc_val_sum -= auxadc_val_max;
+	auxadc_val_sum -= auxadc_val_min;
+
+	auxadc_val_avg = auxadc_val_sum / (countlimit - 2);
+
+	return auxadc_val_avg;
+}
+
+void mt8167_codec_show_voltage_of_hp(struct snd_soc_codec *codec)
+{
+	int32_t voltage = 0;
+
+	/* enable ADA_HPLO_TO_AUXADC */
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(15), BIT(15));
+
+	/* enable ADA_HPRO_TO_AUXADC */
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(14), BIT(14));
+
+	voltage = mt8167_codec_query_avg_voltage(codec, AUXADC_CH_AU_HPL);
+	dev_dbg(codec->dev, "%s HPL voltage %d\n", __func__, voltage);
+
+	voltage = mt8167_codec_query_avg_voltage(codec, AUXADC_CH_AU_HPR);
+	dev_dbg(codec->dev, "%s HPR voltage %d\n", __func__, voltage);
+
+	/* disable ADA_HPLO_TO_AUXADC */
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(15), 0x0);
+
+	/* disable ADA_HPRO_TO_AUXADC */
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(14), 0x0);
+}
+EXPORT_SYMBOL_GPL(mt8167_codec_show_voltage_of_hp);
+
+static int32_t mt8167_codec_calc_dc_offset(int32_t voltage_prev,
+	int32_t voltage_cur)
+{
+	int32_t cali_val = 0;
+
+	cali_val = voltage_prev - voltage_cur;
+	cali_val = cali_val / 100; /* 0.1 mV */
 
 	return cali_val;
 }
 
-uint32_t mt8167_codec_conv_dc_offset_to_comp_val(int32_t dc_offset)
+static uint64_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
+	uint32_t auxadc_channel,
+	long dc_offset[HP_CALI_NUMS][HP_PGA_GAIN_NUMS])
+{
+	struct snd_dma_buffer dma_buf;
+	int32_t auxadc_val_target = 0;
+	int32_t auxadc_val_prev = 0;
+	int32_t auxadc_val_cur = 0;
+	uint32_t pga;
+#ifdef TIMESTAMP_INFO
+	uint64_t stamp_1 = 0, stamp_2 = 0;
+#endif
+	uint64_t latency_cali_dac_to_op = 0;
+
+	dev_dbg(codec->dev, "%s\n", __func__);
+
+	/* enter A */
+	mt8167_codec_setup_cali_path(codec, &dma_buf);
+
+	usleep_range(50 * 1000, 60 * 1000);
+
+	/* voltage of A */
+	auxadc_val_prev =
+		mt8167_codec_query_avg_voltage(codec, auxadc_channel);
+
+	auxadc_val_target = auxadc_val_prev;
+
+	dev_dbg(codec->dev, "%s voltage of A %d\n", __func__, auxadc_val_prev);
+
+	/* enter B */
+	mt8167_codec_enable_cali_path(codec, HP_CALI_VCM_TO_DAC);
+
+#ifdef TIMESTAMP_INFO
+	stamp_1 = sched_clock();
+#endif
+
+	usleep_range(DAC_STABLE_TIME, DAC_STABLE_TIME + 10);
+
+	/* voltage of B */
+	auxadc_val_cur =
+		mt8167_codec_query_avg_voltage(codec, auxadc_channel);
+	dev_dbg(codec->dev, "%s voltage of B %d\n", __func__, auxadc_val_cur);
+
+	/* dc_offset of A and B */
+	for (pga = 0; pga < HP_PGA_GAIN_NUMS; pga++)
+		dc_offset[HP_CALI_VCM_TO_DAC][pga] =
+			mt8167_codec_calc_dc_offset(auxadc_val_prev,
+				auxadc_val_cur);
+
+	auxadc_val_prev = auxadc_val_cur;
+
+#ifdef TIMESTAMP_INFO
+	stamp_2 = sched_clock();
+
+	latency_cali_dac_to_op = stamp_2 - stamp_1;
+#endif
+
+	/* enter C */
+	mt8167_codec_enable_cali_path(codec, HP_CALI_DAC_TO_OP);
+
+	usleep_range(50 * 1000, 60 * 1000);
+
+	/* voltage after OP on is dependent on PGA gain
+	 * store dc offsets per each pga gain for runtime usage
+	 * to eliminate the voltage jump before and after OP on or off
+	 */
+	for (pga = 0; pga < HP_PGA_GAIN_NUMS; pga++) {
+		if (auxadc_channel == AUXADC_CH_AU_HPL)
+			snd_soc_update_bits(codec,
+				AUDIO_CODEC_CON01, GENMASK(2, 0), pga);
+		else
+			snd_soc_update_bits(codec,
+				AUDIO_CODEC_CON01, GENMASK(5, 3), pga << 3);
+
+		usleep_range(5, 6);
+
+		/* voltage of C */
+		auxadc_val_cur =
+			mt8167_codec_query_avg_voltage(codec, auxadc_channel);
+
+		dev_dbg(codec->dev,
+			"%s voltage of C %d\n", __func__, auxadc_val_cur);
+
+		/* dc_offset of B and C */
+		dc_offset[HP_CALI_DAC_TO_OP][pga] =
+			mt8167_codec_calc_dc_offset(auxadc_val_prev,
+				auxadc_val_cur);
+
+		/* dc_offset of A and C */
+		dc_offset[HP_CALI_OP_TO_VCM][pga] =
+			mt8167_codec_calc_dc_offset(auxadc_val_target,
+				auxadc_val_cur);
+	}
+
+	mt8167_codec_disable_cali_path(codec);
+	mt8167_codec_cleanup_cali_path(codec, &dma_buf);
+
+	return latency_cali_dac_to_op;
+}
+
+static uint32_t mt8167_codec_conv_dc_offset_to_comp_val(int32_t dc_offset,
+	uint32_t pga_index)
 {
 	uint32_t dccomp_val = 0;
 	bool invert = false;
@@ -410,14 +849,7 @@ uint32_t mt8167_codec_conv_dc_offset_to_comp_val(int32_t dc_offset)
 	else
 		dc_offset *= (-1);
 
-	/* transform to 1.8V scale */
-	dc_offset = (dc_offset * 18) / 10;
-
-	/*
-	 * ABB_AFE_CON3, 1 step is (1/32768) * 1800 mV = 0.0549
-	 * dccomp_val = dc_cali_value/0.0549 = dc_cali_value * 18
-	 */
-	dccomp_val = dc_offset * 18;
+	dccomp_val = dc_offset * dc_comp_coeff_map[pga_index] / 1000;
 
 	/* two's complement to change the direction of dc compensation value */
 	if (invert)
@@ -425,31 +857,49 @@ uint32_t mt8167_codec_conv_dc_offset_to_comp_val(int32_t dc_offset)
 
 	return dccomp_val;
 }
-EXPORT_SYMBOL_GPL(mt8167_codec_conv_dc_offset_to_comp_val);
 
-int mt8167_codec_get_hpl_cali_val(struct snd_soc_codec *codec,
-	uint32_t *dccomp_val, int32_t *dc_offset)
+void mt8167_codec_gather_comp_val(struct snd_soc_codec *codec,
+	uint32_t dccomp_val[HP_CALI_NUMS][HP_PGA_GAIN_NUMS],
+	long dc_offset[HP_CALI_NUMS][HP_PGA_GAIN_NUMS])
 {
-	*dc_offset = mt8167_codec_get_hp_cali_val(codec, AUXADC_CH_AU_HPL);
-	*dccomp_val = mt8167_codec_conv_dc_offset_to_comp_val(*dc_offset);
+	uint32_t pga;
+	int i;
 
-	dev_dbg(codec->dev, "%s dc_offset %d, dccomp_val %d\n",
-		__func__, *dc_offset, *dccomp_val);
-	return 0;
+	for (pga = 0; pga < HP_PGA_GAIN_NUMS; pga++)
+		dccomp_val[HP_CALI_VCM_TO_DAC][pga] = DC_COMP_COEFF_VDAC;
+
+	for (i = HP_CALI_DAC_TO_OP; i < HP_CALI_NUMS; i++) {
+		for (pga = 0; pga < HP_PGA_GAIN_NUMS; pga++) {
+			dccomp_val[i][pga] =
+				mt8167_codec_conv_dc_offset_to_comp_val(
+					dc_offset[i][pga],
+					pga);
+		}
+	}
 }
-EXPORT_SYMBOL_GPL(mt8167_codec_get_hpl_cali_val);
+EXPORT_SYMBOL_GPL(mt8167_codec_gather_comp_val);
 
-int mt8167_codec_get_hpr_cali_val(struct snd_soc_codec *codec,
-	uint32_t *dccomp_val, int32_t *dc_offset)
+uint64_t mt8167_codec_get_hp_cali_comp_val(struct snd_soc_codec *codec,
+	uint32_t dccomp_val[HP_CALI_NUMS][HP_PGA_GAIN_NUMS],
+	long dc_offset[HP_CALI_NUMS][HP_PGA_GAIN_NUMS],
+	enum hp_channel_id cid)
 {
-	*dc_offset = mt8167_codec_get_hp_cali_val(codec, AUXADC_CH_AU_HPR);
-	*dccomp_val = mt8167_codec_conv_dc_offset_to_comp_val(*dc_offset);
+	uint32_t auxadc_channel = AUXADC_CH_AU_HPL;
+	uint64_t latency_cali_dac_to_op = 0;
 
-	dev_dbg(codec->dev, "%s dc_offset %d, dccomp_val %d\n",
-		__func__, *dc_offset, *dccomp_val);
-	return 0;
+	if (cid == HP_LEFT)
+		auxadc_channel = AUXADC_CH_AU_HPL;
+	else if (cid == HP_RIGHT)
+		auxadc_channel = AUXADC_CH_AU_HPR;
+
+	latency_cali_dac_to_op =
+		mt8167_codec_get_hp_cali_val(codec, auxadc_channel, dc_offset);
+
+	mt8167_codec_gather_comp_val(codec, dccomp_val, dc_offset);
+
+	return latency_cali_dac_to_op;
 }
-EXPORT_SYMBOL_GPL(mt8167_codec_get_hpr_cali_val);
+EXPORT_SYMBOL_GPL(mt8167_codec_get_hp_cali_comp_val);
 
 static bool ul_is_builtin_mic(uint32_t type)
 {

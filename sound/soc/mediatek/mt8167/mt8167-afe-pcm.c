@@ -965,13 +965,6 @@ static int mt8167_afe_int_adda_startup(struct snd_pcm_substream *substream,
 
 	mt8167_afe_enable_main_clk(afe);
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC);
-		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
-	} else {
-		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_ADC);
-	}
-
 	return 0;
 }
 
@@ -995,13 +988,6 @@ static void mt8167_afe_int_adda_shutdown(struct snd_pcm_substream *substream,
 		}
 
 		be->prepared[stream] = false;
-	}
-
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC);
-		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
-	} else {
-		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_ADC);
 	}
 
 	mt8167_afe_disable_main_clk(afe);
@@ -2346,6 +2332,80 @@ static const struct snd_kcontrol_new mrg_bt_o02_enable_ctl =
 static const struct snd_kcontrol_new pcm0_o02_enable_ctl =
 	SOC_DAPM_SINGLE_VIRT("Switch", 1);
 
+
+/* AFE_CLK */
+static int mt8167_afe_clk_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm);
+	struct mtk_afe *afe = snd_soc_component_get_drvdata(component);
+
+	dev_dbg(afe->dev, "%s, event %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		mt8167_afe_enable_main_clk(afe);
+		mt8167_afe_enable_afe_on(afe);
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		mt8167_afe_disable_afe_on(afe);
+		mt8167_afe_disable_main_clk(afe);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/* DA_CLK */
+static int mt8167_afe_da_clk_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm);
+	struct mtk_afe *afe = snd_soc_component_get_drvdata(component);
+
+	dev_dbg(afe->dev, "%s, event %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC);
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/* AD_CLK */
+static int mt8167_afe_ad_clk_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm);
+	struct mtk_afe *afe = snd_soc_component_get_drvdata(component);
+
+	dev_dbg(afe->dev, "%s, event %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_ADC);
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_ADC);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
 static const struct snd_soc_dapm_widget mt8167_afe_pcm_widgets[] = {
 	/* inter-connections */
 	SND_SOC_DAPM_MIXER("I00", SND_SOC_NOPM, 0, 0, NULL, 0),
@@ -2401,6 +2461,16 @@ static const struct snd_soc_dapm_widget mt8167_afe_pcm_widgets[] = {
 	SND_SOC_DAPM_INPUT("DL Source"),
 	SND_SOC_DAPM_INPUT("MRG In"),
 	SND_SOC_DAPM_INPUT("PCM0 In"),
+
+	SND_SOC_DAPM_SUPPLY_S("AFE_CLK", 1, SND_SOC_NOPM, 0, 0,
+			mt8167_afe_clk_event,
+			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_SUPPLY_S("DA_CLK", 2, SND_SOC_NOPM, 0, 0,
+			mt8167_afe_da_clk_event,
+			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_SUPPLY_S("AD_CLK", 2, SND_SOC_NOPM, 0, 0,
+			mt8167_afe_ad_clk_event,
+			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 };
 
 static const struct snd_soc_dapm_route mt8167_afe_pcm_routes[] = {
