@@ -6388,6 +6388,44 @@ void primary_display_update_present_fence(unsigned int fence_idx)
 #endif
 }
 
+static int primary_display_fps_update(void)
+{
+	static unsigned int trigger_cnt;
+	static long long time;
+	long long cur_trigger = sched_clock();
+
+	trigger_cnt++;
+	if (pgc->last_trigger)
+		time += (cur_trigger - pgc->last_trigger);
+
+	if (time > 1000000000) {
+		pgc->avg_fps = trigger_cnt * 1000;
+		do_div(time, 1000000);
+		do_div(pgc->avg_fps, time);
+		time = 0;
+		trigger_cnt = 0;
+	}
+
+	pgc->last_trigger = sched_clock();
+
+	return 0;
+}
+
+static unsigned int primary_display_fps_get(void)
+{
+	long long cur_time = sched_clock();
+	unsigned long long abs_fps;
+	unsigned int avg_fps = pgc->avg_fps;
+
+	abs_fps = 1000000000;
+	do_div(abs_fps, cur_time - pgc->last_trigger);
+
+	if (abs_fps < avg_fps/2 && avg_fps > 10)
+		return (unsigned int)abs_fps;
+
+	return avg_fps;
+}
+
 static int config_wdma_output(disp_path_handle disp_handle, struct cmdqRecStruct *cmdq_handle,
 			struct disp_mem_output_config *output, int is_multipass);
 
@@ -6424,6 +6462,7 @@ int primary_display_trigger(int blocking, void *callback, unsigned int userdata)
 	_disp_primary_path_exit_idle(__func__, 0);
 #endif
 	dprec_logger_start(DPREC_LOGGER_PRIMARY_TRIGGER, pgc->session_mode, pgc->dc_type);
+	primary_display_fps_update();
 
 	if (pgc->session_mode == DISP_SESSION_DIRECT_LINK_MODE) {
 		_trigger_display_interface(blocking, _ovl_fence_release_callback,
@@ -7643,6 +7682,8 @@ int primary_display_get_info(void *info)
 
 	dispif_info->vsyncFPS = pgc->lcm_fps;
 	dispif_info->isConnected = 1;
+
+	dispif_info->updateFPS = primary_display_fps_get();
 
 #ifdef ROME_TODO
 #error
