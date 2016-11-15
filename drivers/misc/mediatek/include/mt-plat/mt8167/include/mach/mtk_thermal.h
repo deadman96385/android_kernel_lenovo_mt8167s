@@ -310,6 +310,11 @@ extern int get_immediate_ts1_wrap(void);
 extern int get_immediate_ts2_wrap(void);
 extern int get_immediate_ts3_wrap(void);
 
+extern int is_cpu_power_unlimit(void);	/* in mtk_ts_cpu.c */
+extern int is_cpu_power_min(void);	/* in mtk_ts_cpu.c */
+extern int get_cpu_target_tj(void);
+extern int get_cpu_target_offset(void);
+
 extern int mtktscpu_debug_log;
 
 #endif

@@ -1713,23 +1713,52 @@ static int tscpu_set_power_consumption_state(void)
 extern unsigned long (*mtk_thermal_get_gpu_loading_fp)(void);
 
 static int GPU_L_H_TRIP = 80, GPU_L_L_TRIP = 40;
-
+static int cpu_target_tj = 65000;
+static int cpu_target_offset = 10000;
 static int TARGET_TJ = 65000;
 static int TARGET_TJ_HIGH = 66000;
 static int TARGET_TJ_LOW = 64000;
 static int PACKAGE_THETA_JA_RISE = 10;
 static int PACKAGE_THETA_JA_FALL = 10;
-static int MINIMUM_CPU_POWER = 500;
-static int MAXIMUM_CPU_POWER = 1240;
-static int MINIMUM_GPU_POWER = 676;
-static int MAXIMUM_GPU_POWER = 676;
-static int MINIMUM_TOTAL_POWER = 500 + 676;
-static int MAXIMUM_TOTAL_POWER = 1240 + 676;
-static int FIRST_STEP_TOTAL_POWER_BUDGET = 1750;
+static int MINIMUM_CPU_POWER = 127;
+static int MAXIMUM_CPU_POWER = 1500;
+static int MINIMUM_GPU_POWER = 466;
+static int MAXIMUM_GPU_POWER = 1200;
+static int MINIMUM_TOTAL_POWER = 127 + 466;
+static int MAXIMUM_TOTAL_POWER = 1500 + 1200; /* GPU 600MHz, CPU 1.5GHz */
+static int FIRST_STEP_TOTAL_POWER_BUDGET = 1350;
+static int g_total_power;
 
 /* 1. MINIMUM_BUDGET_CHANGE = 0 ==> thermal equilibrium maybe at higher than TARGET_TJ_HIGH */
 /* 2. Set MINIMUM_BUDGET_CHANGE > 0 if to keep Tj at TARGET_TJ */
 static int MINIMUM_BUDGET_CHANGE = 50;
+
+/**
+ * TODO: What's the diff from get_target_tj?
+ */
+int get_cpu_target_tj(void)
+{
+	return cpu_target_tj;
+}
+EXPORT_SYMBOL(get_cpu_target_tj);
+
+int get_cpu_target_offset(void)
+{
+	return cpu_target_offset;
+}
+EXPORT_SYMBOL(get_cpu_target_offset);
+
+int is_cpu_power_unlimit(void)
+{
+	return (g_total_power == 0 || g_total_power >= MAXIMUM_TOTAL_POWER) ? 1 : 0;
+}
+EXPORT_SYMBOL(is_cpu_power_unlimit);
+
+int is_cpu_power_min(void)
+{
+	return (g_total_power <= MINIMUM_TOTAL_POWER) ? 1 : 0;
+}
+EXPORT_SYMBOL(is_cpu_power_min);
 
 static int P_adaptive(int total_power, unsigned int gpu_loading)
 {
@@ -1739,6 +1768,7 @@ static int P_adaptive(int total_power, unsigned int gpu_loading)
 
 	last_cpu_power = cpu_power;
 	last_gpu_power = gpu_power;
+	g_total_power = total_power;
 
 	if (total_power == 0) {
 		cpu_power = gpu_power = 0;
@@ -2037,6 +2067,10 @@ static int decide_ttj(void)
 	}
 	cl_dev_adp_cpu_state_active = temp_cl_dev_adp_cpu_state_active;
 	TARGET_TJ = ret;
+	cpu_target_tj = TARGET_TJ;
+#ifdef CONTINUOUS_TM
+	cpu_target_offset = TARGET_TJ - current_ETJ;
+#endif
 	TARGET_TJ_HIGH = TARGET_TJ + 1000;
 	TARGET_TJ_LOW = TARGET_TJ - 1000;
 
