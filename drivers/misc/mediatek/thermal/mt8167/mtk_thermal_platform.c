@@ -33,7 +33,7 @@
 #include "mtk_thermal_typedefs.h"
 
 #include <mt-plat/mtk_mdm_monitor.h>
-#include "inc/mtk_thermal.h"
+#include "mach/mtk_thermal.h"
 #include <mt-plat/aee.h>
 #include <mtk_gpu_utility.h>
 

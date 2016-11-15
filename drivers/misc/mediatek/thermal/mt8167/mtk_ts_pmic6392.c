@@ -30,7 +30,7 @@
 
 #include "mt-plat/mtk_thermal_monitor.h"
 #include "mtk_thermal_typedefs.h"
-#include "inc/mtk_thermal.h"
+#include "mach/mtk_thermal.h"
 #include <linux/regmap.h>
 
 #include <linux/mfd/mt6397/core.h>
