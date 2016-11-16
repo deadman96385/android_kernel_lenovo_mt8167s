@@ -267,6 +267,7 @@ extern void vShowEdidRawData(void);
 extern void vClearEdidInfo(void);
 extern void hdmi_AppGetEdidInfo(HDMI_EDID_T *pv_get_info);
 extern unsigned char vCheckPcmBitSize(unsigned char ui1ChNumInx);
+extern int hdmi_drv_get_external_device_capablity(void);
 
 extern unsigned char hdmi_check_edid_header(void);
 #endif

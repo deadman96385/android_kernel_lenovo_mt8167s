@@ -112,6 +112,15 @@ const unsigned char _cFsStr[][7] = { {"32khz  "},
 };
 
 unsigned char cDstStr[50];
+unsigned char Audio_SampleRate[7] = {
+	HDMI_MAX_SAMPLERATE_32,
+	HDMI_MAX_SAMPLERATE_44,
+	HDMI_MAX_SAMPLERATE_48,
+	0,
+	HDMI_MAX_SAMPLERATE_96,
+	0,
+	HDMI_MAX_SAMPLERATE_192
+};
 
 bool fgIsHdmiNoEDIDCheck(void)
 {
@@ -1402,6 +1411,29 @@ void hdmi_checkedid(unsigned char i1noedid)
 		vSetNoEdidChkInfo();
 }
 #endif
+
+int hdmi_drv_get_external_device_capablity(void)
+{
+	int capablity = 0;
+	unsigned char  bInx = 0;
+	unsigned char Cap_SampleRate = 0, Cap_SampleChannel = 0, Cap_SampleBit = 0;
+	unsigned char bTemp;
+
+	for (bInx = 0; bInx < 7; bInx++) {
+		if (_HdmiSinkAvCap.ui1_sink_pcm_ch_sampling[bInx] != 0)
+			bTemp = bInx;
+		}
+	Cap_SampleChannel = bTemp + 2;
+	Cap_SampleBit = vCheckPcmBitSize(bTemp);
+	for (bInx = 0; bInx < 7; bInx++) {
+		if ((_HdmiSinkAvCap.ui1_sink_pcm_ch_sampling[bTemp] >> bInx) & 0x01)
+			Cap_SampleRate = Audio_SampleRate[bInx];
+		}
+	capablity = Cap_SampleChannel << 3 | Cap_SampleRate << 7 | Cap_SampleBit << 10;
+
+	return capablity;
+}
+
 
 unsigned char vCheckPcmBitSize(unsigned char ui1ChNumInx)
 {

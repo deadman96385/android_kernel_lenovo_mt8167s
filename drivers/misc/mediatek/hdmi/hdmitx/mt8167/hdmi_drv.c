@@ -1894,6 +1894,7 @@ const struct HDMI_DRIVER *HDMI_GetDriver(void)
 		.cecusrcmd = hdmi_cec_usr_cmd,
 		.checkedidheader = hdmi_check_edid_header,
 		.resolution_setting = hdmi_resolution_debug_setting,
+		.get_external_device_capablity = hdmi_drv_get_external_device_capablity,
 	};
 
 	return &HDMI_DRV;
