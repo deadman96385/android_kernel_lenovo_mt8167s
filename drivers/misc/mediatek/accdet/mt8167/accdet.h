@@ -121,25 +121,13 @@ struct headset_mode_settings {
 	int debounce1;		/*mic bias debounce*/
 	int debounce3;		/*plug out debounce*/
 };
-struct three_key_threshold {
-	int mid_key;
-	int up_key;
-	int down_key;
-};
-struct four_key_threshold {
-	int mid_key_four;
-	int voice_key_four;
-	int up_key_four;
-	int down_key_four;
-};
+
 struct head_dts_data {
 	int mic_mode_vol;
 	struct headset_mode_settings headset_debounce;
 	int accdet_plugout_debounce;
 	int eint_debounce;
 	int accdet_mic_mode;
-	struct three_key_threshold three_key;
-	struct four_key_threshold four_key;
 };
 #ifdef CONFIG_ACCDET_EINT
 extern struct platform_device accdet_device;
