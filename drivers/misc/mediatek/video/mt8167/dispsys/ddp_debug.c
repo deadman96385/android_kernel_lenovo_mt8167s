@@ -398,6 +398,13 @@ static void process_dbg_opt(const char *opt)
 				force_sec = 0;
 			pr_err("force_sec: %d\n", force_sec);
 			sprintf(buf, "force_sec: %d\n", force_sec);
+		} else if (enable == 14) {
+			if (gSkipIdleDetect == 0)
+				gSkipIdleDetect = 1;
+			else
+				gSkipIdleDetect = 0;
+			pr_err("gSkipIdleDetect: %d\n", gSkipIdleDetect);
+			sprintf(buf, "gSkipIdleDetect: %d\n", gSkipIdleDetect);
 		}
 	} else if (strncmp(opt, "mmp", 3) == 0) {
 		init_ddp_mmp_events();
