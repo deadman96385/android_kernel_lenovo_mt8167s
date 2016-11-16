@@ -263,6 +263,7 @@ static void hs_slew_rate_cal(void)
 }
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH
+u32 usb_port_mode_temp;
 bool usb_phy_check_in_uart_mode(void)
 {
 	UINT8 usb_port_mode;
@@ -283,12 +284,24 @@ bool usb_phy_check_in_uart_mode(void)
 
 void usb_phy_switch_to_uart(void)
 {
-	if (usb_phy_check_in_uart_mode())
-		return;
-
+	/*if (usb_phy_check_in_uart_mode()) */
+		/*return;*/
+	DBG(0, "USB Port -> UART\n");
 	usb_enable_clock(true);
 	udelay(50);
 
+	USBPHY_SET8(0x00, 0x01);
+	USBPHY_CLR8(0x1a, 0x80);
+	USBPHY_SET8(0x6e, 0x01);
+	USBPHY_SET8(0x6b, 0x40);
+	USBPHY_CLR8(0x6b, 0x80);
+	USBPHY_SET8(0x22, 0x02);
+	USBPHY_SET8(0x6b, 0x04);
+	USBPHY_SET8(0x6e, 0x04);
+	USBPHY_SET8(0x6b, 0x10);
+
+	regmap_update_bits(mt_regmap, 0x980, 1<<7, 1<<7);
+#if 0
 	/* RG_USB20_BC11_SW_EN = 1'b0 */
 	USBPHY_CLR8(0x1a, 0x80);
 
@@ -306,10 +319,11 @@ void usb_phy_switch_to_uart(void)
 
 	/* Set RG_USB20_DM_100K_EN to 1 */
 	USBPHY_SET8(0x22, 0x02);
+#endif
 	usb_enable_clock(false);
 
 	/*set uart rx path*/
-	mtk_uart_usb_rx_sel(1, 1);
+	/*mtk_uart_usb_rx_sel(1, 1);*/
 	usb_port_mode_temp = 1;
 	DBG(0, "usb port value in uart function:%d\n", usb_port_mode_temp);
 	/* GPIO Selection */
@@ -319,6 +333,11 @@ void usb_phy_switch_to_uart(void)
 
 void usb_phy_switch_to_usb(void)
 {
+	usb_enable_clock(true);
+	udelay(50);
+
+	regmap_update_bits(mt_regmap, 0x980, 1<<7, 0<<7);
+#if 0
 	/* GPIO Selection */
 	/*DRV_WriteReg32(GPIO_BASE + 0x508, 0x10);		//set */
 	mtk_uart_usb_rx_sel(1, 0);
@@ -326,6 +345,7 @@ void usb_phy_switch_to_usb(void)
 	udelay(50);
 	/* clear force_uart_en */
 	USBPHY_WRITE8(0x6B, 0x00);
+#endif
 	usb_enable_clock(false);
 	usb_phy_poweron();
 	/* disable the USB clock turned on in usb_phy_poweron() */
