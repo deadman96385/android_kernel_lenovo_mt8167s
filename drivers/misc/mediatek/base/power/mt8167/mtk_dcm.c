@@ -147,7 +147,6 @@ typedef enum {
 #define MP1_CNTVALUEB_DCM_EN			0x02
 #define MP_CCI_ADB400_DCM_CONFIG_SETTING	0x45
 #define CCI_BW_MON_DCM_DIS			0x100
-#define RG_CPUSYS_RGU_DCM_CONFIG		0x01
 
 int dcm_mcusys(ENUM_MCUSYS_DCM on)
 {
@@ -161,7 +160,6 @@ int dcm_mcusys(ENUM_MCUSYS_DCM on)
 		reg_write(MCU_MISC_DCM_CTRL, and(reg_read(MCU_MISC_DCM_CTRL), ~MP1_CNTVALUEB_DCM_EN));
 		reg_write(MP_CCI_ADB400_DCM_CONFIG, and(reg_read(MP_CCI_ADB400_DCM_CONFIG),
 								~MP_CCI_ADB400_DCM_CONFIG_SETTING));
-		reg_write(MP0_RGU_DCM_CONFIG, and(reg_read(MP0_RGU_DCM_CONFIG),	~RG_CPUSYS_RGU_DCM_CONFIG));
 	} else if (on == MCUSYS_DCM_ON) {
 		reg_write(CCI_ADB400_DCM_CONFIG, aor(reg_read(CCI_ADB400_DCM_CONFIG),
 						~CCI_ADB400_DCM_CONFIG_SETTING, CCI_ADB400_DCM_CONFIG_SETTING));
@@ -173,8 +171,6 @@ int dcm_mcusys(ENUM_MCUSYS_DCM on)
 					~MP1_CNTVALUEB_DCM_EN, MP1_CNTVALUEB_DCM_EN));
 		reg_write(MP_CCI_ADB400_DCM_CONFIG, aor(reg_read(MP_CCI_ADB400_DCM_CONFIG),
 					~MP_CCI_ADB400_DCM_CONFIG_SETTING, MP_CCI_ADB400_DCM_CONFIG_SETTING));
-		reg_write(MP0_RGU_DCM_CONFIG, aor(reg_read(MP0_RGU_DCM_CONFIG),
-					~RG_CPUSYS_RGU_DCM_CONFIG, RG_CPUSYS_RGU_DCM_CONFIG));
 	} else {
 		dcm_err("%s(): unkwon value\n", __func__);
 		return -EINVAL;
