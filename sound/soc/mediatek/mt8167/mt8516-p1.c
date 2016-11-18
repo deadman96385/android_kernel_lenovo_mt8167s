@@ -19,9 +19,67 @@
 #include <linux/of_gpio.h>
 #include <linux/regulator/consumer.h>
 
+#define ENUM_TO_STR(enum) #enum
+
 enum PINCTRL_PIN_STATE {
 	PIN_STATE_DEFAULT = 0,
 	PIN_STATE_MAX
+};
+
+enum mtkfile_pcm_state {
+	MTKFILE_PCM_STATE_UNKNOWN = 0,
+	MTKFILE_PCM_STATE_OPEN,
+	MTKFILE_PCM_STATE_HW_PARAMS,
+	MTKFILE_PCM_STATE_PREPARE,
+	MTKFILE_PCM_STATE_START,
+	MTKFILE_PCM_STATE_PAUSE,
+	MTKFILE_PCM_STATE_RESUME,
+	MTKFILE_PCM_STATE_DRAIN,
+	MTKFILE_PCM_STATE_STOP,
+	MTKFILE_PCM_STATE_HW_FREE,
+	MTKFILE_PCM_STATE_CLOSE,
+	MTKFILE_PCM_STATE_NUM,
+};
+
+static const char *const pcm_state_func[] = {
+	ENUM_TO_STR(MTKFILE_PCM_STATE_UNKNOWN),
+	ENUM_TO_STR(MTKFILE_PCM_STATE_OPEN),
+	ENUM_TO_STR(MTKFILE_PCM_STATE_HW_PARAMS),
+	ENUM_TO_STR(MTKFILE_PCM_STATE_PREPARE),
+	ENUM_TO_STR(MTKFILE_PCM_STATE_START),
+	ENUM_TO_STR(MTKFILE_PCM_STATE_PAUSE),
+	ENUM_TO_STR(MTKFILE_PCM_STATE_RESUME),
+	ENUM_TO_STR(MTKFILE_PCM_STATE_DRAIN),
+	ENUM_TO_STR(MTKFILE_PCM_STATE_STOP),
+	ENUM_TO_STR(MTKFILE_PCM_STATE_HW_FREE),
+	ENUM_TO_STR(MTKFILE_PCM_STATE_CLOSE),
+};
+
+static const char * const nfy_ctl_names[] = {
+	"Master Volume",
+	"Master Volume X",
+	"Master Switch",
+	"Master Switch X",
+	"PCM State",
+	"PCM State X",
+};
+
+enum {
+	MASTER_VOLUME_ID = 0,
+	MASTER_VOLUMEX_ID,
+	MASTER_SWITCH_ID,
+	MASTER_SWITCHX_ID,
+	PCM_STATE_ID,
+	PCM_STATEX_ID,
+	CTRL_NOTIFY_NUM,
+	CTRL_NOTIFY_INVAL = 0xFFFF,
+};
+struct soc_ctlx_res {
+	int master_volume;
+	int master_switch;
+	int pcm_state;
+	struct snd_ctl_elem_id nfy_ids[CTRL_NOTIFY_NUM];
+	struct mutex res_mutex;
 };
 
 struct mt8516_p1_priv {
@@ -31,105 +89,169 @@ struct mt8516_p1_priv {
 	struct regulator *extamp_supply;
 	struct regulator *tdmadc_supply;
 	struct regulator *amp_rst_supply;
+	struct soc_ctlx_res ctlx_res;
 };
 
 static const char * const mt8516_p1_pinctrl_pin_str[PIN_STATE_MAX] = {
 	"default",
 };
 
-static int master_volume_info(struct snd_kcontrol *kctl,
-	struct snd_ctl_elem_info *uinfo)
+static SOC_ENUM_SINGLE_EXT_DECL(pcm_state_enums, pcm_state_func);
+
+/* ctrl resource manager */
+static inline int soc_ctlx_init(struct soc_ctlx_res *ctlx_res, struct snd_soc_card *soc_card)
 {
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
-	uinfo->count = 1;
-	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 100;
+	int i;
+	struct snd_card *card = soc_card->snd_card;
+	struct snd_kcontrol *control;
+
+	ctlx_res->master_volume = 100;
+	ctlx_res->master_switch = 1;
+	ctlx_res->pcm_state = MTKFILE_PCM_STATE_UNKNOWN;
+	mutex_init(&ctlx_res->res_mutex);
+
+	for (i = 0; i < CTRL_NOTIFY_NUM; i++) {
+		list_for_each_entry(control, &card->controls, list) {
+			if (strncmp(control->id.name, nfy_ctl_names[i], sizeof(control->id.name)))
+				continue;
+			ctlx_res->nfy_ids[i] = control->id;
+		}
+	}
+
 	return 0;
 }
 
-static int master_volume_get(struct snd_kcontrol *kctl,
+static int soc_ctlx_get(struct snd_kcontrol *kctl,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	ucontrol->value.integer.value[0] = 100;
+	struct snd_soc_card *card = snd_kcontrol_chip(kctl);
+	struct mt8516_p1_priv *card_data = snd_soc_card_get_drvdata(card);
+	struct soc_ctlx_res *res_mgr = &card_data->ctlx_res;
+	int type;
+
+	for (type = 0; type < CTRL_NOTIFY_NUM; type++) {
+		if (kctl->id.numid == res_mgr->nfy_ids[type].numid)
+			break;
+	}
+	if (type == CTRL_NOTIFY_NUM) {
+		pr_err("invalid mixer control(numid:%d)\n", kctl->id.numid);
+		return -EINVAL;
+	}
+
+	mutex_lock(&res_mgr->res_mutex);
+	switch (type) {
+	case MASTER_VOLUME_ID:
+	case MASTER_VOLUMEX_ID:
+		ucontrol->value.integer.value[0] = res_mgr->master_volume;
+		break;
+	case MASTER_SWITCH_ID:
+	case MASTER_SWITCHX_ID:
+		ucontrol->value.integer.value[0] = res_mgr->master_switch;
+		break;
+	case PCM_STATE_ID:
+	case PCM_STATEX_ID:
+		ucontrol->value.integer.value[0] = res_mgr->pcm_state;
+		break;
+	default:
+		break;
+	}
+	mutex_unlock(&res_mgr->res_mutex);
+	pr_notice("get mixer control(%s) value is:%ld\n", kctl->id.name, ucontrol->value.integer.value[0]);
+
 	return 0;
 }
 
-static int master_volume_put(struct snd_kcontrol *kctl,
+static int soc_ctlx_put(struct snd_kcontrol *kctl,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	return 0;
-}
+	struct snd_soc_card *card = snd_kcontrol_chip(kctl);
+	struct mt8516_p1_priv *card_data = snd_soc_card_get_drvdata(card);
+	struct soc_ctlx_res *res_mgr = &card_data->ctlx_res;
+	int type;
+	int nfy_type;
+	int *value = NULL;
 
-static int master_switch_info(struct snd_kcontrol *kctl,
-	struct snd_ctl_elem_info *uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
-	uinfo->count = 1;
-	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 1;
-	return 0;
-}
+	for (type = 0; type < CTRL_NOTIFY_NUM; type++) {
+		if (kctl->id.numid == res_mgr->nfy_ids[type].numid)
+			break;
+	}
+	if (type == CTRL_NOTIFY_NUM) {
+		pr_err("invalid mixer control(numid:%d)\n", kctl->id.numid);
+		return -EINVAL;
+	}
 
-static int master_switch_get(struct snd_kcontrol *kctl,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	ucontrol->value.integer.value[0] = 1;
-	return 0;
-}
+	mutex_lock(&res_mgr->res_mutex);
+	switch (type) {
+	case MASTER_VOLUME_ID:
+		nfy_type = MASTER_VOLUMEX_ID;
+		value = &res_mgr->master_volume;
+		break;
+	case MASTER_VOLUMEX_ID:
+		nfy_type = MASTER_VOLUME_ID;
+		value = &res_mgr->master_volume;
+		break;
+	case MASTER_SWITCH_ID:
+		nfy_type = MASTER_SWITCHX_ID;
+		value = &res_mgr->master_switch;
+		break;
+	case MASTER_SWITCHX_ID:
+		nfy_type = MASTER_SWITCH_ID;
+		value = &res_mgr->master_switch;
+		break;
+	case PCM_STATE_ID:
+		nfy_type = PCM_STATEX_ID;
+		value = &res_mgr->pcm_state;
+		break;
+	default:
+		break;
+	}
+	if (value != NULL && ucontrol->value.integer.value[0] != *value) {
+		*value = ucontrol->value.integer.value[0];
+		snd_ctl_notify(card->snd_card, SNDRV_CTL_EVENT_MASK_VALUE, &(res_mgr->nfy_ids[nfy_type]));
+	} else {
+		nfy_type = CTRL_NOTIFY_INVAL;
+	}
+	mutex_unlock(&res_mgr->res_mutex);
+	pr_notice("set mixer control(%s) value is:%ld, notify id:%x\n",
+						kctl->id.name,
+						ucontrol->value.integer.value[0],
+						nfy_type);
 
-static int master_switch_put(struct snd_kcontrol *kctl,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	return 0;
-}
-
-static int pcm_state_info(struct snd_kcontrol *kctl,
-	struct snd_ctl_elem_info *uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
-	uinfo->count = 1;
-	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 10;
-	return 0;
-}
-
-static int pcm_state_get(struct snd_kcontrol *kctl,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	return 0;
-}
-
-static int pcm_state_put(struct snd_kcontrol *kctl,
-	struct snd_ctl_elem_value *ucontrol)
-{
 	return 0;
 }
 
 static const struct snd_kcontrol_new mt8516_p1_soc_controls[] = {
-	{
-		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-		.name = "Master Volume",
-		.index = 0,
-		.info = master_volume_info,
-		.get = master_volume_get,
-		.put = master_volume_put,
-	},
-	{
-		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-		.name = "Master Switch",
-		.index = 0,
-		.info = master_switch_info,
-		.get = master_switch_get,
-		.put = master_switch_put,
-	},
-	{
-		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-		.name = "PCM State",
-		.index = 0,
-		.info = pcm_state_info,
-		.get = pcm_state_get,
-		.put = pcm_state_put,
-	},
+	/* for third party app use */
+	SOC_SINGLE_EXT("Master Volume",
+			    0,
+			    0,
+			    100,
+			    0,
+			    soc_ctlx_get,
+			    soc_ctlx_put),
+	SOC_SINGLE_EXT("Master Volume X",
+			    0,
+			    0,
+			    100,
+			    0,
+			    soc_ctlx_get,
+			    soc_ctlx_put),
+	SOC_SINGLE_BOOL_EXT("Master Switch",
+			    0,
+			    soc_ctlx_get,
+			    soc_ctlx_put),
+	SOC_SINGLE_BOOL_EXT("Master Switch X",
+			    0,
+			    soc_ctlx_get,
+			    soc_ctlx_put),
+	SOC_ENUM_EXT("PCM State",
+		     pcm_state_enums,
+		     soc_ctlx_get,
+		     soc_ctlx_put),
+	SOC_ENUM_EXT("PCM State X",
+		     pcm_state_enums,
+		     soc_ctlx_get,
+		     0),
 };
 
 /* Digital audio interface glue - connects codec <---> CPU */
@@ -373,7 +495,6 @@ static int mt8516_p1_dev_probe(struct platform_device *pdev)
 
 	card_data = devm_kzalloc(&pdev->dev,
 		sizeof(struct mt8516_p1_priv), GFP_KERNEL);
-
 	if (!card_data) {
 		ret = -ENOMEM;
 		dev_err(&pdev->dev,
@@ -391,6 +512,7 @@ static int mt8516_p1_dev_probe(struct platform_device *pdev)
 	if (ret)
 		dev_err(&pdev->dev, "%s snd_soc_register_card fail %d\n",
 			__func__, ret);
+	soc_ctlx_init(&card_data->ctlx_res, card);
 
 	return ret;
 }
