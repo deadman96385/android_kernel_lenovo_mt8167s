@@ -76,7 +76,7 @@ int PMIC_IMM_GetOneChannelValue(unsigned int dwChannel, int deCount, int trimd)
 {
 	int ret, adc_rdy, reg_val;
 	int raw_data, adc_result;
-	int adc_div = 0, raw_mask = 0, r_val_temp = 0;
+	int adc_div = 4096, raw_mask = 0, r_val_temp = 0;
 	int count = 0;
 	int raw_data_sum = 0, raw_data_avg = 0;
 	int u4Sample_times = 0;
