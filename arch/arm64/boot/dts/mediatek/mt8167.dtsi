@@ -1651,8 +1651,14 @@
 
 		mtee {
 			compatible = "mediatek,mtee";
-			clocks = <&topckgen CLK_TOP_GCPU_B>, <&topckgen CLK_TOP_TRNG>;
-			clock-names = "GCPU", "TRNG";
+			clocks = <&topckgen CLK_TOP_GCPU_B>,
+				 <&topckgen CLK_TOP_TRNG>,
+				 <&imgsys CLK_IMG_VENC>,
+				 <&imgsys CLK_IMG_LARB1_SMI>;
+			clock-names = "GCPU",
+				      "TRNG",
+				      "IMG_CLK",
+				      "IMG_SMI";
 			pm-devs = <&larb1>;
 			pm-names = "isp";
 		};
