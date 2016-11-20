@@ -2229,12 +2229,11 @@ static int _update_ovl_from_wdma_info(struct OVL_CONFIG_STRUCT *ovl_config,
 	ovl_config->dst_y = 0;
 	ovl_config->dst_w = wdma_config->srcWidth;
 	ovl_config->dst_h = wdma_config->srcHeight;
+	ovl_config->source = OVL_LAYER_SOURCE_MEM;
 
 	memset(&ovl_config[1], 0, sizeof(struct OVL_CONFIG_STRUCT));
 	memset(&ovl_config[2], 0, sizeof(struct OVL_CONFIG_STRUCT));
-
-	if (!isAEEEnabled)
-		memset(&ovl_config[3], 0, sizeof(struct OVL_CONFIG_STRUCT));
+	memset(&ovl_config[3], 0, sizeof(struct OVL_CONFIG_STRUCT));
 
 	return 0;
 }
