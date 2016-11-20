@@ -46,6 +46,7 @@
 /* #include <mach/irqs.h> */
 
 #include <mt-plat/dma.h>
+#include <mt-plat/mtk_boot_common.h>
 #include "disp_assert_layer.h"
 
 #include "debug.h"
@@ -2638,11 +2639,13 @@ static void mtkfb_blank_resume(void)
 #endif
 
 	ret = primary_display_resume();
-
 	if (ret) {
 		DISPERR("primary display resume failed\n");
 		return;
 	}
+
+	if (get_boot_mode() == FACTORY_BOOT)
+		mtkfb_pan_display_impl(&mtkfb_fbi->var, mtkfb_fbi);
 
 	pr_debug("[FB Driver] leave late_resume\n");
 }
