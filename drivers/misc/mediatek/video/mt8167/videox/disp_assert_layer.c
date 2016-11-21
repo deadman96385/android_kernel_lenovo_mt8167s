@@ -392,7 +392,8 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 
 	mutex_lock(&disp_trigger_lock);
 	/* Since the output buffer may not exsit, so skip frame trigger update. */
-	if (primary_display_get_session_mode() != DISP_SESSION_DECOUPLE_MIRROR_MODE)
+	if (primary_display_get_session_mode() != DISP_SESSION_DECOUPLE_MIRROR_MODE
+		&& primary_display_get_session_mode() != DISP_SESSION_DECOUPLE_MODE)
 		ret = primary_display_trigger(0, NULL, 0);
 	mutex_unlock(&disp_trigger_lock);
 

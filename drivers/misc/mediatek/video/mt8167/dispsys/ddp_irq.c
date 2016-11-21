@@ -367,20 +367,20 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 			/* disp_irq_log_module |= 1<<module; */
 		}
 		if (reg_val & (1 << 9)) {
-			/* DDPERR("IRQ: OVL%d-L0 fifo underflow!\n",index); */
+			DDPERR("IRQ: OVL%d-L0 fifo underflow!\n", index);
 			/* disp_irq_log_module |= 1<<module; */
 		}
 
 		if (reg_val & (1 << 10)) {
-			/* DDPERR("IRQ: OVL%d-L1 fifo underflow!\n",index); */
+			DDPERR("IRQ: OVL%d-L1 fifo underflow!\n", index);
 			/* disp_irq_log_module |= 1<<module; */
 		}
 		if (reg_val & (1 << 11)) {
-			/* DDPERR("IRQ: OVL%d-L2 fifo underflow!\n",index); */
+			DDPERR("IRQ: OVL%d-L2 fifo underflow!\n", index);
 			/* disp_irq_log_module |= 1<<module; */
 		}
 		if (reg_val & (1 << 12)) {
-			/* DDPERR("IRQ: OVL%d-L3 fifo underflow!\n",index); */
+			DDPERR("IRQ: OVL%d-L3 fifo underflow!\n", index);
 			/* disp_irq_log_module |= 1<<module; */
 		}
 

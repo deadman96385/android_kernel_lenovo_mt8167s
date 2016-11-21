@@ -3322,7 +3322,7 @@ int _trigger_ovl_to_memory(disp_path_handle disp_handle, struct cmdqRecStruct *c
 {
 	unsigned int rdma_pitch_sec;
 
-	DISPMSG("start trigger ovl to mem --- primary\n");
+	DISPMSG("start trigger ovl to mem --- primary, data=%d blocking=%d\n", data, blocking);
 	dpmgr_wdma_path_force_power_on();
 	dpmgr_path_trigger(disp_handle, cmdq_handle, CMDQ_ENABLE);
 	cmdqRecWaitNoClear(cmdq_handle, CMDQ_EVENT_DISP_WDMA0_EOF);
@@ -4662,6 +4662,7 @@ static int _ovl_ext_fence_release_callback(uint32_t userdata)
 	int fence_idx, layer;
 	int i = 0;
 #endif
+	DISPMSG("primary ovl->wdma frame done - ext\n");
 	mmprofile_log_ex(ddp_mmp_get_events()->session_release, MMPROFILE_FLAG_START, 1, userdata);
 #ifndef MTK_FB_CMDQ_DISABLE
 	for (i = 0; i < PRIMARY_DISPLAY_SESSION_LAYER_COUNT; i++) {

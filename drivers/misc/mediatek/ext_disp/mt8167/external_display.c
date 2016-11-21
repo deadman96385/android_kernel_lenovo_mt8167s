@@ -1065,13 +1065,13 @@ int ext_disp_init(char *lcm_name, unsigned int session)
 	if (ext_disp_use_cmdq == CMDQ_ENABLE)
 		_cmdq_reset_config_handle();
 
+	init_waitqueue_head(&rdma_update_wq);
+	mutex_init(&(pgc->vsync_lock));
+
 	rdma_update_task = kthread_create(ext_disp_rdma_update_kthread,
 							 NULL, "ext_disp_rdma_update");
 	wake_up_process(rdma_update_task);
 
-	init_waitqueue_head(&rdma_update_wq);
-
-	mutex_init(&(pgc->vsync_lock));
 	pgc->state = EXTD_INIT;
 
  done:
