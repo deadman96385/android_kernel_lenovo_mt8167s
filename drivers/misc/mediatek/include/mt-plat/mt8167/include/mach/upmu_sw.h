@@ -90,6 +90,9 @@ extern unsigned int pmic_config_interface(unsigned int regnum, unsigned int val,
 	unsigned int shift);
 extern unsigned int pmic_read_interface(unsigned int regnum, unsigned int *val, unsigned int mask, unsigned int shift);
 
+extern void upmu_set_vcn35_on_ctrl_bt(unsigned int val);
+extern void upmu_set_vcn35_on_ctrl_wifi(unsigned int val);
+
 /* upmu interface */
 static inline void upmu_set_rg_vcdt_hv_en(unsigned int val)
 {
@@ -1223,28 +1226,6 @@ static inline unsigned int upmu_get_ni_vproc_vosel(void)
 	    );
 
 	return val;
-}
-
-static inline void upmu_set_vcn35_on_ctrl_bt(unsigned int val)
-{
-	unsigned int ret = 0;
-
-	ret = pmic_config_interface((unsigned int)(MT6392_ANALDO_CON16),
-				    (unsigned int)(val),
-				    (unsigned int)(MT6392_PMIC_VCN35_ON_CTRL_BT_MASK),
-				    (unsigned int)(MT6392_PMIC_VCN35_ON_CTRL_BT_SHIFT)
-	    );
-}
-
-static inline void upmu_set_vcn35_on_ctrl_wifi(unsigned int val)
-{
-	unsigned int ret = 0;
-
-	ret = pmic_config_interface((unsigned int)(MT6392_ANALDO_CON17),
-				    (unsigned int)(val),
-				    (unsigned int)(MT6392_PMIC_VCN35_ON_CTRL_WIFI_MASK),
-				    (unsigned int)(MT6392_PMIC_VCN35_ON_CTRL_WIFI_SHIFT)
-	    );
 }
 
 static inline unsigned int upmu_get_auxadc_adc_out_wakeup_pchr(void)
