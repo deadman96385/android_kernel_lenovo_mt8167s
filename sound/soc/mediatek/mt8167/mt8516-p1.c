@@ -509,9 +509,11 @@ static int mt8516_p1_dev_probe(struct platform_device *pdev)
 	mt8516_p1_gpio_probe(card);
 
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
-	if (ret)
+	if (ret) {
 		dev_err(&pdev->dev, "%s snd_soc_register_card fail %d\n",
-			__func__, ret);
+		__func__, ret);
+		return ret;
+	}
 	soc_ctlx_init(&card_data->ctlx_res, card);
 
 	return ret;
