@@ -1246,6 +1246,7 @@ int dpmgr_path_config(disp_path_handle dp_handle, struct disp_ddp_path_config *c
 	handle = (struct ddp_path_handle *)dp_handle;
 	modules = ddp_get_scenario_list(handle->scenario);
 	module_num = ddp_get_module_num(handle->scenario);
+	config->hw_mutex_id = handle->hwmutexid;
 
 	memcpy(&handle->last_config, config, sizeof(struct disp_ddp_path_config));
 

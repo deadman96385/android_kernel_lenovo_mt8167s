@@ -120,6 +120,7 @@ struct disp_ddp_path_config {
 	unsigned int dst_w;
 	unsigned int dst_h;
 	unsigned int fps;
+	unsigned int hw_mutex_id;
 };
 
 typedef int (*ddp_module_notify)(enum DISP_MODULE_ENUM, enum DISP_PATH_EVENT);
