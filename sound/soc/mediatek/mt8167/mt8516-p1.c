@@ -261,13 +261,12 @@ static struct snd_soc_dai_link mt8516_p1_dais[] = {
 		.name = "I2S 8CH Playback",
 		.stream_name = "I2S8CH Playback",
 		.cpu_dai_name = "HDMI",
-		.codec_dai_name = "cs4382a-i2s",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
 		.trigger = {
 			SND_SOC_DPCM_TRIGGER_POST,
 			SND_SOC_DPCM_TRIGGER_POST
 		},
-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-			   SND_SOC_DAIFMT_CBS_CFS,
 		.dynamic = 1,
 		.dpcm_playback = 1,
 	},
@@ -275,8 +274,9 @@ static struct snd_soc_dai_link mt8516_p1_dais[] = {
 		.name = "HDMI BE",
 		.cpu_dai_name = "HDMIO",
 		.no_pcm = 1,
-		.codec_name = "snd-soc-dummy",
-		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_dai_name = "cs4382a-i2s",
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+			   SND_SOC_DAIFMT_CBS_CFS,
 		.dpcm_playback = 1,
 	},
 	{
