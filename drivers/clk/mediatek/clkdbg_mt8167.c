@@ -682,6 +682,29 @@ void setup_provider_clk(struct provider_clk *pvdck)
 }
 
 /*
+ * chip_ver functions
+ */
+
+#include <linux/seq_file.h>
+#include <mt-plat/mtk_chip.h>
+
+static int clkdbg_chip_ver(struct seq_file *s, void *v)
+{
+	static const char * const sw_ver_name[] = {
+		"CHIP_SW_VER_01",
+		"CHIP_SW_VER_02",
+		"CHIP_SW_VER_03",
+		"CHIP_SW_VER_04",
+	};
+
+	enum chip_sw_ver ver = mt_get_chip_sw_ver();
+
+	seq_printf(s, "mt_get_chip_sw_ver(): %d (%s)\n", ver, sw_ver_name[ver]);
+
+	return 0;
+}
+
+/*
  * init functions
  */
 
@@ -696,6 +719,16 @@ static struct clkdbg_ops clkdbg_mt8167_ops = {
 	.setup_provider_clk = setup_provider_clk,
 };
 
+static void __init init_custom_cmds(void)
+{
+	static const struct cmd_fn cmds[] = {
+		CMDFN("chip_ver", clkdbg_chip_ver),
+		{}
+	};
+
+	set_custom_cmds(cmds);
+}
+
 static int __init clkdbg_mt8167_init(void)
 {
 	if (!of_machine_is_compatible("mediatek,mt8167"))
@@ -703,6 +736,7 @@ static int __init clkdbg_mt8167_init(void)
 
 	init_regbase();
 
+	init_custom_cmds();
 	set_clkdbg_ops(&clkdbg_mt8167_ops);
 
 #if ALL_CLK_ON
