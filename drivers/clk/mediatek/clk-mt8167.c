@@ -17,6 +17,7 @@
 #include <linux/of_address.h>
 #include <linux/slab.h>
 #include <linux/mfd/syscon.h>
+#include <mt-plat/mtk_chip.h>
 
 #include "clk-mtk.h"
 #include "clk-gate.h"
@@ -423,9 +424,16 @@ static const char * const dpi1_mm_parents[] __initconst = {
 	"tvdpll_d16"
 };
 
-static const char * const axi_mfg_in_parents[] __initconst = {
+static const char * const axi_mfg_in_parents_e1[] __initconst = {
 	"clk26m_ck",
 	"gfmux_emi1x_sel",
+	"univpll_d24",
+	"mmpll380m"
+};
+
+static const char * const axi_mfg_in_parents[] __initconst = {
+	"clk26m_ck",
+	"mainpll_d11",
 	"univpll_d24",
 	"mmpll380m"
 };
@@ -525,7 +533,7 @@ static const char * const nfiecc_parents[] __initconst = {
 	"csw_nfiecc_sel"
 };
 
-static const struct mtk_composite top_muxes[] __initconst = {
+static struct mtk_composite top_muxes[] __initdata = {
 	/* CLK_MUX_SEL0 */
 	MUX(CLK_TOP_UART0_SEL, "uart0_sel", uart0_parents,
 		0x000, 0, 1),
@@ -947,7 +955,7 @@ static const struct mtk_gate top_clks[] __initconst = {
 		11),
 	GATE_TOP1(CLK_TOP_BTIF, "btif", "ahb_infra_sel",
 		12),
-	GATE_TOP1(CLK_TOP_USB, "usb", "usb_78m_sel",
+	GATE_TOP1(CLK_TOP_USB, "usb", "usb_78m",
 		13),
 	GATE_TOP1(CLK_TOP_FLASHIF_26M, "flashif_26m", "clk26m_ck",
 		14),
@@ -1010,7 +1018,7 @@ static const struct mtk_gate top_clks[] __initconst = {
 		12),
 	GATE_TOP2(CLK_TOP_PWM5_FB, "pwm5_fb", "rg_pwm_infra",
 		13),
-	GATE_TOP2(CLK_TOP_USB_1P, "usb_1p", "usb_78m_sel",
+	GATE_TOP2(CLK_TOP_USB_1P, "usb_1p", "usb_78m",
 		14),
 	GATE_TOP2(CLK_TOP_FLASHIF_FREERUN, "flashif_freerun", "ahb_infra_sel",
 		15),
@@ -1038,6 +1046,8 @@ static const struct mtk_gate top_clks[] __initconst = {
 		26),
 	GATE_TOP2(CLK_TOP_GCPU_B, "gcpu_b", "ahb_infra_sel",
 		27),
+	GATE_TOP2(CLK_TOP_USB_78M, "usb_78m", "usb_78m_sel",
+		31),
 	/* TOP3 */
 	GATE_TOP3(CLK_TOP_RG_SPINOR, "rg_spinor", "spinor_sel",
 		0),
@@ -1292,13 +1302,23 @@ static const struct mtk_gate vdec_clks[] __initconst = {
 static void __init mtk_topckgen_init(struct device_node *node)
 {
 	struct clk_onecell_data *clk_data;
-	int r;
+	int r, i;
 	void __iomem *base;
+	enum chip_sw_ver ver = mt_get_chip_sw_ver();
 
 	base = of_iomap(node, 0);
 	if (!base) {
 		pr_err("%s(): ioremap failed\n", __func__);
 		return;
+	}
+
+	if (ver == CHIP_SW_VER_01) {
+		for (i = 0; i < ARRAY_SIZE(top_muxes); i++) {
+			struct mtk_composite *t = &top_muxes[i];
+
+			if (t->id == CLK_TOP_AXI_MFG_IN_SEL)
+				t->parent_names = axi_mfg_in_parents_e1;
+		}
 	}
 
 	clk_data = mtk_alloc_clk_data(CLK_TOP_NR_CLK);
