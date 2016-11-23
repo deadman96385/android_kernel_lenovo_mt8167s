@@ -134,6 +134,9 @@ void ext_disp_path_set_mode(enum EXT_DISP_PATH_MODE mode, unsigned int session)
 	if (mode == EXTD_DIRECT_LINK_MODE)
 		mode = EXTD_RDMA_DPI_MODE;
 
+	if (primary_display_is_decouple_mode() && !primary_display_is_mirror_mode())
+		mode = EXTD_DECOUPLE_MODE;
+
 	EXT_DISP_LOG("ext_disp_path_set_mode: %d\n", mode);
 	ext_disp_mode = mode;
 	pgc->mode = mode;
@@ -1480,14 +1483,11 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 				&(input->config[i]));
 			dprec_mmp_dump_ovl_layer(&(data_config->ovl_config[config_layer_id]), config_layer_id, 2);
 
-			if (init_roi == 1) {
-				EXT_DISP_LOG("set dest w:%d, h:%d\n",
+			EXT_DISP_LOG("set dest w:%d, h:%d\n",
 						extd_lcm_params.dpi.width, extd_lcm_params.dpi.height);
-				data_config->dst_w = extd_lcm_params.dpi.width;
-				data_config->dst_h = extd_lcm_params.dpi.height;
-				data_config->dst_dirty = 1;
-				/* data_config->rdma_config.address = 0; */
-			}
+			data_config->dst_w = extd_lcm_params.dpi.width;
+			data_config->dst_h = extd_lcm_params.dpi.height;
+			data_config->dst_dirty = 1;
 			data_config->ovl_dirty = 1;
 			pgc->need_trigger_overlay = 1;
 		}
@@ -1536,11 +1536,6 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 	if (pgc->mode == EXTD_DECOUPLE_MODE) {
 		pgc->decouple_wdma_config.dstAddress = pgc->dc_buf[pgc->dc_buf_id];
 		pgc->decouple_wdma_config.security = DISP_NORMAL_BUFFER;
-		pgc->decouple_wdma_config.srcHeight = data_config->dst_h;
-		pgc->decouple_wdma_config.srcWidth = data_config->dst_w;
-		pgc->decouple_wdma_config.clipHeight = data_config->dst_h;
-		pgc->decouple_wdma_config.clipWidth = data_config->dst_w;
-		pgc->decouple_wdma_config.dstPitch = data_config->dst_w * DP_COLOR_BITS_PER_PIXEL(eRGB888) / 8;
 
 		for (i = 0; i < EXTD_OVERLAY_CNT; i++) {
 			if (data_config->ovl_config[i].layer_en &&
