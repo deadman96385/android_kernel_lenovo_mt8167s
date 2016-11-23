@@ -159,6 +159,7 @@ struct mt8167_afe_memif_data {
 
 struct mt8167_afe_be_dai_data {
 	bool prepared[SNDRV_PCM_STREAM_LAST + 1];
+	unsigned int fmt_mode;
 };
 
 struct mt8167_afe_memif {
