@@ -695,6 +695,9 @@ int ddp_mutex_hw_dcm_off(int mutex_idx, void *handle)
 
 int ddp_get_module_num(enum DDP_SCENARIO_ENUM scenario)
 {
+	if (scenario >= DDP_SCENARIO_MAX || scenario < 0)
+		return 0;
+
 	return ddp_get_module_num_l(module_list_scenario[scenario]);
 }
 

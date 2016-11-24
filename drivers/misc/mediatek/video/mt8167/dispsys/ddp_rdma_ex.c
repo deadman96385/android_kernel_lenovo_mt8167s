@@ -879,7 +879,7 @@ static int setup_rdma_sec(enum DISP_MODULE_ENUM module, struct disp_ddp_path_con
 	cmdq_engine = rdma_idx == 0 ? CMDQ_ENG_DISP_RDMA0 : CMDQ_ENG_DISP_RDMA1;
 
 	if (!handle) {
-		DDPMSG("[SVP] bypass rdma sec setting sec=%d,handle=NULL\n", security);
+		DDPMSG("[SVP] bypass rdma%d sec setting sec=%d,handle=NULL\n", rdma_idx, security);
 		return 0;
 	}
 	/* sec setting make sence only in memory mode ! */

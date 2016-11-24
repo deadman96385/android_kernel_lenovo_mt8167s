@@ -2464,6 +2464,8 @@ static int _DC_switch_to_DL_fast(void)
 	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_DONE);
 	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_START);
 
+	disp_update_trigger_time();
+
 	/* 1. enable SODI */
 #if defined(MTK_FB_SODI_SUPPORT)
 	spm_enable_sodi(1);
@@ -3349,6 +3351,7 @@ int _trigger_ovl_to_memory_mirror(disp_path_handle disp_handle, struct cmdqRecSt
 	int layer = 0;
 	unsigned int rdma_pitch_sec;
 
+	DISPMSG("start trigger ovl to mem mirror --- primary, data=%d\n", data);
 	dpmgr_wdma_path_force_power_on();
 	dpmgr_path_trigger(disp_handle, cmdq_handle, CMDQ_ENABLE);
 
