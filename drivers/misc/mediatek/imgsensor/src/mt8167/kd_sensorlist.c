@@ -4202,6 +4202,13 @@ static ssize_t CAMERA_HW_Reg_Debug3(struct file *file, const char *buffer, size_
 	return count;
 }
 
+void CAMERA_HW_Get_i2C_BusNum(unsigned int *I2C_Bus_Num)
+{
+	I2C_Bus_Num[0] = SUPPORT_I2C_BUS_NUM1;
+	I2C_Bus_Num[1] = SUPPORT_I2C_BUS_NUM2;
+}
+
+
 /*=======================================================================
   * platform driver
   *=======================================================================*/
@@ -4266,6 +4273,7 @@ static struct file_operations fcamera_proc_fops1 = {
 	.open = proc_camera_info_open,
 	.read = seq_read,
 };
+
 
 /*=======================================================================
   * CAMERA_HW_i2C_init()
