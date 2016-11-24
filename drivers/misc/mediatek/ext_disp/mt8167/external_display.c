@@ -1088,7 +1088,7 @@ int ext_disp_init(char *lcm_name, unsigned int session)
 	_ext_disp_path_unlock();
 	dpmgr_path_stop(pgc->dpmgr_handle, CMDQ_DISABLE);
 
-	EXT_DISP_LOG("ext_disp_init done\n");
+	EXT_DISP_ERR("ext_disp_init done\n");
 	return ret;
 }
 
@@ -1119,7 +1119,7 @@ int ext_disp_deinit(unsigned int session)
  deinit_exit:
 	_ext_disp_path_unlock();
 	is_context_inited = 0;
-	EXT_DISP_LOG("ext_disp_deinit done\n");
+	EXT_DISP_ERR("ext_disp_deinit done\n");
 	return 0;
 }
 
@@ -1168,10 +1168,20 @@ int ext_disp_suspend(unsigned int session)
 	}
 
 	pgc->need_trigger_overlay = 0;
+	pgc->state = EXTD_SUSPEND;
 
 	usleep_range(16000, 17000);
 	if (dpmgr_path_is_busy(pgc->dpmgr_handle))
 		dpmgr_wait_event_timeout(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_DONE, HZ);
+
+	if (ext_disp_use_cmdq == CMDQ_ENABLE && DISP_SESSION_DEV(session) != DEV_EINK + 1)
+		_cmdq_stop_trigger_loop();
+
+	dpmgr_path_stop(pgc->dpmgr_handle, CMDQ_DISABLE);
+	dpmgr_path_power_off(pgc->dpmgr_handle, CMDQ_DISABLE);
+	if (dpmgr_path_is_busy(pgc->dpmgr_handle))
+		dpmgr_wait_event_timeout(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_DONE, HZ);
+	dpmgr_path_reset(pgc->dpmgr_handle, CMDQ_DISABLE);
 
 	if (pgc->mode == EXTD_DECOUPLE_MODE) {
 		if (dpmgr_path_is_busy(pgc->ovl2mem_path_handle))
@@ -1179,24 +1189,10 @@ int ext_disp_suspend(unsigned int session)
 		msleep(30);
 	}
 
-	if (ext_disp_use_cmdq == CMDQ_ENABLE && DISP_SESSION_DEV(session) != DEV_EINK + 1)
-		_cmdq_stop_trigger_loop();
-
-	dpmgr_path_stop(pgc->dpmgr_handle, CMDQ_DISABLE);
-
-	if (dpmgr_path_is_busy(pgc->dpmgr_handle))
-		dpmgr_wait_event_timeout(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_DONE, HZ);
-
-	dpmgr_path_reset(pgc->dpmgr_handle, CMDQ_DISABLE);
-
-	dpmgr_path_power_off(pgc->dpmgr_handle, CMDQ_DISABLE);
-
-	pgc->state = EXTD_SUSPEND;
-
  done:
 	_ext_disp_path_unlock();
 
-	EXT_DISP_LOG("ext_disp_suspend done\n");
+	EXT_DISP_ERR("ext_disp_suspend done\n");
 	return ret;
 }
 
@@ -1209,7 +1205,7 @@ int ext_disp_resume(unsigned int session)
 	_ext_disp_path_lock();
 
 	if (pgc->state != EXTD_SUSPEND) {
-		EXT_DISP_ERR("EXTD_DEINIT/EXTD_INIT/EXTD_RESUME\n");
+		EXT_DISP_ERR("no need resume, pgc->state = %d\n", pgc->state);
 		goto done;
 	}
 
@@ -1231,10 +1227,9 @@ int ext_disp_resume(unsigned int session)
 		pgc->suspend_config = 0;
 
 	pgc->state = EXTD_RESUME;
-
+	EXT_DISP_ERR("ext_disp_resume done\n");
  done:
 	_ext_disp_path_unlock();
-	EXT_DISP_LOG("ext_disp_resume done\n");
 	mmprofile_log_ex(ddp_mmp_get_events()->Extd_State, MMPROFILE_FLAG_PULSE, Resume, 1);
 	return ret;
 }

@@ -1963,7 +1963,9 @@ int set_session_mode(struct disp_session_config *config_info, int force)
 
 	primary_display_switch_mode(config_info->mode, config_info->session_id, force);
 #if defined(CONFIG_MTK_HDMI_SUPPORT) || defined(CONFIG_MTK_EPD_SUPPORT)
-	external_display_switch_mode(config_info->mode, session_config, config_info->session_id);
+	if (!primary_display_is_sleepd())
+		external_display_switch_mode(config_info->mode, session_config,
+						config_info->session_id);
 #endif
 	return ret;
 }

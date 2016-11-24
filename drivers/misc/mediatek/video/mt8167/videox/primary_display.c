@@ -5969,7 +5969,7 @@ done:
 #endif
 	primary_trigger_cnt = 0;
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_suspend, MMPROFILE_FLAG_END, 0, 0);
-	DISPCHECK("primary_display_suspend end\n");
+	pr_err("primary_display_suspend end\n");
 	return ret;
 }
 
@@ -6194,6 +6194,8 @@ int primary_display_resume(void)
 
 done:
 	_primary_path_unlock(__func__);
+
+	pr_err("primary_display_resume end\n");
 
 	/* primary_display_diagnose(); */
 #ifndef DISP_NO_AEE
