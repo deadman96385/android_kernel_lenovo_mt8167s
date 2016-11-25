@@ -485,8 +485,62 @@ static int cs4382a_soc_resume(struct snd_soc_codec *codec)
 #define cs4382a_soc_resume	NULL
 #endif /* CONFIG_PM */
 
+static int cs4382a_vol_get(struct snd_kcontrol *kctl,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kctl);
+	struct cs4382a_private *cs4382a =
+		snd_soc_component_get_drvdata(component);
+	int value, ret;
+
+	ret = regmap_read(cs4382a->regmap, CS4382A_VOLA1, &value);
+	if (ret < 0) {
+		pr_err("%s failed(%d) to read volume at cs4382a\n",
+			__func__, ret);
+		return ret;
+	}
+	ucontrol->value.integer.value[0] = 100 - (value&0x7F);
+	pr_notice("read volume is :%d\n", 100 - (value&0x7F));
+
+	return 0;
+}
+
+static int cs4382a_vol_put(struct snd_kcontrol *kctl,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kctl);
+	struct cs4382a_private *cs4382a =
+		snd_soc_component_get_drvdata(component);
+	int value, ret;
+
+	value = ucontrol->value.integer.value[0];
+	pr_notice("volume setting is :%d\n", value);
+	value = 100 - value;
+	ret = regmap_update_bits(cs4382a->regmap, CS4382A_MODE3, 0x20, 0x20);
+	if (ret < 0) {
+		pr_err("%s failed(%d) to set volume single control\n",
+			__func__, ret);
+		return ret;
+	}
+	/* if set volume to -100db, do mute enable */
+	if (value == 100)
+		value |= 0x80;
+	else
+		value &= 0x7F;
+
+	ret = regmap_write(cs4382a->regmap, CS4382A_VOLA1, value);
+	if (ret < 0) {
+		pr_err("%s failed(%d) to set volume control\n",
+			__func__, ret);
+	}
+
+	return ret;
+}
+
+
 static const struct snd_kcontrol_new cs4382a_controls[] = {
 	SOC_SINGLE("Amute H/L Switch", CS4382A_MODE3, 3, 1, 0),
+	SOC_SINGLE("VOL Single Switch", CS4382A_MODE3, 5, 1, 0),
 	SOC_SINGLE("DAC MuteA1 Switch", CS4382A_VOLA1, 7, 1, 0),
 	SOC_SINGLE("DAC MuteB1 Switch", CS4382A_VOLB1, 7, 1, 0),
 	SOC_SINGLE("DAC MuteA2 Switch", CS4382A_VOLA2, 7, 1, 0),
@@ -495,6 +549,13 @@ static const struct snd_kcontrol_new cs4382a_controls[] = {
 	SOC_SINGLE("DAC MuteB3 Switch", CS4382A_VOLB3, 7, 1, 0),
 	SOC_SINGLE("DAC MuteA4 Switch", CS4382A_VOLA4, 7, 1, 0),
 	SOC_SINGLE("DAC MuteB4 Switch", CS4382A_VOLB4, 7, 1, 0),
+	SOC_SINGLE_EXT("DAC Master Volume",
+			    0,
+			    0,
+			    100,
+			    0,
+			    cs4382a_vol_get,
+			    cs4382a_vol_put),
 };
 
 /*
@@ -505,8 +566,8 @@ static const struct snd_soc_codec_driver soc_codec_device_cs4382a = {
 	.remove =		cs4382a_remove,
 	.suspend =		cs4382a_soc_suspend,
 	.resume =		cs4382a_soc_resume,
-	.controls = cs4382a_controls,
-	.num_controls = ARRAY_SIZE(cs4382a_controls),
+	.controls =		cs4382a_controls,
+	.num_controls =		ARRAY_SIZE(cs4382a_controls),
 };
 
 /*
