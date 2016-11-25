@@ -34,7 +34,7 @@
 #define IDLE_HAVE_SODI		1
 #define IDLE_HAVE_MCDI		0
 #define IDLE_HAVE_CPUFREQ	0
-#define IDLE_HAVE_THERMAL	0
+#define IDLE_HAVE_THERMAL	1
 #define IDLE_HAVE_GPUDVFS	0
 #define IDLE_HAVE_CPUXGPT	0
 #define IDLE_HAVE_DCM		0
@@ -64,7 +64,7 @@
 #endif
 
 #if IDLE_HAVE_THERMAL
-#include <mach/mt_thermal.h>
+#include <mach/mtk_thermal.h>
 #endif
 
 #if IDLE_HAVE_PTP
