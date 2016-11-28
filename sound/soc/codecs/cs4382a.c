@@ -103,6 +103,20 @@ static const struct reg_default cs4382a_reg_defaults[] = {
 	{ 18, 0x70 },
 };
 
+/* volume linear to db table */
+static const unsigned char vol_linear_to_db[] = {
+50, 40, 34, 30, 28, 26, 24, 23, 22, 21,
+20, 19, 18, 18, 17, 16, 16, 15, 15, 14,
+14, 14, 13, 13, 12, 12, 12, 11, 11, 11,
+10, 10, 10, 10, 9, 9, 9, 9, 8, 8,
+8, 8, 8, 7, 7, 7, 7, 7, 6, 6,
+6, 6, 6, 6, 5, 5, 5, 5, 5, 5,
+4, 4, 4, 4, 4, 4, 4, 3, 3, 3,
+3, 3, 3, 3, 3, 2, 2, 2, 2, 2,
+2, 2, 2, 2, 2, 1, 1, 1, 1, 1,
+1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0
+};
+
 /* Private data for the cs4382a */
 struct cs4382a_private {
 	struct regmap *regmap;
@@ -110,6 +124,7 @@ struct cs4382a_private {
 	unsigned int mode; /* The mode (I2S or left-justified) */
 	unsigned int slave_mode;
 	unsigned int manual_mute;
+	int master_volume;
 	int rst_gpio;
 	/* power domain regulators */
 	struct regulator *supply; /* power for va vd vlc vls */
@@ -418,6 +433,8 @@ static int cs4382a_probe(struct snd_soc_codec *codec)
 	if (ret < 0)
 		dev_err(codec->dev, "set cs4382a pdn disable fail(%d)\n", ret);
 
+	cs4382a->master_volume = 100;
+
 	return ret;
 }
 
@@ -491,16 +508,9 @@ static int cs4382a_vol_get(struct snd_kcontrol *kctl,
 	struct snd_soc_component *component = snd_kcontrol_chip(kctl);
 	struct cs4382a_private *cs4382a =
 		snd_soc_component_get_drvdata(component);
-	int value, ret;
 
-	ret = regmap_read(cs4382a->regmap, CS4382A_VOLA1, &value);
-	if (ret < 0) {
-		pr_err("%s failed(%d) to read volume at cs4382a\n",
-			__func__, ret);
-		return ret;
-	}
-	ucontrol->value.integer.value[0] = 100 - (value&0x7F);
-	pr_notice("read volume is :%d\n", 100 - (value&0x7F));
+	ucontrol->value.integer.value[0] = cs4382a->master_volume;
+	pr_notice("read volume is :%d\n", cs4382a->master_volume);
 
 	return 0;
 }
@@ -511,11 +521,11 @@ static int cs4382a_vol_put(struct snd_kcontrol *kctl,
 	struct snd_soc_component *component = snd_kcontrol_chip(kctl);
 	struct cs4382a_private *cs4382a =
 		snd_soc_component_get_drvdata(component);
-	int value, ret;
+	int value, db, ret;
 
 	value = ucontrol->value.integer.value[0];
 	pr_notice("volume setting is :%d\n", value);
-	value = 100 - value;
+	db = (int)(vol_linear_to_db[value]);
 	ret = regmap_update_bits(cs4382a->regmap, CS4382A_MODE3, 0x20, 0x20);
 	if (ret < 0) {
 		pr_err("%s failed(%d) to set volume single control\n",
@@ -523,16 +533,17 @@ static int cs4382a_vol_put(struct snd_kcontrol *kctl,
 		return ret;
 	}
 	/* if set volume to -100db, do mute enable */
-	if (value == 100)
-		value |= 0x80;
+	if (value == 0)
+		db |= 0x80;
 	else
-		value &= 0x7F;
+		db &= 0x7F;
 
-	ret = regmap_write(cs4382a->regmap, CS4382A_VOLA1, value);
+	ret = regmap_write(cs4382a->regmap, CS4382A_VOLA1, db);
 	if (ret < 0) {
 		pr_err("%s failed(%d) to set volume control\n",
 			__func__, ret);
 	}
+	cs4382a->master_volume = value;
 
 	return ret;
 }
