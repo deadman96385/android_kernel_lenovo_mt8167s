@@ -113,8 +113,14 @@ static void ptp_restore_ptp_volt(struct ptp_det *det);
 /* TODO: FIXME, refer to PMIC_VAL_TO_VOLT() */
 #define VAL_TO_MV(VAL)		(((VAL) * 625) / 100 + 600)
 #endif
+/**
+ * We need to add 0x10 * 6.25mV = 100mV after getting PTPOD voltage for matching PMIC equation.
+ * pmic_step = ptp_step + 0x10
+ * PTPOD equation is [(ptp_step * 6.25) + 800]
+ * PMIC equation [(pmic_step * 6.25) + 700]
+ */
 /* offset 0x10(16 steps) for CPU/GPU DVFS */
-#define PTPOD_PMIC_OFFSET (0x0)
+#define PTPOD_PMIC_OFFSET (0x10)
 
 #define DTHI_VAL		0x01		/* positive */
 #define DTLO_VAL		0xfe		/* negative (2's compliment) */
@@ -122,7 +128,7 @@ static void ptp_restore_ptp_volt(struct ptp_det *det);
 #define AGECONFIG_VAL		0x555555
 #define AGEM_VAL		0x0
 #define DVTFIXED_VAL		0x6
-#define VCO_VAL			0x10
+#define VCO_VAL			0x38
 #define DCCONFIG_VAL		0x555555
 
 /*
@@ -692,9 +698,9 @@ static struct ptp_det ptp_detectors[NR_PTP_DET] = {
 		.ctrl_id	= PTP_CTRL_MCUSYS,
 		.features	= FEA_INIT01 | FEA_INIT02 | FEA_MON,
 		.freq_base	= 1300000000, /* 1300Mhz */
-		.VBOOT		= PTP_VOLT_TO_PMIC_VAL(1306250), /* 1.30625v */
-		.VMAX		= PTP_VOLT_TO_PMIC_VAL(1306250), /* 1.30625v */
-		.VMIN		= PTP_VOLT_TO_PMIC_VAL(1150000), /* 1.15v */
+		.VBOOT		= 0x38, /* 1.15v */
+		.VMAX		= 0x51, /* 1.30625v */
+		.VMIN		= 0x38, /* 1.15v */
 		.dev_id		= 0,
 	},
 #if SUPPORT_PTPOD_GPU
@@ -703,10 +709,10 @@ static struct ptp_det ptp_detectors[NR_PTP_DET] = {
 		.ops		= &gpu_det_ops,
 		.ctrl_id	= PTP_CTRL_GPUSYS,
 		.features	= FEA_INIT01 | FEA_INIT02 | FEA_MON, /* <-@@@ */
-		.freq_base	= 400000, /* 400Mhz */
-		.VBOOT		= PTP_VOLT_TO_PMIC_VAL(1150000), /* 1.15v */
-		.VMAX		= PTP_VOLT_TO_PMIC_VAL(1306250), /* 1.30625v */
-		.VMIN		= PTP_VOLT_TO_PMIC_VAL(1150000), /* 1.15v */
+		.freq_base	= 500000, /* 500Mhz */
+		.VBOOT		= 0x38, /* 1.15v */
+		.VMAX		= 0x51, /* 1.30625v */
+		.VMIN		= 0x38, /* 1.15v */
 		.volt_offset	= 0, /* <-@@@ */
 /*		.disabled	= BY_PROCFS, */
 		.dev_id		= 2,
@@ -1189,7 +1195,6 @@ static void base_ops_get_freq_volt_table(struct ptp_det *det)
 	FUNC_EXIT(FUNC_LV_HELP);
 }
 
-/* Will return 10uV */
 static int get_volt_cpu(struct ptp_det *det)
 {
 	FUNC_ENTER(FUNC_LV_HELP);
@@ -1481,7 +1486,7 @@ static int limit_mcusys_env(struct ptp_det *det)
 {
 	int ret = 0;
 	int opp_index;
-	int u_vboot = PTP_PMIC_VAL_TO_VOLT(det->VBOOT);
+	int u_vboot = PTP_PMIC_VAL_TO_VOLT(det->VBOOT + PTPOD_PMIC_OFFSET);
 
 	/*
 	 * we have to make sure all CPUs are on and working at VBOOT volt.
@@ -1654,7 +1659,7 @@ static void ptp_set_ptp_volt(struct ptp_det *det)
 {
 #if SET_PMIC_VOLT
 	int i, cur_temp, low_temp_offset;
-	unsigned int clamp_vmax;
+	unsigned int clamp_signed_off_vmax;
 	struct ptp_ctrl *ctrl = id_to_ptp_ctrl(det->ctrl_id);
 
 	cur_temp = det->ops->get_temp(det);
@@ -1669,9 +1674,10 @@ static void ptp_set_ptp_volt(struct ptp_det *det)
 
 	/* all scale of volt_tbl_pmic,volt_tbl,volt_offset are pmic value */
 	for (i = 0; i < det->num_freq_tbl; i++) {
-		clamp_vmax = PTP_VOLT_TO_PMIC_VAL(det->volt_table[i]);
+		clamp_signed_off_vmax = PTP_VOLT_TO_PMIC_VAL(det->volt_table[i]);
 		det->volt_tbl_pmic[i] =
-			clamp(det->volt_tbl[i] + det->volt_offset + low_temp_offset, det->VMIN, clamp_vmax);
+			clamp(det->volt_tbl[i] + det->volt_offset + low_temp_offset,
+					(det->VMIN + PTPOD_PMIC_OFFSET), clamp_signed_off_vmax);
 	}
 
 	ctrl->volt_update |= PTP_VOLT_UPDATE;
@@ -2273,7 +2279,7 @@ void ptp_init01(void)
 		{
 			unsigned int vboot;
 #if 1
-			vboot = PTP_VOLT_TO_PMIC_VAL(det->ops->get_volt(det));
+			vboot = PTP_VOLT_TO_PMIC_VAL(det->ops->get_volt(det)) - PTPOD_PMIC_OFFSET;
 
 			if (ptp_log_en)
 				ptp_info("@%s(), get_volt(%s) = 0x%08X, VBOOT = 0x%08X\n",
@@ -2766,9 +2772,9 @@ static int ptp_dump_proc_show(struct seq_file *m, void *v)
 		   leakage_sram1
 		   );
 #endif
-	for_each_det(det) {
-		seq_printf(m, "PTP_DCVALUES[%s]\t= 0x%08X\n", det->name, det->VBOOT);
+	seq_printf(m, "PTPOD_PMIC_OFFSET = 0x%0X\n", PTPOD_PMIC_OFFSET);
 
+	for_each_det(det) {
 		for (i = PTP_PHASE_INIT01; i < NR_PTP_PHASE; i++) {
 			seq_printf(m, "dcvalues=0x%08X, ptp_freqpct30=0x%08X, ptp_26c=0x%08X,", det->dcvalues[i],
 					det->ptp_freqpct30[i], det->ptp_26c[i]);
