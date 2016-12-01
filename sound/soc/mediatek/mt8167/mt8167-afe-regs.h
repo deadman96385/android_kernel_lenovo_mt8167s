@@ -122,7 +122,7 @@
 #define AFE_MEMIF_MON15		0x0d7c
 #define ABB_AFE_SDM_TEST	0x0f4c
 
-#define AFE_IRQ_STATUS_BITS	0xff
+#define AFE_IRQ_STATUS_BITS	0x2ff
 
 /* AUDIO_TOP_CON0 (0x0000) */
 #define AUD_TCON0_PDN_DAC_PREDIS	BIT(26)
@@ -262,9 +262,12 @@
 #define AFE_TDM_IN_CON1_8CH_PER_SDATA		(0x2 << 10)
 #define AFE_TDM_IN_CON1_4CH_PER_SDATA		(0x1 << 10)
 #define AFE_TDM_IN_CON1_2CH_PER_SDATA		(0x0 << 10)
-#define AFE_TDM_IN_CON1_WLEN_32BIT		(0x2 << 8)
-#define AFE_TDM_IN_CON1_WLEN_16BIT		(0x0 << 8)
+#define AFE_TDM_IN_CON1_WLEN_32BIT		(0x3 << 8)
+#define AFE_TDM_IN_CON1_WLEN_24BIT		(0x2 << 8)
+#define AFE_TDM_IN_CON1_WLEN_16BIT		(0x1 << 8)
 #define AFE_TDM_IN_CON1_I2S			BIT(3)
+#define AFE_TDM_IN_CON1_LRCK_INV		BIT(2)
+#define AFE_TDM_IN_CON1_BCK_INV			BIT(1)
 #define AFE_TDM_IN_CON1_EN			BIT(0)
 
 #endif
