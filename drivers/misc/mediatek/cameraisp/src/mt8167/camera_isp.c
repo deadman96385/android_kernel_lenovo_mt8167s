@@ -104,9 +104,17 @@ typedef bool MBOOL;
 ********************************************************************************/
 #define MyTag "[Camera-ISP]"
 
-#define	LOG_VRB(format,	args...)    pr_info(MyTag "[%s]" format "\n", __func__, ##args)
-#define LOG_DBG(format, args...)    pr_err(MyTag "[%s]" format "\n", __func__, ##args)
-#define LOG_INF(format, args...)    pr_err(MyTag "[%s]" format "\n", __func__, ##args)
+#undef LOG_VRB
+#undef LOG_DBG
+#undef LOG_INF
+#undef LOG_NOTICE
+#undef LOG_WRN
+#undef LOG_ERR
+#undef LOG_AST
+
+#define LOG_VRB(format, args...)    pr_debug(MyTag "[%s]" format "\n", __func__, ##args)
+#define LOG_DBG(format, args...)    pr_debug(MyTag "[%s]" format "\n", __func__, ##args)
+#define LOG_INF(format, args...)    pr_info(MyTag "[%s]" format "\n", __func__, ##args)
 #define LOG_NOTICE(format, args...) pr_notice(MyTag "[%s]" format "\n", __func__, ##args)
 #define LOG_WRN(format, args...)    pr_warn(MyTag "[%s, line%05d]Warning:" format "\n", __func__, __LINE__, ##args)
 #define LOG_ERR(format, args...)    pr_err(MyTag "[%s, line%05d]ERROR:" format "\n", __func__, __LINE__, ##args)
@@ -3870,16 +3878,19 @@ static MINT32 ISP_WaitIrq(ISP_WAIT_IRQ_STRUCT WaitIrq)
 	if (WaitIrq.Clear == ISP_IRQ_CLEAR_WAIT) {
 		spin_lock_irqsave(&(g_IspInfo.SpinLockIrq), flags);
 		if (g_IspInfo.IrqInfo.Status[WaitIrq.Type] & WaitIrq.Status) {
-			LOG_DBG("WARNING: Clear(%d), Type(%d): IrqStatus(0x%08X) has been cleared",
-				WaitIrq.Clear, WaitIrq.Type,
-				g_IspInfo.IrqInfo.Status[WaitIrq.Type] & WaitIrq.Status);
+			/*  LOG_DBG("WARNING: Clear(%d), Type(%d): IrqStatus(0x%08X) has been cleared",
+			 *	WaitIrq.Clear, WaitIrq.Type,
+			 *	g_IspInfo.IrqInfo.Status[WaitIrq.Type] & WaitIrq.Status);
+			*/
 			g_IspInfo.IrqInfo.Status[WaitIrq.Type] &= (~WaitIrq.Status);
 		}
 		spin_unlock_irqrestore(&(g_IspInfo.SpinLockIrq), flags);
 	} else if (WaitIrq.Clear == ISP_IRQ_CLEAR_ALL) {
 		spin_lock_irqsave(&(g_IspInfo.SpinLockIrq), flags);
-		LOG_DBG("WARNING: Clear(%d), Type(%d): IrqStatus(0x%08X) has been cleared",
-			WaitIrq.Clear, WaitIrq.Type, g_IspInfo.IrqInfo.Status[WaitIrq.Type]);
+		/*
+		*  LOG_DBG("WARNING: Clear(%d), Type(%d): IrqStatus(0x%08X) has been cleared",
+		*	WaitIrq.Clear, WaitIrq.Type, g_IspInfo.IrqInfo.Status[WaitIrq.Type]);
+		*/
 		g_IspInfo.IrqInfo.Status[WaitIrq.Type] = 0;
 		spin_unlock_irqrestore(&(g_IspInfo.SpinLockIrq), flags);
 	}
