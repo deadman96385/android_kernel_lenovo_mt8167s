@@ -2186,6 +2186,7 @@ static int mtk_disp_mgr_probe(struct platform_device *pdev)
 	struct class_device;
 	struct class_device *class_dev = NULL;
 	int i;
+	int ret;
 
 	pr_debug("mtk_disp_mgr_probe called!\n");
 
@@ -2196,7 +2197,11 @@ static int mtk_disp_mgr_probe(struct platform_device *pdev)
 	mtk_disp_mgr_cdev->owner = THIS_MODULE;
 	mtk_disp_mgr_cdev->ops = &mtk_disp_mgr_fops;
 
-	cdev_add(mtk_disp_mgr_cdev, mtk_disp_mgr_devno, 1);
+	ret = cdev_add(mtk_disp_mgr_cdev, mtk_disp_mgr_devno, 1);
+	if (ret < 0) {
+		DISPERR("cdev_add failed\n");
+		return -EFAULT;
+	}
 
 	mtk_disp_mgr_class = class_create(THIS_MODULE, DISP_SESSION_DEVICE);
 	class_dev =

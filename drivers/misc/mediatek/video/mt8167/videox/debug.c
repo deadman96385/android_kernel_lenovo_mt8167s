@@ -57,7 +57,8 @@ struct MTKFB_MMP_Events_t MTKFB_MMP_Events;
 /* extern LCM_DRIVER *lcm_drv; */
 #endif
 /* extern unsigned int EnableVSyncLog; */
-/* extern unsigned int gTriggerDispMode; */ /* 0: normal, 1: lcd only, 2: none of lcd and lcm */
+/* extern unsigned int gTriggerDispMode; */
+/* 0: normal, 1: lcd only, 2: none of lcd and lcm */
 
 #define MTKFB_DEBUG_FS_CAPTURE_LAYER_CONTENT_SUPPORT
 
@@ -176,8 +177,10 @@ void init_mtkfb_mmp_events(void)
 		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "EarlySuspend");
 		MTKFB_MMP_Events.DispDone =
 		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "DispDone");
-		MTKFB_MMP_Events.DSICmd = mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "DSICmd");
-		MTKFB_MMP_Events.DSIIRQ = mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "DSIIrq");
+		MTKFB_MMP_Events.DSICmd =
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "DSICmd");
+		MTKFB_MMP_Events.DSIIRQ =
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "DSIIrq");
 		MTKFB_MMP_Events.WaitVSync =
 		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "WaitVSync");
 		MTKFB_MMP_Events.LayerDump =
@@ -192,7 +195,8 @@ void init_mtkfb_mmp_events(void)
 		    mmprofile_register_event(MTKFB_MMP_Events.LayerDump, "Layer3");
 		MTKFB_MMP_Events.OvlDump =
 		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "OvlDump");
-		MTKFB_MMP_Events.FBDump = mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "FBDump");
+		MTKFB_MMP_Events.FBDump =
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "FBDump");
 		MTKFB_MMP_Events.DSIRead =
 		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "DSIRead");
 		MTKFB_MMP_Events.GetLayerInfo =
@@ -205,7 +209,8 @@ void init_mtkfb_mmp_events(void)
 		    mmprofile_register_event(MTKFB_MMP_Events.GetLayerInfo, "LayerInfo2");
 		MTKFB_MMP_Events.LayerInfo[3] =
 		    mmprofile_register_event(MTKFB_MMP_Events.GetLayerInfo, "LayerInfo3");
-		MTKFB_MMP_Events.IOCtrl = mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "IOCtrl");
+		MTKFB_MMP_Events.IOCtrl =
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "IOCtrl");
 		MTKFB_MMP_Events.Debug = mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "Debug");
 		mmprofile_enable_event_recursive(MTKFB_MMP_Events.MTKFB, 1);
 	}
@@ -338,7 +343,8 @@ void DBG_OnLcdDone(void)
 
 		pr_debug("DISP/DBG MTKFB FPS: %ld.%02ld, Avg. update time: %ld.%02ld ms,\n",
 			 f / 100, f % 100, update / 100, update % 100);
-		pr_debug("(TE delay %ld.%02ld ms, LCD %ld.%02ld ms)\n", te / 100, te % 100, lcd / 100, lcd % 100);
+		pr_debug("(TE delay %ld.%02ld ms, LCD %ld.%02ld ms)\n", te / 100, te % 100,
+			 lcd / 100, lcd % 100);
 		reset_fps_logger();
 	}
 }
@@ -581,7 +587,7 @@ void _debug_fps_meter(unsigned long mva, unsigned long va, unsigned int w, unsig
 			_draw_block(addr, i * 18, 10, 18, 18 * _fps_meter_array[i], linepitch,
 				    0xff0000ff);
 		else
-			; /* _draw_block(addr, i*18, 10, 18, 18, linepitch, 0x00000000); */
+			_draw_block(addr, i*18, 10, 18, 18, linepitch, 0x00000000);
 
 	}
 
@@ -592,11 +598,10 @@ void _debug_fps_meter(unsigned long mva, unsigned long va, unsigned int w, unsig
 }
 #endif
 
-static char dbg_buf[1024];
 static void process_dbg_opt(const char *opt)
 {
 	int ret = 0;
-	char *buf = dbg_buf + strlen(dbg_buf);
+	char *tmp;
 
 	if (strncmp(opt, "dsipattern", 10) == 0) {
 		char *p = (char *)opt + 11;
@@ -616,8 +621,8 @@ static void process_dbg_opt(const char *opt)
 			return;
 		}
 	}
-#if 0 /*DVFS*/
-	else if (strncmp(opt, "dvfs_test:", 10) == 0) {
+#if 0	 /*DVFS*/
+	    else if (strncmp(opt, "dvfs_test:", 10) == 0) {
 		char *p = (char *)opt + 10;
 		unsigned int val = (unsigned int)kstrtoul(p, 16, &p);
 
@@ -697,7 +702,7 @@ static void process_dbg_opt(const char *opt)
 		if (ret)
 			pr_err("DISP/%s: errno %d\n", __func__, ret);
 
-		DSI_ChangeClk(DISP_MODULE_DSI0, NULL, (uint32_t)clk);
+		DSI_ChangeClk(DISP_MODULE_DSI0, NULL, (uint32_t) clk);
 	} else if (strncmp(opt, "diagnose", 8) == 0) {
 		primary_display_diagnose();
 		return;
@@ -709,7 +714,7 @@ static void process_dbg_opt(const char *opt)
 		if (ret)
 			pr_err("DISP/%s: errno %d\n", __func__, ret);
 
-		primary_display_switch_dst_mode((uint32_t)mode % 2);
+		primary_display_switch_dst_mode((uint32_t) mode % 2);
 		return;
 	} else if (strncmp(opt, "disp_mode:", 10) == 0) {
 		char *p = (char *)opt + 10;
@@ -726,10 +731,10 @@ static void process_dbg_opt(const char *opt)
 		unsigned long addr = 0;
 		unsigned long val = 0;
 
-		STR_CONVERT(&p, &addr, ul);
-		STR_CONVERT(&p, &val, ul);
-		if (ret)
-			pr_err("DISP/%s: errno %d\n", __func__, ret);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &addr);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &val);
 
 		if (addr)
 			OUTREG32(addr, val);
@@ -740,7 +745,8 @@ static void process_dbg_opt(const char *opt)
 		char *p = (char *)opt + 5;
 		unsigned long addr = 0;
 
-		STR_CONVERT(&p, &addr, ul);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &addr);
 		if (addr)
 			pr_debug("Read register 0x%lx: 0x%08x\n", addr, INREG32(addr));
 		else
@@ -752,24 +758,27 @@ static void process_dbg_opt(const char *opt)
 		dprec_handle_option(0x3);
 	} else if (strncmp(opt, "dprec", 5) == 0) {
 		char *p = (char *)opt + 6;
-		unsigned long int option = 0;
+		unsigned int option = 0;
 
-		STR_CONVERT(&p, &option, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtouint(tmp, 0, &option);
 		dprec_handle_option((int)option);
 	} else if (strncmp(opt, "cmdq", 4) == 0) {
 		char *p = (char *)opt + 5;
-		unsigned long int option = 0;
+		unsigned int option = 0;
 
-		STR_CONVERT(&p, &option, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtouint(tmp, 0, &option);
 		if (option)
 			primary_display_switch_cmdq_cpu(CMDQ_ENABLE);
 		else
 			primary_display_switch_cmdq_cpu(CMDQ_DISABLE);
 	} else if (strncmp(opt, "maxlayer", 8) == 0) {
 		char *p = (char *)opt + 9;
-		unsigned long int maxlayer = 0;
+		unsigned int maxlayer = 0;
 
-		STR_CONVERT(&p, &maxlayer, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtouint(tmp, 0, &maxlayer);
 		if (maxlayer)
 			primary_display_set_max_layer((int)maxlayer);
 		else
@@ -778,17 +787,19 @@ static void process_dbg_opt(const char *opt)
 		primary_display_reset();
 	} else if (strncmp(opt, "esd_check", 9) == 0) {
 		char *p = (char *)opt + 10;
-		unsigned long int enable = 0;
+		unsigned int enable = 0;
 
-		STR_CONVERT(&p, &enable, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtouint(tmp, 0, &enable);
 		primary_display_esd_check_enable((int)enable);
 	} else if (strncmp(opt, "cmd:", 4) == 0) {
 		char *p = (char *)opt + 4;
-		unsigned long int value = 0;
+		unsigned int value = 0;
 		int lcm_cmd[5];
 		unsigned int cmd_num = 1;
 
-		STR_CONVERT(&p, &value, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtouint(tmp, 0, &value);
 		lcm_cmd[0] = (int)value;
 		primary_display_set_cmd(lcm_cmd, cmd_num);
 	} else if (strncmp(opt, "esd_recovery", 12) == 0) {
@@ -822,9 +833,10 @@ static void process_dbg_opt(const char *opt)
 		DISP_CPU_REG_SET(DDP_REG_BASE_MMSYS_CONFIG + 0x150, 1);
 	} else if (strncmp(opt, "cg", 2) == 0) {
 		char *p = (char *)opt + 2;
-		unsigned long int enable = 0;
+		unsigned int enable = 0;
 
-		STR_CONVERT(&p, &enable, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtouint(tmp, 0, &enable);
 		primary_display_enable_path_cg((int)enable);
 	} else if (strncmp(opt, "ovl2mem:", 8) == 0) {
 		if (strncmp(opt + 8, "on", 2) == 0)
@@ -835,9 +847,12 @@ static void process_dbg_opt(const char *opt)
 		if (strncmp(opt + 11, "on", 2) == 0) {
 			char *p = (char *)opt + 14;
 
-			STR_CONVERT(&p, &gCapturePriLayerDownX, uint);
-			STR_CONVERT(&p, &gCapturePriLayerDownY, uint);
-			STR_CONVERT(&p, &gCapturePriLayerNum, uint);
+			tmp = strsep(&p, ",");
+			ret = kstrtouint(tmp, 0, &gCapturePriLayerDownX);
+			tmp = strsep(&p, ",");
+			ret = kstrtouint(tmp, 0, &gCapturePriLayerDownY);
+			tmp = strsep(&p, ",");
+			ret = kstrtouint(tmp, 0, &gCapturePriLayerNum);
 
 			gCapturePriLayerEnable = 1;
 			if (gCapturePriLayerDownX == 0)
@@ -845,8 +860,8 @@ static void process_dbg_opt(const char *opt)
 			if (gCapturePriLayerDownY == 0)
 				gCapturePriLayerDownY = 20;
 			pr_err("dump_layer En %d DownX %d DownY %d,Num %d",
-				 gCapturePriLayerEnable, gCapturePriLayerDownX,
-				 gCapturePriLayerDownY, gCapturePriLayerNum);
+			       gCapturePriLayerEnable, gCapturePriLayerDownX,
+			       gCapturePriLayerDownY, gCapturePriLayerNum);
 
 		} else if (strncmp(opt + 11, "off", 3) == 0) {
 			gCapturePriLayerEnable = 0;
@@ -857,9 +872,12 @@ static void process_dbg_opt(const char *opt)
 		if (strncmp(opt + 14, "on", 2) == 0) {
 			char *p = (char *)opt + 17;
 
-			STR_CONVERT(&p, &gCapturePriLayerDownX, uint);
-			STR_CONVERT(&p, &gCapturePriLayerDownY, uint);
-			STR_CONVERT(&p, &gCapturePriLayerNum, uint);
+			tmp = strsep(&p, ",");
+			ret = kstrtouint(tmp, 0, &gCapturePriLayerDownX);
+			tmp = strsep(&p, ",");
+			ret = kstrtouint(tmp, 0, &gCapturePriLayerDownY);
+			tmp = strsep(&p, ",");
+			ret = kstrtouint(tmp, 0, &gCapturePriLayerNum);
 
 			gCaptureWdmaLayerEnable = 1;
 			if (gCapturePriLayerDownX == 0)
@@ -867,8 +885,8 @@ static void process_dbg_opt(const char *opt)
 			if (gCapturePriLayerDownY == 0)
 				gCapturePriLayerDownY = 20;
 			pr_err("dump_decouple En %d DownX %d DownY %d,Num %d",
-				 gCaptureWdmaLayerEnable, gCapturePriLayerDownX,
-				 gCapturePriLayerDownY, gCapturePriLayerNum);
+			       gCaptureWdmaLayerEnable, gCapturePriLayerDownX,
+			       gCapturePriLayerDownY, gCapturePriLayerNum);
 
 		} else if (strncmp(opt + 14, "off", 3) == 0) {
 			gCaptureWdmaLayerEnable = 0;
@@ -997,7 +1015,7 @@ static int layer_debug_open(struct inode *inode, struct file *file)
 	struct MTKFB_LAYER_DBG_OPTIONS *dbgopt;
 	/* /record the private data */
 	file->private_data = inode->i_private;
-	dbgopt = (struct MTKFB_LAYER_DBG_OPTIONS *) file->private_data;
+	dbgopt = (struct MTKFB_LAYER_DBG_OPTIONS *)file->private_data;
 
 	dbgopt->working_size = DISP_GetScreenWidth() * DISP_GetScreenHeight() * 2 + 32;
 	dbgopt->working_buf = (unsigned long)vmalloc(dbgopt->working_size);
@@ -1017,7 +1035,8 @@ static ssize_t layer_debug_read(struct file *file, char __user *ubuf, size_t cou
 static ssize_t layer_debug_write(struct file *file,
 				 const char __user *ubuf, size_t count, loff_t *ppos)
 {
-	struct MTKFB_LAYER_DBG_OPTIONS *dbgopt = (struct MTKFB_LAYER_DBG_OPTIONS *) file->private_data;
+	struct MTKFB_LAYER_DBG_OPTIONS *dbgopt =
+	    (struct MTKFB_LAYER_DBG_OPTIONS *)file->private_data;
 
 	pr_debug("DISP/DBG mtkfb_layer%d write is not implemented yet\n", dbgopt->layer_index);
 
@@ -1028,7 +1047,7 @@ static int layer_debug_release(struct inode *inode, struct file *file)
 {
 	struct MTKFB_LAYER_DBG_OPTIONS *dbgopt;
 
-	dbgopt = (struct MTKFB_LAYER_DBG_OPTIONS *) file->private_data;
+	dbgopt = (struct MTKFB_LAYER_DBG_OPTIONS *)file->private_data;
 
 	if (dbgopt->working_buf != 0)
 		vfree((void *)dbgopt->working_buf);
