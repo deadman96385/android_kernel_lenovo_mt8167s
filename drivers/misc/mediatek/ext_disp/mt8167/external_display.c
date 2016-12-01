@@ -1205,7 +1205,7 @@ int ext_disp_resume(unsigned int session)
 	_ext_disp_path_lock();
 
 	if (pgc->state != EXTD_SUSPEND) {
-		EXT_DISP_ERR("no need resume, pgc->state = %d\n", pgc->state);
+		EXT_DISP_LOG("no need resume, pgc->state = %d\n", pgc->state);
 		goto done;
 	}
 

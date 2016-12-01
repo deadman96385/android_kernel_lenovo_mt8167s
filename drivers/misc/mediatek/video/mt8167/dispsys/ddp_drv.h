@@ -275,8 +275,6 @@ enum DISP_INTERLACE_FORMAT {
 	DISP_INTERLACE_FORMAT_BOTTOM_FIELD
 };
 
-struct device *disp_get_device(void);
-
 #define DISP_IOCTL_MAGIC        'x'
 
 #define DISP_IOCTL_WRITE_REG       _IOW(DISP_IOCTL_MAGIC, 1, struct DISP_WRITE_REG)
@@ -428,6 +426,7 @@ struct dispsys_device {
 #endif
 #ifdef CONFIG_MTK_IOMMU
 	struct platform_device *larb_pdev[1];
+	struct platform_device *iommu_pdev;
 #endif
 };
 
@@ -458,6 +457,8 @@ extern struct DPI_REGS *DPI_REG[2];
 /*extern unsigned long DPI_TVDPLL_CON1;*/
 
 const char *ddp_get_reg_module_name(enum DISP_REG_ENUM reg);
+struct device *disp_get_device(void);
+struct device *disp_get_iommu_device(void);
 
 #ifdef CONFIG_MTK_M4U
 extern int m4u_enable_tf(int port, bool fgenable);

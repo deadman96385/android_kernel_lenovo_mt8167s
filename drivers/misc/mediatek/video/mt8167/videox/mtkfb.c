@@ -224,8 +224,8 @@ static int mtkfb_open(struct fb_info *info, int user)
 {
 	/* NOT_REFERENCED(info); */
 	/* NOT_REFERENCED(user); */
-	/* DISPFUNC();*/
-	DISPPRINT("%s\n", __func__);
+	DISPFUNC();
+
 	MSG_FUNC_ENTER();
 	MSG_FUNC_LEAVE();
 	return 0;

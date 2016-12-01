@@ -304,6 +304,15 @@ struct device *disp_get_device(void)
 	return dispsys_dev->dev;
 }
 
+struct device *disp_get_iommu_device(void)
+{
+	if (!dispsys_dev->iommu_pdev)
+		return NULL;
+
+	return &(dispsys_dev->iommu_pdev->dev);
+}
+
+
 #if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) && defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
 static struct miscdevice disp_misc_dev;
 #endif
@@ -510,7 +519,7 @@ const char *ddp_get_reg_module_name(enum DISP_REG_ENUM reg)
 	case DISP_REG_SMI_LARB0:
 		return "mediatek,mt8167-smi-larb";
 	case DISP_REG_SMI_COMMON:
-		return "mediatek,mt8167-smi";
+		return "mediatek,mt8167-smi-common";
 	case DISP_REG_MIPI:
 		return "mediatek,mt8167-disp_mipi_tx";
 	case DISP_REG_MUTEX:
@@ -541,6 +550,7 @@ static int disp_probe(struct platform_device *pdev)
 #ifdef CONFIG_MTK_IOMMU
 	struct device_node *larb_node[1];
 	struct platform_device *larb_pdev[1];
+	struct platform_device *iommu_pdev = NULL;
 #endif
 
 	DDPMSG("real disp_probe\n");
@@ -570,9 +580,21 @@ static int disp_probe(struct platform_device *pdev)
 	larb_pdev[0] = of_find_device_by_node(larb_node[0]);
 	of_node_put(larb_node[0]);
 	if ((!larb_pdev[0]) || (!larb_pdev[0]->dev.driver)) {
-		pr_err("disp_probe is earlier than SMI\n");
+		DDPERR("disp_probe is earlier than SMI\n");
 		return -EPROBE_DEFER;
 	}
+
+	/* add for mmp dump mva->pa */
+	np = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-pseudo-port-m4u");
+	if (np == NULL) {
+		DDPERR("DT mediatek,mt8167-pseudo-port-m4u is not found\n");
+	} else {
+		iommu_pdev = of_find_device_by_node(np);
+		of_node_put(np);
+		if (!iommu_pdev)
+			DDPERR("get iommu device failed\n");
+	}
+
 #endif
 
 	new_count = nr_dispsys_dev + 1;
@@ -587,6 +609,7 @@ static int disp_probe(struct platform_device *pdev)
 	dispsys_dev->dev = &pdev->dev;
 #ifdef CONFIG_MTK_IOMMU
 	dispsys_dev->larb_pdev[0] = larb_pdev[0];
+	dispsys_dev->iommu_pdev = iommu_pdev;
 	dev_set_drvdata(&pdev->dev, dispsys_dev);
 #endif
 
