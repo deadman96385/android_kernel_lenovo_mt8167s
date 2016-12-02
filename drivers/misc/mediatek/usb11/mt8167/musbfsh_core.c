@@ -847,6 +847,36 @@ static int __init musbfsh_core_init(struct musbfsh *musbfsh)
 	void __iomem *mbase = musbfsh->mregs;
 	int status = 0;
 	int i;
+	char aInfo[90];
+	u8 reg;
+
+	/* log core options (read using indexed model) */
+	reg = musbfsh_read_configdata(mbase);
+	strcpy(aInfo, (reg & MUSBFSH_CONFIGDATA_UTMIDW) ? "UTMI-16" : "UTMI-8");
+	if (reg & MUSBFSH_CONFIGDATA_DYNFIFO) {
+		strcat(aInfo, ", dyn FIFOs");
+		musbfsh->dyn_fifo = true;
+	}
+	if (reg & MUSBFSH_CONFIGDATA_MPRXE) {
+		strcat(aInfo, ", bulk combine");
+		musbfsh->bulk_combine = true;
+	}
+	if (reg & MUSBFSH_CONFIGDATA_MPTXE) {
+		strcat(aInfo, ", bulk split");
+		musbfsh->bulk_split = true;
+	}
+	if (reg & MUSBFSH_CONFIGDATA_HBRXE) {
+		strcat(aInfo, ", HB-ISO Rx");
+		musbfsh->hb_iso_rx = true;
+	}
+	if (reg & MUSBFSH_CONFIGDATA_HBTXE) {
+		strcat(aInfo, ", HB-ISO Tx");
+		musbfsh->hb_iso_tx = true;
+	}
+	if (reg & MUSBFSH_CONFIGDATA_SOFTCONE)
+		strcat(aInfo, ", SoftConn");
+
+	WARNING("%s: ConfigData=0x%02x (%s)\n", musbfsh_driver_name, reg, aInfo);
 
 	INFO("++\n");
 	/* configure ep0 */
