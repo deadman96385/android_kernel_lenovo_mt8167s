@@ -162,20 +162,21 @@ struct device *sensor_device;
 #define PFX "[kd_sensorlist]"
 #define PK_DBG_NONE(fmt, arg...)    do {} while (0)
 #define PK_DBG_FUNC(fmt, arg...)    pr_debug(PFX "[%s] " fmt, __func__, ##arg)
-#define PK_INFO(fmt, arg...)    pr_info(PFX " [%s] " fmt, __func__, ##arg)
 
 #undef DEBUG_CAMERA_HW_K
 #define DEBUG_CAMERA_HW_K
 #ifdef DEBUG_CAMERA_HW_K
 #define PK_DBG PK_DBG_FUNC
-#define PK_ERR(fmt, arg...)         pr_err(PFX "[%s] " fmt, __func__, ##arg)
+#define PK_INFO(fmt, arg...)         pr_info(PFX "[%s] " fmt, __func__, ##arg)
+#define PK_ERR(fmt, arg...)          pr_err(PFX "[%s] " fmt, __func__, ##arg)
 #define PK_XLOG_INFO(fmt, args...) \
 	do {    \
 	    pr_debug(fmt, ##args); \
 	} while (0)
 #else
 #define PK_DBG(a, ...)
-#define PK_ERR(fmt, arg...)             pr_err(PFX "[%s] " fmt, __func__, ##arg)
+#define PK_INFO(fmt, arg...)         pr_info(PFX "[%s] " fmt, __func__, ##arg)
+#define PK_ERR(fmt, arg...)          pr_err(PFX "[%s] " fmt, __func__, ##arg)
 #define PK_XLOG_INFO(fmt, args...)
 
 #endif
@@ -1857,7 +1858,8 @@ static inline int adopt_CAMERA_HW_GetInfo2(void *pBuf)
 		if (copy_to_user
 		    ((void __user *)(pSensorGetInfo->pSensorResolution),
 		     (void *)psensorResolution[0], sizeof(MSDK_SENSOR_RESOLUTION_INFO_STRUCT))) {
-			PK_DBG("[CAMERA_HW][Resolution] ioctl copy to user failed\n");
+			PK_ERR("[CAMERA_HW][Resolution] ioctl copy to user failed, addr:%p\n",
+				pSensorGetInfo->pSensorResolution);
 			return -EFAULT;
 		}
 	} else {
@@ -1865,7 +1867,8 @@ static inline int adopt_CAMERA_HW_GetInfo2(void *pBuf)
 		if (copy_to_user
 		    ((void __user *)(pSensorGetInfo->pSensorResolution),
 		     (void *)psensorResolution[1], sizeof(MSDK_SENSOR_RESOLUTION_INFO_STRUCT))) {
-			PK_DBG("[CAMERA_HW][Resolution] ioctl copy to user failed\n");
+			PK_ERR("[CAMERA_HW][Resolution][not RFC] ioctl copy to user failed addr:%p\n",
+				pSensorGetInfo->pSensorResolution);
 			return -EFAULT;
 		}
 	}
