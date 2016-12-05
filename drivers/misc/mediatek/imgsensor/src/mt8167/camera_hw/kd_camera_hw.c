@@ -215,17 +215,10 @@ int mtkcam_gpio_set(int PinIdx, int PwrType, int Val)
 
 	switch (PwrType) {
 	case CAMRST:
-		if (PinIdx == 0) {
-			if (Val == 0)
-				gpio_direction_output(GPIO_CAM_RST, 0);
-			else
-				gpio_direction_output(GPIO_CAM_RST, 1);
-		} else {
-			if (Val == 0)
-				gpio_direction_output(GPIO_CAM_RST, 0);
-			else
-				gpio_direction_output(GPIO_CAM_RST, 1);
-		}
+		if (Val == 0)
+			gpio_direction_output(GPIO_CAM_RST, 0);
+		else
+			gpio_direction_output(GPIO_CAM_RST, 1);
 		break;
 	case CAMPDN:
 		if (PinIdx == 0) {
@@ -273,7 +266,7 @@ bool _hwPowerOnCnt(int PinIdx, KD_REGULATOR_TYPE_T powerId, int powerVolt, char 
 			cntVCAMA += 1;
 		else if (powerId == VCAMIO)
 			cntVCAMIO += 1;
-		else if (powerId == VCAMIO)
+		else if (powerId == VCAMAF)
 			cntVCAMAF += 1;
 		else if (powerId == SUB_VCAMD)
 			cntVCAMD_SUB += 1;

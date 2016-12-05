@@ -486,19 +486,13 @@ void GC0312NightMode(kal_bool bEnable)
 {
 	if (bEnable) {
 		GC0312_write_cmos_sensor(0xfe, 0x01);
-		if (GC0312_MPEG4_encode_mode == KAL_TRUE)
-			GC0312_write_cmos_sensor(0x3c, 0x30);
-		else
-			GC0312_write_cmos_sensor(0x3c, 0x30);
+		GC0312_write_cmos_sensor(0x3c, 0x30);
 		GC0312_write_cmos_sensor(0xfe, 0x00);
 		/* GC0312GammaSelect(GC0312_RGB_Gamma_night); */
 		GC0312_NIGHT_MODE = KAL_TRUE;
 	} else {
 		GC0312_write_cmos_sensor(0xfe, 0x01);
-		if (GC0312_MPEG4_encode_mode == KAL_TRUE)
-			GC0312_write_cmos_sensor(0x3c, 0x20);
-		else
-			GC0312_write_cmos_sensor(0x3c, 0x20);
+		GC0312_write_cmos_sensor(0x3c, 0x20);
 		GC0312_write_cmos_sensor(0xfe, 0x00);
 		/* GC0312GammaSelect(GC0312_RGB_Gamma_m3); */
 		GC0312_NIGHT_MODE = KAL_FALSE;
