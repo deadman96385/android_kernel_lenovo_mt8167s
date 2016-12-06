@@ -128,7 +128,7 @@ static void ptp_restore_ptp_volt(struct ptp_det *det);
 #define AGECONFIG_VAL		0x555555
 #define AGEM_VAL		0x0
 #define DVTFIXED_VAL		0x6
-#define VCO_VAL			0x38
+#define VCO_VAL			0x10
 #define DCCONFIG_VAL		0x555555
 
 /*
