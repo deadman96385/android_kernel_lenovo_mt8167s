@@ -293,6 +293,7 @@ static int assign_default_irqs_table(enum DDP_SCENARIO_ENUM scenario, struct DDP
 	return 0;
 }
 
+static int fix_mutex_id;
 static int acquire_mutex(enum DDP_SCENARIO_ENUM scenario)
 {
 /* /: primay use mutex 0 */
@@ -301,6 +302,11 @@ static int acquire_mutex(enum DDP_SCENARIO_ENUM scenario)
 	int mutex_idx_free = content->mutex_idx;
 
 	ASSERT(scenario >= 0 && scenario < DDP_SCENARIO_MAX);
+	if ((scenario == DDP_SCENARIO_PRIMARY_DITHER_MEMOUT
+		|| scenario == DDP_SCENARIO_PRIMARY_OVL_MEMOUT)
+		&& fix_mutex_id != 0)
+		return fix_mutex_id;
+
 	while (mutex_idx_free) {
 		if (mutex_idx_free & 0x1) {
 			content->mutex_idx &= (~(0x1 << mutex_id));
@@ -311,6 +317,9 @@ static int acquire_mutex(enum DDP_SCENARIO_ENUM scenario)
 		++mutex_id;
 	}
 	ASSERT(mutex_id < (DISP_MUTEX_DDP_FIRST + DISP_MUTEX_DDP_COUNT));
+	if (scenario == DDP_SCENARIO_PRIMARY_DITHER_MEMOUT
+		|| scenario == DDP_SCENARIO_PRIMARY_OVL_MEMOUT)
+		fix_mutex_id = mutex_id;
 	DISP_LOG_I("scenario %s acquire mutex %d , left mutex 0x%x!\n",
 		   ddp_get_scenario_name(scenario), mutex_id, content->mutex_idx);
 	return mutex_id;
@@ -322,6 +331,8 @@ static int release_mutex(int mutex_idx)
 
 	ASSERT(mutex_idx < (DISP_MUTEX_DDP_FIRST + DISP_MUTEX_DDP_COUNT));
 	content->mutex_idx |= 1 << (mutex_idx - DISP_MUTEX_DDP_FIRST);
+	if (fix_mutex_id == mutex_idx)
+		fix_mutex_id = 0;
 	DISP_LOG_I("release mutex %d , left mutex 0x%x!\n", mutex_idx, content->mutex_idx);
 	return 0;
 }
@@ -2158,9 +2169,10 @@ static void dpmgr_irq_handler(enum DISP_MODULE_ENUM module, unsigned int regvalu
 
 int dpmgr_init(void)
 {
-	DDPMSG("ddp manager init\n");
 	if (ddp_manager_init)
 		return 0;
+
+	DDPMSG("ddp manager init\n");
 	ddp_manager_init = 1;
 	ddp_debug_init();
 	disp_init_irq();

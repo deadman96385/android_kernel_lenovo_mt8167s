@@ -685,48 +685,13 @@ static void ovl_restore_regs(enum DISP_MODULE_ENUM module, void *handle)
 	reg_back_cnt[idx] = 0;
 }
 
-static unsigned int ovl_clock_cnt[2] = { 0, 0 };
-
 int ovl_clock_on(enum DISP_MODULE_ENUM module, void *handle)
 {
-	int idx = ovl_index(module);
-
-	DDPMSG("ovl%d_clock_on\n", idx);
-#ifdef ENABLE_CLK_MGR
-	if (idx == 0) {
-#ifdef CONFIG_MTK_CLKMGR
-		enable_clock(MT_CG_DISP0_DISP_OVL0, "OVL0");
-#else
-		ddp_clk_enable(DISP0_DISP_OVL0);
-#endif
-	}
-
-	ovl_clock_cnt[idx]++;
-#endif
 	return 0;
 }
 
 int ovl_clock_off(enum DISP_MODULE_ENUM module, void *handle)
 {
-	int idx = ovl_index(module);
-
-	DDPMSG("ovl%d_clock_off\n", idx);
-#ifdef ENABLE_CLK_MGR
-	if (ovl_clock_cnt[idx] == 0) {
-		DDPERR("ovl_deinit, clock off OVL%d, but it's already off!\n", idx);
-		return 0;
-	}
-
-	if (idx == 0) {
-#ifdef CONFIG_MTK_CLKMGR
-		disable_clock(MT_CG_DISP0_DISP_OVL0, "OVL0");
-#else
-		ddp_clk_disable(DISP0_DISP_OVL0);
-#endif
-	}
-
-	ovl_clock_cnt[idx]--;
-#endif
 	return 0;
 }
 
@@ -735,15 +700,6 @@ int ovl_resume(enum DISP_MODULE_ENUM module, void *handle)
 	int idx = ovl_index(module);
 
 	DDPMSG("ovl%d_resume\n", idx);
-#ifdef ENABLE_CLK_MGR
-	if (idx == 0) {
-#ifdef CONFIG_MTK_CLKMGR
-		enable_clock(MT_CG_DISP0_DISP_OVL0, "OVL0");
-#else
-		ddp_clk_enable(DISP0_DISP_OVL0);
-#endif
-	}
-#endif
 	ovl_restore_regs(module, handle);
 	return 0;
 }
@@ -754,21 +710,6 @@ int ovl_suspend(enum DISP_MODULE_ENUM module, void *handle)
 
 	DDPMSG("ovl%d_suspend\n", idx);
 	ovl_store_regs(module);
-#ifdef ENABLE_CLK_MGR
-	if (idx == 0) {
-#ifdef CONFIG_MTK_CLKMGR
-		disable_clock(MT_CG_DISP0_DISP_OVL0 + idx, "OVL0");
-#else
-		ddp_clk_disable(DISP0_DISP_OVL0 + idx);
-#endif
-	} else {
-#ifdef CONFIG_MTK_CLKMGR
-		disable_clock(MT_CG_DISP0_DISP_OVL0 + idx, "OVL1");
-#else
-		ddp_clk_disable(DISP0_DISP_OVL0 + idx);
-#endif
-	}
-#endif
 	return 0;
 }
 
