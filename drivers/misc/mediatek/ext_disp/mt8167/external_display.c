@@ -1254,8 +1254,6 @@ static int ext_disp_trigger_ovl_to_memory(disp_path_handle disp_handle, struct c
 unsigned int ovl_curr_addr[EXTD_OVERLAY_CNT];
 static int _ovl_fence_release_callback(uint32_t userdata)
 {
-	int i;
-	int fence_idx = 0;
 	int secure = 0;
 	unsigned int addr = 0;
 
@@ -1279,11 +1277,7 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 	pgc->dc_buf_id++;
 	pgc->dc_buf_id %= DISP_INTERNAL_BUFFER_COUNT;
 
-	for (i = 0; i < EXTD_OVERLAY_CNT; i++) {
-		cmdqBackupReadSlot(pgc->ovl_address, i, &ovl_curr_addr[i]);
-		fence_idx = disp_sync_find_fence_idx_by_addr(pgc->session, i, ovl_curr_addr[i]);
-		mtkfb_release_fence(pgc->session, i, fence_idx + 1);
-	}
+	mtkfb_release_session_fence(pgc->session);
 
 	return 0;
 }
@@ -1493,6 +1487,9 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 			data_config->dst_dirty = 1;
 			data_config->ovl_dirty = 1;
 			pgc->need_trigger_overlay = 1;
+
+			cmdqRecBackupUpdateSlot(cmdq_handle, pgc->ovl_address,
+					config_layer_id, data_config->ovl_config[config_layer_id].addr);
 		}
 		data_config->ovl_dirty = 1;
 		data_config->dst_dirty = 1;
@@ -1554,10 +1551,6 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 		cmdqRecBackupUpdateSlot(cmdq_handle, pgc->wdma_info, 1, pgc->decouple_wdma_config.dstAddress);
 		_config_wdma_output(&pgc->decouple_wdma_config, disp_handle,
 			    ext_disp_cmdq_enabled() ? cmdq_handle : NULL);
-
-		for (i = 0; i < EXTD_OVERLAY_CNT; i++)
-			cmdqRecBackupRegisterToSlot(cmdq_handle, pgc->ovl_address,
-										i, 0x14007f40 + 0x20*i);
 	}
 	/* this is used for decouple mode, to indicate whether we need to trigger ovl */
 	/* pgc->need_trigger_overlay = 1; */
