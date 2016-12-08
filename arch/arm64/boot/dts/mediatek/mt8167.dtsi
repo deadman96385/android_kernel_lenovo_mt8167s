@@ -471,7 +471,8 @@
 		};
 
 		mcucfg: mcucfg@10200000 {
-			compatible = "mediatek,mt8167-mcucfg", "syscon";
+			compatible = "mediatek,mt8167-mcucfg",
+				     "mediatek,mcucfg", "syscon";
 			reg = <0 0x10200000 0 0x2000>;
 		};
 
@@ -516,7 +517,7 @@
 		};
 
 		systracker: systracker@1020b000 {
-			compatible = "mediatek,bus_dbg-v1";
+			compatible = "mediatek,bus_dbg-v2";
 			reg = <0 0x1020b000 0 0x1000>;
 			interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_LOW>;
 		};
