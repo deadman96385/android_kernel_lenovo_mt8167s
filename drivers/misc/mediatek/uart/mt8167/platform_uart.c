@@ -131,7 +131,6 @@ static unsigned int modem_uart[UART_NR] = { 1, 0, 0};
 #endif
 /*---------------------------------------------------------------------------*/
 /* uart control blocks */
-static struct mtk_uart mtk_uarts[UART_NR];
 /*---------------------------------------------------------------------------*/
 struct mtk_uart_setting *get_uart_default_settings(int idx)
 {
