@@ -80,7 +80,9 @@ int PMIC_IMM_GetOneChannelValue(unsigned int dwChannel, int deCount, int trimd)
 	int count = 0;
 	int raw_data_sum = 0, raw_data_avg = 0;
 	int u4Sample_times = 0;
+	unsigned int adc_channel;
 
+	adc_channel = dwChannel;
 	do {
 		/*defined channel 5 for TYEPC_CC1, channel 6 for TYPEC_CC2*/
 		/*defined channel 7 for CHG_DP, channel 8 for CHG_DM*/
@@ -112,7 +114,7 @@ int PMIC_IMM_GetOneChannelValue(unsigned int dwChannel, int deCount, int trimd)
 					return ret;
 				}
 				/* AUXADC_RQST0_SET is bit 6*/
-				dwChannel = 6;
+				adc_channel = 6;
 			} else {
 				ret = pmic_config_interface(MT6392_TYPE_C_CC_SW_FORCE_MODE_VAL_0, 0x1fc0, 0xffff, 0);
 				if (ret < 0) {
@@ -138,7 +140,7 @@ int PMIC_IMM_GetOneChannelValue(unsigned int dwChannel, int deCount, int trimd)
 					return ret;
 				}
 				/* AUXADC_RQST0_SET is bit 8*/
-				dwChannel = 8;
+				adc_channel = 8;
 			} else {
 				/*DM channel*/
 				ret = pmic_config_interface(MT6392_CHR_CON18, 0x0b00, 0x0f00, 0);
@@ -150,20 +152,20 @@ int PMIC_IMM_GetOneChannelValue(unsigned int dwChannel, int deCount, int trimd)
 		}
 
 		/* AUXADC_RQST0 SET  */
-		ret = pmic_config_interface(MT6392_AUXADC_RQST0_SET, 0x1, 0xffff, dwChannel);
+		ret = pmic_config_interface(MT6392_AUXADC_RQST0_SET, 0x1, 0xffff, adc_channel);
 		if (ret < 0) {
 			mutex_unlock(&mt6392_adc_mutex);
 			return ret;
 		}
 
-		if ((dwChannel == 0) || (dwChannel == 1))
+		if ((adc_channel == 0) || (adc_channel == 1))
 			udelay(1500);
 		else
 			udelay(100);
 
 		/* check auxadc is ready */
 		do {
-			ret = pmic_read_interface(mt6392_auxadc_regs[dwChannel], &reg_val, 0xffff, 0);
+			ret = pmic_read_interface(mt6392_auxadc_regs[adc_channel], &reg_val, 0xffff, 0);
 			if (ret < 0) {
 				mutex_unlock(&mt6392_adc_mutex);
 				return ret;
@@ -177,13 +179,13 @@ int PMIC_IMM_GetOneChannelValue(unsigned int dwChannel, int deCount, int trimd)
 
 		if (adc_rdy != 1) {
 			mutex_unlock(&mt6392_adc_mutex);
-			pr_debug("PMIC_IMM_GetOneChannelValue adc get ready Fail\n");
+			pr_err("PMIC_IMM_GetOneChannelValue adc get ready Fail\n");
 			return -ETIMEDOUT;
 		}
 		count = 0;
 
 		/* get the raw data and calculate the adc result of adc */
-		ret = pmic_read_interface(mt6392_auxadc_regs[dwChannel], &reg_val, 0xffff, 0);
+		ret = pmic_read_interface(mt6392_auxadc_regs[adc_channel], &reg_val, 0xffff, 0);
 		if (ret < 0) {
 			mutex_unlock(&mt6392_adc_mutex);
 			return ret;
@@ -191,7 +193,7 @@ int PMIC_IMM_GetOneChannelValue(unsigned int dwChannel, int deCount, int trimd)
 
 		mutex_unlock(&mt6392_adc_mutex);
 
-		switch (dwChannel) {
+		switch (adc_channel) {
 		case 0:
 		case 1:
 			r_val_temp = 3;
