@@ -1707,7 +1707,7 @@ static void _cmdq_build_trigger_loop(void)
 		/* wait and clear stream_done, HW will assert mutex enable automatically in frame done reset. */
 		/* todo: should let dpmanager to decide wait which mutex's eof. */
 
-		ret = cmdqRecWait(pgc->cmdq_handle_trigger, CMDQ_EVENT_DISP_RDMA0_EOF);
+		/* ret = cmdqRecWait(pgc->cmdq_handle_trigger, CMDQ_EVENT_DISP_RDMA0_EOF); */
 		ret = cmdqRecWait(pgc->cmdq_handle_trigger,
 				  dpmgr_path_get_mutex(pgc->dpmgr_handle) +
 				  CMDQ_EVENT_MUTEX0_STREAM_EOF);
@@ -3342,7 +3342,7 @@ int _trigger_ovl_to_memory(disp_path_handle disp_handle, struct cmdqRecStruct *c
 		cmdqRecFlushAsyncCallback(cmdq_handle, (CmdqAsyncFlushCB) callback, data);
 	cmdqRecReset(cmdq_handle);
 	cmdqRecWait(cmdq_handle, CMDQ_EVENT_DISP_WDMA0_EOF);
-	mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger, MMPROFILE_FLAG_PULSE, 0, data);
+	/* mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger, MMPROFILE_FLAG_PULSE, 0, data); */
 	return 0;
 }
 
@@ -6555,8 +6555,8 @@ int primary_display_trigger(int blocking, void *callback, unsigned int userdata)
 				if (primary_display_is_secure_path(DISP_SESSION_PRIMARY)) {
 					_trigger_ovl_to_memory(pgc->ovl2mem_path_handle,
 							       pgc->cmdq_handle_ovl1to2_config,
-							       (fence_release_callback)_ovl_fence_release_callback,
-							       DISP_SESSION_DECOUPLE_MODE, 1);
+						       (fence_release_callback)_ovl_fence_release_callback,
+						       DISP_SESSION_DECOUPLE_MODE, 1);
 					_ovl_fence_release_callback(DISP_SESSION_DECOUPLE_MODE);
 				} else {
 					_trigger_ovl_to_memory(pgc->ovl2mem_path_handle,

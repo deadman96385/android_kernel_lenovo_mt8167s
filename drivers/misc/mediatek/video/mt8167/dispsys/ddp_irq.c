@@ -418,8 +418,12 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 		     dispsys_irq[DISP_REG_WDMA0]) ? DISP_MODULE_WDMA0 : DISP_MODULE_WDMA1;
 		reg_val =
 		    DISP_REG_GET(DISP_REG_WDMA_INTSTA + index * DISP_WDMA_INDEX_OFFSET);
-		if (reg_val & (1 << 0))
+		if (reg_val & (1 << 0)) {
 			DDPIRQ("IRQ: WDMA%d frame done! (cnt%d)\n", index, cnt_wdma_framedone[index]++);
+
+			mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger,
+							MMPROFILE_FLAG_END, 0, DISP_REG_GET(DISP_REG_WDMA_SRC_SIZE));
+		}
 
 		if (reg_val & (1 << 1)) {
 			DDPERR("IRQ: WDMA%d underrun! cnt=%d, src_size(0x%x)\n", index,
@@ -535,6 +539,9 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 				mutex_start_irq_cnt[mutexID]++;
 				mmprofile_log_ex(ddp_mmp_get_events()->MUTEX_IRQ[mutexID],
 					       MMPROFILE_FLAG_PULSE, reg_val, 0);
+				if (mutexID == 1)
+					mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger,
+								MMPROFILE_FLAG_START, 0, 0);
 			}
 			if (reg_val & (0x1 << (mutexID + DISP_MUTEX_TOTAL))) {
 				DDPIRQ("IRQ: mutex%d eof!\n", mutexID);
@@ -548,6 +555,7 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 		module = DISP_MODULE_AAL;
 		reg_val = DISP_REG_GET(DISP_AAL_INTSTA);
 		disp_aal_on_end_of_frame();
+		DISP_CPU_REG_SET(DISP_AAL_INTSTA, ~reg_val);
 	} else if (irq == dispsys_irq[DISP_REG_CONFIG])	{/* MMSYS error intr */
 
 		reg_val = DISP_REG_GET(DISP_REG_CONFIG_MMSYS_INTSTA) & 0x7;

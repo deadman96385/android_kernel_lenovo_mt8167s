@@ -68,6 +68,7 @@ int ext_disp_use_m4u;
 enum EXT_DISP_PATH_MODE ext_disp_mode;
 
 static int is_context_inited;
+static int log_en;
 
 struct ext_disp_path_context {
 	enum EXTD_POWER_STATE state;
@@ -101,6 +102,24 @@ struct ext_disp_path_context {
 
 #define pgc	_get_context()
 
+#ifdef EXT_DISP_LOG
+#undef EXT_DISP_LOG
+#define EXT_DISP_LOG(fmt, arg...)                   \
+	do {                                       \
+		if (log_en) \
+			pr_err("[EXTD]:"fmt, ##arg); \
+	} while (0)
+#endif
+
+#ifdef EXT_DISP_FUNC
+#undef EXT_DISP_FUNC
+#define EXT_DISP_FUNC()                   \
+	do {                                       \
+		if (log_en) \
+			pr_err("[EXTD]: %s\n", __func__); \
+	} while (0)
+#endif
+
 LCM_PARAMS extd_lcm_params;
 int enable_ut;
 disp_path_handle ovl2mem_path_handle;
@@ -120,6 +139,11 @@ static struct ext_disp_path_context *_get_context(void)
 	}
 
 	return &g_context;
+}
+
+void ext_disp_enable_log(bool en)
+{
+	log_en = en;
 }
 
 enum EXT_DISP_PATH_MODE ext_disp_path_get_mode(unsigned int session)
@@ -1162,8 +1186,9 @@ int ext_disp_suspend(unsigned int session)
 	_ext_disp_path_lock();
 
 	if (pgc->state == EXTD_DEINIT || pgc->state == EXTD_SUSPEND || session != pgc->session) {
-		EXT_DISP_ERR("status is not EXTD_RESUME\n");
-		goto done;
+		EXT_DISP_LOG("no need suspend, pgc->state = %d\n", pgc->state);
+		_ext_disp_path_unlock();
+		return ret;
 	}
 
 	pgc->need_trigger_overlay = 0;
@@ -1188,10 +1213,9 @@ int ext_disp_suspend(unsigned int session)
 		msleep(30);
 	}
 
- done:
+	EXT_DISP_ERR("ext_disp_suspend done\n");
 	_ext_disp_path_unlock();
 
-	EXT_DISP_ERR("ext_disp_suspend done\n");
 	return ret;
 }
 
@@ -1257,7 +1281,13 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 	int secure = 0;
 	unsigned int addr = 0;
 
+	_ext_disp_path_lock();
 	EXT_DISP_LOG("extd ovl->wdma frame done\n");
+	if (pgc->state == EXTD_DEINIT || pgc->state == EXTD_SUSPEND) {
+		EXT_DISP_LOG("%s ext display is already slept\n", __func__);
+		_ext_disp_path_unlock();
+		return -1;
+	}
 	cmdqBackupReadSlot(pgc->wdma_info, 0, &(secure));
 	cmdqBackupReadSlot(pgc->wdma_info, 1, &(addr));
 	pgc->decouple_rdma_config.security = secure;
@@ -1278,6 +1308,7 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 	pgc->dc_buf_id %= DISP_INTERNAL_BUFFER_COUNT;
 
 	mtkfb_release_session_fence(pgc->session);
+	_ext_disp_path_unlock();
 
 	return 0;
 }
@@ -1313,8 +1344,8 @@ int ext_disp_trigger(int blocking, void *callback, unsigned int userdata, unsign
 	}
 
 	if (pgc->mode == EXTD_DECOUPLE_MODE) {
-		/* because primary secure ovl->wdma use sync */
-		ext_disp_trigger_ovl_to_memory(pgc->ovl2mem_path_handle, pgc->cmdq_handle_ovl2mem_config, NULL, 0, 1);
+		ext_disp_trigger_ovl_to_memory(pgc->ovl2mem_path_handle, pgc->cmdq_handle_ovl2mem_config,
+					(fence_release_callback)_ovl_fence_release_callback, 0, 1);
 		_ovl_fence_release_callback(0);
 	} else {
 		if (DISP_SESSION_TYPE(session) == DISP_SESSION_EXTERNAL && DISP_SESSION_DEV(session) == DEV_MHL + 1)
@@ -1703,6 +1734,12 @@ int ext_disp_path_change(enum EXTD_OVL_REQ_STATUS action, unsigned int session)
 
 	if (EXTD_OVERLAY_CNT > 0) {
 		_ext_disp_path_lock();
+		if (pgc->state == EXTD_DEINIT || pgc->state == EXTD_SUSPEND) {
+			EXT_DISP_LOG("%s ext display is already slept\n", __func__);
+			_ext_disp_path_unlock();
+			return -1;
+		}
+
 		switch (action) {
 		case EXTD_OVL_NO_REQ:
 			if (pgc->ovl_req_state == EXTD_OVL_REMOVED) {
