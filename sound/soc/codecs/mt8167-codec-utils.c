@@ -636,9 +636,9 @@ static const struct reg_setting mt8167_codec_builtin_amic_enable_regs[] = {
 
 static const struct reg_setting mt8167_codec_headset_amic_enable_regs[] = {
 	{ /* micbias1 */
-		.reg = AUDIO_CODEC_CON01,
-		.mask = BIT(21),
-		.val = BIT(21),
+		.reg = AUDIO_CODEC_CON03,
+		.mask = BIT(6),
+		.val = BIT(6),
 	},
 	{ /* left pga mux <- AU_VIN1 */
 		.reg = AUDIO_CODEC_CON00,
@@ -742,8 +742,8 @@ static const struct reg_setting mt8167_codec_amic_disable_regs[] = {
 		.val = 0x0,
 	},
 	{ /* micbias1 */
-		.reg = AUDIO_CODEC_CON01,
-		.mask = BIT(21),
+		.reg = AUDIO_CODEC_CON03,
+		.mask = BIT(6),
 		.val = 0x0,
 	},
 	{ /* left pga mux <- OPEN */

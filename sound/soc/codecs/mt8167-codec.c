@@ -1371,7 +1371,7 @@ static const struct snd_soc_dapm_widget mt8167_codec_dapm_widgets[] = {
 	SND_SOC_DAPM_SUPPLY_S("AU_MICBIAS0", 5,
 			AUDIO_CODEC_CON03, 17, 0, NULL, 0),
 	SND_SOC_DAPM_SUPPLY_S("AU_MICBIAS1", 5,
-			AUDIO_CODEC_CON01, 21, 0, NULL, 0),
+			AUDIO_CODEC_CON03, 6, 0, NULL, 0),
 
 	/* platform domain */
 	SND_SOC_DAPM_INPUT("AU_VIN0"),
