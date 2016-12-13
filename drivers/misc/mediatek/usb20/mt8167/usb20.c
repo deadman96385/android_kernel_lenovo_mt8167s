@@ -1645,6 +1645,12 @@ static int mt_usb_remove(struct platform_device *pdev)
 static void mt_usb_shutdown(struct platform_device *pdev)
 {
 	pr_err("%s, start to shut down\n", __func__);
+	/* disable all level-1 interrupts in shutdown status */
+	musb_writel(mtk_musb->mregs, USB_L1INTM, 0x0);
+	musb_writeb(mtk_musb->mregs, MUSB_HSDMA_INTR, 0xff);
+	pr_err("%s, 0xa4 = 0x%x, 0x200 = 0x%x\n", __func__,
+		musb_readl(mtk_musb->mregs, USB_L1INTM),
+		musb_readb(mtk_musb->mregs, MUSB_HSDMA_INTR));
 	usb_shutdown = true;
 
 }
