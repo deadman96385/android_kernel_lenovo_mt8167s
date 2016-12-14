@@ -313,7 +313,7 @@ struct device *disp_get_iommu_device(void)
 }
 
 
-#if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) && defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
+#if defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT) && defined(DISP_SVP_DEBUG)
 static struct miscdevice disp_misc_dev;
 #endif
 /* Kernel interface */
@@ -728,7 +728,7 @@ static int disp_remove(struct platform_device *pdev)
 	/* sysfs */
 	kobject_put(&kdispobj);
 
-#if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) && defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
+#if defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT) && defined(DISP_SVP_DEBUG)
 	misc_deregister(&disp_misc_dev);
 #endif
 	return 0;

@@ -4513,7 +4513,7 @@ static void primary_display_frame_update_irq_callback(enum DISP_MODULE_ENUM modu
 			wake_up_interruptible(&primary_display_frame_update_wq);
 		}
 	}
-#if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) && defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
+#if defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
 	/* In TEE, we have to protect WDMA registers, so we can't enable WDMA interrupt */
 	/* here we use ovl frame done interrupt instead */
 	if ((module == DISP_MODULE_OVL0) && (_is_decouple_mode(pgc->session_mode) == 1)) {

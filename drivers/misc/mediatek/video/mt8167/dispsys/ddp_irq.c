@@ -680,7 +680,7 @@ int disp_is_intr_enable(enum DISP_REG_ENUM module)
 		return 0;
 
 	case DISP_REG_WDMA0:
-#if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) && defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
+#if defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
 		return 0;
 #else
 		return 1;
