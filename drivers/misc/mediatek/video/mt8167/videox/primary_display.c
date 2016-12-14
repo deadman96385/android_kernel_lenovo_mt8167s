@@ -5741,7 +5741,7 @@ int primary_display_wait_for_vsync(void *config)
 	if (ret != 0)
 		DISPCHECK("vsync signaled by unknown signal ret=%d\n", ret);
 
-	c->vsync_ts = get_current_time_us();
+	c->vsync_ts = ts;
 	c->vsync_cnt++;
 
 done:
