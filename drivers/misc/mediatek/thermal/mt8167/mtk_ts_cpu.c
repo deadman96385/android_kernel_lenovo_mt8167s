@@ -3229,6 +3229,7 @@ static int tscpu_thermal_resume(struct platform_device *dev)
 
 	if (talking_flag == false) {
 		tscpu_reset_thermal();
+		tscpu_thermal_clock_on();
 
 		temp = DRV_Reg32(TS_CON1);
 		temp &= ~(0x00000030);	/* TS_CON1[5:4]=2'b00,   00: Buffer on, TSMCU to AUXADC */
@@ -3635,8 +3636,6 @@ static void tscpu_reset_thermal(void)
 	temp = DRV_Reg32(INFRA_GLOBALCON_RST_0_CLR);
 	temp |= 0x00000001;	/* 1: Enable reset Disables thermal control software reset */
 	THERMAL_WRAP_WR32(temp, INFRA_GLOBALCON_RST_0_CLR);
-
-	tscpu_thermal_clock_on();
 }
 
 static void tscpu_fast_initial_sw_workaround(void)
@@ -4077,6 +4076,7 @@ static int tscpu_thermal_probe(struct platform_device *pdev)
 	thermal_cal_prepare();
 	thermal_calibration();
 
+	tscpu_thermal_clock_on();
 	tscpu_reset_thermal();
 
 	temp = DRV_Reg32(TS_CON1);
@@ -4249,9 +4249,27 @@ err_unreg:
 
 }
 
+static int tscpu_thermal_remove(struct platform_device *pdev)
+{
+
+	pr_err("tscpu_remove\n");
+#if MTK_TS_CPU_RT
+	if (ktp_thread_handle)
+		kthread_stop(ktp_thread_handle);
+#endif
+	tscpu_unregister_thermal();
+	tscpu_unregister_DVFS_hotplug_cooler();
+	hrtimer_cancel(&ts_tempinfo_hrtimer);
+	tscpu_thermal_clock_off();
+#if THERMAL_DRV_UPDATE_TEMP_DIRECT_TO_MET
+	mt_thermalsampler_registerCB(NULL);
+#endif
+	return 0;
+}
+
 
 static struct platform_driver mtk_thermal_driver = {
-	.remove = NULL,
+	.remove = tscpu_thermal_remove,
 	.shutdown = NULL,
 	.probe = tscpu_thermal_probe,
 	.suspend = tscpu_thermal_suspend,
@@ -4272,24 +4290,7 @@ static int __init tscpu_init(void)
 
 static void __exit tscpu_exit(void)
 {
-
 	tscpu_dprintk("tscpu_exit\n");
-
-#if MTK_TS_CPU_RT
-	if (ktp_thread_handle)
-		kthread_stop(ktp_thread_handle);
-#endif
-
-	tscpu_unregister_thermal();
-	tscpu_unregister_DVFS_hotplug_cooler();
-
-
-	hrtimer_cancel(&ts_tempinfo_hrtimer);
-
-
-#if THERMAL_DRV_UPDATE_TEMP_DIRECT_TO_MET
-	mt_thermalsampler_registerCB(NULL);
-#endif
 }
 module_init(tscpu_init);
 module_exit(tscpu_exit);
