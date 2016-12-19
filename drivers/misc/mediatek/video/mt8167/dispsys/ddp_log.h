@@ -136,8 +136,8 @@ extern unsigned int gEnableUartLog;
 	do {                                       \
 		if (ddp_debug_irq_log_level())          \
 			DISP_LOG_I(fmt, ##args);            \
-		if (g_mobilelog) \
-			pr_debug("[DDP/"LOG_TAG"]"fmt, ##args); \
+		if (ddp_debug_irq_log_level() >= 2) \
+			pr_err("[DDP/"LOG_TAG"]"fmt, ##args); \
 	} while (0)
 
 #define DDPDBG(fmt, args...)                   \

@@ -89,11 +89,14 @@ struct ext_disp_path_context {
 
 	struct disp_internal_buffer_info *decouple_buffer_info[DISP_INTERNAL_BUFFER_COUNT];
 	unsigned int dc_buf[DISP_INTERNAL_BUFFER_COUNT];
+	void *dc_buf_va[DISP_INTERNAL_BUFFER_COUNT];
 	unsigned int dc_sec_buf[DISP_INTERNAL_BUFFER_COUNT];
 	unsigned int dc_buf_id;
 	struct WDMA_CONFIG_STRUCT decouple_wdma_config;
 	struct RDMA_CONFIG_STRUCT decouple_rdma_config;
 	bool is_interlace;
+	bool is_secure;
+	bool is_first_trigger;
 
 	cmdqBackupSlotHandle ovl_address;
 	cmdqBackupSlotHandle wdma_info;
@@ -128,6 +131,9 @@ struct task_struct *rdma_update_task;
 wait_queue_head_t rdma_update_wq;
 atomic_t rdma_update_event = ATOMIC_INIT(0);
 static DEFINE_SEMAPHORE(external_disp_mutex);
+
+static void ext_disp_path_blank(int enCmdq);
+static void ext_disp_path_blank_svp(int enCmdq);
 
 static struct ext_disp_path_context *_get_context(void)
 {
@@ -412,10 +418,12 @@ static int ext_init_decouple_buffers(void)
 		pgc->decouple_buffer_info[i] = allocat_decouple_buffer(buffer_size);
 		if (pgc->decouple_buffer_info[i] != NULL) {
 			pgc->dc_buf[i] = pgc->decouple_buffer_info[i]->mva;
+			pgc->dc_buf_va[i] = pgc->decouple_buffer_info[i]->va;
 			EXT_DISP_LOG("extd alloc decouple buffer: 0x%x\n", pgc->dc_buf[i]);
 		}
 	}
 
+	pgc->decouple_rdma_config.address = pgc->dc_buf[pgc->dc_buf_id];
 	pgc->decouple_rdma_config.height = ext_disp_get_height();
 	pgc->decouple_rdma_config.width = ext_disp_get_width();
 	pgc->decouple_rdma_config.idx = 0;
@@ -438,6 +446,7 @@ static int ext_init_decouple_buffers(void)
 	return 0;
 }
 
+static int ext_free_sec_buffer(void);
 static int ext_deinit_decouple_buffer(void)
 {
 	int i = 0;
@@ -888,8 +897,9 @@ static int _convert_disp_input_to_ovl(struct OVL_CONFIG_STRUCT *dst, struct disp
 		dst->source = OVL_LAYER_SOURCE_MEM;
 	}
 
-	EXT_DISP_LOG("extd convert input to ovl: layer%d en%d w%d h%d pitch%d addr0x%lx\n",
-			dst->layer, dst->layer_en, dst->dst_w, dst->dst_h, dst->src_pitch, dst->addr);
+	EXT_DISP_LOG("convert input to ovl: layer%d en%d w%d h%d pitch%d addr0x%lx sec%d\n",
+			dst->layer, dst->layer_en, dst->dst_w, dst->dst_h,
+			dst->src_pitch, dst->addr, dst->security);
 
 	return ret;
 }
@@ -1015,7 +1025,6 @@ void ext_disp_probe(void)
 
 int ext_disp_init(char *lcm_name, unsigned int session)
 {
-	struct disp_ddp_path_config *data_config;
 	enum EXT_DISP_STATUS ret;
 
 	EXT_DISP_FUNC();
@@ -1080,20 +1089,7 @@ int ext_disp_init(char *lcm_name, unsigned int session)
 
 	dpmgr_path_set_video_mode(pgc->dpmgr_handle, ext_disp_is_video_mode());
 	dpmgr_path_init(pgc->dpmgr_handle, CMDQ_DISABLE);
-
-	data_config = vmalloc(sizeof(struct disp_ddp_path_config));
-	if (data_config) {
-		memset((void *)data_config, 0, sizeof(struct disp_ddp_path_config));
-		memcpy(&(data_config->dispif_config), &extd_lcm_params, sizeof(LCM_PARAMS));
-
-		data_config->dst_w = extd_lcm_params.dpi.width;
-		data_config->dst_h = extd_lcm_params.dpi.height;
-		data_config->dst_dirty = 1;
-		ret = dpmgr_path_config(pgc->dpmgr_handle, data_config, CMDQ_DISABLE);
-		EXT_DISP_LOG("ext_disp_init roi w:%d, h:%d\n", data_config->dst_w, data_config->dst_h);
-		vfree(data_config);
-	} else
-		EXT_DISP_LOG("allocate buffer failed!!!\n");
+	ext_disp_path_blank(CMDQ_DISABLE);
 
 	if (ext_disp_use_cmdq == CMDQ_ENABLE)
 		_cmdq_reset_config_handle();
@@ -1188,6 +1184,9 @@ int ext_disp_suspend(unsigned int session)
 		_ext_disp_path_unlock();
 		return ret;
 	}
+
+	if (pgc->is_secure)
+		ext_disp_path_blank_svp(CMDQ_ENABLE);
 
 	pgc->need_trigger_overlay = 0;
 	pgc->state = EXTD_SUSPEND;
@@ -1302,6 +1301,9 @@ static int _ovl_fence_release_callback(uint32_t block)
 	_config_rdma_input_data(&pgc->decouple_rdma_config, pgc->dpmgr_handle, pgc->cmdq_handle_config);
 	_ext_disp_trigger(0, NULL, 0);
 
+	if (secure !=  DISP_SECURE_BUFFER)
+		ext_free_sec_buffer();
+
 	pgc->dc_buf_id++;
 	pgc->dc_buf_id %= DISP_INTERNAL_BUFFER_COUNT;
 
@@ -1407,6 +1409,68 @@ int ext_disp_suspend_trigger(void *callback, unsigned int userdata, unsigned int
 	return ret;
 }
 
+static void ext_disp_path_blank(int enCmdq)
+{
+	struct disp_ddp_path_config *data_config;
+
+	data_config = vmalloc(sizeof(struct disp_ddp_path_config));
+	if (data_config) {
+		memset((void *)data_config, 0, sizeof(struct disp_ddp_path_config));
+		memcpy(&(data_config->dispif_config), &extd_lcm_params, sizeof(LCM_PARAMS));
+
+		pgc->decouple_rdma_config.address = pgc->dc_buf[pgc->dc_buf_id];
+		pgc->decouple_rdma_config.security = DISP_NORMAL_BUFFER;
+		memcpy(&(data_config->rdma_config), &(pgc->decouple_rdma_config),
+				sizeof(struct RDMA_CONFIG_STRUCT));
+
+		data_config->dst_w = extd_lcm_params.dpi.width;
+		data_config->dst_h = extd_lcm_params.dpi.height;
+		data_config->dst_dirty = 1;
+
+		dpmgr_path_config(pgc->dpmgr_handle, data_config,
+					enCmdq?pgc->cmdq_handle_config:NULL);
+		if (_should_start_path())
+			dpmgr_path_start(pgc->dpmgr_handle, enCmdq);
+		if (_should_trigger_path())
+			dpmgr_path_trigger(pgc->dpmgr_handle, NULL, enCmdq);
+
+		EXT_DISP_LOG("ext_disp_init roi w:%d, h:%d\n", data_config->dst_w, data_config->dst_h);
+		vfree(data_config);
+	} else
+		EXT_DISP_LOG("allocate buffer failed!!!\n");
+}
+
+static void ext_disp_path_blank_svp(int enCmdq)
+{
+	struct disp_ddp_path_config *data_config;
+	int i;
+
+	data_config = dpmgr_path_get_last_config(pgc->ovl2mem_path_handle);
+	for (i = 0; i < EXTD_OVERLAY_CNT; i++) {
+		data_config->ovl_config[i].layer = i;
+		data_config->ovl_config[i].layer_en = 0;
+		data_config->ovl_config[i].security = DISP_NORMAL_BUFFER;
+	}
+
+	data_config->wdma_config.dstAddress = pgc->dc_buf[pgc->dc_buf_id];
+	data_config->wdma_config.security = DISP_NORMAL_BUFFER;
+
+	data_config->dst_dirty = 1;
+	data_config->ovl_dirty = 1;
+	data_config->wdma_dirty = 1;
+	dpmgr_path_config(pgc->ovl2mem_path_handle, data_config,
+			enCmdq ? pgc->cmdq_handle_ovl2mem_config : NULL);
+	cmdqRecBackupUpdateSlot(pgc->cmdq_handle_ovl2mem_config, pgc->wdma_info,
+							0, DISP_NORMAL_BUFFER);
+	cmdqRecBackupUpdateSlot(pgc->cmdq_handle_ovl2mem_config, pgc->wdma_info,
+							1, data_config->wdma_config.dstAddress);
+	ext_disp_trigger_ovl_to_memory(pgc->ovl2mem_path_handle, pgc->cmdq_handle_ovl2mem_config,
+					(fence_release_callback)_ovl_fence_release_callback, 0, 1);
+	_ovl_fence_release_callback(1);
+
+	EXT_DISP_LOG("ext_disp_path_blank_svp\n");
+}
+
 #if defined(CONFIG_MTK_HDMI_SUPPORT)
 static void ext_disp_update_rdma(enum DISP_MODULE_ENUM module, unsigned int param)
 {
@@ -1445,10 +1509,15 @@ bool ext_disp_check_secure(struct disp_session_input_config *input)
 {
 	int i;
 
-	for (i = 0; i < input->config_layer_num; i++)
-		if (input->config[i].security == DISP_SECURE_BUFFER)
+	for (i = 0; i < input->config_layer_num; i++) {
+		if (input->config[i].security == DISP_SECURE_BUFFER) {
+			pgc->is_secure = true;
+			ext_alloc_sec_buffer();
 			return true;
+		}
+	}
 
+	pgc->is_secure = false;
 	return false;
 }
 
@@ -1495,20 +1564,16 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 	ext_check_is_interlace_output(data_config);
 #endif
 
-	if (ext_disp_check_secure(input))
-		ext_alloc_sec_buffer();
+	ext_disp_check_secure(input);
 
-	/* hope we can use only 1 input struct for input config, just set layer number */
 	if (_should_config_ovl_input()) {
-		EXT_DISP_LOG("extd input ovl\n");
+		EXT_DISP_LOG("set input ovl\n");
 		for (i = 0; i < input->config_layer_num; i++) {
 			config_layer_id = input->config[i].layer_id;
 			ret = _convert_disp_input_to_ovl(&(data_config->ovl_config[config_layer_id]),
 				&(input->config[i]));
 			dprec_mmp_dump_ovl_layer(&(data_config->ovl_config[config_layer_id]), config_layer_id, 2);
 
-			EXT_DISP_LOG("set dest w:%d, h:%d\n",
-						extd_lcm_params.dpi.width, extd_lcm_params.dpi.height);
 			data_config->dst_w = extd_lcm_params.dpi.width;
 			data_config->dst_h = extd_lcm_params.dpi.height;
 			data_config->dst_dirty = 1;
@@ -1518,6 +1583,8 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 			cmdqRecBackupUpdateSlot(cmdq_handle, pgc->ovl_address,
 					config_layer_id, data_config->ovl_config[config_layer_id].addr);
 		}
+		EXT_DISP_LOG("set dest w:%d, h:%d\n",
+						extd_lcm_params.dpi.width, extd_lcm_params.dpi.height);
 		data_config->ovl_dirty = 1;
 		data_config->dst_dirty = 1;
 	} else {

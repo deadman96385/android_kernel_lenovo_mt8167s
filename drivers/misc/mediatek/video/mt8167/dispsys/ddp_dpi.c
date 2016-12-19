@@ -649,7 +649,9 @@ static irqreturn_t _DPI_InterruptHandler(enum DISP_MODULE_ENUM module, unsigned 
 
 int ddp_dpi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 {
+#if ENABLE_DPI_INTERRUPT
 	unsigned int i;
+#endif
 
 	DDPMSG("DISP/DPI, init %s - %p\n", ddp_get_module_name(module), cmdq);
 
@@ -666,8 +668,8 @@ int ddp_dpi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 
 	disp_register_module_irq_callback(module, _DPI_InterruptHandler);
 #endif
-	for (i = 0; i < DPI_INTERFACE_NUM; i++)
-		DISPCHECK("dpi%d init finished\n", i);
+
+	DDPMSG("%s init finished\n", ddp_get_module_name(module));
 
 	return 0;
 }
