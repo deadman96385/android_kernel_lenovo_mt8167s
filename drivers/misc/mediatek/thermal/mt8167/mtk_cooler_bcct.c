@@ -59,7 +59,7 @@ pr_warn("[thermal/cooler/bcct]" fmt, ##args)
 #define mtk_cooler_bcct_dprintk(fmt, args...) \
 do { \
 	if (cl_bcct_klog_on == 1) \
-		pr_debug("[thermal/cooler/bcct]" fmt, ##args); \
+		pr_err("[thermal/cooler/bcct]" fmt, ##args); \
 } while (0)
 
 #define MAX_NUM_INSTANCE_MTK_COOLER_BCCT  3

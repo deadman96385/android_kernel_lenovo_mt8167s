@@ -104,7 +104,7 @@ void mt_thermal_unlock(unsigned long *x)
 /* 1: turn on supports to MET logging; 0: turn off */
 #define CONFIG_SUPPORT_MET_MTKTSCPU         (0)
 
-#define THERMAL_CONTROLLER_HW_FILTER        (1)	/* 1, 2, 4, 8, 16 */
+#define THERMAL_CONTROLLER_HW_FILTER        (4)	/* 1, 2, 4, 8, 16 */
 
 /* 1: turn on thermal controller HW thermal protection; 0: turn off */
 #define THERMAL_CONTROLLER_HW_TP            (1)
@@ -754,8 +754,8 @@ static void thermal_reset_and_initial(void)
 	THERMAL_WRAP_WR32(0x001F7972, TEMPAHBPOLL);	/* poll is set to 31.25ms */
 	THERMAL_WRAP_WR32(0x00000049, TEMPMSRCTL0);	/* temperature sampling control, 2 out of 4 samples */
 #elif THERMAL_CONTROLLER_HW_FILTER == 4
-	THERMAL_WRAP_WR32(0x050A050A, TEMPMONCTL2);	/* both filt and sen interval is 20ms */
-	THERMAL_WRAP_WR32(0x001424C4, TEMPAHBPOLL);	/* poll is set to 20ms */
+	THERMAL_WRAP_WR32(0x01C001C0, TEMPMONCTL2);	/* both filt and sen interval is 6.94ms */
+	THERMAL_WRAP_WR32(0x0006FE8B, TEMPAHBPOLL);	/* poll is set to 6.94ms */
 	THERMAL_WRAP_WR32(0x000000DB, TEMPMSRCTL0);	/* temperature sampling control, 4 out of 6 samples */
 #elif THERMAL_CONTROLLER_HW_FILTER == 8
 	THERMAL_WRAP_WR32(0x03390339, TEMPMONCTL2);	/* both filt and sen interval is 12.5ms */
@@ -1643,8 +1643,8 @@ static int tscpu_set_power_consumption_state(void)
 
 				if (!mtk_gpu_power) {
 					pr_err("%s GPU POWER NOT READY!!", __func__);
-					/* GPU freq = 299000, power = 548 */
-					power = (i * 100) + 200 - 548;
+					/* GPU freq = 299000, power = 466 */
+					power = (i * 100) + 700 - 466;
 					pr_err("%s cpu_power=%d\n", __func__, power);
 					set_static_cpu_power_limit(power);
 					return -ENOMEM;
@@ -1652,42 +1652,36 @@ static int tscpu_set_power_consumption_state(void)
 
 				if (Num_of_GPU_OPP == 3) {
 					power =
-						(i * 100 + 200) - mtk_gpu_power[Num_of_GPU_OPP -
+						(i * 100 + 700) - mtk_gpu_power[Num_of_GPU_OPP -
 						1].gpufreq_power;
+
+					if (power < 0)
+						goto budget_abnormal;
 					set_static_cpu_power_limit(power);
 					set_static_gpu_power_limit(mtk_gpu_power
 							[Num_of_GPU_OPP -
 							1].gpufreq_power);
-					tscpu_dprintk
-						("Num_of_GPU_OPP=%d, gpufreq_power=%d, power=%d\n",
-						 Num_of_GPU_OPP,
-						 mtk_gpu_power[Num_of_GPU_OPP - 1].gpufreq_power,
-						 power);
 				} else if (Num_of_GPU_OPP == 2) {
-					power = (i * 100 + 200) - mtk_gpu_power[1].gpufreq_power;
+					power = (i * 100 + 700) - mtk_gpu_power[1].gpufreq_power;
+
+					if (power < 0)
+						goto budget_abnormal;
 					set_static_cpu_power_limit(power);
 					set_static_gpu_power_limit(mtk_gpu_power[1].gpufreq_power);
-					tscpu_dprintk
-						("Num_of_GPU_OPP=%d, gpufreq_power=%d, power=%d\n",
-						 Num_of_GPU_OPP, mtk_gpu_power[1].gpufreq_power, power);
 				} else if (Num_of_GPU_OPP == 1) {
 #if 0
 					/* 653mW,GPU 500Mhz,1V(preloader default) */
 					/* 1016mW,GPU 700Mhz,1.1V */
 					power = (i * 100 + 700) - 653;
 #else
-					power = (i * 100 + 200) - mtk_gpu_power[0].gpufreq_power;
+					power = (i * 100 + 700) - mtk_gpu_power[0].gpufreq_power;
 #endif
+					if (power < 0)
+						goto budget_abnormal;
 					set_static_cpu_power_limit(power);
-					tscpu_dprintk
-						("Num_of_GPU_OPP=%d, gpufreq_power=%d, power=%d\n",
-						 Num_of_GPU_OPP, mtk_gpu_power[0].gpufreq_power, power);
 				} else {	/* TODO: fix this, temp solution, this project has over 5 GPU OPP... */
-					power = (i * 100 + 200);
+					power = (i * 100 + 100);
 					set_static_cpu_power_limit(power);
-					tscpu_dprintk
-						("Num_of_GPU_OPP=%d, gpufreq_power=%d, power=%d\n",
-						 Num_of_GPU_OPP, mtk_gpu_power[0].gpufreq_power, power);
 				}
 			}
 			break;
@@ -1705,6 +1699,11 @@ static int tscpu_set_power_consumption_state(void)
 			set_static_gpu_power_limit(0);
 		}
 	}
+
+budget_abnormal:
+	tscpu_dprintk
+		("Num_of_GPU_OPP=%d, gpufreq_power=%d, power=%d\n", Num_of_GPU_OPP,
+		 mtk_gpu_power[Num_of_GPU_OPP - 1].gpufreq_power, power);
 	return 0;
 }
 
