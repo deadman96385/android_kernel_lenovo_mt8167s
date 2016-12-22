@@ -661,18 +661,6 @@
 				     (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
 		};
 
-		btif_tx: btif_tx@11000380 {
-			compatible = "mediatek,btif_tx";
-			reg = <0 0x11000380 0 0x80>;
-			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_LOW>;
-		};
-
-		btif_rx: btif_rx@11000400 {
-			compatible = "mediatek,btif_rx";
-			reg = <0 0x11000400 0 0x80>;
-			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_LOW>;
-		};
-
 		nfi: nfi@11001000 {
 			compatible = "mediatek,mt8167-nfi";
 			reg = <0 0x11001000 0 0x1000>;
@@ -895,9 +883,14 @@
 
 		btif: btif@1100e000 {
 			compatible = "mediatek,btif";
-			reg = <0 0x1100e000 0 0x1000>;
-			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&topckgen CLK_TOP_BTIF>, <&topckgen CLK_TOP_APDMA>;
+			reg = <0 0x1100e000 0 0x1000>,	/*btif base*/
+			    <0 0x11000380 0 0x80>,	/*btif tx dma base*/
+			    <0 0x11000400 0 0x80>;	/*btif rx dma base*/
+			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_LOW>,	/*btif irq*/
+				   <GIC_SPI 94 IRQ_TYPE_LEVEL_LOW>,	/*btif tx dma irq*/
+				   <GIC_SPI 95 IRQ_TYPE_LEVEL_LOW>;	/*btif rx dma irq*/
+			clocks = <&topckgen CLK_TOP_BTIF>,	/*btif clock*/
+			       <&topckgen CLK_TOP_APDMA>;	/*ap dma clock*/
 			clock-names = "btifc", "apdmac";
 		};/* End of btif */
 
