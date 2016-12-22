@@ -527,7 +527,6 @@ int _ioctl_trigger_session(unsigned long arg)
 	if (session_info)
 		dprec_start(&session_info->event_trigger, 0, 0);
 
-
 	if (DISP_SESSION_TYPE(session_id) == DISP_SESSION_PRIMARY)
 		DISPPR_FENCE("T+/%s%d/%d/dct:%d\n", disp_session_mode_spy(session_id),
 			     DISP_SESSION_DEV(session_id), config.present_fence_idx,
@@ -543,7 +542,9 @@ int _ioctl_trigger_session(unsigned long arg)
 			mmprofile_log_ex(ddp_mmp_get_events()->present_fence_set, MMPROFILE_FLAG_PULSE,
 				       config.present_fence_idx, 0);
 		}
+		dprec_trigger(&session_info->event_trigger, 5, 0);
 		primary_display_merge_session_cmd(&config);
+		dprec_trigger(&session_info->event_trigger, 5, 10);
 		primary_display_trigger(0, NULL, 0);
 	} else if (DISP_SESSION_TYPE(session_id) == DISP_SESSION_EXTERNAL) {
 #if defined(CONFIG_MTK_HDMI_SUPPORT) || defined(CONFIG_MTK_EPD_SUPPORT)
@@ -2191,8 +2192,10 @@ static int mtk_disp_mgr_probe(struct platform_device *pdev)
 {
 	struct class_device;
 	struct class_device *class_dev = NULL;
-	int i;
 	int ret;
+#ifdef CONFIG_ALL_IN_TRIGGER_STAGE
+	int i;
+#endif
 
 	pr_debug("mtk_disp_mgr_probe called!\n");
 
