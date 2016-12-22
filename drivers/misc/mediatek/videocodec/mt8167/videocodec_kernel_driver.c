@@ -534,7 +534,7 @@ void enc_isr(void)
 		/* Add one line comment for avoid kernel coding style, WARNING:BRACES: */
 		MODULE_MFV_LOGE("[VCODEC][ERROR] ISR set EncIsrEvent error\n");
 	}
-	MODULE_MFV_LOGE("[MFV] enc_isr ISR set EncIsrEvent done\n");
+	MODULE_MFV_LOGD("[MFV] enc_isr ISR set EncIsrEvent done\n");
 }
 
 static irqreturn_t video_intr_dlr(int irq, void *dev_id)
