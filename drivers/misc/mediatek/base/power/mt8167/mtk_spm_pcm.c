@@ -14,8 +14,6 @@
 #include <linux/types.h>
 #include "mtk_spm_internal.h"
 
-#define CONFIG_SPMC_MODE	1
-
 #if CONFIG_SPMC_MODE
 #if CONFIG_SUPPORT_PCM_ALLINONE
 static const u32 suspend_binary[] = {
