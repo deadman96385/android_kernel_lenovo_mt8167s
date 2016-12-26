@@ -1797,7 +1797,7 @@ static ssize_t msdc_debug_proc_write(struct file *file, const char *buf,
 			return count;
 		}
 
-		msdc_clk_enable(host);
+		msdc_ungate_clock(host);
 
 		if (p1 == 0) {
 			reg_value = p4;
@@ -1819,7 +1819,7 @@ static ssize_t msdc_debug_proc_write(struct file *file, const char *buf,
 			msdc_dump_info(host->id);
 		}
 
-		msdc_clk_disable(host);
+		msdc_gate_clock(host);
 	} else if (cmd == SD_TOOL_SET_DRIVING) {
 		id = p1;
 		if (id >= HOST_MAX_NUM || id < 0)
