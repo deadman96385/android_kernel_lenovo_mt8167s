@@ -28,6 +28,7 @@
 #include <mt-plat/upmu_common.h>
 
 #define PMIC6392_E1_CID_CODE 0x1092
+#define E_PWR_INVALID_DATA	33
 
 struct regmap *pwrap_regmap;
 
@@ -56,6 +57,12 @@ unsigned int pmic_config_interface(unsigned int RegNum, unsigned int val, unsign
 {
 	unsigned int return_value = 0;
 	unsigned int pmic_reg = 0;
+
+	if (val > MASK) {
+		pr_err("[Power/PMIC][pmic_config_interface] Invalid data, Reg[%x]: MASK = 0x%x, val = 0x%x\n",
+			RegNum, MASK, val);
+		return E_PWR_INVALID_DATA;
+	}
 
 	return_value = regmap_read(pwrap_regmap, RegNum, &pmic_reg);
 	if (return_value != 0) {
