@@ -487,11 +487,10 @@ static int wdma_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_conf
 				       __func__, ret);
 
 			cmdqRecReset(nonsec_switch_handle);
-			_cmdq_insert_wait_frame_done_token_mira(nonsec_switch_handle);
 			cmdqRecSetSecure(nonsec_switch_handle, 1);
 			cmdqRecSecureEnablePortSecurity(nonsec_switch_handle, (1LL << cmdq_engine));
 			cmdqRecSecureEnableDAPC(nonsec_switch_handle, (1LL << cmdq_engine));
-			cmdqRecFlush(nonsec_switch_handle);
+			cmdqRecFlushAsync(nonsec_switch_handle);
 			cmdqRecDestroy(nonsec_switch_handle);
 			pr_err("[SVP] switch wdma%d to nonsec\n", wdma_idx);
 			wdma_is_sec[wdma_idx] = 0;

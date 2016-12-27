@@ -549,6 +549,9 @@ int _ioctl_trigger_session(unsigned long arg)
 	} else if (DISP_SESSION_TYPE(session_id) == DISP_SESSION_EXTERNAL) {
 #if defined(CONFIG_MTK_HDMI_SUPPORT) || defined(CONFIG_MTK_EPD_SUPPORT)
 		mutex_lock(&disp_session_lock);
+		ext_disp_config_input_multiple(&captured_session_input[DISP_SESSION_EXTERNAL - 1],
+				captured_session_input[DISP_SESSION_EXTERNAL - 1].config[0].next_buff_idx,
+				session_id);
 		ret = external_display_trigger(config.tigger_mode, session_id);
 		mutex_unlock(&disp_session_lock);
 #endif
@@ -1239,6 +1242,7 @@ static int set_external_buffer(struct disp_session_input_config *input)
 	unsigned long int mva_offset = 0;
 	struct disp_session_sync_info *session_info = NULL;
 
+	mutex_lock(&session_config_mutex);
 	session_id = input->session_id;
 	session_info = disp_get_session_sync_info_for_debug(session_id);
 
@@ -1312,10 +1316,17 @@ static int set_external_buffer(struct disp_session_input_config *input)
 				     (input->config_layer_num << 28) | (input->config[i].layer_id << 24)
 				     | (input->config[i].src_fmt << 12) | input->config[i].layer_enable);
 		}
+#ifdef CONFIG_ALL_IN_TRIGGER_STAGE
+		captured_session_input[DISP_SESSION_EXTERNAL - 1].session_id = input->session_id;
+		captured_session_input[DISP_SESSION_EXTERNAL - 1].config[layer_id] = input->config[i];
+#endif
 	}
 
+	mutex_unlock(&session_config_mutex);
+#ifndef CONFIG_ALL_IN_TRIGGER_STAGE
 #if defined(CONFIG_MTK_HDMI_SUPPORT) || defined(CONFIG_MTK_EPD_SUPPORT)
 	ret = ext_disp_config_input_multiple(input, input->config[0].next_buff_idx, session_id);
+#endif
 #endif
 
 	if (ret == -2) {

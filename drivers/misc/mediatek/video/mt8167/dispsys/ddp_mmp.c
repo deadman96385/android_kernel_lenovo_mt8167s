@@ -439,6 +439,7 @@ void ddp_umap_va(void *va)
 
 #define MVA_LINE_MAP
 #ifdef MVA_LINE_MAP
+struct page **pages;
 void *ddp_map_mva_to_va(unsigned long mva, unsigned int size)
 {
 	void *va = NULL;
@@ -449,7 +450,6 @@ void *ddp_map_mva_to_va(unsigned long mva, unsigned int size)
 	unsigned int addr;
 	unsigned int page_count;
 	unsigned int i = 0;
-	struct page **pages;
 
 	if (dev) {
 		domain = iommu_get_domain_for_dev(dev);
@@ -474,8 +474,10 @@ void *ddp_map_mva_to_va(unsigned long mva, unsigned int size)
 
 void ddp_umap_va(void *va)
 {
-	if (va)
+	if (va) {
 		vunmap(va);
+		kfree(pages);
+	}
 }
 #endif
 
