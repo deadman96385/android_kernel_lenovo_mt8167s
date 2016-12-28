@@ -14,6 +14,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/delay.h>
 #include <sound/soc.h>
 
 enum PINCTRL_PIN_STATE {
@@ -26,6 +27,10 @@ enum PINCTRL_PIN_STATE {
 struct mt8167_evb_priv {
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *pin_states[PIN_STATE_MAX];
+	uint32_t ext_spk_amp_warmup_time_us;
+	uint32_t ext_spk_amp_shutdown_time_us;
+	uint32_t hp_spk_amp_warmup_time_us;
+	uint32_t hp_spk_amp_shutdown_time_us;
 };
 
 static const char * const mt8167_evb_pinctrl_pin_str[PIN_STATE_MAX] = {
@@ -111,24 +116,32 @@ static int mt8167_evb_hp_spk_amp_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
-		if (!IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_ON])) {
-			ret = pinctrl_select_state(
-				card_data->pinctrl,
-				card_data->pin_states[PIN_STATE_EXTAMP_ON]);
-			if (ret)
-				dev_err(card->dev, "%s failed to select state %d\n",
-					__func__, ret);
-		}
+		if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_ON]))
+			return 0;
+
+		ret = pinctrl_select_state(card_data->pinctrl,
+			card_data->pin_states[PIN_STATE_EXTAMP_ON]);
+		if (ret)
+			dev_err(card->dev, "%s failed to select state %d\n",
+				__func__, ret);
+
+		if (card_data->hp_spk_amp_warmup_time_us > 0)
+			usleep_range(card_data->hp_spk_amp_warmup_time_us,
+				card_data->hp_spk_amp_warmup_time_us + 1);
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
-		if (!IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_OFF])) {
-			ret = pinctrl_select_state(
-				card_data->pinctrl,
-				card_data->pin_states[PIN_STATE_EXTAMP_OFF]);
-			if (ret)
-				dev_err(card->dev, "%s failed to select state %d\n",
-					__func__, ret);
-		}
+		if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_OFF]))
+			return 0;
+
+		ret = pinctrl_select_state(card_data->pinctrl,
+			card_data->pin_states[PIN_STATE_EXTAMP_OFF]);
+		if (ret)
+			dev_err(card->dev, "%s failed to select state %d\n",
+				__func__, ret);
+
+		if (card_data->hp_spk_amp_shutdown_time_us > 0)
+			usleep_range(card_data->hp_spk_amp_shutdown_time_us,
+				card_data->hp_spk_amp_shutdown_time_us + 1);
 		break;
 	default:
 		break;
@@ -154,24 +167,32 @@ static int mt8167_evb_ext_spk_amp_wevent(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
-		if (!IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_ON])) {
-			ret = pinctrl_select_state(
-				card_data->pinctrl,
-				card_data->pin_states[PIN_STATE_EXTAMP_ON]);
-			if (ret)
-				dev_err(card->dev, "%s failed to select state %d\n",
-					__func__, ret);
-		}
+		if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_ON]))
+			return 0;
+
+		ret = pinctrl_select_state(card_data->pinctrl,
+			card_data->pin_states[PIN_STATE_EXTAMP_ON]);
+		if (ret)
+			dev_err(card->dev, "%s failed to select state %d\n",
+				__func__, ret);
+
+		if (card_data->ext_spk_amp_warmup_time_us > 0)
+			usleep_range(card_data->ext_spk_amp_warmup_time_us,
+				card_data->ext_spk_amp_warmup_time_us + 1);
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
-		if (!IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_OFF])) {
-			ret = pinctrl_select_state(
-				card_data->pinctrl,
-				card_data->pin_states[PIN_STATE_EXTAMP_OFF]);
-			if (ret)
-				dev_err(card->dev, "%s failed to select state %d\n",
-					__func__, ret);
-		}
+		if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_OFF]))
+			return 0;
+
+		ret = pinctrl_select_state(card_data->pinctrl,
+			card_data->pin_states[PIN_STATE_EXTAMP_OFF]);
+		if (ret)
+			dev_err(card->dev, "%s failed to select state %d\n",
+				__func__, ret);
+
+		if (card_data->ext_spk_amp_shutdown_time_us > 0)
+			usleep_range(card_data->ext_spk_amp_shutdown_time_us,
+				card_data->ext_spk_amp_shutdown_time_us + 1);
 		break;
 	default:
 		break;
@@ -467,14 +488,14 @@ exit:
 static int mt8167_evb_dev_probe(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = &mt8167_evb_card;
+	struct device *dev = &pdev->dev;
 	struct device_node *platform_node;
 	int ret, i;
 	struct mt8167_evb_priv *card_data;
 
-	platform_node = of_parse_phandle(pdev->dev.of_node,
-					 "mediatek,platform", 0);
+	platform_node = of_parse_phandle(dev->of_node, "mediatek,platform", 0);
 	if (!platform_node) {
-		dev_err(&pdev->dev, "Property 'platform' missing or invalid\n");
+		dev_err(dev, "Property 'platform' missing or invalid\n");
 		return -EINVAL;
 	}
 
@@ -484,15 +505,13 @@ static int mt8167_evb_dev_probe(struct platform_device *pdev)
 		mt8167_evb_dais[i].platform_of_node = platform_node;
 	}
 
-	card->dev = &pdev->dev;
+	card->dev = dev;
 
-	card_data = devm_kzalloc(&pdev->dev,
-		sizeof(struct mt8167_evb_priv), GFP_KERNEL);
-
+	card_data = devm_kzalloc(dev, sizeof(struct mt8167_evb_priv),
+				GFP_KERNEL);
 	if (!card_data) {
 		ret = -ENOMEM;
-		dev_err(&pdev->dev,
-			"%s allocate card private data fail %d\n",
+		dev_err(dev, "%s allocate card private data fail %d\n",
 			__func__, ret);
 		return ret;
 	}
@@ -501,9 +520,25 @@ static int mt8167_evb_dev_probe(struct platform_device *pdev)
 
 	mt8167_evb_gpio_probe(card);
 
-	ret = devm_snd_soc_register_card(&pdev->dev, card);
+	of_property_read_u32(dev->of_node,
+			"mediatek,ext-spk-amp-warmup-time-us",
+			&card_data->ext_spk_amp_warmup_time_us);
+
+	of_property_read_u32(dev->of_node,
+			"mediatek,ext-spk-amp-shutdown-time-us",
+			&card_data->ext_spk_amp_shutdown_time_us);
+
+	of_property_read_u32(dev->of_node,
+			 "mediatek,hp-spk-amp-warmup-time-us",
+			 &card_data->hp_spk_amp_warmup_time_us);
+
+	of_property_read_u32(dev->of_node,
+			 "mediatek,hp-spk-amp-shutdown-time-us",
+			 &card_data->hp_spk_amp_shutdown_time_us);
+
+	ret = devm_snd_soc_register_card(dev, card);
 	if (ret)
-		dev_err(&pdev->dev, "%s snd_soc_register_card fail %d\n",
+		dev_err(dev, "%s snd_soc_register_card fail %d\n",
 			__func__, ret);
 
 	return ret;
