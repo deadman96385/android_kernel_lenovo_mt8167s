@@ -221,8 +221,8 @@ static void mt_usb_try_idle(struct musb *musb, unsigned long timeout)
 
 	/* Never idle if active, or when VBUS timeout is not set as host */
 	if (musb->is_active || ((musb->a_wait_bcon == 0)
-			&& (musb->state == OTG_STATE_A_WAIT_BCON))) {
-		DBG(2, "%s active, deleting timer\n", otg_state_string(musb->state));
+			&& (musb->xceiv->otg->state == OTG_STATE_A_WAIT_BCON))) {
+		DBG(2, "%s active, deleting timer\n", otg_state_string(musb->xceiv->otg->state));
 		del_timer(&musb_idle_timer);
 		last_timer = jiffies;
 		return;
@@ -239,7 +239,7 @@ static void mt_usb_try_idle(struct musb *musb, unsigned long timeout)
 	last_timer = timeout;
 
 	DBG(2, "%s inactive, for idle timer for %lu ms\n",
-		otg_state_string(musb->state),
+		otg_state_string(musb->xceiv->otg->state),
 		(unsigned long)jiffies_to_msecs(timeout - jiffies));
 
 	mod_timer(&musb_idle_timer, timeout);
