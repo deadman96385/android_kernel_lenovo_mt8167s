@@ -887,6 +887,15 @@ static const struct mtk_gate_regs top5_cg_regs = {
 		.ops = &mtk_clk_gate_ops_setclr,	\
 	}
 
+#define GATE_TOP2_I(_id, _name, _parent, _shift) {	\
+		.id = _id,				\
+		.name = _name,				\
+		.parent_name = _parent,			\
+		.regs = &top2_cg_regs,			\
+		.shift = _shift,			\
+		.ops = &mtk_clk_gate_ops_setclr_inv,	\
+	}
+
 #define GATE_TOP3(_id, _name, _parent, _shift) {	\
 		.id = _id,				\
 		.name = _name,				\
@@ -1046,11 +1055,11 @@ static const struct mtk_gate top_clks[] __initconst = {
 		26),
 	GATE_TOP2(CLK_TOP_GCPU_B, "gcpu_b", "ahb_infra_sel",
 		27),
-	GATE_TOP2(CLK_TOP_MSDC0_INFRA, "msdc0_infra", "msdc0",
+	GATE_TOP2_I(CLK_TOP_MSDC0_INFRA, "msdc0_infra", "msdc0",
 		28),
-	GATE_TOP2(CLK_TOP_MSDC1_INFRA, "msdc1_infra", "msdc1",
+	GATE_TOP2_I(CLK_TOP_MSDC1_INFRA, "msdc1_infra", "msdc1",
 		29),
-	GATE_TOP2(CLK_TOP_MSDC2_INFRA, "msdc2_infra", "rg_msdc2",
+	GATE_TOP2_I(CLK_TOP_MSDC2_INFRA, "msdc2_infra", "rg_msdc2",
 		30),
 	GATE_TOP2(CLK_TOP_USB_78M, "usb_78m", "usb_78m_sel",
 		31),
