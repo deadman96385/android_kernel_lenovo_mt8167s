@@ -42,7 +42,7 @@
 #define dpidle_dbg(fmt, args...)	pr_debug(DPIDLE_TAG fmt, ##args)
 
 #define SPM_PWAKE_EN            0
-#define SPM_BYPASS_SYSPWREQ     1
+#define SPM_BYPASS_SYSPWREQ     0
 
 #define WAKE_SRC_FOR_DPIDLE \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_CONN_WDT| \
@@ -91,7 +91,9 @@ static struct pwr_ctrl dpidle_ctrl = {
 	.disp0_req_mask = 1,
 	.disp1_req_mask = 1,
 	.mfg_req_mask = 1,
+#if SPM_BYPASS_SYSPWREQ
 	.syspwreq_mask = 1,
+#endif
 };
 
 static unsigned int dpidle_log_discard_cnt;
