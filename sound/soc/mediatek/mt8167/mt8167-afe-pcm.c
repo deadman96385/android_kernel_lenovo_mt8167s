@@ -1231,6 +1231,7 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	const int bit_width = snd_pcm_format_width(runtime->format);
 	const unsigned int stream = substream->stream;
 	unsigned int val;
+	unsigned int bck_inverse = 0;
 
 	if (be->prepared[stream]) {
 		dev_info(afe->dev, "%s prepared already\n", __func__);
@@ -1264,18 +1265,19 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
 			      rate * channels * bit_width);
 
-	val = AFE_TDM_CON1_BCK_INV |
-	      AFE_TDM_CON1_MSB_ALIGNED;
+	val = AFE_TDM_CON1_MSB_ALIGNED;
 
 	if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S &&
 	    (be->fmt_mode & SND_SOC_DAIFMT_FORMAT_MASK) == SND_SOC_DAIFMT_I2S) {
 		val |= AFE_TDM_CON1_1_BCK_DELAY |
 		       AFE_TDM_CON1_LRCK_INV;
+		bck_inverse = AUD_TCON3_HDMI_BCK_INV;
 	} else if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) {
 		val |= AFE_TDM_CON1_1_BCK_DELAY |
 		       AFE_TDM_CON1_LRCK_INV;
 	} else if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) {
 		val |= AFE_TDM_CON1_1_BCK_DELAY;
+		bck_inverse = AUD_TCON3_HDMI_BCK_INV;
 	}
 
 	/* bit width related */
@@ -1344,6 +1346,9 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 
 	regmap_update_bits(afe->regmap, AFE_TDM_CON2,
 			   AFE_TDM_CON2_SOUT_MASK, val);
+
+	regmap_update_bits(afe->regmap, AUDIO_TOP_CON3,
+			   AUD_TCON3_HDMI_BCK_INV, bck_inverse);
 
 	regmap_update_bits(afe->regmap, AFE_HDMI_OUT_CON0,
 			   AFE_HDMI_OUT_CON0_CH_MASK, channels << 4);
