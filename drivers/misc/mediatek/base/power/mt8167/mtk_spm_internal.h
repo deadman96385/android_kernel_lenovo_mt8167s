@@ -354,6 +354,10 @@ static inline void set_pwrctrl_pcm_flags(struct pwr_ctrl *pwrctrl, u32 flags)
 		pwrctrl->pcm_flags = flags;
 	else
 		pwrctrl->pcm_flags = pwrctrl->pcm_flags_cust;
+
+#if !CONFIG_SUPPORT_PCM_ALLINONE
+	pwrctrl->pcm_flags |= SPM_ALL_IN_ONE_DIS;
+#endif
 }
 
 static inline void set_pwrctrl_pcm_data(struct pwr_ctrl *pwrctrl, u32 data)

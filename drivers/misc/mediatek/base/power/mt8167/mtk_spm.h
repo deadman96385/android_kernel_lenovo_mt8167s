@@ -244,6 +244,7 @@ extern u32 spm_irq_7;
 #define SPM_XO_OFF_DIS		(1U << 13)
 #define SPM_32K_LESS		(1U << 14)
 #define SPM_PLL_OFF_DIS		(1U << 15)
+#define SPM_ALL_IN_ONE_DIS	(1U << 16)
 
 /* Wakeup Source*/
 #define SPM_WAKE_SRC_LIST	{	\
