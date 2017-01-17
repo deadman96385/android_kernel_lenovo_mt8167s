@@ -42,6 +42,13 @@ enum dmic_wire_mode {
 	DMIC_TWO_WIRE,
 };
 
+enum headphone_cap_sel {
+	HP_CAP_10UF = 0,
+	HP_CAP_22UF,
+	HP_CAP_33UF,
+	HP_CAP_47UF,
+};
+
 enum codec_pga_gain_enum_id {
 	HP_L_PGA_GAIN = 0,
 	HP_R_PGA_GAIN,
@@ -66,6 +73,7 @@ struct mt8167_codec_priv {
 	bool is_rch_dc_calibrated;
 	uint32_t pga_gain[PGA_GAIN_MAX];
 	uint32_t dmic_wire_mode;
+	uint32_t headphone_cap_sel;
 	uint32_t loopback_type;
 	struct clk *clk;
 #ifdef TIMESTAMP_INFO
@@ -595,6 +603,8 @@ static int mt8167_codec_ul_vref24_event(struct snd_soc_dapm_widget *w,
 
 static void mt8167_codec_hp_depop_setup(struct snd_soc_codec *codec)
 {
+	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
+
 	/* Set audio DAC bias current */
 	snd_soc_update_bits(codec, AUDIO_CODEC_CON01, (0x1F << 6), 0x0);
 	/* Set the charge option of depop VCM gen. to "charge type" */
@@ -607,7 +617,7 @@ static void mt8167_codec_hp_depop_setup(struct snd_soc_codec *codec)
 	 * 33uF < cap <= 47uF: (3 << 19)
 	 */
 	snd_soc_update_bits(codec, AUDIO_CODEC_CON02,
-		GENMASK(20, 19), (1 << 19));
+		GENMASK(20, 19), (codec_data->headphone_cap_sel << 19));
 	/* Set the depop VCM voltage of depop VCM gen. to 1.35V. */
 	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(21), 0x0);
 	/* Enable the depop VCM generator. */
@@ -1802,6 +1812,19 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 	} else if ((codec_data->dmic_wire_mode != DMIC_ONE_WIRE) &&
 		codec_data->dmic_wire_mode != DMIC_TWO_WIRE) {
 		codec_data->dmic_wire_mode = DMIC_ONE_WIRE;
+	}
+
+	ret = of_property_read_u32(dev->of_node, "mediatek,headphone-cap-sel",
+				&codec_data->headphone_cap_sel);
+	if (ret) {
+		dev_warn(dev, "%s fail to read headphone-cap-sel in node %s\n",
+			__func__, dev->of_node->full_name);
+		codec_data->headphone_cap_sel = HP_CAP_22UF;
+	} else if ((codec_data->headphone_cap_sel != HP_CAP_10UF) &&
+		(codec_data->headphone_cap_sel != HP_CAP_22UF) &&
+		(codec_data->headphone_cap_sel != HP_CAP_33UF) &&
+		(codec_data->headphone_cap_sel != HP_CAP_47UF)) {
+		codec_data->headphone_cap_sel = HP_CAP_22UF;
 	}
 
 	return ret;
