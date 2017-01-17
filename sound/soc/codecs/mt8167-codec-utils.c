@@ -78,12 +78,12 @@
  * (Gbuf: 12 dB)
  *   dc compensation value = dc offset * 32768 / (3.3839095) / 1000
  *                         = dc_offset * 9.68
- *
  */
 
 /*
  * total path (Vout)
  * (Gbuf: -2 dB): 100 mV * 48.53
+ *
  * -2dB, dB0, 2dB, 4dB, 6dB, 7dB, 10dB, 12dB
  */
 static const uint32_t dc_comp_coeff_map[] = {
@@ -95,27 +95,33 @@ static const uint32_t dc_comp_coeff_map[] = {
 
 /*
  * ramp step size (dc compensation value)
+ * (ramping between vcm and dac stages)
+ *
  * DAC path (Vdac):
  *   dc compensation value = dc offset * 38.55
  *
  * 10uF, 22uF: 50 mV * 38.55 = 0x787
- * 33uF, 47uF: 16 mV * 38.55 = 0x282
- *
+ * 33uF, 47uF: 10 mV * 38.55 = 0x181
  */
 static const uint16_t ramp_vcm_to_dac_step_size_map[] = {
-	0x787, 0x787, 0x282, 0x282,
+	0x787, 0x787, 0x181, 0x181,
 };
 
 /*
  * ramp time per step for different cap value (us)
+ * (ramping between vcm and dac stages)
+ *
  * 10uF, 22uF: 2000
- * 33uF, 47uF:  666
+ * 33uF, 47uF:  400
  */
 static const unsigned long ramp_vcm_to_dac_step_time_map[] = {
-	2000, 2000, 666, 666,
+	2000, 2000, 400, 400,
 };
 
 /*
+ * ramp step size (dc compensation value)
+ * (ramping between op and vcm stages)
+ *
  * total path (Gbuf: -2 dB): 0.08 mV * 48.53 = 4
  * total path (Gbuf:  0 dB): 0.08 mV * 38.55 = 3
  * total path (Gbuf:  2 dB): 0.08 mV * 30.62 = 2
@@ -125,15 +131,30 @@ static const unsigned long ramp_vcm_to_dac_step_time_map[] = {
  * total path (Gbuf: 10 dB): 0.08 mV * 12.19 = 1
  * total path (Gbuf: 12 dB): 0.08 mV *  9.68 = 1
  */
-static const uint16_t ramp_op_to_vcm_step[] = {
+static const uint16_t ramp_op_to_vcm_step_size[] = {
 	4, 3, 2, 2, 2, 1, 1, 1,
 };
 
-/* ramp time per step (us) */
-#define RAMP_OP_TO_VCM_STEP_TIME (75)
+/*
+ * ramp time per step for different cap value (us)
+ * (ramping between op and vcm stages)
+ *
+ * 10uF, 22uF:  75
+ * 33uF, 47uF: 125
+ */
+static const unsigned long ramp_op_to_vcm_step_time_map[] = {
+	75, 75, 125, 125,
+};
 
-/* stable time for dac on or dac off (us) */
-#define DAC_STABLE_TIME (20000)
+/*
+ * dac stable time for different cap value (us)
+ *
+ * 10uF, 22uF: 20000
+ * 33uF, 47uF: 40000
+ */
+static const unsigned long dac_stable_time_map[] = {
+	20000, 20000, 40000, 40000,
+};
 
 enum auxadc_channel_id {
 	AUXADC_CH_AU_HPL = 7,
@@ -495,7 +516,7 @@ static uint32_t mt8167_codec_get_hp_cap_index(struct snd_soc_codec *codec)
 			GENMASK(20, 19)) >> 19;
 }
 
-static unsigned long mt8167_codec_ramp_vcm_to_dac_step(
+static uint16_t mt8167_codec_ramp_vcm_to_dac_step(
 	struct snd_soc_codec *codec)
 {
 	uint32_t index = mt8167_codec_get_hp_cap_index(codec);
@@ -509,6 +530,22 @@ static unsigned long mt8167_codec_ramp_vcm_to_dac_step_time(
 	uint32_t index = mt8167_codec_get_hp_cap_index(codec);
 
 	return ramp_vcm_to_dac_step_time_map[index];
+}
+
+static unsigned long mt8167_codec_ramp_op_to_vcm_step_time(
+	struct snd_soc_codec *codec)
+{
+	uint32_t index = mt8167_codec_get_hp_cap_index(codec);
+
+	return ramp_op_to_vcm_step_time_map[index];
+}
+
+static unsigned long mt8167_codec_get_dac_stable_time(
+	struct snd_soc_codec *codec)
+{
+	uint32_t index = mt8167_codec_get_hp_cap_index(codec);
+
+	return dac_stable_time_map[index];
 }
 
 int mt8167_codec_valid_new_dc_comp(struct snd_soc_codec *codec)
@@ -634,9 +671,9 @@ void mt8167_codec_dc_offset_ramp(struct snd_soc_codec *codec,
 			lch_dccomp_target = lch_dccomp[sid-1][lpga_index];
 			rch_dccomp_target = rch_dccomp[sid-1][rpga_index];
 		}
-		lch_step = ramp_op_to_vcm_step[lpga_index];
-		rch_step = ramp_op_to_vcm_step[rpga_index];
-		step_time = RAMP_OP_TO_VCM_STEP_TIME;
+		lch_step = ramp_op_to_vcm_step_size[lpga_index];
+		rch_step = ramp_op_to_vcm_step_size[rpga_index];
+		step_time = mt8167_codec_ramp_op_to_vcm_step_time(codec);
 	}
 
 	while (!hp_ramp_done) {
@@ -743,6 +780,7 @@ static uint64_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
 	int32_t auxadc_val_target = 0;
 	int32_t auxadc_val_prev = 0;
 	int32_t auxadc_val_cur = 0;
+	unsigned long dac_stable_time = 0;
 	uint32_t pga;
 #ifdef TIMESTAMP_INFO
 	uint64_t stamp_1 = 0, stamp_2 = 0;
@@ -771,7 +809,8 @@ static uint64_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
 	stamp_1 = sched_clock();
 #endif
 
-	usleep_range(DAC_STABLE_TIME, DAC_STABLE_TIME + 10);
+	dac_stable_time = mt8167_codec_get_dac_stable_time(codec);
+	usleep_range(dac_stable_time, dac_stable_time + 10);
 
 	/* voltage of B */
 	auxadc_val_cur =
@@ -797,8 +836,9 @@ static uint64_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
 
 	usleep_range(50 * 1000, 60 * 1000);
 
-	/* voltage after OP on is dependent on PGA gain
-	 * store dc offsets per each pga gain for runtime usage
+	/*
+	 * voltage after OP on varies according to PGA gain
+	 * stores dc offsets per each pga gain here for runtime usage
 	 * to eliminate the voltage jump before and after OP on or off
 	 */
 	for (pga = 0; pga < HP_PGA_GAIN_NUMS; pga++) {
