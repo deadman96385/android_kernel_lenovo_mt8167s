@@ -70,4 +70,6 @@ extern void __iomem *pwm_base;
 #define BLOCK_CLK     (66UL*1000*1000)
 #define PWM_26M_CLK   (26UL*1000*1000)
 
+void mt_pwm_platform_init(void);
+
 #endif
