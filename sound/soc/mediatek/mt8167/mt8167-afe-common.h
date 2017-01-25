@@ -127,6 +127,17 @@ enum {
 };
 
 enum {
+	MT8167_AFE_1ST_I2S = 0,
+	MT8167_AFE_2ND_I2S,
+	MT8167_AFE_I2S_SETS,
+};
+
+enum {
+	MT8167_AFE_I2S_SEPARATE_CLOCK = 0,
+	MT8167_AFE_I2S_SHARED_CLOCK,
+};
+
+enum {
 	MT8167_AFE_APLL1 = 0,
 	MT8167_AFE_APLL2,
 	MT8167_AFE_APLL_NUM,
@@ -200,6 +211,7 @@ struct mtk_afe {
 	int top_cg_ref_cnt[MT8167_AFE_CG_NUM];
 	int apll_tuner_ref_cnt[MT8167_AFE_APLL_NUM];
 	unsigned int tdm_out_mode;
+	unsigned int i2s_clk_modes[MT8167_AFE_I2S_SETS];
 	/* locks */
 	spinlock_t afe_ctrl_lock;
 	struct mutex afe_clk_mutex;
