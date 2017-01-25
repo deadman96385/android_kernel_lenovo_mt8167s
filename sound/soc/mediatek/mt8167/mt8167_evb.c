@@ -342,7 +342,7 @@ static struct snd_soc_dai_link mt8167_evb_dais[] = {
 		.dynamic = 1,
 		.dpcm_capture = 1,
 	},
-#ifdef CONFIG_MTK_BTCVSD_ALSA
+#ifdef CONFIG_SND_SOC_MTK_BTCVSD
 	{
 		.name = "BTCVSD_RX",
 		.stream_name = "BTCVSD_Capture",
