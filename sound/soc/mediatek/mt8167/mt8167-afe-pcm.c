@@ -718,15 +718,22 @@ static int mt8167_afe_i2s_startup(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	const unsigned int clk_mode = afe->i2s_clk_modes[MT8167_AFE_1ST_I2S];
 
 	dev_dbg(afe->dev, "%s '%s'\n",
 		__func__, snd_pcm_stream_str(substream));
 
+	if (clk_mode == MT8167_AFE_I2S_SHARED_CLOCK && dai->active)
+		return 0;
+
 	mt8167_afe_enable_main_clk(afe);
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK ||
+	    clk_mode == MT8167_AFE_I2S_SHARED_CLOCK)
 		mt8167_afe_dais_enable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV1], NULL);
-	else
+
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE ||
+	    clk_mode == MT8167_AFE_I2S_SHARED_CLOCK)
 		mt8167_afe_dais_enable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV2], NULL);
 
 	return 0;
@@ -740,14 +747,23 @@ static void mt8167_afe_i2s_shutdown(struct snd_pcm_substream *substream,
 	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = substream->runtime->rate;
 	const unsigned int stream = substream->stream;
+	const unsigned int clk_mode = afe->i2s_clk_modes[MT8167_AFE_1ST_I2S];
+	const bool reset_i2s_out_change = (stream == SNDRV_PCM_STREAM_PLAYBACK) ||
+		(clk_mode == MT8167_AFE_I2S_SHARED_CLOCK);
+	const bool reset_i2s_in_change = (stream == SNDRV_PCM_STREAM_CAPTURE) ||
+		(clk_mode == MT8167_AFE_I2S_SHARED_CLOCK);
 
 	dev_dbg(afe->dev, "%s '%s'\n",
 		__func__, snd_pcm_stream_str(substream));
 
+	if (clk_mode == MT8167_AFE_I2S_SHARED_CLOCK && dai->active)
+		return;
+
 	if (be->prepared[stream]) {
-		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+		if (reset_i2s_out_change)
 			mt8167_afe_set_i2s_out_enable(afe, false);
-		else
+
+		if (reset_i2s_in_change)
 			mt8167_afe_set_i2s_in_enable(afe, false);
 
 		if (rate % 8000)
@@ -755,12 +771,17 @@ static void mt8167_afe_i2s_shutdown(struct snd_pcm_substream *substream,
 		else
 			mt8167_afe_disable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
 
-		be->prepared[stream] = false;
+		if (reset_i2s_out_change)
+			be->prepared[SNDRV_PCM_STREAM_PLAYBACK] = false;
+
+		if (reset_i2s_in_change)
+			be->prepared[SNDRV_PCM_STREAM_CAPTURE] = false;
 	}
 
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+	if (reset_i2s_out_change)
 		mt8167_afe_dais_disable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV1], NULL);
-	else
+
+	if (reset_i2s_in_change)
 		mt8167_afe_dais_disable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV2], NULL);
 
 	mt8167_afe_disable_main_clk(afe);
@@ -791,7 +812,21 @@ static int mt8167_afe_i2s_prepare(struct snd_pcm_substream *substream,
 	const unsigned int rate = substream->runtime->rate;
 	const int bit_width = snd_pcm_format_width(substream->runtime->format);
 	const unsigned int stream = substream->stream;
+	const unsigned int clk_mode = afe->i2s_clk_modes[MT8167_AFE_1ST_I2S];
+	const bool apply_i2s_out_change = (stream == SNDRV_PCM_STREAM_PLAYBACK) ||
+		(clk_mode == MT8167_AFE_I2S_SHARED_CLOCK);
+	const bool apply_i2s_in_change = (stream == SNDRV_PCM_STREAM_CAPTURE) ||
+		(clk_mode == MT8167_AFE_I2S_SHARED_CLOCK);
 	int ret;
+
+	if ((clk_mode == MT8167_AFE_I2S_SHARED_CLOCK) &&
+	    (dai->playback_widget->power || dai->capture_widget->power)) {
+		dev_dbg(afe->dev, "%s '%s' widget powered(%u-%u) already\n",
+			__func__, snd_pcm_stream_str(substream),
+			dai->playback_widget->power,
+			dai->capture_widget->power);
+		return 0;
+	}
 
 	if (be->prepared[stream]) {
 		dev_info(afe->dev, "%s '%s' prepared already\n",
@@ -799,20 +834,24 @@ static int mt8167_afe_i2s_prepare(struct snd_pcm_substream *substream,
 		return 0;
 	}
 
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+	if (apply_i2s_out_change) {
 		ret = mt8167_afe_set_i2s_out(afe, rate, bit_width);
-	else
-		ret = mt8167_afe_set_i2s_in(afe, rate, bit_width);
+		if (ret)
+			return ret;
+	}
 
-	if (ret)
-		return ret;
+	if (apply_i2s_in_change) {
+		ret = mt8167_afe_set_i2s_in(afe, rate, bit_width);
+		if (ret)
+			return ret;
+	}
 
 	if (rate % 8000)
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
 	else
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
 
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+	if (apply_i2s_out_change) {
 		clk_set_parent(afe->clocks[MT8167_CLK_I2S1_M_SEL], (rate % 8000) ?
 			afe->clocks[MT8167_CLK_AUD1] : afe->clocks[MT8167_CLK_AUD2]);
 
@@ -820,7 +859,11 @@ static int mt8167_afe_i2s_prepare(struct snd_pcm_substream *substream,
 				rate * MT8167_I2S1_MCLK_MULTIPLIER, NULL, 0);
 
 		mt8167_afe_set_i2s_out_enable(afe, true);
-	} else {
+
+		be->prepared[SNDRV_PCM_STREAM_PLAYBACK] = true;
+	}
+
+	if (apply_i2s_in_change) {
 		clk_set_parent(afe->clocks[MT8167_CLK_I2S2_M_SEL], (rate % 8000) ?
 			afe->clocks[MT8167_CLK_AUD1] : afe->clocks[MT8167_CLK_AUD2]);
 
@@ -828,9 +871,9 @@ static int mt8167_afe_i2s_prepare(struct snd_pcm_substream *substream,
 				rate * MT8167_I2S2_MCLK_MULTIPLIER, NULL, 0);
 
 		mt8167_afe_set_i2s_in_enable(afe, true);
-	}
 
-	be->prepared[stream] = true;
+		be->prepared[SNDRV_PCM_STREAM_CAPTURE] = true;
+	}
 
 	return 0;
 }
@@ -840,15 +883,23 @@ static int mt8167_afe_2nd_i2s_startup(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	const unsigned int stream = substream->stream;
+	const unsigned int clk_mode = afe->i2s_clk_modes[MT8167_AFE_2ND_I2S];
 
 	dev_dbg(afe->dev, "%s '%s'\n",
 		__func__, snd_pcm_stream_str(substream));
 
+	if (clk_mode == MT8167_AFE_I2S_SHARED_CLOCK && dai->active)
+		return 0;
+
 	mt8167_afe_enable_main_clk(afe);
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+	if (stream == SNDRV_PCM_STREAM_PLAYBACK ||
+	    clk_mode == MT8167_AFE_I2S_SHARED_CLOCK)
 		mt8167_afe_dais_enable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV3], NULL);
-	else
+
+	if (stream == SNDRV_PCM_STREAM_CAPTURE ||
+	    clk_mode == MT8167_AFE_I2S_SHARED_CLOCK)
 		mt8167_afe_dais_enable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV0], NULL);
 
 	return 0;
@@ -862,14 +913,23 @@ static void mt8167_afe_2nd_i2s_shutdown(struct snd_pcm_substream *substream,
 	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = substream->runtime->rate;
 	const unsigned int stream = substream->stream;
+	const unsigned int clk_mode = afe->i2s_clk_modes[MT8167_AFE_2ND_I2S];
+	const bool reset_i2s_out_change = (stream == SNDRV_PCM_STREAM_PLAYBACK) ||
+		(clk_mode == MT8167_AFE_I2S_SHARED_CLOCK);
+	const bool reset_i2s_in_change = (stream == SNDRV_PCM_STREAM_CAPTURE) ||
+		(clk_mode == MT8167_AFE_I2S_SHARED_CLOCK);
 
 	dev_dbg(afe->dev, "%s '%s'\n",
 		__func__, snd_pcm_stream_str(substream));
 
+	if (clk_mode == MT8167_AFE_I2S_SHARED_CLOCK && dai->active)
+		return;
+
 	if (be->prepared[stream]) {
-		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+		if (reset_i2s_out_change)
 			mt8167_afe_set_2nd_i2s_out_enable(afe, false);
-		else
+
+		if (reset_i2s_in_change)
 			mt8167_afe_set_2nd_i2s_in_enable(afe, false);
 
 		if (rate % 8000)
@@ -877,12 +937,17 @@ static void mt8167_afe_2nd_i2s_shutdown(struct snd_pcm_substream *substream,
 		else
 			mt8167_afe_disable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
 
-		be->prepared[stream] = false;
+		if (reset_i2s_out_change)
+			be->prepared[SNDRV_PCM_STREAM_PLAYBACK] = false;
+
+		if (reset_i2s_in_change)
+			be->prepared[SNDRV_PCM_STREAM_CAPTURE] = false;
 	}
 
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+	if (reset_i2s_out_change)
 		mt8167_afe_dais_disable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV3], NULL);
-	else
+
+	if (reset_i2s_in_change)
 		mt8167_afe_dais_disable_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV0], NULL);
 
 	mt8167_afe_disable_main_clk(afe);
@@ -913,7 +978,21 @@ static int mt8167_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 	const unsigned int rate = substream->runtime->rate;
 	const int bit_width = snd_pcm_format_width(substream->runtime->format);
 	const unsigned int stream = substream->stream;
+	const unsigned int clk_mode = afe->i2s_clk_modes[MT8167_AFE_2ND_I2S];
+	const bool apply_i2s_out_change = (stream == SNDRV_PCM_STREAM_PLAYBACK) ||
+		(clk_mode == MT8167_AFE_I2S_SHARED_CLOCK);
+	const bool apply_i2s_in_change = (stream == SNDRV_PCM_STREAM_CAPTURE) ||
+		(clk_mode == MT8167_AFE_I2S_SHARED_CLOCK);
 	int ret;
+
+	if ((clk_mode == MT8167_AFE_I2S_SHARED_CLOCK) &&
+	    (dai->playback_widget->power || dai->capture_widget->power)) {
+		dev_dbg(afe->dev, "%s '%s' widget powered(%u-%u) already\n",
+			__func__, snd_pcm_stream_str(substream),
+			dai->playback_widget->power,
+			dai->capture_widget->power);
+		return 0;
+	}
 
 	if (be->prepared[stream]) {
 		dev_info(afe->dev, "%s '%s' prepared already\n",
@@ -921,20 +1000,24 @@ static int mt8167_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 		return 0;
 	}
 
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+	if (apply_i2s_out_change) {
 		ret = mt8167_afe_set_2nd_i2s_out(afe, rate, bit_width);
-	else
-		ret = mt8167_afe_set_2nd_i2s_in(afe, rate, bit_width);
+		if (ret)
+			return ret;
+	}
 
-	if (ret)
-		return ret;
+	if (apply_i2s_in_change) {
+		ret = mt8167_afe_set_2nd_i2s_in(afe, rate, bit_width);
+		if (ret)
+			return ret;
+	}
 
 	if (rate % 8000)
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
 	else
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL2);
 
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+	if (apply_i2s_out_change) {
 		clk_set_parent(afe->clocks[MT8167_CLK_I2S3_M_SEL], (rate % 8000) ?
 			afe->clocks[MT8167_CLK_AUD1] : afe->clocks[MT8167_CLK_AUD2]);
 
@@ -942,7 +1025,11 @@ static int mt8167_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 				rate * MT8167_I2S3_MCLK_MULTIPLIER, NULL, 0);
 
 		mt8167_afe_set_2nd_i2s_out_enable(afe, true);
-	} else {
+
+		be->prepared[SNDRV_PCM_STREAM_PLAYBACK] = true;
+	}
+
+	if (apply_i2s_in_change) {
 		clk_set_parent(afe->clocks[MT8167_CLK_I2S0_M_SEL], (rate % 8000) ?
 			afe->clocks[MT8167_CLK_AUD1] : afe->clocks[MT8167_CLK_AUD2]);
 
@@ -950,9 +1037,9 @@ static int mt8167_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 				rate * MT8167_I2S0_MCLK_MULTIPLIER, NULL, 0);
 
 		mt8167_afe_set_2nd_i2s_in_enable(afe, true);
-	}
 
-	be->prepared[stream] = true;
+		be->prepared[SNDRV_PCM_STREAM_CAPTURE] = true;
+	}
 
 	return 0;
 }
@@ -2258,6 +2345,18 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 	},
 };
 
+static struct snd_soc_dai_driver *mt8167_afe_get_dai_drv_by_id(unsigned int id)
+{
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(mt8167_afe_pcm_dais); i++) {
+		if (id == mt8167_afe_pcm_dais[i].id)
+			return &mt8167_afe_pcm_dais[i];
+	}
+
+	return NULL;
+}
+
 static const struct snd_kcontrol_new mt8167_afe_o00_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I05 Switch", AFE_CONN0, 5, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I07 Switch", AFE_CONN0, 7, 1, 0),
@@ -2940,6 +3039,32 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, afe);
 
+	if (of_property_read_u32(np, "mediatek,tdm-out-mode", &afe->tdm_out_mode))
+		afe->tdm_out_mode = MT8167_AFE_TDM_OUT_HDMI;
+
+	if (of_property_read_u32_array(np, "mediatek,i2s-clock-modes",
+	    afe->i2s_clk_modes, ARRAY_SIZE(afe->i2s_clk_modes))) {
+		for (i = 0; i < ARRAY_SIZE(afe->i2s_clk_modes); i++)
+			afe->i2s_clk_modes[i] = MT8167_AFE_I2S_SEPARATE_CLOCK;
+	}
+
+	for (i = 0; i < MT8167_AFE_I2S_SETS; i++) {
+		struct snd_soc_dai_driver *drv;
+
+		const unsigned int i2s_dai_ids[MT8167_AFE_I2S_SETS] = {
+			MT8167_AFE_IO_I2S, MT8167_AFE_IO_2ND_I2S
+		};
+
+		if (afe->i2s_clk_modes[i] == MT8167_AFE_I2S_SHARED_CLOCK) {
+			drv = mt8167_afe_get_dai_drv_by_id(i2s_dai_ids[i]);
+			if (!drv)
+				continue;
+
+			drv->symmetric_rates = 1;
+			drv->symmetric_samplebits = 1;
+		}
+	}
+
 	ret = snd_soc_register_platform(&pdev->dev, &mt8167_afe_pcm_platform);
 	if (ret)
 		goto err_platform;
@@ -2952,9 +3077,6 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 		goto err_component;
 
 	mt8167_afe_init_debugfs(afe);
-
-	if (of_property_read_u32(np, "mediatek,tdm-out-mode", &afe->tdm_out_mode))
-		afe->tdm_out_mode = MT8167_AFE_TDM_OUT_HDMI;
 
 	dev_info(&pdev->dev, "MTK AFE driver initialized.\n");
 	return 0;
