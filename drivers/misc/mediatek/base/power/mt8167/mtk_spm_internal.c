@@ -67,6 +67,7 @@ static const char *wakesrc_str[32] = {
 	[13] = "PCM_WDT",
 	[14] = "USB_CD ",
 	[15] = "USB_PDN",
+	[16] = "ETH",
 	[18] = "DBGSYS",
 	[19] = "UART0",
 	[20] = "AFE",
