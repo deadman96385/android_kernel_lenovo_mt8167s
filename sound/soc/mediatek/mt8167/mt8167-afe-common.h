@@ -112,6 +112,12 @@ enum {
 	MT8167_AFE_TDM_OUT_TDM,
 };
 
+enum {
+	MT8167_AFE_APLL1 = 0,
+	MT8167_AFE_APLL2,
+	MT8167_AFE_APLL_NUM,
+};
+
 struct snd_pcm_substream;
 
 struct mt8167_afe_memif_data {
@@ -177,9 +183,11 @@ struct mtk_afe {
 	int daibt_on_ref_cnt;
 	int irq_mode_ref_cnt[MT8167_AFE_IRQ_NUM];
 	int top_cg_ref_cnt[MT8167_AFE_CG_NUM];
+	int apll_tuner_ref_cnt[MT8167_AFE_APLL_NUM];
 	unsigned int tdm_out_mode;
 	/* locks */
 	spinlock_t afe_ctrl_lock;
+	struct mutex afe_clk_mutex;
 #ifdef IDLE_TASK_DRIVER_API
 	int emi_clk_ref_cnt;
 	struct mutex emi_clk_mutex;
