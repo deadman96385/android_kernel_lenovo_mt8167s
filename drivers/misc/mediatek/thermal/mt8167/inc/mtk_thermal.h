@@ -309,6 +309,7 @@ void tscpu_start_thermal_timer(void);
 int mtkts_bts_get_hw_temp(void);
 
 int get_immediate_ts1_wrap(void);
+int get_immediate_ts2_wrap(void);
 int get_immediate_ts3_wrap(void);
 int get_immediate_ts4_wrap(void);
 int get_immediate_ts5_wrap(void);

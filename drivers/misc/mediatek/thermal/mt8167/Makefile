@@ -23,25 +23,20 @@ else
 endif
 
 obj-$(CONFIG_THERMAL) += mtk_thermal_platform.o
-#obj-$(CONFIG_THERMAL) += mtk_ts_pa_thput.o
-#obj-$(CONFIG_THERMAL) += mtk_cooler_bcct.o
+obj-$(CONFIG_THERMAL) += mtk_thermal_timer.o
 
-#ifneq ($(CONFIG_MTK_COMBO_WIFI),)
-#    obj-$(CONFIG_THERMAL) += mtk_ts_wmt.o
-#endif
+ifneq ($(CONFIG_MTK_COMBO_WIFI),)
+    obj-$(CONFIG_THERMAL) += mtk_ts_wmt.o
+endif
 
 # Only included in non-EVB projects
 ifneq ($(CONFIG_POWER_EXT), y)
     obj-$(CONFIG_THERMAL) += mtk_cooler_bcct.o
+    obj-$(CONFIG_THERMAL) += mtk_ts_battery.o
 endif
 
 obj-$(CONFIG_THERMAL) += mtk_ts_bts.o
-#obj-$(CONFIG_THERMAL) += mtk_ts_btsmdpa.o
 obj-$(CONFIG_THERMAL) += mtk_ts_cpu.o
 #obj-$(CONFIG_THERMAL) += mtk_ts_abb.o
 #obj-$(CONFIG_THERMAL) += mtk_ts_all_ts.o
-#obj-$(CONFIG_THERMAL) += mtk_ts_battery.o
 obj-$(CONFIG_THERMAL) += mtk_ts_pmic6392.o
-#obj-$(CONFIG_THERMAL) += tm_nth.o
-
-
