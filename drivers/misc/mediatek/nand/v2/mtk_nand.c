@@ -9827,9 +9827,7 @@ static int mtk_nand_probe(struct platform_device *pdev)
 		goto out;
 	}
 
-	if (g_i4Interrupt)
-		enable_irq(MT_NFI_IRQ_ID);
-	else
+	if (!g_i4Interrupt)
 		disable_irq(MT_NFI_IRQ_ID);
 
 #if 0
