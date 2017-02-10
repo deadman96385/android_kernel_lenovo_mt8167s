@@ -283,8 +283,10 @@ int primary_display_switch_mode(int sess_mode, unsigned int session, int force);
 int primary_display_diagnose(void);
 
 int primary_display_get_info(void *info);
+#ifdef CONFIG_MTK_M4U
 int primary_display_capture_framebuffer(unsigned long pbuf);
 int primary_display_capture_framebuffer_ovl(unsigned long pbuf, unsigned int format);
+#endif
 uint32_t DISP_GetVRamSizeBoot(char *cmdline);
 uint32_t DISP_GetVRamSize(void);
 uint32_t DISP_GetFBRamSize(void);
@@ -337,7 +339,9 @@ void disp_update_trigger_time(void);
 
 struct display_primary_path_context *primary_display_path_lock(const char *caller);
 void primary_display_path_unlock(const char *caller);
+#ifdef CONFIG_MTK_M4U
 int primary_display_switch_wdma_dump(int on);
+#endif
 void _cmdq_insert_wait_frame_done_token_mira(void *handle);
 int primary_display_switch_mode_nolock(int sess_mode, unsigned int session, int force);
 int primary_display_release_fence_fake(void);

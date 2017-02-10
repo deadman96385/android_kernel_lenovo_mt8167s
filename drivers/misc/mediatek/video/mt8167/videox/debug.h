@@ -154,9 +154,11 @@ static inline void dbg_print(int level, const char *fmt, ...)
 void _debug_pattern(unsigned long mva, unsigned long va, unsigned int w, unsigned int h,
 		    unsigned int linepitch, unsigned int color, unsigned int layerid,
 		    unsigned int bufidx);
+#ifdef CONFIG_MTK_M4U
 void _debug_fps_meter(unsigned long mva, unsigned long va, unsigned int w, unsigned int h,
 		      unsigned int linepitch, unsigned int color, unsigned int layerid,
 		      unsigned int bufidx);
+#endif
 
 bool get_ovl1_to_mem_on(void);
 

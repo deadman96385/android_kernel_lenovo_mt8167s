@@ -26,7 +26,7 @@
 #ifdef CONFIG_MTK_IOMMU
 #include <soc/mediatek/smi.h>
 #include <linux/dma-iommu.h>
-#include <dt-bindings/memory/mt8173-larb-port.h>
+#include <dt-bindings/memory/mt8167-larb-port.h>
 #else
 #include "m4u.h"
 #endif
@@ -396,6 +396,7 @@ void switch_ovl1_to_mem(bool on)
 	pr_debug("DISP/DBG switch_ovl1_to_mem %d\n", enable_ovl1_to_mem);
 }
 
+#ifdef CONFIG_MTK_M4U
 static int _draw_line(unsigned long addr, int l, int t, int r, int b, int linepitch,
 		      unsigned int color)
 {
@@ -443,6 +444,7 @@ static void _draw_block(unsigned long addr, unsigned int x, unsigned int y, unsi
 			*(unsigned long *)(start_addr + i * 4 + j * linepitch) = color;
 	}
 }
+#endif
 
 /* extern void smp_inner_dcache_flush_all(void); */
 
@@ -451,6 +453,7 @@ void _debug_pattern(unsigned long mva, unsigned long va, unsigned int w, unsigne
 		    unsigned int linepitch, unsigned int color, unsigned int layerid,
 		    unsigned int bufidx)
 {
+#ifdef CONFIG_MTK_M4U
 	unsigned long addr = 0;
 	unsigned int layer_size = 0;
 	unsigned int mapped_size = 0;
@@ -524,8 +527,10 @@ void _debug_pattern(unsigned long mva, unsigned long va, unsigned int w, unsigne
 /* outer_flush_all(); */
 	if (mapped_size)
 		m4u_mva_unmap_kernel(addr, layer_size, addr);
+#endif
 }
 
+#ifdef CONFIG_MTK_M4U
 #define DEBUG_FPS_METER_SHOW_COUNT	60
 static int _fps_meter_array[DEBUG_FPS_METER_SHOW_COUNT] = { 0 };
 
@@ -585,6 +590,7 @@ void _debug_fps_meter(unsigned long mva, unsigned long va, unsigned int w, unsig
 	if (mapped_size)
 		m4u_mva_unmap_kernel(addr, layer_size, addr);
 }
+#endif
 
 static void process_dbg_opt(const char *opt)
 {

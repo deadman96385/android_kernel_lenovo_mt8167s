@@ -416,6 +416,19 @@ enum eDDP_CLK_ID {
 	MAX_DISP_CLK_CNT
 };
 
+struct dispsys_device {
+	void __iomem *regs[DISP_REG_NUM];
+	struct device *dev;
+	int irq[DISP_REG_NUM];
+
+#ifndef CONFIG_MTK_CLKMGR
+	struct clk *disp_clk[MAX_DISP_CLK_CNT];
+#endif
+#ifdef CONFIG_MTK_IOMMU
+	struct platform_device *larb_pdev[1];
+#endif
+};
+
 int ddp_clk_prepare(enum eDDP_CLK_ID id);
 int ddp_clk_unprepare(enum eDDP_CLK_ID id);
 int ddp_clk_enable(enum eDDP_CLK_ID id);
@@ -429,7 +442,9 @@ int ddp_clk_set_rate(enum eDDP_CLK_ID id, unsigned long rate);
 extern unsigned int dispsys_irq[DISP_REG_NUM];
 extern unsigned long dispsys_reg[DISP_REG_NUM];
 
+#ifdef CONFIG_MTK_M4U
 extern void disp_m4u_tf_disable(void);
+#endif
 
 /* TODO: FIXME */
 #include <linux/types.h>
@@ -442,6 +457,8 @@ extern struct DPI_REGS *DPI_REG[2];
 
 const char *ddp_get_reg_module_name(enum DISP_REG_ENUM reg);
 
+#ifdef CONFIG_MTK_M4U
 extern int m4u_enable_tf(int port, bool fgenable);
+#endif
 
 #endif

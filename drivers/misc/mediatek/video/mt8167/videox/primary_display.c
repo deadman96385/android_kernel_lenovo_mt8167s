@@ -106,8 +106,10 @@ enum DISP_PRIMARY_PATH_MODE primary_display_mode = DIRECT_LINK_MODE;
 
 static unsigned long dim_layer_mva;
 /* wdma dump thread */
+#ifdef CONFIG_MTK_M4U
 static unsigned int primary_dump_wdma;
 static struct task_struct *primary_display_wdma_out;
+#endif
 static unsigned long dc_vAddr[DISP_INTERNAL_BUFFER_COUNT];
 static struct disp_internal_buffer_info *decouple_buffer_info[DISP_INTERNAL_BUFFER_COUNT];
 static struct RDMA_CONFIG_STRUCT decouple_rdma_config;
@@ -2767,6 +2769,7 @@ static int __build_path_decouple(void)
 	 * Before turn on all the m4u of display modules,
 	 * the data path need to change to rdma0->dsi.
 	 */
+#ifdef CONFIG_MTK_M4U
 	{
 		M4U_PORT_STRUCT sPort;
 
@@ -2787,6 +2790,7 @@ static int __build_path_decouple(void)
 			return -1;
 		}
 	}
+#endif
 
 	/* 3. Build and switch display data path from ovl->dsi to rdma->dsi. */
 	ret = _build_path_rdma_to_dsi();
@@ -2842,6 +2846,7 @@ static int __build_path_debug_rdma1_dsi0(void)
 #ifndef MTKFB_NO_M4U
 	{
 #ifdef MTK_FB_RDMA1_SUPPORT
+#ifdef CONFIG_MTK_M4U
 		M4U_PORT_STRUCT sPort;
 
 		sPort.ePortID = M4U_PORT_DISP_RDMA1;
@@ -2860,6 +2865,7 @@ static int __build_path_debug_rdma1_dsi0(void)
 				  primary_display_use_m4u ? "virtual" : "physical", ret);
 			return -1;
 		}
+#endif
 #endif
 	}
 #endif
@@ -4860,14 +4866,13 @@ static int _present_fence_release_worker_thread(void *data)
 	return 0;
 }
 
+#ifdef CONFIG_MTK_M4U
 int primary_display_capture_framebuffer_wdma(void *data)
 {
 	int ret = 0;
 	struct cmdqRecStruct *cmdq_handle = NULL;
 	struct disp_ddp_path_config *pconfig = NULL;
-#ifdef CONFIG_MTK_M4U
 	m4u_client_t *m4uClient = NULL;
-#endif
 	unsigned int w_xres = primary_display_get_width();
 	unsigned int h_yres = primary_display_get_height();
 	unsigned int pixel_byte = primary_display_get_dc_bpp() / 8; /* bpp is either 32 or 16, can not be other value */
@@ -4894,7 +4899,7 @@ int primary_display_capture_framebuffer_wdma(void *data)
 		ret = -1;
 		goto out;
 	}
-#ifdef CONFIG_MTK_M4U
+
 	m4uClient = m4u_create_client();
 	if (m4uClient == NULL) {
 		DISPCHECK("wdma dump:Fail to alloc  m4uClient=0x%p\n", m4uClient);
@@ -4917,7 +4922,7 @@ int primary_display_capture_framebuffer_wdma(void *data)
 		ret = -1;
 		goto out;
 	}
-#endif
+
 	if (primary_display_cmdq_enabled()) {
 		/*create config thread */
 		ret = cmdqRecCreate(CMDQ_SCENARIO_PRIMARY_DISP, &cmdq_handle);
@@ -4981,7 +4986,7 @@ int primary_display_capture_framebuffer_wdma(void *data)
 
 out:
 	cmdqRecDestroy(cmdq_handle);
-#ifdef CONFIG_MTK_M4U
+
 	if (mva[0] > 0)
 		m4u_dealloc_mva(m4uClient, M4U_PORT_DISP_WDMA0, mva[0]);
 	if (mva[1] > 0)
@@ -4990,15 +4995,16 @@ out:
 		vfree(va[0]);
 	if (va[1] != NULL)
 		vfree(va[1]);
-#endif
 	if (m4uClient != 0)
 		m4u_destroy_client(m4uClient);
+
 	DISPMSG("wdma dump:end\n");
 
 	return ret;
 }
+#endif
 
-
+#ifdef CONFIG_MTK_M4U
 int primary_display_switch_wdma_dump(int on)
 {
 	if (on && (!primary_dump_wdma)) {
@@ -5011,6 +5017,7 @@ int primary_display_switch_wdma_dump(int on)
 	}
 	return 0;
 }
+#endif
 
 #define xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
@@ -5414,6 +5421,7 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 	}
 
 #ifndef MTKFB_NO_M4U
+#ifdef CONFIG_MTK_M4U
 	{
 		M4U_PORT_STRUCT sPort;
 
@@ -5430,6 +5438,7 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 			return -1;
 		}
 	}
+#endif
 #endif
 	pgc->lcm_fps = lcm_fps;
 	if (lcm_fps > 6000)	/* FIXME: if fps bigger than 60, support 8 layer? */
@@ -5456,6 +5465,7 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 done:
 
 	/* disable OVL TF in video mode, cause cmdq/sodi log is not ready, avoid too much TF issue */
+#ifdef CONFIG_MTK_M4U
 	{
 		/* extern unsigned int gDisableOVLTF; */
 
@@ -5464,6 +5474,7 @@ done:
 			disp_m4u_tf_disable();
 		}
 	}
+#endif
 
 #ifndef WDMA_PATH_CLOCK_DYNAMIC_SWITCH
 #ifndef CONFIG_FPGA_EARLY_PORTING
@@ -6666,6 +6677,7 @@ static int _config_interface_input(struct primary_disp_input_config *input)
 }
 #endif
 
+#ifdef CONFIG_MTK_M4U
 static void update_debug_fps_meter(struct disp_ddp_path_config *data_config)
 {
 	int i, dst_id = 0;
@@ -6682,7 +6694,7 @@ static void update_debug_fps_meter(struct disp_ddp_path_config *data_config)
 			 data_config->ovl_config[dst_id].src_pitch, 0x00000000, dst_id,
 			 data_config->ovl_config[dst_id].buff_idx);
 }
-
+#endif
 
 static int _config_ovl_input(struct disp_session_input_config *session_input,
 			     disp_path_handle disp_handle, struct cmdqRecStruct *cmdq_handle)
@@ -6801,7 +6813,9 @@ static int _config_ovl_input(struct disp_session_input_config *session_input,
 	}
 #endif
 
+#ifdef CONFIG_MTK_M4U
 	update_debug_fps_meter(data_config);
+#endif
 	if (DISP_SESSION_TYPE(session_input->session_id) == DISP_SESSION_PRIMARY) {
 		last_primary_config = *data_config;
 		is_hwc_update_frame = 1;
@@ -8008,14 +8022,13 @@ LCM_DRIVER *DISP_GetLcmDrv(void)
 		return NULL;
 }
 
+#ifdef CONFIG_MTK_M4U
 int primary_display_capture_framebuffer_decouple(unsigned long pbuf, unsigned int format)
 {
 	unsigned int i = 0;
 	int ret = 0;
 	struct disp_ddp_path_config *pconfig = NULL;
-#ifdef CONFIG_MTK_M4U
 	m4u_client_t *m4uClient = NULL;
-#endif
 	unsigned int mva = 0;
 	unsigned long va = 0;
 	unsigned int mapped_size = 0;
@@ -8024,14 +8037,14 @@ int primary_display_capture_framebuffer_decouple(unsigned long pbuf, unsigned in
 	unsigned int pixel_byte = primary_display_get_dc_bpp() / 8;/* bpp is either 32 or 16, can not be other value */
 	unsigned int pitch = 0;
 	int buffer_size = h_yres * w_xres * pixel_byte;
-#ifdef CONFIG_MTK_M4U
+
 	m4uClient = m4u_create_client();
 	if (m4uClient == NULL) {
 		DISPCHECK("primary capture:Fail to alloc  m4uClient=0x%p\n", m4uClient);
 		ret = -1;
 		goto out;
 	}
-#endif
+
 /* mva = pgc->dc_buf[pgc->dc_buf_id]; */
 	pconfig = dpmgr_path_get_last_config(pgc->dpmgr_handle);
 
@@ -8049,7 +8062,6 @@ int primary_display_capture_framebuffer_decouple(unsigned long pbuf, unsigned in
 	buffer_size = h_yres * pitch;
 	ASSERT((pitch / 4) >= w_xres);
 /* dpmgr_get_input_address(pgc->dpmgr_handle,&mva); */
-#ifdef CONFIG_MTK_M4U
 	m4u_mva_map_kernel(mva, buffer_size, &va, &mapped_size);
 	if (!va) {
 		DISPERR("map mva 0x%08x failed\n", mva);
@@ -8062,7 +8074,7 @@ int primary_display_capture_framebuffer_decouple(unsigned long pbuf, unsigned in
 	ret =
 	    m4u_cache_sync(m4uClient, M4U_PORT_DISP_WDMA0, va, buffer_size, mva,
 			   M4U_CACHE_FLUSH_ALL);
-#endif
+
 #if 1
 	{
 		unsigned int j = 0;
@@ -8083,13 +8095,12 @@ int primary_display_capture_framebuffer_decouple(unsigned long pbuf, unsigned in
 	memcpy(pbuf, va, mapped_size);
 #endif
 out:
-#ifdef CONFIG_MTK_M4U
 	if (mapped_size)
 		m4u_mva_unmap_kernel(mva, mapped_size, va);
 
 	if (m4uClient != NULL)
 		m4u_destroy_client(m4uClient);
-#endif
+
 	DISPMSG("primary capture: end\n");
 
 	return ret;
@@ -8101,9 +8112,7 @@ int primary_display_capture_framebuffer_ovl(unsigned long pbuf, unsigned int for
 	struct cmdqRecStruct *cmdq_handle = NULL;
 	struct cmdqRecStruct *cmdq_wait_handle = NULL;
 	struct disp_ddp_path_config *pconfig = NULL;
-#ifdef CONFIG_MTK_M4U
 	m4u_client_t *m4uClient = NULL;
-#endif
 	unsigned int mva = 0;
 	unsigned int w_xres = primary_display_get_width();
 	unsigned int h_yres = primary_display_get_height();
@@ -8133,7 +8142,7 @@ int primary_display_capture_framebuffer_ovl(unsigned long pbuf, unsigned int for
 		DISPMSG("primary capture: fill black for decouple & mirror mode End\n");
 		goto out;
 	}
-#ifdef CONFIG_MTK_M4U
+
 	m4uClient = m4u_create_client();
 	if (m4uClient == NULL) {
 		DISPCHECK("primary capture:Fail to alloc  m4uClient=0x%p\n", m4uClient);
@@ -8156,7 +8165,7 @@ int primary_display_capture_framebuffer_ovl(unsigned long pbuf, unsigned int for
 		ret = -1;
 		goto out;
 	}
-#endif
+
 	if (primary_display_cmdq_enabled()) {
 		/* create config thread */
 		ret = cmdqRecCreate(CMDQ_SCENARIO_PRIMARY_DISP, &cmdq_handle);
@@ -8233,19 +8242,18 @@ out:
 
 	cmdqRecDestroy(cmdq_handle);
 	cmdqRecDestroy(cmdq_wait_handle);
-#ifdef CONFIG_MTK_M4U
 	if (mva > 0)
 		m4u_dealloc_mva(m4uClient, M4U_PORT_DISP_WDMA0, mva);
 
 	if (m4uClient != 0)
 		m4u_destroy_client(m4uClient);
-#endif
 	_primary_path_unlock(__func__);
 	disp_sw_mutex_unlock(&(pgc->capture_lock));
 	DISPMSG("primary capture: end\n");
 
 	return ret;
 }
+#endif
 
 int primary_display_capture_framebuffer(unsigned long pbuf)
 {
