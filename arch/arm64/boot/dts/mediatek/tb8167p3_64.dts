@@ -702,8 +702,7 @@
 	usb0_drvvbus: drvvbus_init {
 		pins_cmd_dat {
 			pins = <MT8167_PIN_68_MSDC2_CMD__FUNC_GPIO68>;
-			slew-rate = <1>;
-			bias-pull-up = <00>;
+			output-low;
 		};
 	};
 
