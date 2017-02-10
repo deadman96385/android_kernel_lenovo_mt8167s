@@ -40,6 +40,14 @@
 #include "mtk_leds_sw.h"
 #include "mtk_leds_hal.h"
 
+
+/* MET + NI */
+#define MET_USER_EVENT_SUPPORT
+#include <mt-plat/met_drv.h>
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
+static unsigned int ate_gpio;
+
 /* for LED&Backlight bringup, define the dummy API */
 #ifndef CONFIG_MTK_PMIC
 u16 pmic_set_register_value(u32 flagname, u32 val)
@@ -200,6 +208,11 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
 				pled_dtsi[i].mode = 0;
 				pled_dtsi[i].data = -1;
 			} else {
+				ate_gpio = of_get_named_gpio(led_node, "ate_gpio", 0);
+				ret = gpio_request(ate_gpio, "ate_gpio");
+				if (ret)
+					LEDS_DEBUG("cannot find gpio from dts %d\n", ate_gpio);
+
 				isSupportDTS = true;
 				ret =
 				    of_property_read_u32(led_node, "led_mode",
@@ -1016,6 +1029,15 @@ void mt_mt65xx_led_set(struct led_classdev *led_cdev, enum led_brightness level)
 	    container_of(led_cdev, struct mt65xx_led_data, cdev);
 	/* unsigned long flags; */
 	/* spin_lock_irqsave(&leds_lock, flags); */
+
+	output_met_backlight_tag(level);
+	if (level == 0) {
+		if (gpio_is_valid(ate_gpio))
+			gpio_direction_output(ate_gpio, 0);
+	} else {
+		if (gpio_is_valid(ate_gpio))
+			gpio_direction_output(ate_gpio, 1);
+	}
 
 #ifdef CONFIG_MTK_AAL_SUPPORT
 	if (led_data->level != level) {
