@@ -828,6 +828,7 @@
 			dma = <1>;
 			num_eps = <16>;
 			dma_channels = <8>;
+			iddig_gpio = <&pio 41 2>;
 			clocks = <&topckgen CLK_TOP_USB_PHY48M>,
 				 <&topckgen CLK_TOP_USBIF>,
 				 <&topckgen CLK_TOP_USB>,

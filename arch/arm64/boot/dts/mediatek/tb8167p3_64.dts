@@ -698,7 +698,7 @@
 /* USB GPIO start */
 	usb0_drvvbus: drvvbus_init {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_43_KPCOL1__FUNC_USB_DRVVBUS>;
+			pins = <MT8167_PIN_68_MSDC2_CMD__FUNC_GPIO68>;
 			slew-rate = <1>;
 			bias-pull-up = <00>;
 		};
@@ -706,7 +706,7 @@
 
 	usb0_drvvbus_high: drvvbus_high {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_43_KPCOL1__FUNC_USB_DRVVBUS>;
+			pins = <MT8167_PIN_68_MSDC2_CMD__FUNC_GPIO68>;
 			slew-rate = <1>;
 			output-high;
 		};
@@ -714,7 +714,7 @@
 
 	usb0_drvvbus_low: drvvbus_low {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_43_KPCOL1__FUNC_USB_DRVVBUS>;
+			pins = <MT8167_PIN_68_MSDC2_CMD__FUNC_GPIO68>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -722,7 +722,7 @@
 
 	usb0_iddig: iddig_irq_init {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_41_KPROW1__FUNC_GPIO41>;
+			pins = <MT8167_PIN_41_KPROW1__FUNC_IDDIG>;
 			slew-rate = <0>;
 			bias-pull-up = <00>;
 		};
@@ -782,4 +782,5 @@
 	pinctrl-3 = <&usb0_drvvbus_high>;
 	usb-power-supply = <&mt6392_vusb_reg>;
 	status = "okay";
+	drvvbus_gpio = <&pio 68 0>;
 };
