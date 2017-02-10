@@ -40,18 +40,6 @@ mtk_wcn_cmb_stub_query_ctrl(void)
 	return 0;
 }
 
-bool __attribute__ ((weak))
-is_cpu_power_unlimit(void)
-{
-	return true;
-}
-
-int __attribute__ ((weak))
-get_cpu_target_tj(void)
-{
-	return 85000;
-}
-
 #define MIN(_a_, _b_) ((_a_) > (_b_) ? (_b_) : (_a_))
 #define MAX(_a_, _b_) ((_a_) > (_b_) ? (_a_) : (_b_))
 
