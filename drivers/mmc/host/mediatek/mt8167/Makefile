@@ -12,6 +12,7 @@
 #
 
 #add kernel source code path as head file search path
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
 ccflags-y += -I$(srctree)/drivers/mmc
 
 obj-$(CONFIG_MMC_MTK_SDIO) += msdc.o
