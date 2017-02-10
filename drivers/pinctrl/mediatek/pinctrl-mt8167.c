@@ -164,7 +164,7 @@ static const struct mtk_pin_spec_pupd_set_samereg mt8167_spec_pupd[] = {
 	MTK_PIN_PUPD_SPEC_SR(23, 0xe70, 6, 5, 4),
 
 	MTK_PIN_PUPD_SPEC_SR(40, 0xe80, 2, 1, 0),
-	MTK_PIN_PUPD_SPEC_SR(41, 0x80, 6, 5, 4),
+	MTK_PIN_PUPD_SPEC_SR(41, 0xe80, 6, 5, 4),
 	MTK_PIN_PUPD_SPEC_SR(42, 0xe90, 2, 1, 0),
 	MTK_PIN_PUPD_SPEC_SR(43, 0xe90, 6, 5, 4),
 
