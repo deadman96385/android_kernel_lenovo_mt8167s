@@ -3182,6 +3182,8 @@ int _trigger_ovl_to_memory(disp_path_handle disp_handle, struct cmdqRecStruct *c
 
 	dpmgr_wdma_path_force_power_on();
 	dpmgr_path_trigger(disp_handle, cmdq_handle, CMDQ_ENABLE);
+	DISP_REG_SET(NULL, DISP_REG_CONFIG_MUTEX_EN(1), 1);
+	DISP_REG_SET(NULL, DISP_REG_CONFIG_MUTEX_EN(2), 1);
 	cmdqRecWaitNoClear(cmdq_handle, CMDQ_EVENT_DISP_WDMA0_EOF);
 
 	cmdqRecBackupUpdateSlot(cmdq_handle, pgc->rdma_buff_info, 0, mem_config.addr);
@@ -5180,7 +5182,7 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 		DISPCHECK("cmdqRecCreate SUCCESS, g_cmdq_handle=0x%p\n", pgc->cmdq_handle_config);
 	}
 	/*create ovl2mem path cmdq handle */
-	ret = cmdqRecCreate(CMDQ_SCENARIO_DISP_COLOR, &(pgc->cmdq_handle_ovl1to2_config));
+	ret = cmdqRecCreate(CMDQ_SCENARIO_PRIMARY_MEMOUT, &(pgc->cmdq_handle_ovl1to2_config));
 	if (ret != 0) {
 		DISPERR("cmdqRecCreate FAIL, ret=%d\n", ret);
 		return -1;

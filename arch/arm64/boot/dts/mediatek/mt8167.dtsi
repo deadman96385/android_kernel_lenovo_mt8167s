@@ -1574,6 +1574,10 @@
 			compatible = "mediatek,mt8167-dummy_char";
 		};
 
+		extd_drv: extd_drv@0 {
+			compatible = "mediatek,extd_dev";
+		};
+
 		/* flashlight  */
 		flashlight: flashlight@ {
 			compatible = "mediatek,camera_flashlight";

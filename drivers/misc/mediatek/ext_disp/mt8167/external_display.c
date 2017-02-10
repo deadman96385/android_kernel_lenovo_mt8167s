@@ -967,7 +967,7 @@ int ext_disp_trigger(int blocking, void *callback, unsigned int userdata, unsign
 	EXT_DISP_FUNC();
 
 	if (pgc->state == EXTD_DEINIT || pgc->state == EXTD_SUSPEND || pgc->need_trigger_overlay < 1) {
-		EXT_DISP_LOG("trigger ext display is already slept\n");
+		EXT_DISP_LOG("%s ext display is already slept\n", __func__);
 		mmprofile_log_ex(ddp_mmp_get_events()->Extd_ErrorInfo, MMPROFILE_FLAG_PULSE, Trigger, 0);
 		return -1;
 	}
@@ -997,7 +997,7 @@ int ext_disp_suspend_trigger(void *callback, unsigned int userdata, unsigned int
 	EXT_DISP_FUNC();
 
 	if (pgc->state != EXTD_RESUME) {
-		EXT_DISP_LOG("trigger ext display is already slept\n");
+		EXT_DISP_LOG("%s ext display is already slept\n", __func__);
 		mmprofile_log_ex(ddp_mmp_get_events()->Extd_ErrorInfo, MMPROFILE_FLAG_PULSE, Trigger, 0);
 		return -1;
 	}

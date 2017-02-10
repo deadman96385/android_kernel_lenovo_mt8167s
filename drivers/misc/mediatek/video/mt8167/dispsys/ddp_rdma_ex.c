@@ -318,7 +318,7 @@ int rdma_reset(enum DISP_MODULE_ENUM module, void *handle)
 
 /* set ultra registers */
 void rdma_set_ultra(unsigned int idx, unsigned int width, unsigned int height, unsigned int bpp,
-		    unsigned int frame_rate, void *handle)
+		    unsigned int frame_rate, void *handle, enum RDMA_MODE mode, bool isidle)
 {
 	/* constant */
 	static const unsigned int blank_overhead = 115;	/* it is 1.15, need to divide 100 later */
@@ -326,6 +326,7 @@ void rdma_set_ultra(unsigned int idx, unsigned int width, unsigned int height, u
 	static const unsigned int ultra_low_time = 6;	/* in unit of us */
 	static const unsigned int pre_ultra_low_time = 8;	/* in unit of us */
 	static const unsigned int pre_ultra_high_time = 9;	/* in unit of us */
+	/* static const unsigned int fifo_size = 512; */
 	static const unsigned int fifo_valid_line_ratio = 125;	/* valid size 1/8 line; */
 	static const unsigned int fifo_min_size = 32;
 	/* working variables */
@@ -337,13 +338,11 @@ void rdma_set_ultra(unsigned int idx, unsigned int width, unsigned int height, u
 	unsigned int pre_ultra_low_ofs;
 	unsigned int pre_ultra_high_ofs;
 	unsigned int fifo_valid_size = 16;
+	unsigned int sodi_threshold = 0;
 
 	/* compute fifo valid size */
-
 	fifo_valid_size = (width * bpp * fifo_valid_line_ratio) / (rdma_fifo_width * 1000);
 	fifo_valid_size = fifo_valid_size > fifo_min_size ? fifo_valid_size : fifo_min_size;
-	/* consume_levels_per_sec = ((long long unsigned int)width * height * frame_rate * blank_overhead * bpp) /*/
-	/*				rdma_fifo_width / 100;*/
 	/* change calculation order to prevent overflow of unsigned int */
 	consume_levels_per_sec =
 	    (width * height * frame_rate * bpp / rdma_fifo_width / 100) * blank_overhead;
@@ -358,63 +357,236 @@ void rdma_set_ultra(unsigned int idx, unsigned int width, unsigned int height, u
 	ultra_high_ofs = 1;
 	pre_ultra_high_ofs = pre_ultra_high_level - pre_ultra_low_level;
 
-	if (gUltraEnable == 1) {
-		ultra_low_level = 0x6b;
-		pre_ultra_low_ofs = 0xa0;
-		ultra_high_ofs = 1;
-		pre_ultra_high_ofs = 1;
-	}
-	/* write ultra_low_level, ultra_high_ofs, pre_ultra_low_ofs,
-	 * pre_ultra_high_ofs into register DISP_RDMA_MEM_GMC_SETTING_0
-	 */
-	DISP_REG_SET(handle, idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0,
-		     ultra_low_level | (pre_ultra_low_ofs << 8) | (ultra_high_ofs << 16) |
-		     (pre_ultra_high_ofs << 24));
+	/* write ultra_low_level, ultra_high_ofs, pre_ultra_low_ofs, pre_ultra_high_ofs */
+	DISP_REG_SET(handle,
+		idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0,
+		ultra_low_level | (pre_ultra_low_ofs << 8) | (ultra_high_ofs << 16) | (pre_ultra_high_ofs << 24));
 
 	/* set rdma ultra/pre-ultra according to resolution */
 	if (idx == 0) {
-		if (width > 800) {
-			DISP_REG_SET(handle,
-				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0, 0x1C013770);
-			DISP_REG_SET(handle,
-				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1, 0x0000003B);
-		} else if (width > 540) {
-			DISP_REG_SET(handle,
-				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0, 0x0C011832);
-			DISP_REG_SET(handle,
-				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1, 0x000000A8);
-		} else if (width > 480) {
-			DISP_REG_SET(handle,
-				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0, 0x32010D1C);
-			DISP_REG_SET(handle,
-				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1, 0x000000A3);
-		} else {
-			DISP_REG_SET(handle,
-				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0, 0x39010A16);
-			DISP_REG_SET(handle,
-				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1, 0x000000A5);
-		}
+		/* For video mode low power test */
+		DISP_REG_SET(handle,
+				idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1,
+				0xFF);
 
-		if (gRDMAUltraSetting)
+		if (((width >= 1280) && (height >= 800)) || ((width >= 800) && (height >= 1280))) {
+			ultra_low_level = 56;
+			pre_ultra_low_level = 83;
+			pre_ultra_high_level = 97;
+			pre_ultra_low_ofs = pre_ultra_low_level - ultra_low_level;
+			ultra_high_ofs = 1;
+			pre_ultra_high_ofs = pre_ultra_high_level - pre_ultra_low_level;
+
 			DISP_REG_SET(handle,
-				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0, gRDMAUltraSetting);
-	} else {
-		DISP_REG_SET(handle, idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0, 0x0C013770);
+					idx*DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0,
+					ultra_low_level | (pre_ultra_low_ofs << 8) |
+					(ultra_high_ofs << 16) | (pre_ultra_high_ofs << 24));
+			/* Issue Reg threshold */
+			DISP_REG_SET(handle,
+					idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1,
+					128);
+
+			sodi_threshold = 83 | (97 << 10);
+			fifo_valid_size = 83;
+			if (mode != (RDMA_MODE_DIRECT_LINK && isidle))
+				fifo_valid_size = 64;
+		} else if (((width >= 1280) && (height >= 720)) || ((width >= 720) && (height <= 1280))) {
+			/* HD */
+			/* Issue Reg threshold */
+			DISP_REG_SET(handle,
+				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1,
+				     180);
+			/* Best ultra */
+			DISP_REG_SET(handle,
+				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0,
+				     0x0B01194B);
+			/* Max ultra */
+			/* DISP_REG_SET(handle,idx*DISP_RDMA_INDEX_OFFSET+ DISP_REG_RDMA_MEM_GMC_SETTING_0, 0x0x); */
+			if (mode == RDMA_MODE_DIRECT_LINK) {
+				/* low:101 high:112 (direct link in HD) */
+				sodi_threshold = 101 | (112 << 10);
+				fifo_valid_size = 100 + 1;
+			} else {
+				/* mode == RDMA_MODE_DECOUPLE */
+				/* low:101 high:112 (decouple in HD) */
+				sodi_threshold = 101 | (112 << 10);
+				fifo_valid_size = 100 + 1;
+
+				/* home screen idle senario (300MHz), in future we should setting by different clock */
+				if (isidle) {
+					/* low:101 high:112 (decouple in HD) */
+					sodi_threshold = 101 | (112 << 10);
+					fifo_valid_size = 100 + 1;
+					DISP_REG_SET(handle,
+						     idx * DISP_RDMA_INDEX_OFFSET +
+						     DISP_REG_RDMA_MEM_GMC_SETTING_1, 180);
+					DISP_REG_SET(handle,
+						     idx * DISP_RDMA_INDEX_OFFSET +
+						     DISP_REG_RDMA_MEM_GMC_SETTING_0, 0x0B01194B);
+				}
+			}
+		} else if (((width >= 540) && (height >= 960)) || ((width >= 960) && (height >= 540))) {
+			/* qHD */
+			/* DISP_REG_SET(handle,idx*DISP_RDMA_INDEX_OFFSET+ DISP_REG_RDMA_MEM_GMC_SETTING_0, ); */
+			DISP_REG_SET(handle,
+				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1,
+				     213);
+			/* Best ultra */
+			DISP_REG_SET(handle,
+				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0,
+				     0x07010E1C);
+			/* Max ultra */
+			/* DISP_REG_SET(handle,idx*DISP_RDMA_INDEX_OFFSET+ DISP_REG_RDMA_MEM_GMC_SETTING_0, 0x0x); */
+			if (mode == RDMA_MODE_DIRECT_LINK) {
+				/* low:42     high:49 (direct link in qHD) */
+				sodi_threshold = 42 | (49 << 10);
+				fifo_valid_size = 42 + 1;
+			} else {
+				/* mode == RDMA_MODE_DECOUPLE */
+				/* low:42 high:49 (decouple in qHD) */
+				sodi_threshold = 42 | (49 << 10);
+				fifo_valid_size = 42 + 1;
+
+				/* home screen idle senario (300MHz), in future we should setting by different clock */
+				if (isidle) {
+					/* low:21 high:153 (decouple in qHD when home screen idle senario) */
+					sodi_threshold = 42 | (49 << 10);
+					fifo_valid_size = 32;
+					DISP_REG_SET(handle,
+						     idx * DISP_RDMA_INDEX_OFFSET +
+						     DISP_REG_RDMA_MEM_GMC_SETTING_1, 192);
+					DISP_REG_SET(handle,
+						     idx * DISP_RDMA_INDEX_OFFSET +
+						     DISP_REG_RDMA_MEM_GMC_SETTING_0, 0x07010E1C);
+				}
+			}
+		} else if (((width >= 480) && (height >= 640)) || ((width >= 640) && (height >= 480))) {
+			/* WVGA */
+			/* Issue Reg threshold */
+			DISP_REG_SET(handle,
+				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1,
+				     221);
+			/* Best ultra */
+			DISP_REG_SET(handle,
+				     idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0,
+				     0x06010816);
+			/* Max ultra */
+			/* DISP_REG_SET(handle,idx*DISP_RDMA_INDEX_OFFSET+ DISP_REG_RDMA_MEM_GMC_SETTING_0, 0x0x); */
+			if (mode == RDMA_MODE_DIRECT_LINK) {
+				/* low:34     high:44 (direct link in WVGA) */
+				sodi_threshold = 34 | (44 << 10);
+				fifo_valid_size = 32;
+			} else {
+				/* mode == RDMA_MODE_DECOUPLE */
+				/* low:34 high:39 (decouple in WVGA) */
+				sodi_threshold = 34 | (39 << 10);
+				fifo_valid_size = 32;
+				/* home screen idle senario (300MHz), in future we should setting by different clock */
+				if (isidle) {
+					/* low:17 high:152 (decouple in WVGA when home screen idle senario) */
+					sodi_threshold = 17 | (152 << 10);
+					fifo_valid_size = 32;
+					DISP_REG_SET(handle,
+							idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1,
+							196);
+					DISP_REG_SET(handle,
+							idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0,
+							0x05010A06);
+				}
+			}
+		} else if (((width >= 320) && (height >= 480)) || ((width >= 480) && (height >= 320))) {
+			/* HVGA */
+			/* Issue Reg threshold */
+			DISP_REG_SET(handle,
+					idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1,
+					221);
+			/* Best ultra */
+			DISP_REG_SET(handle,
+					idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0,
+					0x06010816);
+			if (mode == RDMA_MODE_DIRECT_LINK) {
+				/* low:34 high:44 (direct link in HVGA) */
+				sodi_threshold = 34 | (44 << 10);
+				fifo_valid_size = 32;
+			} else {
+				/* mode == RDMA_MODE_DECOUPLE */
+				/* low:34 high:39 (decouple in HVGA) */
+				sodi_threshold = 34 | (39 << 10);
+				fifo_valid_size = 32;
+				/* home screen idle senario (300MHz), in future we should setting by different clock */
+				if (isidle) {
+					/* low:17 high:152 (decouple in WVGA when home screen idle senario) */
+					sodi_threshold = 18 | (21 << 10);
+					fifo_valid_size = 32;
+					DISP_REG_SET(handle,
+							idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1,
+							208);
+					DISP_REG_SET(handle,
+							idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0,
+							0x0201020C);
+				}
+			}
+		} else {
+			/* lower resolution than HVGA */
+			DDPERR("Resolution is lower than HVGA\n");
+			/* Issue Reg threshold */
+			DISP_REG_SET(handle,
+					idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1,
+					221);
+			/* Best ultra */
+			DISP_REG_SET(handle,
+					idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0,
+					0x06010816);
+			if (mode == RDMA_MODE_DIRECT_LINK) {
+				/* low:34 high:44 */
+				sodi_threshold = 34 | (44 << 10);
+				fifo_valid_size = 32;
+			} else {
+				/* mode == RDMA_MODE_DECOUPLE */
+				/* low:34 high:39 */
+				sodi_threshold = 34 | (39 << 10);
+				fifo_valid_size = 32;
+				/* home screen idle senario (300MHz), in future we should setting by different clock */
+				if (isidle) {
+					/* low:17 high:152 (decouple in WVGA when home screen idle senario) */
+					sodi_threshold = 18 | (21 << 10);
+					fifo_valid_size = 32;
+					DISP_REG_SET(handle,
+							idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_1,
+							208);
+					DISP_REG_SET(handle,
+							idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_GMC_SETTING_0,
+							0x0201020C);
+				}
+			}
+		}
 	}
 
+	DDPDBG("RDMA sodi low threshold(%d) high threshold(%d)\n", (sodi_threshold & 0x3ff),
+	       (sodi_threshold & 0xffc00) >> 10);
 
+	DISP_REG_SET(handle, idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_THRESHOLD_FOR_SODI,
+		     sodi_threshold);
 
 	DISP_REG_SET_FIELD(handle, FIFO_CON_FLD_OUTPUT_VALID_FIFO_THRESHOLD,
 			   idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_FIFO_CON, fifo_valid_size);
 
-	DDPDBG("FIFO_VALID_Size      = 0x%03x = %d\n", fifo_valid_size, fifo_valid_size);
-	DDPDBG("ultra_low_level      = 0x%03x = %d\n", ultra_low_level, ultra_low_level);
-	DDPDBG("pre_ultra_low_level  = 0x%03x = %d\n", pre_ultra_low_level, pre_ultra_low_level);
-	DDPDBG("pre_ultra_high_level = 0x%03x = %d\n", pre_ultra_high_level, pre_ultra_high_level);
-	DDPDBG("ultra_high_ofs       = 0x%03x = %d\n", ultra_high_ofs, ultra_high_ofs);
-	DDPDBG("pre_ultra_low_ofs    = 0x%03x = %d\n", pre_ultra_low_ofs, pre_ultra_low_ofs);
-	DDPDBG("pre_ultra_high_ofs   = 0x%03x = %d\n", pre_ultra_high_ofs, pre_ultra_high_ofs);
+	DISP_REG_SET_FIELD(handle, FIFO_CON_FLD_FIFO_UNDERFLOW_EN,
+				   idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_FIFO_CON, 1);
+
+	DDPDBG("RDMA FIFO_VALID_Size      = 0x%03x = %d\n", fifo_valid_size, fifo_valid_size);
+	DDPDBG("RDMA ultra_low_level      = 0x%03x = %d\n", ultra_low_level, ultra_low_level);
+	DDPDBG("RDMA pre_ultra_low_level  = 0x%03x = %d\n", pre_ultra_low_level, pre_ultra_low_level);
+	DDPDBG("RDMA pre_ultra_high_level = 0x%03x = %d\n", pre_ultra_high_level, pre_ultra_high_level);
+	DDPDBG("RDMA ultra_high_ofs       = 0x%03x = %d\n", ultra_high_ofs, ultra_high_ofs);
+	DDPDBG("RDMA pre_ultra_low_ofs    = 0x%03x = %d\n", pre_ultra_low_ofs, pre_ultra_low_ofs);
+	DDPDBG("RDMA pre_ultra_high_ofs   = 0x%03x = %d\n", pre_ultra_high_ofs, pre_ultra_high_ofs);
+	DDPDBG("RDMA sodi low threshold(%d) high threshold(%d)\n",
+		(sodi_threshold & 0x3ff),
+		(sodi_threshold & 0xffc00) >> 10);
+
 }
+
 
 /* fixme: spec has no RDMA format, fix enum definition here */
 static int rdma_config(enum DISP_MODULE_ENUM module,
@@ -497,22 +669,8 @@ static int rdma_config(enum DISP_MODULE_ENUM module,
 	DISP_REG_SET(handle, idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_SIZE_CON_0, size_con_reg);
 	DISP_REG_SET(handle, idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_SIZE_CON_1, height);
 
-	rdma_set_ultra(idx, width, height, bpp, rdma_fps[idx], handle);
-#if 1
-	if (ufoe_enable == 0) {	/* UFOE bypassed, enable RDMA underflow intr, else disable RDMA underflow intr */
-		DISP_REG_SET_FIELD(handle, FIFO_CON_FLD_FIFO_UNDERFLOW_EN,
-				   idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_FIFO_CON, 1);
-		DISP_REG_SET_FIELD(handle, FIFO_CON_FLD_OUTPUT_VALID_FIFO_THRESHOLD,
-				   idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_FIFO_CON,
-				   gRDMAFIFOLen);
-	} else {
-		DISP_REG_SET_FIELD(handle, FIFO_CON_FLD_FIFO_UNDERFLOW_EN,
-				   idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_FIFO_CON, 1);
-		DISP_REG_SET_FIELD(handle, FIFO_CON_FLD_OUTPUT_VALID_FIFO_THRESHOLD,
-				   idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_FIFO_CON,
-				   width * 3 * 3 / 16 / 2);	/* FHD:304, HD:203, QHD:151 */
-	}
-#endif
+	rdma_set_ultra(idx, width, height, bpp, rdma_fps[idx], handle, mode, 0);
+
 	return 0;
 }
 

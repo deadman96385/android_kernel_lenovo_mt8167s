@@ -416,6 +416,7 @@ int dpmgr_modify_path(disp_path_handle dp_handle, enum DDP_SCENARIO_ENUM new_sce
 	struct ddp_path_handle *handle;
 	struct DDP_MANAGER_CONTEXT *content;
 	enum DDP_SCENARIO_ENUM old_scenario;
+	enum DISP_MODULE_ENUM dst_module;
 	int *new_modules;
 	int new_module_num;
 	int *old_modules;
@@ -424,6 +425,7 @@ int dpmgr_modify_path(disp_path_handle dp_handle, enum DDP_SCENARIO_ENUM new_sce
 	ASSERT(dp_handle != NULL);
 	handle = (struct ddp_path_handle *)dp_handle;
 	content = _get_context();
+	dst_module = dpmgr_path_get_dst_module(handle);
 	old_scenario = handle->scenario;
 	new_modules = ddp_get_scenario_list(new_scenario);
 	new_module_num = ddp_get_module_num(new_scenario);
@@ -432,6 +434,7 @@ int dpmgr_modify_path(disp_path_handle dp_handle, enum DDP_SCENARIO_ENUM new_sce
 
 	handle->cmdqhandle = cmdq_handle;
 	handle->scenario = new_scenario;
+	dpmgr_path_set_dst_module(handle, dst_module);
 	DISP_LOG_I("modify handle %p from %s to %s\n", handle, ddp_get_scenario_name(old_scenario),
 		   ddp_get_scenario_name(new_scenario));
 
@@ -537,6 +540,7 @@ int dpmgr_path_add_memout(disp_path_handle dp_handle, enum ENGINE_DUMP engine, v
 	struct ddp_path_handle *handle;
 	enum DISP_MODULE_ENUM wdma;
 	struct DDP_MANAGER_CONTEXT *context;
+	enum DISP_MODULE_ENUM dst_module;
 
 	ASSERT(dp_handle != NULL);
 	handle = (struct ddp_path_handle *) dp_handle;
@@ -554,11 +558,12 @@ int dpmgr_path_add_memout(disp_path_handle dp_handle, enum ENGINE_DUMP engine, v
 		return -1;
 	}
 	/* update contxt */
+	dst_module = dpmgr_path_get_dst_module(handle);
 	context = _get_context();
-
 	context->module_usage_table[wdma]++;
 	context->module_path_table[wdma] = handle;
 	handle->scenario = DDP_SCENARIO_PRIMARY_ALL;
+	dpmgr_path_set_dst_module(handle, dst_module);
 	/* update connected */
 	ddp_connect_path(handle->scenario, cmdq_handle);
 	ddp_mutex_set(handle->hwmutexid, handle->scenario, handle->mode, cmdq_handle);

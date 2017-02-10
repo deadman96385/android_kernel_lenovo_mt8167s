@@ -254,36 +254,393 @@ static void hdmi_set_util_funcs(const struct HDMI_UTIL_FUNCS *util)
 
 static void hdmi_get_params(struct HDMI_PARAMS *params)
 {
+	enum HDMI_VIDEO_RESOLUTION input_resolution = params->init_config.vformat;
+
+	HDMI_DRV_LOG("hdmi_get_params resolution(%d)\n", input_resolution);
 	memset(params, 0, sizeof(struct HDMI_PARAMS));
+	params->input_clock = input_resolution;
+	params->init_config.vformat = input_resolution;
 
-	HDMI_DRV_LOG("720p\n");
-	params->init_config.vformat = HDMI_VIDEO_1280x720p_50Hz;
-	params->init_config.aformat = HDMI_AUDIO_PCM_16bit_48000;
+	switch (input_resolution) {
+	case HDMI_VIDEO_720x480p_60Hz:
+		{
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+#else
+			params->clk_pol = HDMI_POLARITY_RISING;
+#endif
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_RISING;
+			params->vsync_pol = HDMI_POLARITY_RISING;
 
-	params->clk_pol = HDMI_POLARITY_FALLING;
-	params->de_pol = HDMI_POLARITY_RISING;
-	params->vsync_pol = HDMI_POLARITY_RISING;
-	params->hsync_pol = HDMI_POLARITY_RISING;
+			params->hsync_pulse_width = 62;
+			params->hsync_back_porch = 60;
+			params->hsync_front_porch = 16;
 
-	params->hsync_pulse_width = 40;
-	params->hsync_back_porch = 220;
-	params->hsync_front_porch = 440;
-	params->vsync_pulse_width = 5;
-	params->vsync_back_porch = 20;
-	params->vsync_front_porch = 5;
+			params->vsync_pulse_width = 6;
+			params->vsync_back_porch = 30;
+			params->vsync_front_porch = 9;
 
-	params->rgb_order = HDMI_COLOR_ORDER_RGB;
+			/* params->dpi_clock = 27027; */
+			params->width = 720;
+			params->height = 480;
+			break;
+		}
 
-	params->io_driving_current = IO_DRIVING_CURRENT_2MA;
-	params->intermediat_buffer_num = 4;
-	params->output_mode = HDMI_OUTPUT_MODE_LCD_MIRROR;
-	params->is_force_awake = 1;
-	params->is_force_landscape = 1;
+	case HDMI_VIDEO_720x576p_50Hz:
+		{
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+#else
+			params->clk_pol = HDMI_POLARITY_RISING;
+#endif
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_RISING;
+			params->vsync_pol = HDMI_POLARITY_RISING;
 
-	params->scaling_factor = 0;
+			params->hsync_pulse_width = 64;
+			params->hsync_back_porch = 68;
+			params->hsync_front_porch = 12;
+
+			params->vsync_pulse_width = 5;
+			params->vsync_back_porch = 39;
+			params->vsync_front_porch = 5;
+
+			/* params->dpi_clock = 27027; */
+			params->width = 720;
+			params->height = 576;
+
+			break;
+		}
+
+	case HDMI_VIDEO_1280x720p_60Hz:
+		{
+			params->clk_pol = HDMI_POLARITY_RISING;
+			params->de_pol = HDMI_POLARITY_RISING;
+#if defined(HDMI_TDA19989)
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+#else
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+#endif
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#endif
+
+			params->hsync_pulse_width = 40;
+			params->hsync_back_porch = 220;
+			params->hsync_front_porch = 110;
+
+			params->vsync_pulse_width = 5;
+			params->vsync_back_porch = 20;
+			params->vsync_front_porch = 5;
+
+			/* params->dpi_clock = 74250; */
+			params->width = 1280;
+			params->height = 720;
+
+			break;
+		}
+
+	case HDMI_VIDEO_1280x720p_50Hz:
+		{
+			params->clk_pol = HDMI_POLARITY_RISING;
+			params->de_pol = HDMI_POLARITY_RISING;
+#if defined(HDMI_TDA19989)
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+#else
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+#endif
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#endif
+
+			params->hsync_pulse_width = 40;
+			params->hsync_back_porch = 220;
+			params->hsync_front_porch = 440;
+
+			params->vsync_pulse_width = 5;
+			params->vsync_back_porch = 20;
+			params->vsync_front_porch = 5;
+
+			/* params->dpi_clock = 74250; */
+			params->width = 1280;
+			params->height = 720;
+			break;
+		}
+
+	case HDMI_VIDEO_1920x1080p_30Hz:
+		{
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#else
+			params->clk_pol = HDMI_POLARITY_RISING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#endif
+
+			params->hsync_pulse_width = 44;
+			params->hsync_back_porch = 148;
+			params->hsync_front_porch = 88;
+
+			params->vsync_pulse_width = 5;
+			params->vsync_back_porch = 36;
+			params->vsync_front_porch = 4;
+
+			/* params->dpi_clock = 74250; */
+			params->width = 1920;
+			params->height = 1080;
+
+			break;
+		}
+
+	case HDMI_VIDEO_1920x1080p_24Hz:
+		{
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#else
+			params->clk_pol = HDMI_POLARITY_RISING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#endif
+
+			params->hsync_pulse_width = 44;
+			params->hsync_back_porch = 148;
+			params->hsync_front_porch = 638;
+
+			params->vsync_pulse_width = 5;
+			params->vsync_back_porch = 36;
+			params->vsync_front_porch = 4;
+
+			/* params->dpi_clock = 74250; */
+			params->width = 1920;
+			params->height = 1080;
+
+			break;
+		}
+
+
+	case HDMI_VIDEO_1920x1080p_25Hz:
+		{
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#else
+			params->clk_pol = HDMI_POLARITY_RISING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#endif
+
+			params->hsync_pulse_width = 44;
+			params->hsync_back_porch = 148;
+			params->hsync_front_porch = 528;
+
+			params->vsync_pulse_width = 5;
+			params->vsync_back_porch = 36;
+			params->vsync_front_porch = 4;
+
+			/* params->dpi_clock = 74250; */
+			params->width = 1920;
+			params->height = 1080;
+			break;
+		}
+
+
+	case HDMI_VIDEO_1920x1080p_29Hz:
+		{
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#else
+			params->clk_pol = HDMI_POLARITY_RISING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#endif
+
+			params->hsync_pulse_width = 44;
+			params->hsync_back_porch = 148;
+			params->hsync_front_porch = 88;
+
+			params->vsync_pulse_width = 5;
+			params->vsync_back_porch = 36;
+			params->vsync_front_porch = 4;
+
+			/* params->dpi_clock = 74250; */
+			params->width = 1920;
+			params->height = 1080;
+			break;
+		}
+
+
+	case HDMI_VIDEO_1920x1080p_23Hz:
+		{
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#else
+			params->clk_pol = HDMI_POLARITY_RISING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#endif
+
+			params->hsync_pulse_width = 44;
+			params->hsync_back_porch = 148;
+			params->hsync_front_porch = 638;
+
+			params->vsync_pulse_width = 5;
+			params->vsync_back_porch = 36;
+			params->vsync_front_porch = 4;
+
+			/* params->dpi_clock = 74250; */
+			params->width = 1920;
+			params->height = 1080;
+			break;
+		}
+
+	case HDMI_VIDEO_1920x1080p_60Hz:
+		{
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#else
+			params->clk_pol = HDMI_POLARITY_RISING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#endif
+			params->hsync_pulse_width = 44;
+			params->hsync_back_porch = 148;
+			params->hsync_front_porch = 88;
+
+			params->vsync_pulse_width = 5;
+			params->vsync_back_porch = 36;
+			params->vsync_front_porch = 4;
+
+			/* params->dpi_clock = 148500; */
+			params->width = 1920;
+			params->height = 1080;
+			break;
+		}
+
+	case HDMI_VIDEO_1920x1080p_50Hz:
+		{
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#else
+			params->clk_pol = HDMI_POLARITY_RISING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#endif
+			params->hsync_pulse_width = 44;
+			params->hsync_back_porch = 148;
+			params->hsync_front_porch = 528;
+
+			params->vsync_pulse_width = 5;
+			params->vsync_back_porch = 36;
+			params->vsync_front_porch = 4;
+
+			/* params->dpi_clock = 148500; */
+			params->width = 1920;
+			params->height = 1080;
+			break;
+		}
+
+	case HDMI_VIDEO_1920x1080i_50Hz:
+		{
+			/* fgInterlace = TRUE; */
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#else
+			params->clk_pol = HDMI_POLARITY_RISING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#endif
+			params->hsync_pulse_width = 44;
+			params->hsync_back_porch = 148;
+			params->hsync_front_porch = 528;
+
+			params->vsync_pulse_width = 5;
+			params->vsync_back_porch = 15;
+			params->vsync_front_porch = 2;
+
+			/* params->dpi_clock = 148500; */
+			params->width = 1920;
+			params->height = 1080;
+			break;
+		}
+
+	case HDMI_VIDEO_1920x1080i_60Hz:
+		{
+			/* fgInterlace = TRUE; */
+#if defined(MHL_SII8338) || defined(MHL_SII8348)
+			params->clk_pol = HDMI_POLARITY_FALLING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#else
+			params->clk_pol = HDMI_POLARITY_RISING;
+			params->de_pol = HDMI_POLARITY_RISING;
+			params->hsync_pol = HDMI_POLARITY_FALLING;
+			params->vsync_pol = HDMI_POLARITY_FALLING;
+#endif
+			params->hsync_pulse_width = 44;
+			params->hsync_back_porch = 148;
+			params->hsync_front_porch = 88;
+
+			params->vsync_pulse_width = 5;
+			params->vsync_back_porch = 15;
+			params->vsync_front_porch = 2;
+
+			/* params->dpi_clock = 148500; */
+			params->width = 1920;
+			params->height = 1080;
+			break;
+		}
+
+	default:
+		break;
+	}
+
 #ifndef CONFIG_MTK_HDMI_HDCP_SUPPORT
 	params->NeedSwHDCP = 1;
 #endif
+
 }
 
 static int hdmi_internal_enter(void)
