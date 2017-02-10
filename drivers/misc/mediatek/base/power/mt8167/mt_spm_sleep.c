@@ -22,15 +22,11 @@
 #include <linux/of_fdt.h>
 #include <asm/setup.h>
 #include <linux/lockdep.h>
-/* #include <linux/irqchip/mt-gic.h> */
 /* #include <mach/mt_cirq.h> */
 #include "mt_spm_sleep.h"
-/* #include "mach/mt_clkmgr.h" */
 #include "mt_cpuidle.h"
 /* #include <mach/wd_api.h> */
 /* #include <mach/eint.h> */
-/* #include <mach/mtk_ccci_helper.h> */
-/* #include <mt-plat/mt_ccci_common.h> */
 /* #include "mt_cpufreq.h" */
 /* #include "mt_power_gs-v1.h" */
 /* #include <mt-plat/upmu_common.h> */
@@ -66,7 +62,6 @@
 #define I2C_CHANNEL 2
 
 int spm_dormant_sta;	/* MT_CPU_DORMANT_RESET */
-int spm_ap_mdsrc_req_cnt;
 u32 spm_suspend_flag;
 
 struct wake_status suspend_info[20];
@@ -213,21 +208,18 @@ static struct pcm_desc suspend_pcm = {
 /**************************************
  * SW code for suspend
  **************************************/
-#define SPM_SYSCLK_SETTLE       99	/* 3ms */
+#define SPM_SYSCLK_SETTLE       128	/* 3ms */
 
 #define WAIT_UART_ACK_TIMES     10	/* 10 * 10us */
 
 #define SPM_WAKE_PERIOD         600	/* sec */
 
 #define WAKE_SRC_FOR_SUSPEND \
-	(WAKE_SRC_KP | WAKE_SRC_EINT |  WAKE_SRC_CONN_WDT  |  WAKE_SRC_CCIF0_MD | WAKE_SRC_CONN2AP | \
+	(WAKE_SRC_KP | WAKE_SRC_EINT |  WAKE_SRC_CONN_WDT  | WAKE_SRC_CONN2AP | \
 	WAKE_SRC_USB_CD | WAKE_SRC_USB_PDN |  WAKE_SRC_SEJ | \
-	WAKE_SRC_SYSPWREQ | WAKE_SRC_MD1_WDT)
+	WAKE_SRC_SYSPWREQ)
 
 #define spm_is_wakesrc_invalid(wakesrc)     (!!((u32)(wakesrc) & 0xFC7F3A9B))
-
-#define WAKE_SRC_FOR_MD32  0                                          \
-				/* (WAKE_SRC_AUD_MD32) */
 
 #define reg_read(addr)         __raw_readl((void __force __iomem *)(addr))
 #define reg_write(addr, val)   mt_reg_sync_writel((val), ((void *)addr))
@@ -299,7 +291,6 @@ void __attribute__ ((weak)) mt_eint_print_status(void)
 
 static struct pwr_ctrl suspend_ctrl = {
 	.wake_src = WAKE_SRC_FOR_SUSPEND,
-	.wake_src_md32 = WAKE_SRC_FOR_MD32,
 	.r0_ctrl_en = 1,
 	.r7_ctrl_en = 1,
 	.infra_dcm_lock = 1,
@@ -311,26 +302,11 @@ static struct pwr_ctrl suspend_ctrl = {
 	.disp_req_mask = 0,
 	.mfg_req_mask = 0,
 	.gce_req_mask = 1,
-	.md1_req_mask = 0,
-	.md2_req_mask = 0,
-	.md32_req_mask = 1,
-	.md_apsrc_sel = 0,
-	.md2_apsrc_sel = 0,
-	.lte_mask = 1,
 	.conn_mask = 0,
 #ifdef CONFIG_MTK_NFC
 	.srclkenai_mask = 0,	/* unmask for NFC use */
 #else
 	.srclkenai_mask = 1,	/* mask for gpio/i2c use */
-#endif
-#if 0
-	/* use for birng-up */
-	.ccif0_to_ap_mask = 1,
-	.ccif0_to_md_mask = 1,
-	.ccif1_to_ap_mask = 1,
-	.ccif1_to_md_mask = 1,
-	.ccifmd_md1_event_mask = 1,
-	.ccifmd_md2_event_mask = 1,
 #endif
 	/* .pcm_apsrc_req = 1, */
 
@@ -358,18 +334,13 @@ struct spm_lp_scen __spm_suspend = {
 
 static void spm_set_sysclk_settle(void)
 {
-	u32 md_settle, settle;
+	u32 settle;
 
-	/* get MD SYSCLK settle */
-	spm_write(SPM_CLK_CON, spm_read(SPM_CLK_CON) | CC_SYSSETTLE_SEL);
-	spm_write(SPM_CLK_SETTLE, 0);
-	md_settle = spm_read(SPM_CLK_SETTLE);
-
-	/* SYSCLK settle = MD SYSCLK settle but set it again for MD PDN */
-	spm_write(SPM_CLK_SETTLE, SPM_SYSCLK_SETTLE - md_settle);
+	/* SYSCLK settle = VTCXO settle time */
+	spm_write(SPM_CLK_SETTLE, SPM_SYSCLK_SETTLE);
 	settle = spm_read(SPM_CLK_SETTLE);
 
-	spm_warn("md_settle = %u, settle = %u\n", md_settle, settle);
+	spm_warn("settle = %u\n", settle);
 }
 
 static void spm_kick_pcm_to_run(struct pwr_ctrl *pwrctrl)
@@ -440,8 +411,6 @@ static void spm_clean_after_wakeup(void)
 static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct pcm_desc *pcmdesc)
 {
 	wake_reason_t wr;
-	u32 md32_flag = 0;
-	u32 md32_flag2 = 0;
 
 	wr = __spm_output_wake_reason(wakesta, pcmdesc, true);
 
@@ -461,16 +430,8 @@ static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct 
 		log_wakesta_index = 0;
 #endif
 
-#ifdef CONFIG_MD32_SUPPORT
-	md32_flag = spm_read(MD32_BASE + 0x2C);
-	md32_flag2 = spm_read(MD32_BASE + 0x30);
-#endif
-	spm_warn("suspend dormant state = %d, md32_flag = 0x%x, md32_flag2 = %d\n",
-		  spm_dormant_sta, md32_flag, md32_flag2);
+	spm_warn("suspend dormant state = %d\n", spm_dormant_sta);
 	spm_warn("log_wakesta_index = %d\n", log_wakesta_index);
-	if (spm_ap_mdsrc_req_cnt != 0)
-		spm_warn("warning: spm_ap_mdsrc_req_cnt = %d, r7[ap_mdsrc_req] = 0x%x\n",
-			  spm_ap_mdsrc_req_cnt, spm_read(SPM_POWER_ON_VAL1) & (1 << 17));
 
 	if (wakesta->r12 & WAKE_SRC_EINT)
 		mt_eint_print_status();
@@ -550,15 +511,9 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 {
 	u32 sec = 2;
 /*	int wd_ret; */
-	/* struct wake_status wakesta; */
 	unsigned long flags;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M)
-	unsigned long temp_a, temp_b;
-#endif
-#if 0
-	unsigned int temp_c;
-#endif
-/*	struct mtk_irq_mask mask; */
+	struct mtk_irq_mask mask;
+	struct irq_desc *desc = irq_to_desc(spm_irq_0);
 /*	struct wd_api *wd_api; */
 	static wake_reason_t last_wr = WR_NONE;
 	struct pcm_desc *pcmdesc;
@@ -589,13 +544,13 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	/* spm_suspend_pre_process(pwrctrl); */
 	lockdep_off();
 	spin_lock_irqsave(&__spm_lock, flags);
-#if 0
-	mt_irq_mask_all(&mask);
-	mt_irq_unmask_for_sleep(SPM_IRQ0_ID);
 
+	mt_irq_mask_all(&mask);
+	if (desc)
+		unmask_irq(desc);
 	mt_cirq_clone_gic();
 	mt_cirq_enable();
-#endif
+
 	spm_set_sysclk_settle();
 
 	spm_warn("sec = %u, wakesrc = 0x%x (%u)(%u)\n",
@@ -649,12 +604,11 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	last_wr = spm_output_wake_reason(&spm_wakesta, pcmdesc);
 
 RESTORE_IRQ:
-#if 0
 	mt_cirq_flush();
 	mt_cirq_disable();
 
 	mt_irq_mask_restore(&mask);
-#endif
+
 	spin_unlock_irqrestore(&__spm_lock, flags);
 	lockdep_on();
 	/* spm_suspend_post_process(pwrctrl); */
@@ -704,16 +658,6 @@ void spm_poweron_config_set(void)
 	spin_lock_irqsave(&__spm_lock, flags);
 	/* enable register control */
 	spm_write(SPM_POWERON_CONFIG_SET, (SPM_PROJECT_CODE << 16) | (1U << 0));
-	spin_unlock_irqrestore(&__spm_lock, flags);
-}
-
-void spm_md32_sram_con(u32 value)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&__spm_lock, flags);
-	/* enable register control */
-	spm_write(SPM_MD32_SRAM_CON, value);
 	spin_unlock_irqrestore(&__spm_lock, flags);
 }
 

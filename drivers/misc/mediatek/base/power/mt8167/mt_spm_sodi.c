@@ -70,9 +70,8 @@
 #else
 #define WAKE_SRC_FOR_SODI \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_WDT | \
-	WAKE_SRC_CCIF0_MD | WAKE_SRC_CONN2AP | \
-	WAKE_SRC_USB_CD | WAKE_SRC_USB_PDN | WAKE_SRC_AFE | \
-	WAKE_SRC_CIRQ | WAKE_SRC_SEJ | WAKE_SRC_SYSPWREQ | WAKE_SRC_MD1_WDT)
+	WAKE_SRC_CONN2AP | WAKE_SRC_USB_CD | WAKE_SRC_USB_PDN | WAKE_SRC_AFE | \
+	WAKE_SRC_CIRQ | WAKE_SRC_SEJ | WAKE_SRC_SYSPWREQ)
 #endif
 
 #ifdef CONFIG_MTK_RAM_CONSOLE
@@ -237,17 +236,12 @@ static struct pwr_ctrl sodi_ctrl = {
 	/* SPM_AP_STANBY_CON */
 	.wfi_op			= WFI_OP_AND,
 	.mfg_req_mask		= 1,
-	.lte_mask			= 1,
-
-	.md2_req_mask		= 1,
 
 #if 0 /*(SODI_DVT_APxGPT)*/
 	/*.ca7top_idle_mask   = 1,*/
 	/*.ca15top_idle_mask  = 1,*/
 	/*.mcusys_idle_mask   = 1,*/
 	/*.disp_req_mask	= 1,*/
-	.md1_req_mask		= 1,
-	.md2_req_mask		= 1,
 	.conn_mask			= 1,
 #endif
 
@@ -285,7 +279,6 @@ static const char *sodi_wakesrc_str[32] = {
 	[5] = "EINT",
 	[6] = "CONN_WDT",
 	[7] = "GCE",
-	[8] = "CCIF0_MD",
 	[9] = "LOW_BAT",
 	[10] = "CONN2AP",
 	[11] = "F26M_WAKE",
@@ -293,8 +286,6 @@ static const char *sodi_wakesrc_str[32] = {
 	[13] = "PCM_WDT",
 	[14] = "USB_CD ",
 	[15] = "USB_PDN",
-	[16] = "MD1_VRF18_WAKE",
-	[17] = "MD1_VRF18_SLEEP",
 	[18] = "DBGSYS",
 	[19] = "UART0",
 	[20] = "AFE",
@@ -302,7 +293,6 @@ static const char *sodi_wakesrc_str[32] = {
 	[22] = "CIRQ",
 	[23] = "SEJ",
 	[24] = "SYSPWREQ",
-	[25] = "MD1_WDT",
 	[26] = "CPU0_IRQ",
 	[27] = "CPU1_IRQ",
 	[28] = "CPU2_IRQ",

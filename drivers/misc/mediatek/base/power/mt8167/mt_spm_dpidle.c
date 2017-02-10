@@ -18,7 +18,6 @@
 #include <linux/delay.h>
 #include <linux/of_fdt.h>
 #include <linux/lockdep.h>
-/* #include <linux/irqchip/mt-gic.h> */
 
 #ifdef CONFIG_OF
 #include <linux/of.h>
@@ -49,10 +48,8 @@
 
 #define WAKE_SRC_FOR_DPIDLE \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_CONN_WDT| \
-	WAKE_SRC_CCIF0_MD | WAKE_SRC_CONN2AP | WAKE_SRC_USB_CD | WAKE_SRC_USB_PDN | \
-	WAKE_SRC_AFE | WAKE_SRC_SYSPWREQ | WAKE_SRC_MD1_WDT | WAKE_SRC_SEJ)
-
-#define WAKE_SRC_FOR_MD32  0
+	WAKE_SRC_CONN2AP | WAKE_SRC_USB_CD | WAKE_SRC_USB_PDN | \
+	WAKE_SRC_AFE | WAKE_SRC_SYSPWREQ | WAKE_SRC_SEJ)
 
 #define I2C_CHANNEL 2
 
@@ -216,7 +213,6 @@ static struct pcm_desc dpidle_pcm = {
 
 static struct pwr_ctrl dpidle_ctrl = {
 	.wake_src = WAKE_SRC_FOR_DPIDLE,
-	.wake_src_md32 = WAKE_SRC_FOR_MD32,
 	.r0_ctrl_en = 1,
 	.r7_ctrl_en = 1,
 	.infra_dcm_lock = 1,
@@ -231,7 +227,6 @@ static struct pwr_ctrl dpidle_ctrl = {
 	.ca7_wfi3_en = 1,
 	.disp_req_mask = 1,
 	.mfg_req_mask = 1,
-	.lte_mask = 1,
 	.syspwreq_mask = 1,
 };
 
@@ -399,7 +394,8 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 {
 	struct wake_status wakesta;
 	unsigned long flags;
-/*	struct mtk_irq_mask mask; */
+	struct mtk_irq_mask mask;
+	struct irq_desc *desc = irq_to_desc(spm_irq_0);
 	wake_reason_t wr = WR_NONE;
 	struct pcm_desc *pcmdesc = __spm_dpidle.pcmdesc;
 	struct pwr_ctrl *pwrctrl = __spm_dpidle.pwrctrl;
@@ -414,12 +410,13 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 
 	lockdep_off();
 	spin_lock_irqsave(&__spm_lock, flags);
-#if 0
+
 	mt_irq_mask_all(&mask);
-	mt_irq_unmask_for_sleep(SPM_IRQ0_ID);
+	if (desc)
+		unmask_irq(desc);
 	mt_cirq_clone_gic();
 	mt_cirq_enable();
-#endif
+
 #if SPM_AEE_RR_REC
 	aee_rr_rec_deepidle_val(aee_rr_curr_deepidle_val() | (1 << SPM_DEEPIDLE_ENTER_UART_SLEEP));
 #endif
@@ -474,11 +471,11 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 #endif
 
 	wr = spm_output_wake_reason(&wakesta, pcmdesc, dump_log);
-#if 0
+
 	mt_cirq_flush();
 	mt_cirq_disable();
 	mt_irq_mask_restore(&mask);
-#endif
+
 	spin_unlock_irqrestore(&__spm_lock, flags);
 	lockdep_on();
 /*	spm_dpidle_after_wfi(); */
@@ -505,7 +502,8 @@ wake_reason_t spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data)
 /*	int wd_ret; */
 	struct wake_status wakesta;
 	unsigned long flags;
-/*	struct mtk_irq_mask mask; */
+	struct mtk_irq_mask mask;
+	struct irq_desc *desc = irq_to_desc(spm_irq_0);
 /*	struct wd_api *wd_api; */
 	static wake_reason_t last_wr = WR_NONE;
 	struct pcm_desc *pcmdesc = __spm_dpidle.pcmdesc;
@@ -526,13 +524,13 @@ wake_reason_t spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data)
 		wd_api->wd_suspend_notify();
 #endif
 	spin_lock_irqsave(&__spm_lock, flags);
-#if 0
-	mt_irq_mask_all(&mask);
-	mt_irq_unmask_for_sleep(SPM_IRQ0_ID);
 
+	mt_irq_mask_all(&mask);
+	if (desc)
+		unmask_irq(desc);
 	mt_cirq_clone_gic();
 	mt_cirq_enable();
-#endif
+
 	/* set PMIC WRAP table for deepidle power control */
 /*	mt_cpufreq_set_pmic_phase(PMIC_WRAP_PHASE_DEEPIDLE); */
 
@@ -576,12 +574,11 @@ RESTORE_IRQ:
 
 	/* set PMIC WRAP table for normal power control */
 /*	mt_cpufreq_set_pmic_phase(PMIC_WRAP_PHASE_NORMAL); */
-#if 0
+
 	mt_cirq_flush();
 	mt_cirq_disable();
 
 	mt_irq_mask_restore(&mask);
-#endif
 	spin_unlock_irqrestore(&__spm_lock, flags);
 #if 0
 	if (!wd_ret)

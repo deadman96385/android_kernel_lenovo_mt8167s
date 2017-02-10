@@ -16,6 +16,9 @@
 
 #include <linux/kernel.h>
 #include <linux/io.h>
+#include <linux/irq.h>
+#include <linux/irqdesc.h>
+#include <linux/irqchip/mtk-gic-extend.h>
 
 extern void __iomem *spm_base;
 extern void __iomem *scp_i2c0_base;
@@ -86,7 +89,6 @@ extern u32 spm_irq_7;
 #define SPM_CA7_CPU3_L1_PDN		(SPM_BASE + 0x274)
 #define SPM_GCPU_SRAM_CON		(SPM_BASE + 0x27c)
 #define SPM_CONN_PWR_CON		(SPM_BASE + 0x280)
-#define SPM_MD_PWR_CON			(SPM_BASE + 0x284)
 #define SPM_MCU_PWR_CON			(SPM_BASE + 0x290)
 #define SPM_IFR_SRAMROM_CON		(SPM_BASE + 0x294)
 #define SPM_MJC_PWR_CON			(SPM_BASE + 0x298)
@@ -100,10 +102,7 @@ extern u32 spm_irq_7;
 #define SPM_CA15_L2_PWR_CON		(SPM_BASE + 0x2b8)
 #define SPM_MFG_2D_PWR_CON      (SPM_BASE + 0x2c0)
 #define SPM_MFG_ASYNC_PWR_CON		(SPM_BASE + 0x2c4)
-#define SPM_MD32_SRAM_CON		(SPM_BASE + 0x2c8)
 #define SPM_ARMPLL_DIV_PWR_CON  (SPM_BASE + 0x2cc)
-#define SPM_MD2_PWR_CON         (SPM_BASE + 0x2d0)
-#define SPM_C2K_PWR_CON         (SPM_BASE + 0x2d4)
 #define SPM_INFRA_MD_PWR_CON    (SPM_BASE + 0x2d8)
 #define SPM_CPU_EXT_ISO         (SPM_BASE + 0x2dc)
 #define SPM_PCM_CON0			(SPM_BASE + 0x310)
@@ -177,15 +176,11 @@ extern u32 spm_irq_7;
 #define SPM_SLEEP_IDLE_SEL		(SPM_BASE + 0x78C)
 #define SPM_SLEEP_WAKEUP_EVENT_MASK	(SPM_BASE + 0x810)
 #define SPM_SLEEP_CPU_WAKEUP_EVENT	(SPM_BASE + 0x814)
-#define SPM_SLEEP_MD32_WAKEUP_EVENT_MASK	(SPM_BASE + 0x818)
 #define SPM_PCM_WDT_TIMER_VAL		(SPM_BASE + 0x824)
 #define SPM_PCM_WDT_TIMER_OUT		(SPM_BASE + 0x828)
-#define SPM_PCM_MD32_MAILBOX		(SPM_BASE + 0x830)
-#define SPM_PCM_MD32_IRQ		(SPM_BASE + 0x834)
 #define SPM_SLEEP_ISR_MASK		(SPM_BASE + 0x900)
 #define SPM_SLEEP_ISR_STATUS		(SPM_BASE + 0x904)
 #define SPM_SLEEP_ISR_RAW_STA		(SPM_BASE + 0x910)
-#define SPM_SLEEP_MD32_ISR_RAW_STA	(SPM_BASE + 0x914)
 #define SPM_SLEEP_WAKEUP_MISC		(SPM_BASE + 0x918)
 #define SPM_SLEEP_BUS_PROTECT_RDY	(SPM_BASE + 0x91c)
 #define SPM_SLEEP_SUBSYS_IDLE_STA	(SPM_BASE + 0x920)
@@ -248,7 +243,6 @@ extern u32 spm_irq_7;
 #define SPM_DRAM_RANK1_ADDR_SEL2	(1U << 21)	/* 0xc0000000 */
 
 /* Wakeup Source*/
-#if 1
 #define SPM_WAKE_SRC_LIST	{	\
 	SPM_WAKE_SRC(0, SPM_MERGE),	/* PCM timer, TWAM or CPU */	\
 	SPM_WAKE_SRC(1, AUDIO_REQ), /* new */	\
@@ -258,7 +252,6 @@ extern u32 spm_irq_7;
 	SPM_WAKE_SRC(5, EINT),	\
 	SPM_WAKE_SRC(6, CONN_WDT),		\
 	SPM_WAKE_SRC(7, GCE),	\
-	SPM_WAKE_SRC(8, CCIF0_MD), \
 	SPM_WAKE_SRC(9, LOW_BAT),	\
 	SPM_WAKE_SRC(10, CONN2AP),	\
 	SPM_WAKE_SRC(11, F26M_WAKE),	\
@@ -266,8 +259,6 @@ extern u32 spm_irq_7;
 	SPM_WAKE_SRC(13, PCM_WDT),	\
 	SPM_WAKE_SRC(14, USB_CD),	\
 	SPM_WAKE_SRC(15, USB_PDN),	\
-	SPM_WAKE_SRC(16, MD1_VRF18_WAKE), \
-	SPM_WAKE_SRC(17, MD1_VRF18_SLEEP), \
 	SPM_WAKE_SRC(18, DBGSYS), \
 	SPM_WAKE_SRC(19, UART0),	\
 	SPM_WAKE_SRC(20, AFE),		\
@@ -275,7 +266,6 @@ extern u32 spm_irq_7;
 	SPM_WAKE_SRC(22, CIRQ),		\
 	SPM_WAKE_SRC(23, SEJ),		\
 	SPM_WAKE_SRC(24, SYSPWREQ),	\
-	SPM_WAKE_SRC(25, MD1_WDT),	 \
 	SPM_WAKE_SRC(26, CPU0_IRQ),	 \
 	SPM_WAKE_SRC(27, CPU1_IRQ),		\
 	SPM_WAKE_SRC(28, CPU2_IRQ),	 \
@@ -283,42 +273,6 @@ extern u32 spm_irq_7;
 	SPM_WAKE_SRC(30, APSRC_WAKE),	\
 	SPM_WAKE_SRC(31, APSRC_SLEEP)	\
 }
-#else
-#define SPM_WAKE_SRC_LIST	{	\
-	SPM_WAKE_SRC(0, SPM_MERGE),	/* PCM timer, TWAM or CPU */	\
-	SPM_WAKE_SRC(1, MD32_WDT),	\
-	SPM_WAKE_SRC(2, KP),		\
-	SPM_WAKE_SRC(3, WDT),		\
-	SPM_WAKE_SRC(4, GPT),		\
-	SPM_WAKE_SRC(5, CONN2AP),	\
-	SPM_WAKE_SRC(6, EINT),		\
-	SPM_WAKE_SRC(7, CONN_WDT),	\
-	SPM_WAKE_SRC(8, CCIF0_MD),	\
-	SPM_WAKE_SRC(9, LOW_BAT),	\
-	SPM_WAKE_SRC(10, MD32_SPM),	\
-	SPM_WAKE_SRC(11, F26M_WAKE),	\
-	SPM_WAKE_SRC(12, F26M_SLEEP),	\
-	SPM_WAKE_SRC(13, PCM_WDT),	\
-	SPM_WAKE_SRC(14, USB_CD),	\
-	SPM_WAKE_SRC(15, USB_PDN),	\
-	SPM_WAKE_SRC(16, LTE_WAKE),	\
-	SPM_WAKE_SRC(17, LTE_SLEEP),	\
-	SPM_WAKE_SRC(18, CCIF1_MD),	\
-	SPM_WAKE_SRC(19, UART0),	\
-	SPM_WAKE_SRC(20, AFE),		\
-	SPM_WAKE_SRC(21, THERM),	\
-	SPM_WAKE_SRC(22, CIRQ),		\
-	SPM_WAKE_SRC(23, MD2_WDT),	\
-	SPM_WAKE_SRC(24, SYSPWREQ),	\
-	SPM_WAKE_SRC(25, MD_WDT),	\
-	SPM_WAKE_SRC(26, CLDMA_MD),	\
-	SPM_WAKE_SRC(27, SEJ),		\
-	SPM_WAKE_SRC(28, ALL_MD32),	\
-	SPM_WAKE_SRC(29, CPU_IRQ),	\
-	SPM_WAKE_SRC(30, APSRC_WAKE),	\
-	SPM_WAKE_SRC(31, APSRC_SLEEP)	\
-}
-#endif
 
 enum SPM_WAKE_SRC {
 	WAKE_SRC_SPM_MERGE = (1U << 0),	/* WAKE_ID_SPM_MERGE */
@@ -329,7 +283,6 @@ enum SPM_WAKE_SRC {
 	WAKE_SRC_EINT = (1U << 5),	/* WAKE_ID_EINT */
 	WAKE_SRC_CONN_WDT = (1U << 6),	/* WAKE_ID_CONN_WDT */
 	WAKE_SRC_GCE = (1U << 7),	/* WAKE_ID_GCE */
-	WAKE_SRC_CCIF0_MD = (1U << 8),	/* WAKE_ID_CCIF0_MD */
 	WAKE_SRC_LOW_BAT = (1U << 9),	/* WAKE_ID_LOW_BAT */
 	WAKE_SRC_CONN2AP = (1U << 10),	/* WAKE_ID_CONN2AP */
 	WAKE_SRC_F26M_WAKE = (1U << 11),	/* WAKE_ID_F26M_WAKE */
@@ -337,8 +290,6 @@ enum SPM_WAKE_SRC {
 	WAKE_SRC_PCM_WDT = (1U << 13),	/* WAKE_ID_PCM_WDT */
 	WAKE_SRC_USB_CD = (1U << 14),	/* WAKE_ID_USB_CD */
 	WAKE_SRC_USB_PDN = (1U << 15),	/* WAKE_ID_USB_PDN */
-	WAKE_SRC_MD1_VRF18_WAKE = (1U << 16),	/* WAKE_ID_MD1_VRF18_WAKE */
-	WAKE_SRC_MD1_VRF18_SLEEP = (1U << 17),	/* WAKE_ID_MD1_VRF18_SLEEP */
 	WAKE_SRC_DBGSYS = (1U << 18),	/* WAKE_ID_DBGSYS */
 	WAKE_SRC_UART0 = (1U << 19),	/* WAKE_ID_UART0 */
 	WAKE_SRC_AFE = (1U << 20),	/* WAKE_ID_AFE */
@@ -346,7 +297,6 @@ enum SPM_WAKE_SRC {
 	WAKE_SRC_CIRQ = (1U << 22),	/* WAKE_ID_CIRQ */
 	WAKE_SRC_SEJ = (1U << 23),	/* WAKE_ID_SEJ */
 	WAKE_SRC_SYSPWREQ = (1U << 24),	/* WAKE_ID_SYSPWREQ */
-	WAKE_SRC_MD1_WDT = (1U << 25),	/* WAKE_ID_MD1_WDT */
 	WAKE_SRC_CPU0_IRQ = (1U << 26),	/* WAKE_ID_CPU0_IRQ */
 	WAKE_SRC_CPU1_IRQ = (1U << 27),	/* WAKE_ID_CPU1_IRQ */
 	WAKE_SRC_CPU2_IRQ = (1U << 28),	/* WAKE_ID_CPU2_IRQ */
@@ -394,6 +344,7 @@ extern void spm_twam_disable_monitor(void);
 /*for AP BSI Generator*/
 void spm_ap_bsi_gen(unsigned int *clk_buf_cfg);
 
+extern void unmask_irq(struct irq_desc *desc); /* to replace mt_irq_unmask_for_sleep */
 
 unsigned int spm_get_cpu_pwr_status(void);
 
