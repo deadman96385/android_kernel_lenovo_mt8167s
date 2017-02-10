@@ -138,6 +138,11 @@
 	status = "okay";
 };
 
+&bat_comm {
+	interrupt-parent = <&pmic>;
+	interrupts = <10 IRQ_TYPE_LEVEL_HIGH>;
+};
+
 &consys {
 	pinctrl-names = "default", "gps_lna_state_init", "gps_lna_state_oh", "gps_lna_state_ol";
 	pinctrl-0 = <&consys_pins_default>;
