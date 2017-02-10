@@ -17,6 +17,7 @@
 #include "servicesext.h"
 #include "rgxdevice.h"
 #include "ged_dvfs.h"
+#include <linux/regulator/consumer.h>
 
 /* control APM is enabled or not  */
 #define MTK_PM_SUPPORT 1

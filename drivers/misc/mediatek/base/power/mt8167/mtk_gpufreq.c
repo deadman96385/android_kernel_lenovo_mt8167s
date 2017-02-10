@@ -42,43 +42,48 @@
 
 #include <linux/uaccess.h>
 
-#include "mtk_clkmgr.h"
-#include "mtk_cpufreq.h"
 #include "mtk_gpufreq.h"
+/*
 #include "mtk_static_power.h"
-#include "mt-plat/upmu_common.h"
+*/
+#include <mt-plat/upmu_common.h>
 #include "mt-plat/sync_write.h"
 #include "mt-plat/mtk_pmic_wrap.h"
 
+#include "mach/mtk_fhreg.h"
 #include "mach/mtk_freqhopping.h"
+
 /* TODO: check this! */
 /* #include "mach/mt_static_power.h" */
-#include "mach/mtk_thermal.h"
-#include "mach/upmu_sw.h"
-#include "mach/upmu_hw.h"
-#include "mach/mtk_pbm.h"
+#include "inc/mtk_thermal.h"
+#include "mt8167/include/mach/upmu_sw.h"
+
+#include <linux/regulator/consumer.h>
 
 /* #define BRING_UP */
 
 #define DRIVER_NOT_READY	-1
-#define STATIC_PWR_READY2USE
+/* #define STATIC_PWR_READY2USE */
 /*
  * CONFIG
  */
 /**************************************************
  * Define low battery voltage support
  ***************************************************/
-#define MT_GPUFREQ_LOW_BATT_VOLT_PROTECT
+/* By Power team comment, we don't need it in MT8167*/
+/* #define MT_GPUFREQ_LOW_BATT_VOLT_PROTECT */
 
 /**************************************************
  * Define low battery volume support
  ***************************************************/
-#define MT_GPUFREQ_LOW_BATT_VOLUME_PROTECT
+/* By Power team comment, we don't need it in MT8167*/
+/* #define MT_GPUFREQ_LOW_BATT_VOLUME_PROTECT */
 
 /**************************************************
  * Define oc support
  ***************************************************/
-#define MT_GPUFREQ_OC_PROTECT
+/* By Power team comment, we don't need it in MT8167*/
+/* #define MT_GPUFREQ_OC_PROTECT */
 
 /**************************************************
  * GPU DVFS input boost feature
@@ -123,49 +128,52 @@
 /***************************
  * Operate Point Definition
  ****************************/
-#define GPUOP(khz, volt, idx)	   \
-{						   \
-	.gpufreq_khz = khz,	 \
-	.gpufreq_volt = volt,   \
-	.gpufreq_idx = idx,   \
+#define GPUOP(khz, volt, idx)	\
+{				\
+	.gpufreq_khz = khz,	\
+	.gpufreq_volt = volt,	\
+	.gpufreq_idx = idx,	\
 }
 
 /**************************
  * GPU DVFS OPP table setting
  ***************************/
+#define GPU_DVFS_FREQ0	(598000) /* KHz */
+#define GPU_DVFS_FREQ1	(494000) /* KHz */
+#define GPU_DVFS_FREQ2	(445000) /* KHz */
+#define GPU_DVFS_FREQ3	(396500) /* KHz */
+#define GPU_DVFS_FREQ4	(299000) /* KHz */
+#define GPU_DVFS_FREQ5	(253500) /* KHz */
 
-#define GPU_DVFS_FREQ0	 (900000)	/* KHz */
-#define GPU_DVFS_FREQ1	 (785000)	/* KHz */
-#define GPU_DVFS_FREQ2	 (720000)	/* KHz */
-#define GPU_DVFS_FREQ3	 (600000)	/* KHz */
-#define GPU_DVFS_FREQ4	 (485000)	/* KHz */
-#define GPU_DVFS_FREQ5	 (390000)	/* KHz */
-#define GPU_DVFS_FREQ6	 (310000)	/* KHz */
-#define GPU_DVFS_FREQ7	 (230000)	/* KHz */
-#define GPUFREQ_LAST_FREQ_LEVEL	(GPU_DVFS_FREQ7)
+#define GPUFREQ_LAST_FREQ_LEVEL	(GPU_DVFS_FREQ5)
 
-#define GPU_DVFS_VOLT0	 (90000)	/* mV x 100 */
-#define GPU_DVFS_VOLT1	 (85000)	/* mV x 100 */
-#define GPU_DVFS_VOLT2	 (80000)	/* mV x 100 */
-#define GPU_DVFS_VOLT3	 (75000)	/* mV x 100 */
-#define GPU_DVFS_VOLT4	 (70000)	/* mV x 100 */
-#define GPU_DVFS_VOLT5	 (65000)	/* mV x 100 */
-#define GPU_DVFS_VOLT6	 (60000)	/* mV x 100 */
+#define GPU_DVFS_VOLT0	(130000)    /* mV x 100 */
+#define GPU_DVFS_VOLT1	(125000)    /* mV x 100 */
+#define GPU_DVFS_VOLT2	(115000)    /* mV x 100 */
 
-#define GPU_DVFS_PTPOD_DISABLE_VOLT	GPU_DVFS_VOLT1
+#define GPU_DVFS_PTPOD_DISABLE_VOLT	GPU_DVFS_VOLT2
 
-#define UNIVPLL_FREQ	(416000) /* KHz */
+#define UNIVPLL_FREQ	(396000) /* KHz */
 /*****************************************
  * PMIC settle time (us), should not be changed
  ******************************************/
- #ifdef VGPU_SET_BY_PMIC
+#ifdef VGPU_SET_BY_PMIC
+#define PMIC_MIN_VGPU GPU_DVFS_VOLT2
+#define PMIC_MAX_VGPU GPU_DVFS_VOLT0
+
+/* mt6799 us * 100 BEGIN */
+#define DELAY_FACTOR 1250
+#define HALF_DELAY_FACTOR 625
+#define BUCK_INIT_US 750
+/* mt6799 END */
+
 #define PMIC_CMD_DELAY_TIME	 5
 #define MIN_PMIC_SETTLE_TIME	25
 #define PMIC_VOLT_UP_SETTLE_TIME(old_volt, new_volt)	\
 	(((((new_volt) - (old_volt)) + 1250 - 1) / 1250) + PMIC_CMD_DELAY_TIME)
 #define PMIC_VOLT_DOWN_SETTLE_TIME(old_volt, new_volt)	\
 	(((((old_volt) - (new_volt)) * 2)  / 625) + PMIC_CMD_DELAY_TIME)
-#define PMIC_VOLT_ON_OFF_DELAY_US       (200)
+#define PMIC_VOLT_ON_OFF_DELAY_US	   (200)
 #define INVALID_SLEW_RATE	(0)
 /* #define GPU_DVFS_PMIC_SETTLE_TIME (40) // us */
 
@@ -184,10 +192,10 @@
 #define PMIC_ADDR_VGPU_EN_CTRL_SHIFT	MT6351_PMIC_BUCK_VGPU_EN_CTRL_SHIFT
 #elif defined(VGPU_SET_BY_EXTIC)
 #define GPU_LDO_BASE			0x10001000
-#define EXTIC_VSEL0			0x0        /* [0]     */
+#define EXTIC_VSEL0			0x0		/* [0]	 */
 #define EXTIC_BUCK_EN0_MASK		0x1
 #define EXTIC_BUCK_EN0_SHIFT		0x7
-#define EXTIC_VSEL1			0x1    /* [0]     */
+#define EXTIC_VSEL1			0x1	/* [0]	 */
 #define EXTIC_BUCK_EN1_MASK		0x1
 #define EXTIC_BUCK_EN1_SHIFT		0x7
 #define EXTIC_VGPU_CTRL			0x2
@@ -210,25 +218,26 @@
 /*
  * LOG
  */
+#if 1
 #define TAG	 "[Power/gpufreq] "
 
-#define gpufreq_err(fmt, args...)	   \
-	pr_err(TAG"[ERROR]"fmt, ##args)
+#define gpufreq_err(fmt, args...)	\
+	pr_err(fmt, ##args)
 #define gpufreq_warn(fmt, args...)	\
-	pr_warn(TAG"[WARNING]"fmt, ##args)
+	pr_warn(fmt, ##args)
 #define gpufreq_info(fmt, args...)	\
-	pr_warn(TAG""fmt, ##args)
-#define gpufreq_dbg(fmt, args...)	   \
-	do {								\
-		if (mt_gpufreq_debug)		   \
-			pr_warn(TAG""fmt, ##args);	 \
-	} while (0)
-#define gpufreq_ver(fmt, args...)	   \
-	do {								\
-		if (mt_gpufreq_debug)		   \
-			pr_debug(TAG""fmt, ##args);	\
-	} while (0)
-
+	pr_warn(fmt, ##args)
+#define gpufreq_dbg(fmt, args...)	\
+	pr_warn(fmt, ##args)
+#define gpufreq_ver(fmt, args...)	\
+	pr_debug(fmt, ##args)
+#else
+#define gpufreq_err(fmt, args...)
+#define gpufreq_warn(fmt, args...)
+#define gpufreq_info(fmt, args...)
+#define gpufreq_dbg(fmt, args...)
+#define gpufreq_ver(fmt, args...)
+#endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static struct early_suspend mt_gpufreq_early_suspend_handler = {
@@ -253,15 +262,33 @@ static gpufreq_ptpod_update_notify g_pGpufreq_ptpod_update_notify;
  ****************************/
 /* Full Yield */
 static struct mt_gpufreq_table_info mt_gpufreq_opp_tbl_e1_0[] = {
+/*	GPUOP(GPU_DVFS_FREQ0, GPU_DVFS_VOLT0, 0), */
+/*	GPUOP(GPU_DVFS_FREQ1, GPU_DVFS_VOLT1, 1), */
+/*	GPUOP(GPU_DVFS_FREQ2, GPU_DVFS_VOLT1, 2), */
+	GPUOP(GPU_DVFS_FREQ3, GPU_DVFS_VOLT2, 3),
+	GPUOP(GPU_DVFS_FREQ4, GPU_DVFS_VOLT2, 4),
+	GPUOP(GPU_DVFS_FREQ5, GPU_DVFS_VOLT2, 5),
+};
+
+static struct mt_gpufreq_table_info mt_gpufreq_opp_tbl_e1_1[] = {
+/*	GPUOP(GPU_DVFS_FREQ0, GPU_DVFS_VOLT0, 0), */
+	GPUOP(GPU_DVFS_FREQ1, GPU_DVFS_VOLT1, 1),
+/*	GPUOP(GPU_DVFS_FREQ2, GPU_DVFS_VOLT1, 2), */
+	GPUOP(GPU_DVFS_FREQ3, GPU_DVFS_VOLT2, 3),
+	GPUOP(GPU_DVFS_FREQ4, GPU_DVFS_VOLT2, 4),
+	GPUOP(GPU_DVFS_FREQ5, GPU_DVFS_VOLT2, 5),
+};
+
+
+static struct mt_gpufreq_table_info mt_gpufreq_opp_tbl_e1_2[] = {
 	GPUOP(GPU_DVFS_FREQ0, GPU_DVFS_VOLT0, 0),
 	GPUOP(GPU_DVFS_FREQ1, GPU_DVFS_VOLT1, 1),
-	GPUOP(GPU_DVFS_FREQ2, GPU_DVFS_VOLT2, 2),
-	GPUOP(GPU_DVFS_FREQ3, GPU_DVFS_VOLT3, 3),
-	GPUOP(GPU_DVFS_FREQ4, GPU_DVFS_VOLT4, 4),
-	GPUOP(GPU_DVFS_FREQ5, GPU_DVFS_VOLT5, 5),
-	GPUOP(GPU_DVFS_FREQ6, GPU_DVFS_VOLT5, 6),
-	GPUOP(GPU_DVFS_FREQ7, GPU_DVFS_VOLT6, 7),
+/*	GPUOP(GPU_DVFS_FREQ2, GPU_DVFS_VOLT1, 2), */
+	GPUOP(GPU_DVFS_FREQ3, GPU_DVFS_VOLT2, 3),
+/*	GPUOP(GPU_DVFS_FREQ4, GPU_DVFS_VOLT2, 4), */
+	GPUOP(GPU_DVFS_FREQ5, GPU_DVFS_VOLT2, 5),
 };
+
 
 /*
  * AEE (SRAM debug)
@@ -285,12 +312,11 @@ static void _mt_gpufreq_aee_init(void)
  ***************************/
 static int g_gpufreq_dvfs_disable_count;
 
-static unsigned int g_cur_gpu_freq = 520000;	/* initial value */
-static unsigned int g_cur_gpu_volt = 100000;	/* initial value */
+static unsigned int g_cur_gpu_freq = GPU_DVFS_FREQ5;	/* initial value, 396.5MHz */
+static unsigned int g_cur_gpu_volt = GPU_DVFS_VOLT2;	/* initial value, 1.15v */
 static unsigned int g_cur_gpu_idx = 0xFF;
 static unsigned int g_cur_gpu_OPPidx = 0xFF;
-/* voltage max rising slew rate */
-static unsigned int g_max_slew_rate = INVALID_SLEW_RATE;
+
 
 static unsigned int g_cur_freq_init_keep;
 
@@ -303,8 +329,9 @@ static unsigned int g_gpufreq_max_id;
 static unsigned int g_limited_max_id;
 static unsigned int g_limited_min_id;
 
+/*CJ Fix Me*/
 static bool mt_gpufreq_debug;
-static bool mt_gpufreq_pause;
+static bool mt_gpufreq_pause = true;
 static bool mt_gpufreq_keep_max_frequency_state;
 static bool mt_gpufreq_keep_opp_frequency_state;
 #if 1
@@ -349,7 +376,10 @@ static unsigned int mt_gpufreqs_num;
 static struct mt_gpufreq_table_info *mt_gpufreqs;
 static struct mt_gpufreq_table_info *mt_gpufreqs_default;
 static struct mt_gpufreq_power_table_info *mt_gpufreqs_power;
-static struct mt_gpufreq_clk_t *mt_gpufreq_clk;
+
+static struct mt_gpufreq_pmic_t *mt_gpufreq_pmic;
+
+
 /* static struct mt_gpufreq_power_table_info *mt_gpufreqs_default_power; */
 
 static bool mt_gpufreq_ptpod_disable;
@@ -363,9 +393,6 @@ static unsigned int _mt_gpufreq_get_cur_volt(void);
 static unsigned int _mt_gpufreq_get_cur_freq(void);
 static void _mt_gpufreq_kick_pbm(int enable);
 
-#if !defined(VGPU_SET_BY_EXTIC)
-static unsigned int mt_gpufreq_volt_to_pmic_wrap(unsigned int volt);
-#endif
 
 #ifndef DISABLE_PBM_FEATURE
 static bool g_limited_pbm_ignore_state;
@@ -382,95 +409,6 @@ get_immediate_gpu_wrap(void)
 	return 0;
 }
 
-/*************************************************************************************
- * Get Slew rate
- *
- * @breif
- * Calculate maximum slew rate
- * e.g: voltage range is 0.6V - 0.9V
- *      it will return slew rate from 0.6 to 0.9V
- *
- * return maximum slew rate, or return 0 if failed
- **************************************************************************************/
-static unsigned int _calculate_slew_rate(void)
-{
-#ifdef VGPU_SET_BY_PMIC
-	unsigned int sfchg_rrate, sfchg_rrate_reg;
-	unsigned int max_slew_rate;
-	const unsigned int max_voltage_range = mt_gpufreqs[0].gpufreq_volt;
-	const unsigned int max_voltage_range_steps = mt_gpufreq_volt_to_pmic_wrap(max_voltage_range);
-
-	/* [Olympus]BUCK_VGPU_SFCHG_RRATE
-	*
-	*	4:  0.56us
-	*	8:  1.0us
-	*	11: 1.33us
-	*	17: 2.0us
-	*	23: 2.67us
-	*/
-	pmic_read_interface(MT6351_PMIC_BUCK_VGPU_SFCHG_RRATE_ADDR, &sfchg_rrate_reg,
-	MT6351_PMIC_BUCK_VGPU_SFCHG_RRATE_MASK, MT6351_PMIC_BUCK_VGPU_SFCHG_RRATE_SHIFT);
-	switch (sfchg_rrate_reg) {
-	case 4:
-	case 8:
-		sfchg_rrate = 1;
-		break;
-	case 11:
-	case 17:
-		sfchg_rrate = 2;
-		break;
-	case 23:
-	default:
-		sfchg_rrate = 3;
-		break;
-	}
-
-	max_slew_rate = max_voltage_range_steps * sfchg_rrate;
-	gpufreq_dbg("@%s: slew_rate = %d sfchg_rrate = %d sfchg_rrate_reg = %x max_voltage[%d] steps = %d\n",
-	__func__, max_slew_rate, sfchg_rrate, sfchg_rrate_reg,
-	max_voltage_range, max_voltage_range_steps);
-
-	return max_slew_rate;
-#else
-	return INVALID_SLEW_RATE;
-#endif
-}
-
-/*************************************************************************************
- * Get Post DIV value
- *
- * @breif
- * VCO needs proper post div value to get corresponding dds value to adjust PLL value
- * e.g: VCO range is 1.5GHz - 3.8GHz
- *      required frequency is 900MHz, so pos div could be 2(1.8/2), 4(3.6/4), 8(X), 16(X)
- * It may have special requiremt by DE in different efuse value
- * e.g: In Olympus, efuse value(3'b001) ,VCO range is 1.5GHz - 3.8GHz
- *      375MHz - 900MHz, It only can use post div 4, no pos div 2
- *
- * @param[in] freq: required frequency
- * @param[in] efuse: efuse value
- * return corresponding post div by freq and efuse
- **************************************************************************************/
-static enum post_div_enum _get_post_div_value(unsigned int freq, unsigned int efuse)
-{
-	/* [Olympus]VCO range: 1.5G - 3.8GHz by div 1/2/4/8/16
-	*
-	*	PLL range: 125MHz - 3.8GHz
-	*	Version(eFuse Value)			Info	 POSTDIV		   FOUT
-	*	Free Version(efuse 3'b000)     No limit  1/2/4/8/16  125MHz - 3800MHz
-	*/
-	enum post_div_enum post_div = POST_DIV4;
-
-	if (efuse == 0) {
-		if (freq >= DIV4_MAX_FREQ)
-			post_div = POST_DIV4;
-		else if (freq < DIV4_MIN_FREQ)
-			post_div = POST_DIV8;
-	}
-
-	gpufreq_dbg("@%s: freq = %d efuse = %d post_div = %d\n", __func__, freq, efuse, post_div);
-	return post_div;
-}
 
 /*************************************************************************************
  * Check GPU DVFS Efuse
@@ -481,11 +419,11 @@ static unsigned int mt_gpufreq_get_dvfs_table_type(void)
 	unsigned int type = 0;
 	unsigned int func_code_0, func_code_1;
 
+#if 1	/*CJ, Fix it for efuse code*/
 	func_code_0 = (get_devinfo_with_index(FUNC_CODE_EFUSE_INDEX) >> 24) & 0xf;
 	func_code_1 = get_devinfo_with_index(FUNC_CODE_EFUSE_INDEX) & 0xf;
-
 	gpufreq_info("from efuse: function code 0 = 0x%x, function code 1 = 0x%x\n", func_code_0,
-		     func_code_1);
+			 func_code_1);
 
 	if (func_code_1 == 0)
 		type = 0;
@@ -496,13 +434,13 @@ static unsigned int mt_gpufreq_get_dvfs_table_type(void)
 	gpu_speed_bounding = (get_devinfo_with_index(GPUFREQ_EFUSE_INDEX) >>
 				EFUSE_MFG_SPD_BOND_SHIFT) & EFUSE_MFG_SPD_BOND_MASK;
 	gpufreq_info("GPU frequency bounding from efuse = %x\n", gpu_speed_bounding);
+#endif
 
 	/* No efuse or free run? use clock-frequency from device tree to determine GPU table type! */
 	if (gpu_speed_bounding == 0) {
 #ifdef CONFIG_OF
 		static const struct of_device_id gpu_ids[] = {
-			{.compatible = "arm,malit6xx"},
-			{.compatible = "arm,mali-midgard"},
+			{.compatible = "mediatek,mt8167-clark"},
 			{ /* sentinel */ }
 		};
 		struct device_node *node;
@@ -511,23 +449,23 @@ static unsigned int mt_gpufreq_get_dvfs_table_type(void)
 		node = of_find_matching_node(NULL, gpu_ids);
 		if (!node) {
 			gpufreq_err("@%s: find GPU node failed\n", __func__);
-			gpu_speed = 700;	/* default speed */
+			gpu_speed = 500;	/* default speed */
 		} else {
 			if (!of_property_read_u32(node, "clock-frequency", &gpu_speed)) {
 				gpu_speed = gpu_speed / 1000 / 1000;	/* MHz */
 			} else {
 				gpufreq_err
-				    ("@%s: missing clock-frequency property, use default GPU level\n",
-				     __func__);
-				gpu_speed = 700;	/* default speed */
+					("@%s: missing clock-frequency property, use default GPU level\n",
+					 __func__);
+				gpu_speed = 500;	/* default speed */
 			}
 		}
 		gpufreq_info("GPU clock-frequency from DT = %d MHz\n", gpu_speed);
 
-		if (gpu_speed >= 700)
-			type = 0;	/* 700M */
-		else if (gpu_speed >= 600)
-			type = 1;	/* 600M */
+		if (gpu_speed >= 600)
+			type = 2;	/* 600M */
+		else if (gpu_speed >= 500)
+			type = 1;	/* 500M */
 #else
 		gpufreq_err("@%s: Cannot get GPU speed from DT!\n", __func__);
 		type = 0;
@@ -540,25 +478,12 @@ static unsigned int mt_gpufreq_get_dvfs_table_type(void)
 		mt_gpufreq_dvfs_table_cid = 0;  /* free run */
 		break;
 	case 1:
-		type = 1;	/* 800M */
+		type = 1;	/* 500M */
 	case 2:
-		type = 0;	/* 700M */
-		break;
-	case 3:
-	case 4:
-	case 5:
-	case 6:
-	case 7:
-	case 8:
-	case 9:
-	case 10:
-	case 11:
-	case 12:
-	case 13:
-	case 14:
-	case 15:
-	default:
 		type = 2;	/* 600M */
+		break;
+	default:
+		type = 0;	/* 400M */
 		break;
 	}
 
@@ -567,11 +492,33 @@ static unsigned int mt_gpufreq_get_dvfs_table_type(void)
 
 #ifdef MT_GPUFREQ_INPUT_BOOST
 static struct task_struct *mt_gpufreq_up_task;
+static void mt_gpufreq_clock_switch(unsigned int freq_new);
+
+/*CJ, only for test mmpll*/
+#if 0
+void mt_gpufreq_set_mmpll(void)
+{
+	static int counter;
+
+	counter++;
+	if (counter % 10 == 0) {
+		if (counter % 20 == 0) {
+			gpufreq_err("mt_gpufreq_set_mmpll set to GPU_DVFS_FREQ4/299MHz\n");
+			mt_gpufreq_clock_switch(GPU_DVFS_FREQ4);
+		} else {
+			gpufreq_err("mt_gpufreq_set_mmpll set to GPU_DVFS_FREQ5/253.5MHz\n");
+			mt_gpufreq_clock_switch(GPU_DVFS_FREQ5);
+		}
+	}
+}
+#endif
 
 static int mt_gpufreq_input_boost_task(void *data)
 {
 	while (1) {
 		gpufreq_dbg("@%s: begin\n", __func__);
+		/*CJ, only for test mmpll*/
+		/*mt_gpufreq_set_mmpll();*/
 
 		if (g_pGpufreq_input_boost_notify != NULL) {
 			gpufreq_dbg("@%s: g_pGpufreq_input_boost_notify\n", __func__);
@@ -603,7 +550,7 @@ static void mt_gpufreq_input_event(struct input_handle *handle, unsigned int typ
 	}
 
 	if ((type == EV_KEY) && (code == BTN_TOUCH) && (value == 1)
-	    && (mt_gpufreq_input_boost_state == 1)) {
+		&& (mt_gpufreq_input_boost_state == 1)) {
 		gpufreq_dbg("@%s: accept.\n", __func__);
 
 		wake_up_process(mt_gpufreq_up_task);
@@ -611,7 +558,7 @@ static void mt_gpufreq_input_event(struct input_handle *handle, unsigned int typ
 }
 
 static int mt_gpufreq_input_connect(struct input_handler *handler,
-				    struct input_dev *dev, const struct input_device_id *id)
+					struct input_dev *dev, const struct input_device_id *id)
 {
 	struct input_handle *handle;
 	int error;
@@ -679,12 +626,12 @@ static void mt_gpufreq_power_calculation(unsigned int idx, unsigned int freq,
 	ref_volt = GPU_ACT_REF_VOLT;
 
 	p_dynamic = p_dynamic *
-	    ((freq * 100) / ref_freq) *
-	    ((volt * 100) / ref_volt) * ((volt * 100) / ref_volt) / (100 * 100 * 100);
+		((freq * 100) / ref_freq) *
+		((volt * 100) / ref_volt) * ((volt * 100) / ref_volt) / (100 * 100 * 100);
 
 #ifdef STATIC_PWR_READY2USE
 	p_leakage =
-	    mt_spower_get_leakage(MT_SPOWER_GPU, (volt / 100), temp);
+		mt_spower_get_leakage(MT_SPOWER_GPU, (volt / 100), temp);
 	if (!mt_gpufreq_volt_enable_state || p_leakage < 0)
 		p_leakage = 0;
 #else
@@ -694,7 +641,7 @@ static void mt_gpufreq_power_calculation(unsigned int idx, unsigned int freq,
 	p_total = p_dynamic + p_leakage;
 
 	gpufreq_ver("%d: p_dynamic = %d, p_leakage = %d, p_total = %d, temp = %d\n",
-		    idx, p_dynamic, p_leakage, p_total, temp);
+			idx, p_dynamic, p_leakage, p_total, temp);
 
 	mt_gpufreqs_power[idx].gpufreq_power = p_total;
 }
@@ -720,54 +667,7 @@ static int mt_gpufreq_idx_get(int num)
 }
 #endif
 
-/**************************************
- * Convert pmic wrap register to voltage
- ***************************************/
-static unsigned int mt_gpufreq_pmic_wrap_to_volt(unsigned int pmic_wrap_value)
-{
-	unsigned int volt = 0;
-#ifdef VGPU_SET_BY_EXTIC
-	volt = ((pmic_wrap_value * 12826) + 603000) / 10;
-	/* 1.39375V */
-	if (volt > 141150) {
-		gpufreq_err("@%s: volt > 1.411v!\n", __func__);
-		return 141100;
-	}
-#else
-	volt = (pmic_wrap_value * 625) + 60000;
 
-	gpufreq_dbg("@%s: volt = %d\n", __func__, volt);
-
-	/* 1.39375V */
-	if (volt > 139375) {
-		gpufreq_err("@%s: volt > 1.39375v!\n", __func__);
-		return 139375;
-	}
-#endif
-
-	return volt;
-}
-
-/**************************************
- * Convert voltage to pmic wrap register
- ***************************************/
- #if !defined(VGPU_SET_BY_EXTIC)
-static unsigned int mt_gpufreq_volt_to_pmic_wrap(unsigned int volt)
-{
-	unsigned int reg_val = 0;
-
-	reg_val = (volt - 60000) / 625;
-
-	gpufreq_dbg("@%s: reg_val = %d\n", __func__, reg_val);
-
-	if (reg_val > 0x7F) {
-		gpufreq_err("@%s: reg_val > 0x7F!\n", __func__);
-		return 0x7F;
-	}
-
-	return reg_val;
-}
-#endif
 /* Set frequency and voltage at driver probe function */
 static void mt_gpufreq_set_initial(void)
 {
@@ -786,7 +686,7 @@ static void mt_gpufreq_set_initial(void)
 	for (i = 0; i < mt_gpufreqs_num; i++) {
 		if (cur_volt >= mt_gpufreqs[i].gpufreq_volt) {
 			mt_gpufreq_set(cur_freq, mt_gpufreqs[i].gpufreq_khz,
-			       cur_volt, mt_gpufreqs[i].gpufreq_volt);
+				       cur_volt, mt_gpufreqs[i].gpufreq_volt);
 			g_cur_gpu_OPPidx = i;
 			gpufreq_dbg("init_idx = %d\n", g_cur_gpu_OPPidx);
 			_mt_gpufreq_kick_pbm(1);
@@ -797,9 +697,11 @@ static void mt_gpufreq_set_initial(void)
 	/* Not found, set to LPM */
 	if (i == mt_gpufreqs_num) {
 		gpufreq_err
-		    ("Set to LPM since GPU idx not found according to current Vcore = %d mV\n",
-		     cur_volt / 100);
+			("Set to LPM since GPU idx not found according to current Vcore = %d mV\n",
+			 cur_volt / 100);
 		g_cur_gpu_OPPidx = mt_gpufreqs_num - 1;
+		gpufreq_err
+			("mt_gpufreq_set_initial freq index = %d mV\n", g_cur_gpu_OPPidx);
 		mt_gpufreq_set(cur_freq, mt_gpufreqs[g_cur_gpu_OPPidx].gpufreq_khz,
 			       cur_volt, mt_gpufreqs[g_cur_gpu_OPPidx].gpufreq_volt);
 	}
@@ -808,7 +710,6 @@ static void mt_gpufreq_set_initial(void)
 	g_cur_gpu_volt = mt_gpufreqs[g_cur_gpu_OPPidx].gpufreq_volt;
 	g_cur_gpu_idx = mt_gpufreqs[g_cur_gpu_OPPidx].gpufreq_idx;
 
-	g_max_slew_rate = _calculate_slew_rate();
 
 #ifdef MT_GPUFREQ_AEE_RR_REC
 	aee_rr_rec_gpu_dvfs_oppidx(g_cur_gpu_OPPidx);
@@ -818,40 +719,7 @@ static void mt_gpufreq_set_initial(void)
 	mutex_unlock(&mt_gpufreq_lock);
 }
 
-static unsigned int mt_gpufreq_calc_pmic_settle_time(unsigned int volt_old, unsigned int volt_new)
-{
-	unsigned int delay = 100;
-#if defined(VGPU_SET_BY_EXTIC)
-	unsigned char reg_val;
-	unsigned int slew_rate;
-#endif
 
-	if (volt_new == volt_old) {
-		return 0;
-	} else if (volt_new > volt_old) {
-#ifdef VGPU_SET_BY_PMIC
-		delay = PMIC_VOLT_UP_SETTLE_TIME(volt_old, volt_new);
-#elif defined(VGPU_SET_BY_EXTIC)
-		fan53555_read_byte(0x2, &reg_val);
-		slew_rate = 1 << (6 - ((reg_val >> 4) & (0x7)));
-		delay = EXTIC_VOLT_UP_SETTLE_TIME(volt_old, volt_new, slew_rate);
-#endif
-	} else {
-#ifdef VGPU_SET_BY_PMIC
-		delay = PMIC_VOLT_DOWN_SETTLE_TIME(volt_old, volt_new);
-#elif defined(VGPU_SET_BY_EXTIC)
-		fan53555_read_byte(0x2, &reg_val);
-		slew_rate = 1 << (6 - ((reg_val >> 4) & (0x7)));
-		delay = EXTIC_VOLT_DOWN_SETTLE_TIME(volt_old, volt_new, slew_rate);
-#endif
-	}
-#ifdef VGPU_SET_BY_PMIC
-	if (delay < MIN_PMIC_SETTLE_TIME)
-		delay = MIN_PMIC_SETTLE_TIME;
-#endif
-
-	return delay;
-}
 
 #ifndef DISABLE_PBM_FEATURE
 static void mt_gpufreq_notify_pbm_gpuoff(struct work_struct *work)
@@ -867,127 +735,21 @@ static void mt_gpufreq_notify_pbm_gpuoff(struct work_struct *work)
 /* Set VGPU enable/disable when GPU clock be switched on/off */
 unsigned int mt_gpufreq_voltage_enable_set(unsigned int enable)
 {
-	int ret = 0;
-#ifdef VGPU_SET_BY_EXTIC
-	unsigned char reg_val = 0;
-#else
-	unsigned int reg_val = 0;
-#endif
-#if 0 /* from clk-mtk.h for CCF bring up */
-	if (enable == 0) {
-		gpufreq_dbg("@%s, VGPU should keep on since MTCMOS cannot be turned off!\n", __func__);
-		return DRIVER_NOT_READY;
-	}
-#endif
-
-	mutex_lock(&mt_gpufreq_lock);
-
+	/*CJ mt8167, gpu uses vcore, the enable/disable is always on*/
 	if (mt_gpufreq_ready == false) {
 		gpufreq_warn("@%s: GPU DVFS not ready!\n", __func__);
-		ret = DRIVER_NOT_READY;
-		goto exit;
-	}
-
-	if (enable == mt_gpufreq_volt_enable_state) {
-		ret = 0;
-		goto exit;
+		return DRIVER_NOT_READY;
 	}
 
 	if (mt_gpufreq_ptpod_disable == true) {
 		if (enable == 0) {
 			gpufreq_info("mt_gpufreq_ptpod_disable == true\n");
-			ret = DRIVER_NOT_READY;
-			goto exit;
+			return DRIVER_NOT_READY;
 		}
 	}
-
-	if (enable == 1) {
-#ifdef VGPU_SET_BY_PMIC
-		pmic_config_interface(PMIC_ADDR_VGPU_EN, 0x1,
-				      PMIC_ADDR_VGPU_EN_MASK,
-				      PMIC_ADDR_VGPU_EN_SHIFT);	/* Set VGPU_EN[0] to 1 */
-#elif defined(VGPU_SET_BY_EXTIC)
-		fan53555_config_interface(EXTIC_VSEL0, 0x1,
-					EXTIC_BUCK_EN0_MASK,
-					EXTIC_BUCK_EN0_SHIFT);
-#endif
-	} else {
-#ifdef VGPU_SET_BY_PMIC
-		pmic_config_interface(PMIC_ADDR_VGPU_EN, 0x0,
-				      PMIC_ADDR_VGPU_EN_MASK,
-				      PMIC_ADDR_VGPU_EN_SHIFT);	/* Set VGPU_EN[0] to 0 */
-#elif defined(VGPU_SET_BY_EXTIC)
-		fan53555_config_interface(EXTIC_VSEL0, 0x0,
-					EXTIC_BUCK_EN0_MASK,
-					EXTIC_BUCK_EN0_SHIFT);
-#endif
-	}
-#ifdef VGPU_SET_BY_PMIC
-	/* (g_cur_gpu_volt / 1250) + 26; */
-	/* delay = mt_gpufreq_calc_pmic_settle_time(0, g_cur_gpu_volt); */
-
-	gpufreq_dbg("@%s: enable = %x\n", __func__, enable);
-
-	udelay(PMIC_VOLT_ON_OFF_DELAY_US);
-#elif defined(VGPU_SET_BY_EXTIC)
-	udelay(EXTIC_VOLT_ON_OFF_DELAY_US);
-#endif
-
-#ifdef MT_GPUFREQ_AEE_RR_REC
-	if (enable == 1)
-		aee_rr_rec_gpu_dvfs_status(aee_rr_curr_gpu_dvfs_status() |
-					   (1 << GPU_DVFS_IS_VGPU_ENABLED));
-	else
-		aee_rr_rec_gpu_dvfs_status(aee_rr_curr_gpu_dvfs_status() &
-					   ~(1 << GPU_DVFS_IS_VGPU_ENABLED));
-#endif
-#ifdef VGPU_SET_BY_PMIC
-	pmic_read_interface(PMIC_ADDR_VGPU_EN, &reg_val,
-			    PMIC_ADDR_VGPU_EN_MASK, PMIC_ADDR_VGPU_EN_SHIFT);
-#elif defined(VGPU_SET_BY_EXTIC)
-	fan53555_read_interface(EXTIC_VSEL0, &reg_val,
-				EXTIC_BUCK_EN0_MASK,
-				EXTIC_BUCK_EN0_SHIFT);
-#endif
-	/* Error checking */
-	if (enable == 1 && reg_val == 0) {
-		/* VGPU enable fail, dump info and trigger BUG() */
-		int i = 0;
-
-		gpufreq_err("@%s: enable = %x, reg_val = %d\n", __func__, enable, reg_val);
-
-		/* read PMIC chip id via PMIC wrapper */
-		for (i = 0; i < 10; i++) {
-#ifdef VGPU_SET_BY_EXTIC
-			fan53555_read_interface(EXTIC_VSEL0, &reg_val,
-				EXTIC_BUCK_EN0_MASK,
-				EXTIC_BUCK_EN0_SHIFT);
-			gpufreq_err("@%s: i2c num = 0x%x, fan53555 sw ready is %d, reg_val = 0x%x\n",
-				__func__, get_fan53555_i2c_ch_num(), is_fan53555_sw_ready(), reg_val);
-#else
-			pwrap_read(0x200, &reg_val);
-			gpufreq_err("@%s: PMIC CID via pwap = 0x%x\n", __func__, reg_val);
-#endif
-		}
-	}
-
-#ifndef DISABLE_PBM_FEATURE
-	if (enable == 1) {
-		if (delayed_work_pending(&notify_pbm_gpuoff_work))
-			cancel_delayed_work(&notify_pbm_gpuoff_work);
-		else
-			_mt_gpufreq_kick_pbm(1);
-	} else {
-		schedule_delayed_work(&notify_pbm_gpuoff_work, msecs_to_jiffies(GPU_OFF_SETTLE_TIME_MS));
-	}
-
-	#endif
-
 	mt_gpufreq_volt_enable_state = enable;
-exit:
-	mutex_unlock(&mt_gpufreq_lock);
 
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL(mt_gpufreq_voltage_enable_set);
 
@@ -1061,7 +823,7 @@ void mt_gpufreq_restore_default_volt(void)
 	for (i = 0; i < mt_gpufreqs_num; i++) {
 		mt_gpufreqs[i].gpufreq_volt = mt_gpufreqs_default[i].gpufreq_volt;
 		gpufreq_dbg("@%s: mt_gpufreqs[%d].gpufreq_volt = %x\n", __func__, i,
-			    mt_gpufreqs[i].gpufreq_volt);
+				mt_gpufreqs[i].gpufreq_volt);
 	}
 
 #ifndef MTK_GPU_SPM
@@ -1077,29 +839,39 @@ EXPORT_SYMBOL(mt_gpufreq_restore_default_volt);
 /* Set voltage because PTP-OD modified voltage table by PMIC wrapper */
 unsigned int mt_gpufreq_update_volt(unsigned int pmic_volt[], unsigned int array_size)
 {
+#if 0
 	int i;			/* , idx; */
 	/* unsigned long flags; */
 	unsigned volt = 0;
-
+#endif
 	if (mt_gpufreq_ready == false) {
 		gpufreq_warn("@%s: GPU DVFS not ready!\n", __func__);
 		return DRIVER_NOT_READY;
 	}
 
-	mutex_lock(&mt_gpufreq_lock);
+	if (array_size > mt_gpufreqs_num) {
+		gpufreq_err("mt_gpufreq_update_volt: array_size = %d, Over-Boundary!\n", array_size);
+		return 0;	/*-ENOSYS;*/
+	}
 
+	mutex_lock(&mt_gpufreq_lock);
+#if 0
 	for (i = 0; i < array_size; i++) {
+	/*  mt6799: FIX-ME
+	 *  mt_gpufreq_pmic_wrap_to_volt for ISL91302a
+	 */
+	/* CJ Fix me, need to ask the wrap function*/
 		volt = mt_gpufreq_pmic_wrap_to_volt(pmic_volt[i]);
 		mt_gpufreqs[i].gpufreq_volt = volt;
 		gpufreq_dbg("@%s: mt_gpufreqs[%d].gpufreq_volt = %x\n", __func__, i,
-			    mt_gpufreqs[i].gpufreq_volt);
+				mt_gpufreqs[i].gpufreq_volt);
 	}
+#endif
 
 #ifndef MTK_GPU_SPM
 	mt_gpufreq_volt_switch(g_cur_gpu_volt, mt_gpufreqs[g_cur_gpu_OPPidx].gpufreq_volt);
 #endif
 
-	g_max_slew_rate = _calculate_slew_rate();
 	g_cur_gpu_volt = mt_gpufreqs[g_cur_gpu_OPPidx].gpufreq_volt;
 	if (g_pGpufreq_ptpod_update_notify != NULL)
 		g_pGpufreq_ptpod_update_notify();
@@ -1124,7 +896,7 @@ unsigned int mt_gpufreq_get_freq_by_idx(unsigned int idx)
 
 	if (idx < mt_gpufreqs_num) {
 		gpufreq_dbg("@%s: idx = %d, frequency= %d\n", __func__, idx,
-			    mt_gpufreqs[idx].gpufreq_khz);
+				mt_gpufreqs[idx].gpufreq_khz);
 		return mt_gpufreqs[idx].gpufreq_khz;
 	}
 
@@ -1142,7 +914,7 @@ unsigned int mt_gpufreq_get_volt_by_idx(unsigned int idx)
 
 	if (idx < mt_gpufreqs_num) {
 		gpufreq_dbg("@%s: idx = %d, voltage= %d\n", __func__, idx,
-			    mt_gpufreqs[idx].gpufreq_volt);
+				mt_gpufreqs[idx].gpufreq_volt);
 		return mt_gpufreqs[idx].gpufreq_volt;
 	}
 
@@ -1180,11 +952,11 @@ static void mt_update_gpufreqs_power_table(void)
 			mt_gpufreq_power_calculation(i, freq, volt, temp);
 
 			gpufreq_ver("update mt_gpufreqs_power[%d].gpufreq_khz = %d\n", i,
-				    mt_gpufreqs_power[i].gpufreq_khz);
+					mt_gpufreqs_power[i].gpufreq_khz);
 			gpufreq_ver("update mt_gpufreqs_power[%d].gpufreq_volt = %d\n", i,
-				    mt_gpufreqs_power[i].gpufreq_volt);
+					mt_gpufreqs_power[i].gpufreq_volt);
 			gpufreq_ver("update mt_gpufreqs_power[%d].gpufreq_power = %d\n", i,
-				    mt_gpufreqs_power[i].gpufreq_power);
+					mt_gpufreqs_power[i].gpufreq_power);
 		}
 	} else
 		gpufreq_err("@%s: temp < 0 or temp > 125, NOT update power table!\n", __func__);
@@ -1219,21 +991,23 @@ static void mt_setup_gpufreqs_power_table(int num)
 		mt_gpufreqs_power[i].gpufreq_khz = mt_gpufreqs[i].gpufreq_khz;
 		mt_gpufreqs_power[i].gpufreq_volt = mt_gpufreqs[i].gpufreq_volt;
 
+		/* CJ, Fix? need the mt_gpufreq_power_calculation?*/
 		mt_gpufreq_power_calculation(i,
-					     mt_gpufreqs_power[i].gpufreq_khz,
-					     mt_gpufreqs_power[i].gpufreq_volt,
-					     temp);
+						 mt_gpufreqs_power[i].gpufreq_khz,
+						 mt_gpufreqs_power[i].gpufreq_volt,
+						 temp);
 
 		gpufreq_info("mt_gpufreqs_power[%d].gpufreq_khz = %u\n", i,
-			     mt_gpufreqs_power[i].gpufreq_khz);
+				 mt_gpufreqs_power[i].gpufreq_khz);
 		gpufreq_info("mt_gpufreqs_power[%d].gpufreq_volt = %u\n", i,
-			     mt_gpufreqs_power[i].gpufreq_volt);
+				 mt_gpufreqs_power[i].gpufreq_volt);
 		gpufreq_info("mt_gpufreqs_power[%d].gpufreq_power = %u\n", i,
-			     mt_gpufreqs_power[i].gpufreq_power);
+				 mt_gpufreqs_power[i].gpufreq_power);
 	}
 
 #ifdef CONFIG_THERMAL
-	mtk_gpufreq_register(mt_gpufreqs_power, num);
+	/* CJ Fix me? */
+	/* mtk_gpufreq_register(mt_gpufreqs_power, num); */
 #endif
 }
 
@@ -1246,7 +1020,7 @@ static int mt_setup_gpufreqs_table(struct mt_gpufreq_table_info *freqs, int num)
 
 	mt_gpufreqs = kzalloc((num) * sizeof(*freqs), GFP_KERNEL);
 	mt_gpufreqs_default = kzalloc((num) * sizeof(*freqs), GFP_KERNEL);
-	if (mt_gpufreqs == NULL)
+	if ((mt_gpufreqs == NULL) || (mt_gpufreqs_default == NULL))
 		return -ENOMEM;
 
 	for (i = 0; i < num; i++) {
@@ -1269,7 +1043,7 @@ static int mt_setup_gpufreqs_table(struct mt_gpufreq_table_info *freqs, int num)
 	g_limited_min_id = mt_gpufreqs_num - 1;
 
 	gpufreq_info("@%s: g_cur_gpu_freq = %d, g_cur_gpu_volt = %d\n", __func__, g_cur_gpu_freq,
-		     g_cur_gpu_volt);
+			g_cur_gpu_volt);
 
 	mt_setup_gpufreqs_power_table(num);
 
@@ -1303,7 +1077,7 @@ int mt_gpufreq_state_set(int enabled)
 		 ******************/
 		g_gpufreq_dvfs_disable_count--;
 		gpufreq_dbg("enable GPU DVFS: g_gpufreq_dvfs_disable_count = %d\n",
-			    g_gpufreq_dvfs_disable_count);
+				g_gpufreq_dvfs_disable_count);
 
 		/***********************************************
 		 * enable DVFS if no any module still disable it
@@ -1318,7 +1092,7 @@ int mt_gpufreq_state_set(int enabled)
 		 *******************/
 		g_gpufreq_dvfs_disable_count++;
 		gpufreq_dbg("disable GPU DVFS: g_gpufreq_dvfs_disable_count = %d\n",
-			    g_gpufreq_dvfs_disable_count);
+				g_gpufreq_dvfs_disable_count);
 
 		if (mt_gpufreq_pause) {
 			gpufreq_dbg("gpufreq already disabled\n");
@@ -1331,218 +1105,58 @@ int mt_gpufreq_state_set(int enabled)
 	return 0;
 }
 EXPORT_SYMBOL(mt_gpufreq_state_set);
-
-static unsigned int mt_gpufreq_dds_calc(unsigned int khz, enum post_div_enum post_div)
+static unsigned int mt_gpufreq_dds_calc(unsigned int freq_khz, enum post_div_order_enum post_div_order)
 {
 	unsigned int dds = 0;
 
-	gpufreq_dbg("@%s: request freq = %d, div = %d\n",
-			__func__, khz, post_div);
-	if ((khz >= 125000) && (khz <= 3800000)) {
-		dds = (((khz / 100 * post_div*2) * 16384) / 26 + 5) / 10;
-	} else {
-		gpufreq_err("@%s: target khz(%d) out of range!\n", __func__, khz);
-		/* WARN_ON(); */
-	}
+	dds = (((freq_khz * 4) / 1000) * 0x4000) / 26;
+
+	gpufreq_dbg("@%s: request freq = %d, div_order = %d, dds = %x\n",
+			__func__, freq_khz, post_div_order, dds);
 
 	return dds;
 }
 
 
-static void gpu_dvfs_switch_to_univpll(bool on)
-{
-	clk_prepare_enable(mt_gpufreq_clk->clk_mux);
-	if (on) {
-#if 0
-		/* Step1. Select to UNIVPLL_D3 416MHz   */
-		DRV_ClrReg32(CLK_CFG_1, 0x3 << 24);	/* mask */
-		DRV_SetReg32(CLK_CFG_1, 0x3 << 24);	/* [25:24] = clk_mfg_sel 2'b3 is UNIVPLL_D3 416MHz */
-		DRV_SetReg32(CLK_CFG_UPDATE, 0x1 << 7); /* [7] = mfg_ck_update */
-#else
-		clk_set_parent(mt_gpufreq_clk->clk_mux, mt_gpufreq_clk->clk_sub_parent);
-		clk_disable_unprepare(mt_gpufreq_clk->clk_mux);
-#endif
-	} else {
-#if 0
-		/* Step3. Select back to MFGPLL */
-		DRV_ClrReg32(CLK_CFG_1, 0x3 << 24);	/* mask */
-		DRV_SetReg32(CLK_CFG_1, 0x1 << 24);	/*  [25:24] = clk_mfg_sel 2'b2 is MFGPLL   */
-		DRV_SetReg32(CLK_CFG_UPDATE, 0x1 << 7); /* [7] = mfg_ck_update */
-#else
-		clk_set_parent(mt_gpufreq_clk->clk_mux, mt_gpufreq_clk->clk_main_parent);
-		clk_disable_unprepare(mt_gpufreq_clk->clk_mux);
-#endif
-	}
-
-	gpufreq_dbg("@%s: on = %d, CLK_CFG_1 = 0x%x, CLK_CFG_UPDATE = 0x%x\n",
-			__func__, on, DRV_Reg32(CLK_CFG_1), DRV_Reg32(CLK_CFG_UPDATE));
-}
-
-static void mt_gpufreq_clock_switch_transient(unsigned int freq_new,  enum post_div_enum post_div)
-{
-	unsigned int cur_volt;
-	unsigned int cur_freq;
-	unsigned int univ_volt = mt_gpufreqs[0].gpufreq_volt;
-	unsigned int dds;
-	unsigned int i;
-	unsigned int found;
-	unsigned int tmp_idx;
-
-	/*	MMPLL_CON1: 31: MMPLL_SDM_PCW_CHG
-	*			  26-24: MMPLL_POSDIV
-	*				  000: /1
-	*				  001: /2
-	*				  010: /4
-	*				  011: /8
-	*				  100: /18
-	*			  21-0:MMPLL_SDM_PCW
-	*/
-
-	cur_volt = _mt_gpufreq_get_cur_volt();
-	cur_freq = _mt_gpufreq_get_cur_freq();
-	dds = mt_gpufreq_dds_calc(freq_new, 1 << post_div);
-	gpufreq_dbg("@%s: request GPU dds = 0x%x, cur_volt = %d, cur_freq = %d\n",
-			__func__, dds, cur_volt, cur_freq);
-	gpufreq_dbg("@%s: request MMPLL_CON1 = 0x%x\n",
-			__func__, DRV_Reg32(MMPLL_CON1));
-	if ((DRV_Reg32(MMPLL_CON1) & (0x7 << 24)) != ((post_div+1) << 24)) {
-		gpufreq_dbg("@%s: switch to univ pll\n", __func__);
-		for (i = 0; i < mt_gpufreqs_num; i++) {
-			if (mt_gpufreqs[i].gpufreq_khz < UNIVPLL_FREQ) {
-				/* record idx since current voltage may not in DVFS table */
-				tmp_idx = i - 1;
-				univ_volt = mt_gpufreqs[tmp_idx].gpufreq_volt;
-				found = 1;
-				gpufreq_dbg("@%s: request GPU univ_volt = %d\n",
-					__func__, univ_volt);
-				break;
-			}
-		}
-
-		if (found == 1) {
-			if (cur_volt < univ_volt)
-				mt_gpufreq_volt_switch(cur_volt, univ_volt);
-
-			/* Step1. Select to UNIVPLL_D3 416MHz   */
-			gpu_dvfs_switch_to_univpll(true);
-			/* Step2. Modify MFGPLL POSTDIV */
-			DRV_WriteReg32(MMPLL_CON1, (0x80000000) | ((post_div+1) << 24) | dds);
-			udelay(1);
-			/* Step3. Select back to MFGPLL */
-			gpu_dvfs_switch_to_univpll(false);
-			if (cur_volt != univ_volt)
-				mt_gpufreq_volt_switch(univ_volt, cur_volt);
-			DRV_SetReg32(MMPLL_CON1, 0x80000000);
-			udelay(20);
-		} else {
-			gpufreq_dbg("@%s: request GPU univ_volt not found, khz = %d, volt = %d\n",
-				__func__, mt_gpufreqs[mt_gpufreqs_num - 1].gpufreq_khz,
-				mt_gpufreqs[mt_gpufreqs_num - 1].gpufreq_volt);
-			/* WARN_ON(); */
-		}
-	} else {
-		gpufreq_dbg("@%s: no switch to univ pll\n", __func__);
-		DRV_WriteReg32(MMPLL_CON1, 0x80000000 | ((post_div+1) << 24) | dds);
-	}
-}
 /* static void _mt_gpufreq_set_cur_freq(unsigned int freq_new) */
 static void mt_gpufreq_clock_switch(unsigned int freq_new)
 {
-	unsigned int mfgpll;
+	unsigned int dds;
 
-	if (mt_gpufreq_dvfs_table_cid == 0)
-		mt_gpufreq_clock_switch_transient(freq_new, _get_post_div_value(freq_new, mt_gpufreq_dvfs_table_cid));
-	else
-		gpufreq_err("@%s: efuse number type(%d)\n", __func__, mt_gpufreq_dvfs_table_cid);
+	if (freq_new == g_cur_gpu_freq)
+		return;
 
-	mfgpll = DRV_Reg32(MMPLL_CON1);
-	gpufreq_dbg("@%s: freq_new = %d, mfgpll = 0x%x\n", __func__, freq_new, mfgpll);
+	dds = mt_gpufreq_dds_calc(freq_new, POST_DIV4);
+
+#ifdef CONFIG_MTK_FREQ_HOPPING
+	mt_dfs_mmpll(dds);
+#endif
+
+	g_cur_gpu_freq = freq_new;
 
 	if (g_pFreqSampler != NULL)
 		g_pFreqSampler(freq_new);
 
+	gpufreq_dbg("mt_gpu_clock_switch, freq_new = %d (KHz)\n", freq_new);
+
+	if (g_pFreqSampler != NULL)
+		g_pFreqSampler(freq_new);
 }
 
 static void mt_gpufreq_volt_switch(unsigned int volt_old, unsigned int volt_new)
 {
-#if !defined(VGPU_SET_BY_EXTIC)
-	unsigned int reg_val = 0;
-#else
-	unsigned int gpu_volt = 0;
-#endif
-	unsigned int delay = 0;
-
-	/* unsigned int RegValGet = 0; */
+	unsigned int delay_unit_us = 100;
 
 	gpufreq_dbg("@%s: volt_new = %d\n", __func__, volt_new);
 
-	/* mt_gpufreq_reg_write(0x02B0, PMIC_WRAP_DVFS_ADR2); */
-#if !defined(VGPU_SET_BY_EXTIC)
-	reg_val = mt_gpufreq_volt_to_pmic_wrap(volt_new);
-#ifdef MT_GPUFREQ_AEE_RR_REC
-	aee_rr_rec_gpu_dvfs_vgpu(reg_val);
-#endif
-#endif
-#ifdef VGPU_SET_BY_EXTIC
-	/* set target volt */
-	gpu_volt = volt_new / 100;
-	if (volt_new % 100 != 0)
-		gpu_volt++;
-
-	fan53555_vosel(gpu_volt);
-	gpufreq_dbg("gpu_dvfs_set_cur_volt: request volt = %d, gpu volt = %d\n", volt_new, gpu_volt*100);
-
-#elif defined(VGPU_SET_BY_PMIC)
-	/* Set VGPU_VOSEL_CTRL[1] to HW control */
-	pmic_config_interface(PMIC_ADDR_VGPU_VOSEL_ON, reg_val,
-			      PMIC_ADDR_VGPU_VOSEL_ON_MASK,
-			      PMIC_ADDR_VGPU_VOSEL_ON_SHIFT);
-#elif defined(VGPU_SET_BY_PMIC_WRAP)
-#if 1
-	mt_cpufreq_set_pmic_cmd(PMIC_WRAP_PHASE_NORMAL, IDX_NM_VGPU, reg_val);
-	mt_cpufreq_apply_pmic_cmd(IDX_NM_VGPU);
-
-	/* pmic_read_interface(0x02B0, &RegValGet, 0x7F, 0x0); // Get VDVFS13_EN[0] */
-	/* gpufreq_dbg("0x02B0 = %d\n", RegValGet); */
-#else
-	mt_gpufreq_reg_write(reg_val, PMIC_WRAP_DVFS_WDATA2);
-
-	spm_dvfs_ctrl_volt(GPU_DVFS_CTRL_VOLT);
-#endif
-#endif
-
-	if (volt_new > volt_old) {
-		delay = mt_gpufreq_calc_pmic_settle_time(volt_old, volt_new);
-		gpufreq_dbg("@%s: delay = %d slew_rate = %d\n", __func__, delay, g_max_slew_rate);
-		udelay((g_max_slew_rate != INVALID_SLEW_RATE) ? g_max_slew_rate : delay);
-	}
-
 #ifdef VGPU_SET_BY_PMIC
-
-#if 0
-	/* Control VSRAM_MD */
-	{
-		const unsigned int VSRAM_MD_Volt = GPU_DVFS_VOLT0; /* 0.9V */
-		unsigned int vsram_md_target_volt = 0;
-		unsigned int setSRAM_MD_Volt = 0;
-
-		if (volt_new == GPU_DVFS_VOLT0 && volt_old != GPU_DVFS_VOLT0) {
-			vsram_md_target_volt = volt_new + 10000; /* VSRAM_MD = VGPU + 0.1V */
-			setSRAM_MD_Volt = 1;
-		} else if (volt_old == GPU_DVFS_VOLT0 && volt_new != GPU_DVFS_VOLT0) {
-			vsram_md_target_volt = VSRAM_MD_Volt;
-			setSRAM_MD_Volt = 1;
-		}
-
-		if (setSRAM_MD_Volt) {
-			gpufreq_dbg("@%s: sram volt = %d\n", __func__, vsram_md_target_volt);
-			reg_val = mt_gpufreq_volt_to_pmic_wrap(vsram_md_target_volt);
-			pmic_set_register_value(MT6351_PMIC_BUCK_VSRAM_MD_VOSEL_ON, reg_val);
-			pmic_set_register_value(MT6351_PMIC_BUCK_VSRAM_MD_VOSEL, reg_val);
-		}
-	}
-#endif
-
+	if (volt_new > volt_old)
+		regulator_set_voltage(mt_gpufreq_pmic->reg_vgpu,
+					volt_new*10, (PMIC_MAX_VGPU*10) + 125);
+	else
+		regulator_set_voltage(mt_gpufreq_pmic->reg_vgpu,
+					volt_new*10, volt_old*10);
+	udelay(delay_unit_us);
 #endif
 	if (g_pVoltSampler != NULL)
 		g_pVoltSampler(volt_new);
@@ -1550,45 +1164,16 @@ static void mt_gpufreq_volt_switch(unsigned int volt_old, unsigned int volt_new)
 
 static unsigned int _mt_gpufreq_get_cur_freq(void)
 {
-	unsigned long mfgpll = 0;
-	unsigned int post_div = 0;
-	unsigned int freq = 0;
-
-	mfgpll = DRV_Reg32(MMPLL_CON1) & ~0xffc00000;
-	post_div = (DRV_Reg32(MMPLL_CON1) & (0x3 << 24)) >> 24;
-	if ((mfgpll >= 0x10000) && (mfgpll <= 0x3fffff)) {
-		freq = (((mfgpll * 100 * 26  >> 14) / (1 << post_div) + 5) / 10) * 100;
-	}  else {
-		gpufreq_err("Invalid mfgpll value = %ld\n", mfgpll);
-		/* WARN_ON(); */
-	}
-
-	gpufreq_dbg("mfgpll = %ld, freq = %d div = %d\n", mfgpll, freq, post_div);
-
-	return freq;		/* KHz */
+	/* CJ, can I get from where? */
+	return g_cur_gpu_freq;
 }
 
 static unsigned int _mt_gpufreq_get_cur_volt(void)
 {
-
 	unsigned int gpu_volt = 0;
-#ifdef VGPU_SET_BY_EXTIC
-	unsigned int en = 0;
-	unsigned char reg_val = 0;
-
-	gpufreq_dbg("@%s\n", __func__);
-	fan53555_read_byte(0x0, &reg_val);
-	en = reg_val >> 7;
-	if (en) { /* enabled i.e. not 0mv */
-		fan53555_read_byte(0x0, &reg_val);
-		gpu_volt = ((reg_val & 0x3f) * 12826 + 603000) / 10;
-		gpufreq_dbg("gpu_dvfs_get_cur_volt:[EXTIC] pmic_val = 0x%x, volt = %d\n", reg_val, gpu_volt);
-	} else {
-		gpufreq_dbg("gpu_dvfs_get_cur_volt: VGPU not enabled!\n");
-		gpu_volt = 0;
-	}
-#elif defined(VGPU_SET_BY_PMIC)
-	gpu_volt = mt_gpufreq_pmic_wrap_to_volt(pmic_get_register_value(PMIC_BUCK_VGPU_VOSEL_ON));
+#if defined(VGPU_SET_BY_PMIC)
+	/* WARRNING: regulator_get_voltage prints uV */
+	gpu_volt = regulator_get_voltage(mt_gpufreq_pmic->reg_vgpu) / 10;
 	gpufreq_dbg("gpu_dvfs_get_cur_volt:[PMIC] volt = %d\n", gpu_volt);
 #else
 	gpufreq_dbg("gpu_dvfs_get_cur_volt:[WARN]  no tran value\n");
@@ -1599,7 +1184,7 @@ static unsigned int _mt_gpufreq_get_cur_volt(void)
 
 static void _mt_gpufreq_kick_pbm(int enable)
 {
-#ifndef DISABLE_PBM_FEATURE
+#ifndef DISABLE_PBM_FEATURE /* CJ, we don't define DISABLE_PBM_FEATURE */
 	int i;
 	int tmp_idx = -1;
 	unsigned int found = 0;
@@ -1616,10 +1201,11 @@ static void _mt_gpufreq_kick_pbm(int enable)
 				if (mt_gpufreqs_power[i].gpufreq_volt == cur_volt) {
 					power = mt_gpufreqs_power[i].gpufreq_power;
 					found = 1;
-					kicker_pbm_by_gpu(true, power, cur_volt / 100);
+					/* CJ Fix Me */
+					/* kicker_pbm_by_gpu(true, power, cur_volt / 100); */
 					gpufreq_dbg
-					    ("@%s: request GPU power = %d, cur_volt = %d, cur_freq = %d\n",
-					     __func__, power, cur_volt / 100, cur_freq);
+						("@%s: request GPU power = %d, cur_volt = %d, cur_freq = %d\n",
+						 __func__, power, cur_volt / 100, cur_freq);
 					return;
 				}
 			}
@@ -1631,19 +1217,21 @@ static void _mt_gpufreq_kick_pbm(int enable)
 			if (tmp_idx != -1 && tmp_idx < mt_gpufreqs_num) {
 				/* use freq to found corresponding power budget */
 				power = mt_gpufreqs_power[tmp_idx].gpufreq_power;
-				kicker_pbm_by_gpu(true, power, cur_volt / 100);
+				/* CJ Fix Me */
+				/* kicker_pbm_by_gpu(true, power, cur_volt / 100); */
 				gpufreq_dbg
-				    ("@%s: request GPU power = %d, cur_volt = %d, cur_freq = %d\n",
-				     __func__, power, cur_volt / 100, cur_freq);
+					("@%s: request GPU power = %d, cur_volt = %d, cur_freq = %d\n",
+					 __func__, power, cur_volt / 100, cur_freq);
 			} else {
 				gpufreq_warn("@%s: Cannot found request power in power table!\n",
-					     __func__);
+						 __func__);
 				gpufreq_warn("cur_freq = %dKHz, cur_volt = %dmV\n", cur_freq,
-					     cur_volt / 100);
+						 cur_volt / 100);
 			}
 		}
 	} else {
-		kicker_pbm_by_gpu(false, 0, cur_volt / 100);
+		/* CJ Fix Me */
+		/* kicker_pbm_by_gpu(false, 0, cur_volt / 100); */
 	}
 #endif
 }
@@ -1659,6 +1247,9 @@ static void _mt_gpufreq_kick_pbm(int enable)
 static void mt_gpufreq_set(unsigned int freq_old, unsigned int freq_new,
 			   unsigned int volt_old, unsigned int volt_new)
 {
+	pr_debug("[ERROR] mt_gpufreq_set set to old volt=%x, new volt=%x", volt_old, volt_new);
+	pr_debug("[ERROR] mt_gpufreq_set set to old freq=%x, new freq=%x", freq_old, freq_new);
+
 	if (freq_new > freq_old) {
 		/* if(volt_old != volt_new) // ??? */
 		/* { */
@@ -1700,6 +1291,12 @@ unsigned int mt_gpufreq_target(unsigned int idx)
 
 	mutex_lock(&mt_gpufreq_lock);
 
+	if (mt_gpufreq_pause == true) {
+		gpufreq_warn("GPU DVFS pause!\n");
+		mutex_unlock(&mt_gpufreq_lock);
+		return DRIVER_NOT_READY;
+	}
+
 	if (mt_gpufreq_ready == false) {
 		gpufreq_warn("GPU DVFS not ready!\n");
 		mutex_unlock(&mt_gpufreq_lock);
@@ -1731,7 +1328,7 @@ unsigned int mt_gpufreq_target(unsigned int idx)
 	target_OPPidx = idx;
 
 	gpufreq_dbg("@%s: begin, receive freq: %d, OPPidx: %d\n", __func__, target_freq,
-		    target_OPPidx);
+			target_OPPidx);
 
 	/**********************************
 	 * Check if need to keep max frequency
@@ -1753,7 +1350,7 @@ unsigned int mt_gpufreq_target(unsigned int idx)
 		target_idx = mt_gpufreqs[mt_gpufreq_keep_opp_index].gpufreq_idx;
 		target_OPPidx = mt_gpufreq_keep_opp_index;
 		gpufreq_dbg("Keep opp! opp frequency %d, opp voltage %d, opp idx %d\n", target_freq,
-			    target_volt, target_OPPidx);
+				target_volt, target_OPPidx);
 	}
 
 	/************************************************
@@ -1765,7 +1362,7 @@ unsigned int mt_gpufreq_target(unsigned int idx)
 		target_idx = 0;
 		target_OPPidx = 0;
 		gpufreq_dbg("Fixed! fixed frequency %d, fixed voltage %d\n", target_freq,
-			    target_volt);
+				target_volt);
 	}
 
 	/************************************************
@@ -1779,8 +1376,8 @@ unsigned int mt_gpufreq_target(unsigned int idx)
 			target_OPPidx = mt_gpufreq_opp_max_index;
 
 			gpufreq_dbg
-			    ("opp max freq! opp max frequency %d, opp max voltage %d, opp max idx %d\n",
-			     target_freq, target_volt, target_OPPidx);
+				("opp max freq! opp max frequency %d, opp max voltage %d, opp max idx %d\n",
+				 target_freq, target_volt, target_OPPidx);
 		}
 	}
 
@@ -1797,7 +1394,7 @@ unsigned int mt_gpufreq_target(unsigned int idx)
 			target_volt = mt_gpufreqs[mt_gpufreq_pbm_limited_index].gpufreq_volt;
 			target_OPPidx = mt_gpufreq_pbm_limited_index;
 			gpufreq_dbg("Limit! Thermal/Power limit gpu frequency %d\n",
-				    mt_gpufreqs[mt_gpufreq_pbm_limited_index].gpufreq_khz);
+					mt_gpufreqs[mt_gpufreq_pbm_limited_index].gpufreq_khz);
 		}
 	}
 #endif
@@ -1815,7 +1412,7 @@ unsigned int mt_gpufreq_target(unsigned int idx)
 			target_idx = mt_gpufreqs[g_limited_max_id].gpufreq_idx;
 			target_OPPidx = g_limited_max_id;
 			gpufreq_info("Limit! Thermal/Power limit gpu frequency %d\n",
-				     mt_gpufreqs[g_limited_max_id].gpufreq_khz);
+					 mt_gpufreqs[g_limited_max_id].gpufreq_khz);
 		}
 	}
 
@@ -1829,7 +1426,7 @@ unsigned int mt_gpufreq_target(unsigned int idx)
 		target_idx = mt_gpufreqs[mt_gpufreq_ptpod_disable_idx].gpufreq_idx;
 		target_OPPidx = mt_gpufreq_ptpod_disable_idx;
 		gpufreq_dbg("PTPOD disable dvfs, mt_gpufreq_ptpod_disable_idx = %d\n",
-			    mt_gpufreq_ptpod_disable_idx);
+				mt_gpufreq_ptpod_disable_idx);
 #else
 		mutex_unlock(&mt_gpufreq_lock);
 		gpufreq_dbg("PTPOD disable dvfs, return\n");
@@ -1843,12 +1440,12 @@ unsigned int mt_gpufreq_target(unsigned int idx)
 	if (g_cur_gpu_freq == target_freq && g_cur_gpu_volt == target_volt) {
 		mutex_unlock(&mt_gpufreq_lock);
 		gpufreq_dbg("GPU frequency from %d KHz to %d KHz (skipped) due to same frequency\n",
-			    g_cur_gpu_freq, target_freq);
+				g_cur_gpu_freq, target_freq);
 		return 0;
 	}
 
 	gpufreq_dbg("GPU current frequency %d KHz, target frequency %d KHz\n", g_cur_gpu_freq,
-		    target_freq);
+			target_freq);
 
 #ifdef MT_GPUFREQ_AEE_RR_REC
 	aee_rr_rec_gpu_dvfs_status(aee_rr_curr_gpu_dvfs_status() | (1 << GPU_DVFS_IS_DOING_DVFS));
@@ -1967,7 +1564,7 @@ static void mt_gpufreq_oc_protect(unsigned int limited_index)
 	mutex_unlock(&mt_gpufreq_power_lock);
 }
 
-void mt_gpufreq_oc_callback(BATTERY_OC_LEVEL oc_level)
+void mt_gpufreq_oc_callback(enum BATTERY_OC_LEVEL oc_level)
 {
 	gpufreq_dbg("@%s: oc_level = %d\n", __func__, oc_level);
 
@@ -1983,6 +1580,8 @@ void mt_gpufreq_oc_callback(BATTERY_OC_LEVEL oc_level)
 
 	mt_gpufreq_oc_level = oc_level;
 
+	/* CJ Fix Me ?*/
+	#if 1
 	/* BATTERY_OC_LEVEL_1: >= 5.5A  */
 	if (oc_level == BATTERY_OC_LEVEL_1) {
 		if (mt_gpufreq_oc_limited_index != mt_gpufreq_oc_limited_index_1) {
@@ -1997,6 +1596,7 @@ void mt_gpufreq_oc_callback(BATTERY_OC_LEVEL oc_level)
 			mt_gpufreq_oc_protect(mt_gpufreq_oc_limited_index_0);	/* Unlimit */
 		}
 	}
+	#endif
 }
 #endif
 
@@ -2016,7 +1616,7 @@ static void mt_gpufreq_low_batt_volume_protect(unsigned int limited_index)
 	mutex_unlock(&mt_gpufreq_power_lock);
 }
 
-void mt_gpufreq_low_batt_volume_callback(BATTERY_PERCENT_LEVEL low_battery_volume)
+void mt_gpufreq_low_batt_volume_callback(enum BATTERY_PERCENT_LEVEL low_battery_volume)
 {
 	gpufreq_dbg("@%s: low_battery_volume = %d\n", __func__, low_battery_volume);
 
@@ -2032,12 +1632,14 @@ void mt_gpufreq_low_batt_volume_callback(BATTERY_PERCENT_LEVEL low_battery_volum
 
 	mt_gpufreq_low_battery_volume = low_battery_volume;
 
+	/* CJ Fix Me ?*/
+#if 1
 	/* LOW_BATTERY_VOLUME_1: <= 15%, LOW_BATTERY_VOLUME_0: >15% */
 	if (low_battery_volume == BATTERY_PERCENT_LEVEL_1) {
 		if (mt_gpufreq_low_batt_volume_limited_index !=
-		    mt_gpufreq_low_bat_volume_limited_index_1) {
+			mt_gpufreq_low_bat_volume_limited_index_1) {
 			mt_gpufreq_low_batt_volume_limited_index =
-			    mt_gpufreq_low_bat_volume_limited_index_1;
+				mt_gpufreq_low_bat_volume_limited_index_1;
 
 			/* Unlimited */
 			mt_gpufreq_low_batt_volume_protect(mt_gpufreq_low_bat_volume_limited_index_1);
@@ -2046,14 +1648,16 @@ void mt_gpufreq_low_batt_volume_callback(BATTERY_PERCENT_LEVEL low_battery_volum
 	/* unlimit gpu */
 	else {
 		if (mt_gpufreq_low_batt_volume_limited_index !=
-		    mt_gpufreq_low_bat_volume_limited_index_0) {
+			mt_gpufreq_low_bat_volume_limited_index_0) {
 			mt_gpufreq_low_batt_volume_limited_index =
-			    mt_gpufreq_low_bat_volume_limited_index_0;
+				mt_gpufreq_low_bat_volume_limited_index_0;
 			mt_gpufreq_low_batt_volume_protect(mt_gpufreq_low_bat_volume_limited_index_0);	/* Unlimit */
 		}
 	}
+#endif
 }
 #endif
+
 
 #ifdef MT_GPUFREQ_LOW_BATT_VOLT_PROTECT
 /************************************************
@@ -2073,7 +1677,7 @@ static void mt_gpufreq_low_batt_volt_protect(unsigned int limited_index)
 /******************************************************
  * parameter: low_battery_level
  *******************************************************/
-void mt_gpufreq_low_batt_volt_callback(LOW_BATTERY_LEVEL low_battery_level)
+void mt_gpufreq_low_batt_volt_callback(enum LOW_BATTERY_LEVEL low_battery_level)
 {
 	gpufreq_dbg("@%s: low_battery_level = %d\n", __func__, low_battery_level);
 
@@ -2099,31 +1703,35 @@ void mt_gpufreq_low_batt_volt_callback(LOW_BATTERY_LEVEL low_battery_level)
 #if 0
 	if (low_battery_level == LOW_BATTERY_LEVEL_1) {
 		if (mt_gpufreq_low_batt_volt_limited_index !=
-		    mt_gpufreq_low_bat_volt_limited_index_1) {
+			mt_gpufreq_low_bat_volt_limited_index_1) {
 			mt_gpufreq_low_batt_volt_limited_index =
-			    mt_gpufreq_low_bat_volt_limited_index_1;
+				mt_gpufreq_low_bat_volt_limited_index_1;
 			/* Limit GPU 416Mhz */
 			mt_gpufreq_low_batt_volt_protect(mt_gpufreq_low_bat_volt_limited_index_1);
 		}
 	} else
 #endif
+
+	/* CJ Fix Me ?*/
+#if 1
 	if (low_battery_level == LOW_BATTERY_LEVEL_2) {
 		if (mt_gpufreq_low_batt_volt_limited_index !=
-		    mt_gpufreq_low_bat_volt_limited_index_2) {
+			mt_gpufreq_low_bat_volt_limited_index_2) {
 			mt_gpufreq_low_batt_volt_limited_index =
-			    mt_gpufreq_low_bat_volt_limited_index_2;
+				mt_gpufreq_low_bat_volt_limited_index_2;
 			/* Limit GPU 400Mhz */
 			mt_gpufreq_low_batt_volt_protect(mt_gpufreq_low_bat_volt_limited_index_2);
 		}
 	} else {		/* unlimit gpu */
 		if (mt_gpufreq_low_batt_volt_limited_index !=
-		    mt_gpufreq_low_bat_volt_limited_index_0) {
+			mt_gpufreq_low_bat_volt_limited_index_0) {
 			mt_gpufreq_low_batt_volt_limited_index =
-			    mt_gpufreq_low_bat_volt_limited_index_0;
+				mt_gpufreq_low_bat_volt_limited_index_0;
 			/* Unlimit */
 			mt_gpufreq_low_batt_volt_protect(mt_gpufreq_low_bat_volt_limited_index_0);
 		}
 	}
+#endif
 }
 #endif
 
@@ -2203,7 +1811,7 @@ void mt_gpufreq_thermal_protect(unsigned int limited_power)
 	if (mt_gpufreq_prev_thermal_limited_freq != limited_freq) {
 		mt_gpufreq_prev_thermal_limited_freq = limited_freq;
 		mt_gpufreq_power_throttle_protect();
-		if (limited_freq < GPU_DVFS_FREQ6)
+		if (limited_freq < GPU_DVFS_FREQ5)
 			gpufreq_info("@%s: p %u f %u i %u\n", __func__, limited_power, limited_freq,
 				mt_gpufreq_power_limited_index_array[IDX_THERMAL_LIMITED]);
 	}
@@ -2258,7 +1866,7 @@ void mt_gpufreq_set_power_limit_by_pbm(unsigned int limited_power)
 
 	if (limited_power == mt_gpufreq_pbm_limited_gpu_power) {
 		gpufreq_dbg("@%s: limited_power(%d mW) not changed, skip it!\n",
-			    __func__, limited_power);
+				__func__, limited_power);
 		mutex_unlock(&mt_gpufreq_power_lock);
 		return;
 	}
@@ -2293,6 +1901,7 @@ void mt_gpufreq_set_power_limit_by_pbm(unsigned int limited_power)
 #endif
 }
 
+/* CJ, what is PBM? */
 unsigned int mt_gpufreq_get_leakage_mw(void)
 {
 #ifndef DISABLE_PBM_FEATURE
@@ -2339,7 +1948,7 @@ EXPORT_SYMBOL(mt_gpufreq_get_thermal_limit_index);
 unsigned int mt_gpufreq_get_thermal_limit_freq(void)
 {
 	gpufreq_dbg("current GPU thermal limit freq is %d MHz\n",
-		    mt_gpufreqs[g_limited_max_id].gpufreq_khz / 1000);
+			mt_gpufreqs[g_limited_max_id].gpufreq_khz / 1000);
 	return mt_gpufreqs[g_limited_max_id].gpufreq_khz;
 }
 EXPORT_SYMBOL(mt_gpufreq_get_thermal_limit_freq);
@@ -2449,6 +2058,7 @@ void mt_gpufreq_late_resume(struct early_suspend *h)
 }
 #endif
 
+/* CJ, Need to restore early ?*/
 static int mt_gpufreq_pm_restore_early(struct device *dev)
 {
 	int i = 0;
@@ -2480,62 +2090,6 @@ static int mt_gpufreq_pm_restore_early(struct device *dev)
 	return 0;
 }
 
-int mt_gpufreq_fan53555_init(void)
-{
-#if defined(VGPU_SET_BY_EXTIC)
-	unsigned char reg_val = 0;
-	static void *g_ldo_base;
-
-	gpufreq_info("@%s\n", __func__);
-	/* enable: // VGPU_SRAM */
-	g_ldo_base = ioremap_nocache(GPU_LDO_BASE, 0x1000);
-	gpufreq_info("@%s 2\n", __func__);
-#if 1
-	DRV_WriteReg32(g_ldo_base + 0xfc0, 0x0f0f0f0f);
-	DRV_WriteReg32(g_ldo_base + 0xfc4, 0x0f0f0f0f);
-	DRV_WriteReg32(g_ldo_base + 0xfbc, 0xff);
-
-
-	/* enable VGPU power */
-	fan53555_config_interface(EXTIC_VSEL0, 0x1,
-				EXTIC_BUCK_EN0_MASK,
-				EXTIC_BUCK_EN0_SHIFT);
-	/* set slew rate to 32mv/us */
-	fan53555_config_interface(EXTIC_VGPU_CTRL, 0x11,
-				EXTIC_VGPU_SLEW_MASK,
-				EXTIC_VGPU_SLEW_SHIFT);
-
-#if 0
-	aee_rr_rec_gpu_dvfs_status(aee_rr_curr_gpu_dvfs_status() | (1 << GPU_DVFS_IS_VGPU_ENABLED));
-#endif
-
-	mt_gpufreq_volt_enable_state = 1;
-	gpufreq_info(" check VGPU_EN\n");
-	fan53555_read_interface(EXTIC_VSEL0, &reg_val,
-				EXTIC_BUCK_EN0_MASK,
-				EXTIC_BUCK_EN0_SHIFT);
-	gpufreq_info("VGPU_EN = %d\n", reg_val);
-	fan53555_read_interface(EXTIC_VGPU_CTRL, &reg_val,
-				EXTIC_VGPU_SLEW_MASK,
-				EXTIC_VGPU_SLEW_SHIFT);
-#endif
-	gpufreq_info("VGPU_SLEW = %d\n", reg_val);
-
-	/**********************
-	 * setup initial frequency
-	***********************/
-	mt_gpufreq_set_initial();
-
-	gpufreq_info("GPU current frequency = %dKHz\n", _mt_gpufreq_get_cur_freq());
-	gpufreq_info("GPU current volt = %dmV\n", _mt_gpufreq_get_cur_volt() / 100);
-	gpufreq_info("g_cur_gpu_freq = %d, g_cur_gpu_volt = %d\n", g_cur_gpu_freq, g_cur_gpu_volt);
-	gpufreq_info("g_cur_gpu_idx = %d, g_cur_gpu_OPPidx = %d\n", g_cur_gpu_idx,
-		     g_cur_gpu_OPPidx);
-
-	mt_gpufreq_ready = true;
-#endif
-	return 0;
-}
 #ifdef CONFIG_OF
 static const struct of_device_id mt_gpufreq_of_match[] = {
 	{.compatible = "mediatek,mt8167-gpufreq",},
@@ -2543,13 +2097,11 @@ static const struct of_device_id mt_gpufreq_of_match[] = {
 };
 #endif
 MODULE_DEVICE_TABLE(of, mt_gpufreq_of_match);
-
 static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 {
-#if defined(VGPU_SET_BY_PMIC)
-	unsigned int reg_val = 0;
-#endif
+#ifdef MT_GPUFREQ_LOW_BATT_VOLT_PROTECT
 	int i = 0;
+#endif
 #ifdef MT_GPUFREQ_INPUT_BOOST
 	int rc;
 	struct sched_param param = {.sched_priority = MAX_RT_PRIO - 1 };
@@ -2562,27 +2114,17 @@ static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 	if (!node)
 		gpufreq_err("@%s: find GPU node failed\n", __func__);
 
-	mt_gpufreq_clk = kzalloc(sizeof(struct mt_gpufreq_clk_t), GFP_KERNEL);
-	if (mt_gpufreq_clk == NULL)
+	/* alloc PMIC regulator */
+	mt_gpufreq_pmic = kzalloc(sizeof(struct mt_gpufreq_pmic_t), GFP_KERNEL);
+	if (mt_gpufreq_pmic == NULL)
 		return -ENOMEM;
-	#if 1
-	mt_gpufreq_clk->clk_mux = devm_clk_get(&pdev->dev, "clk_mux");
-	if (IS_ERR(mt_gpufreq_clk->clk_mux)) {
-		dev_err(&pdev->dev, "cannot get clock mux\n");
-		return PTR_ERR(mt_gpufreq_clk->clk_mux);
-	}
-	#endif
-	mt_gpufreq_clk->clk_main_parent = devm_clk_get(&pdev->dev, "clk_main_parent");
-	if (IS_ERR(mt_gpufreq_clk->clk_main_parent)) {
-		dev_err(&pdev->dev, "cannot get main clock parent\n");
-		return PTR_ERR(mt_gpufreq_clk->clk_main_parent);
-	}
-	mt_gpufreq_clk->clk_sub_parent = devm_clk_get(&pdev->dev, "clk_sub_parent");
-	if (IS_ERR(mt_gpufreq_clk->clk_sub_parent)) {
-		dev_err(&pdev->dev, "cannot get sub clock parent\n");
-		return PTR_ERR(mt_gpufreq_clk->clk_sub_parent);
-	}
 
+
+	mt_gpufreq_pmic->reg_vgpu = regulator_get(&pdev->dev, "reg-vgpu");
+	if (IS_ERR(mt_gpufreq_pmic->reg_vgpu)) {
+		dev_err(&pdev->dev, "cannot get reg-vgpu\n");
+		return PTR_ERR(mt_gpufreq_pmic->reg_vgpu);
+	}
 #endif
 
 	mt_gpufreq_dvfs_table_type = mt_gpufreq_get_dvfs_table_type();
@@ -2593,13 +2135,6 @@ static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 	register_early_suspend(&mt_gpufreq_early_suspend_handler);
 #endif
 
-
-#ifdef VGPU_SET_BY_PMIC_WRAP
-	/**********************
-	 * setup PMIC wrap setting
-	 ***********************/
-	mt_cpufreq_set_pmic_phase(PMIC_WRAP_PHASE_NORMAL);
-#endif
 
 	/**********************
 	 * Initial leackage power usage
@@ -2620,96 +2155,69 @@ static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 	 ***********************/
 	gpufreq_info("setup gpufreqs table\n");
 
-	if (mt_gpufreq_dvfs_table_type == 0)	/* 900M */
+	switch (mt_gpufreq_dvfs_table_type) {
+	case 0:		/* 400MHz */
 		mt_setup_gpufreqs_table(mt_gpufreq_opp_tbl_e1_0,
 					ARRAY_SIZE(mt_gpufreq_opp_tbl_e1_0));
-	else
+		break;
+	case 1:		/* 500MHz */
+		mt_setup_gpufreqs_table(mt_gpufreq_opp_tbl_e1_1,
+					ARRAY_SIZE(mt_gpufreq_opp_tbl_e1_1));
+		break;
+	case 2:		/* 600MHz */
+		mt_setup_gpufreqs_table(mt_gpufreq_opp_tbl_e1_2,
+					ARRAY_SIZE(mt_gpufreq_opp_tbl_e1_2));
+		break;
+	default:	/* 400MHz */
 		mt_setup_gpufreqs_table(mt_gpufreq_opp_tbl_e1_0,
 					ARRAY_SIZE(mt_gpufreq_opp_tbl_e1_0));
+		break;
+	}
 
 	/**********************
 	 * setup PMIC init value
 	 ***********************/
 #ifdef VGPU_SET_BY_PMIC
-	/* Set VGPU_VOSEL_CTRL[1] to HW control */
-	pmic_config_interface(PMIC_ADDR_VGPU_VOSEL_CTRL, 0x1,
-			      PMIC_ADDR_VGPU_VOSEL_CTRL_MASK,
-			      PMIC_ADDR_VGPU_VOSEL_CTRL_SHIFT);
-	/* Set VGPU_EN_CTRL[0] SW control to 0 */
-	pmic_config_interface(PMIC_ADDR_VGPU_EN_CTRL, 0x0,
-			      PMIC_ADDR_VGPU_EN_CTRL_MASK,
-			      PMIC_ADDR_VGPU_EN_CTRL_SHIFT);
-	/* Set VGPU_EN[0] to 1 */
-	pmic_config_interface(PMIC_ADDR_VGPU_EN, 0x1,
-			      PMIC_ADDR_VGPU_EN_MASK,
-			      PMIC_ADDR_VGPU_EN_SHIFT);
+
+	gpufreq_info("VGPU Enabled (%d) %d mV\n",
+		regulator_is_enabled(mt_gpufreq_pmic->reg_vgpu),
+		_mt_gpufreq_get_cur_volt());
+
+	/* CJ Fix it, should not set here, test only*/
+#if 0
+	/* VGPU */
+	regulator_set_voltage(mt_gpufreq_pmic->reg_vgpu, GPU_DVFS_VOLT2 * 10, (GPU_DVFS_VOLT2 + 100) * 10);
+	/* Freq */
+	pr_err("[ERROR] mt_gpufreq_clock_switch set to 312Mz");
+	mt_dfs_mmpll(0xF8000);	/* 403MHz, 0x820F8000 */
+	mt_dfs_mmpll(0xF4000);	/* 396.5MHz, 0x820F4000 */
+	mt_dfs_mmpll(0xC0000);	/* 312MHz, 0x820C0000 */
+#endif
+
 #ifdef MT_GPUFREQ_AEE_RR_REC
 	aee_rr_rec_gpu_dvfs_status(aee_rr_curr_gpu_dvfs_status() | (1 << GPU_DVFS_IS_VGPU_ENABLED));
 #endif
-
 	mt_gpufreq_volt_enable_state = 1;
-
-	/* Get VGPU_VOSEL_CTRL[1] */
-	pmic_read_interface(PMIC_ADDR_VGPU_VOSEL_CTRL, &reg_val,
-			    PMIC_ADDR_VGPU_VOSEL_CTRL_MASK,
-			    PMIC_ADDR_VGPU_VOSEL_CTRL_SHIFT);
-	gpufreq_dbg("VGPU_VOSEL_CTRL[1] = %d\n", reg_val);
-	/* Get VGPU_EN_CTRL[0] */
-	pmic_read_interface(PMIC_ADDR_VGPU_EN_CTRL, &reg_val,
-			    PMIC_ADDR_VGPU_EN_CTRL_MASK,
-			    PMIC_ADDR_VGPU_EN_CTRL_SHIFT);
-	gpufreq_dbg("VGPU_EN_CTRL[0] = %d\n", reg_val);
-	/* Get VGPU_EN[0] */
-	pmic_read_interface(PMIC_ADDR_VGPU_EN, &reg_val,
-			    PMIC_ADDR_VGPU_EN_MASK,
-			    PMIC_ADDR_VGPU_EN_SHIFT);
-	gpufreq_dbg("VGPU_EN[0] = %d\n", reg_val);
 #endif
 
-
-	g_cur_freq_init_keep = g_cur_gpu_freq;
-
-#ifdef VGPU_SET_BY_PMIC_WRAP
-#if 1
-	/**********************
-	 * PMIC wrap setting for gpu default volt value
-	 ***********************/
-	reg_val = mt_gpufreq_volt_to_pmic_wrap(mt_gpufreqs[0].gpufreq_volt);
-	mt_cpufreq_set_pmic_cmd(PMIC_WRAP_PHASE_NORMAL, IDX_NM_VGPU, reg_val);
-#else
-	mt_gpufreq_reg_write(0x02B0, PMIC_WRAP_DVFS_ADR2);
-
-	reg_val = mt_gpufreq_volt_to_pmic_wrap(mt_gpufreqs[0].gpufreq_volt);
-	mt_gpufreq_reg_write(reg_val, PMIC_WRAP_DVFS_WDATA2);	/* 1.125V */
-#endif
-#endif
-
-#if !defined(VGPU_SET_BY_EXTIC)
-#if 0
-	/* Make sure the power control is ready */
-	if (!is_fan53555_exist() || !is_fan53555_sw_ready()) {
-		gpufreq_dbg("fan53555 is not ready yet\n");
-		return -EPROBE_DEFER;
-	}
-	mt_gpufreq_fan53555_init();
-#endif
 	/**********************
 	 * setup initial frequency
 	 ***********************/
 	mt_gpufreq_set_initial();
 
+	g_cur_freq_init_keep = g_cur_gpu_freq;
+
 	gpufreq_info("GPU current frequency = %dKHz\n", _mt_gpufreq_get_cur_freq());
 	gpufreq_info("Current Vcore = %dmV\n", _mt_gpufreq_get_cur_volt() / 100);
 	gpufreq_info("g_cur_gpu_freq = %d, g_cur_gpu_volt = %d\n", g_cur_gpu_freq, g_cur_gpu_volt);
 	gpufreq_info("g_cur_gpu_idx = %d, g_cur_gpu_OPPidx = %d\n", g_cur_gpu_idx,
-		     g_cur_gpu_OPPidx);
+			 g_cur_gpu_OPPidx);
 
 	mt_gpufreq_ready = true;
-#endif
 
 #ifdef MT_GPUFREQ_INPUT_BOOST
 	mt_gpufreq_up_task =
-	    kthread_create(mt_gpufreq_input_boost_task, NULL, "mt_gpufreq_input_boost_task");
+		kthread_create(mt_gpufreq_input_boost_task, NULL, "mt_gpufreq_input_boost_task");
 	if (IS_ERR(mt_gpufreq_up_task))
 		return PTR_ERR(mt_gpufreq_up_task);
 
@@ -2719,7 +2227,7 @@ static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 	rc = input_register_handler(&mt_gpufreq_input_handler);
 #endif
 
-#ifdef MT_GPUFREQ_LOW_BATT_VOLT_PROTECT
+#ifdef MT_GPUFREQ_LOW_BATT_VOLT_PROTECT /* CJ Fix Me, Need Thermal Help*/
 	for (i = 0; i < mt_gpufreqs_num; i++) {
 		if (mt_gpufreqs[i].gpufreq_khz == MT_GPUFREQ_LOW_BATT_VOLT_LIMIT_FREQ_1) {
 			mt_gpufreq_low_bat_volt_limited_index_1 = i;
@@ -2734,10 +2242,11 @@ static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 		}
 	}
 
-	register_low_battery_notify(&mt_gpufreq_low_batt_volt_callback, LOW_BATTERY_PRIO_GPU);
+	/* register_low_battery_notify(&mt_gpufreq_low_batt_volt_callback, LOW_BATTERY_PRIO_GPU); */
 #endif
 
-#ifdef MT_GPUFREQ_LOW_BATT_VOLUME_PROTECT
+#ifdef MT_GPUFREQ_LOW_BATT_VOLUME_PROTECT /* CJ Fix Me, Need Thermal Help*/
+	pr_err("[ERROR] mt_gpufreq_pdrv_probe 17");
 	for (i = 0; i < mt_gpufreqs_num; i++) {
 		if (mt_gpufreqs[i].gpufreq_khz == MT_GPUFREQ_LOW_BATT_VOLUME_LIMIT_FREQ_1) {
 			mt_gpufreq_low_bat_volume_limited_index_1 = i;
@@ -2745,11 +2254,12 @@ static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 		}
 	}
 
-	register_battery_percent_notify(&mt_gpufreq_low_batt_volume_callback,
-					BATTERY_PERCENT_PRIO_GPU);
+	/* register_battery_percent_notify(&mt_gpufreq_low_batt_volume_callback,*/
+	/*				BATTERY_PERCENT_PRIO_GPU);		*/
 #endif
 
-#ifdef MT_GPUFREQ_OC_PROTECT
+#ifdef MT_GPUFREQ_OC_PROTECT /* CJ Fix Me, Need Thermal Help*/
+	pr_err("[ERROR] mt_gpufreq_pdrv_probe 18");
 	for (i = 0; i < mt_gpufreqs_num; i++) {
 		if (mt_gpufreqs[i].gpufreq_khz == MT_GPUFREQ_OC_LIMIT_FREQ_1) {
 			mt_gpufreq_oc_limited_index_1 = i;
@@ -2757,9 +2267,10 @@ static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 		}
 	}
 
-	register_battery_oc_notify(&mt_gpufreq_oc_callback, BATTERY_OC_PRIO_GPU);
+	/* register_battery_oc_notify(&mt_gpufreq_oc_callback, BATTERY_OC_PRIO_GPU); */
 #endif
 
+/* CJ, What is PBM? */
 #ifndef DISABLE_PBM_FEATURE
 	INIT_DEFERRABLE_WORK(&notify_pbm_gpuoff_work, mt_gpufreq_notify_pbm_gpuoff);
 #endif
@@ -2787,12 +2298,6 @@ static const struct dev_pm_ops mt_gpufreq_pm_ops = {
 	.resume = NULL,
 	.restore_early = mt_gpufreq_pm_restore_early,
 };
-#if 0
-struct platform_device mt_gpufreq_pdev = {
-	.name = "mt-gpufreq",
-	.id = -1,
-};
-#endif
 static struct platform_driver mt_gpufreq_pdrv = {
 	.probe = mt_gpufreq_pdrv_probe,
 	.remove = mt_gpufreq_pdrv_remove,
@@ -2871,8 +2376,8 @@ static int mt_gpufreq_limited_oc_ignore_proc_show(struct seq_file *m, void *v)
  * limited for low batt volume protect
  ***********************************/
 static ssize_t mt_gpufreq_limited_oc_ignore_proc_write(struct file *file,
-						       const char __user *buffer, size_t count,
-						       loff_t *data)
+							   const char __user *buffer, size_t count,
+							   loff_t *data)
 {
 	char desc[32];
 	int len = 0;
@@ -2890,7 +2395,7 @@ static ssize_t mt_gpufreq_limited_oc_ignore_proc_write(struct file *file,
 			g_limited_oc_ignore_state = false;
 		else
 			gpufreq_warn
-			    ("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
+				("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
 	} else
 		gpufreq_warn("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
 
@@ -2914,8 +2419,8 @@ static int mt_gpufreq_limited_low_batt_volume_ignore_proc_show(struct seq_file *
  * limited for low batt volume protect
  ***********************************/
 static ssize_t mt_gpufreq_limited_low_batt_volume_ignore_proc_write(struct file *file,
-								    const char __user *buffer,
-								    size_t count, loff_t *data)
+									const char __user *buffer,
+									size_t count, loff_t *data)
 {
 	char desc[32];
 	int len = 0;
@@ -2934,7 +2439,7 @@ static ssize_t mt_gpufreq_limited_low_batt_volume_ignore_proc_write(struct file 
 			g_limited_low_batt_volume_ignore_state = false;
 		else
 			gpufreq_warn
-			    ("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
+				("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
 	} else
 		gpufreq_warn("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
 
@@ -2978,7 +2483,7 @@ static ssize_t mt_gpufreq_limited_low_batt_volt_ignore_proc_write(struct file *f
 			g_limited_low_batt_volt_ignore_state = false;
 		else
 			gpufreq_warn
-			    ("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
+				("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
 	} else
 		gpufreq_warn("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
 
@@ -3001,8 +2506,8 @@ static int mt_gpufreq_limited_thermal_ignore_proc_show(struct seq_file *m, void 
  * limited for thermal protect
  ***********************************/
 static ssize_t mt_gpufreq_limited_thermal_ignore_proc_write(struct file *file,
-							    const char __user *buffer,
-							    size_t count, loff_t *data)
+								const char __user *buffer,
+								size_t count, loff_t *data)
 {
 	char desc[32];
 	int len = 0;
@@ -3021,7 +2526,7 @@ static ssize_t mt_gpufreq_limited_thermal_ignore_proc_write(struct file *file,
 			g_limited_thermal_ignore_state = false;
 		else
 			gpufreq_warn
-			    ("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
+				("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
 	} else
 		gpufreq_warn("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
 
@@ -3064,7 +2569,7 @@ static ssize_t mt_gpufreq_limited_pbm_ignore_proc_write(struct file *file,
 			g_limited_pbm_ignore_state = false;
 		else
 			gpufreq_warn
-			    ("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
+				("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
 	} else
 		gpufreq_warn("bad argument!! should be 0 or 1 [0: not ignore, 1: ignore]\n");
 
@@ -3125,7 +2630,7 @@ static int mt_gpufreq_limited_by_pbm_proc_show(struct seq_file *m, void *v)
  * limited power for thermal protect
  ***********************************/
 static ssize_t mt_gpufreq_limited_by_pbm_proc_write(struct file *file, const char __user *buffer,
-						    size_t count, loff_t *data)
+							size_t count, loff_t *data)
 {
 	char desc[32];
 	int len = 0;
@@ -3247,7 +2752,7 @@ static int mt_gpufreq_opp_freq_proc_show(struct seq_file *m, void *v)
  * enable specific frequency
  ************************/
 static ssize_t mt_gpufreq_opp_freq_proc_write(struct file *file, const char __user *buffer,
-					      size_t count, loff_t *data)
+						  size_t count, loff_t *data)
 {
 	char desc[32];
 	int len = 0;
@@ -3343,7 +2848,7 @@ static ssize_t mt_gpufreq_opp_max_freq_proc_write(struct file *file, const char 
 			if (found == 1) {
 				mt_gpufreq_opp_max_frequency_state = true;
 				mt_gpufreq_opp_max_frequency =
-				    mt_gpufreqs[mt_gpufreq_opp_max_index].gpufreq_khz;
+					mt_gpufreqs[mt_gpufreq_opp_max_index].gpufreq_khz;
 
 				mt_gpufreq_voltage_enable_set(1);
 				mt_gpufreq_target(mt_gpufreq_opp_max_index);
@@ -3448,7 +2953,7 @@ static void _mt_gpufreq_fixed_freq(int fixed_freq)
 {
 	/* freq (KHz) */
 	if ((fixed_freq >= GPUFREQ_LAST_FREQ_LEVEL)
-	    && (fixed_freq <= GPU_DVFS_FREQ0)) {
+		&& (fixed_freq <= GPU_DVFS_FREQ0)) {
 		gpufreq_dbg("@ %s, mt_gpufreq_clock_switch1 fix frq = %d, fix volt = %d, volt = %d\n",
 			__func__, mt_gpufreq_fixed_frequency, mt_gpufreq_fixed_voltage, g_cur_gpu_volt);
 		mt_gpufreq_fixed_freq_volt_state = true;
@@ -3465,12 +2970,9 @@ static void _mt_gpufreq_fixed_freq(int fixed_freq)
 static void _mt_gpufreq_fixed_volt(int fixed_volt)
 {
 	/* volt (mV) */
-#ifdef VGPU_SET_BY_EXTIC
-	if (fixed_volt >= (mt_gpufreq_pmic_wrap_to_volt(0x0) / 100) &&
-	    fixed_volt <= (mt_gpufreq_pmic_wrap_to_volt(0x3F) / 100)) {
-#else
-	if (fixed_volt >= (mt_gpufreq_pmic_wrap_to_volt(0x0) / 100) &&
-	    fixed_volt <= (mt_gpufreq_pmic_wrap_to_volt(0x7F) / 100)) {
+#ifdef VGPU_SET_BY_PMIC
+	if (fixed_volt >= (PMIC_MIN_VGPU / 100) &&
+		fixed_volt <= (PMIC_MAX_VGPU / 100)) {
 #endif
 		gpufreq_dbg("@ %s, mt_gpufreq_volt_switch1 fix frq = %d, fix volt = %d, volt = %d\n",
 			__func__, mt_gpufreq_fixed_frequency, mt_gpufreq_fixed_voltage, g_cur_gpu_volt);
@@ -3486,7 +2988,7 @@ static void _mt_gpufreq_fixed_volt(int fixed_volt)
 }
 
 static ssize_t mt_gpufreq_fixed_freq_volt_proc_write(struct file *file, const char __user *buffer,
-						     size_t count, loff_t *data)
+							 size_t count, loff_t *data)
 {
 	char desc[32];
 	int len = 0;
@@ -3632,31 +3134,31 @@ static ssize_t mt_gpufreq_lpt_enable_proc_write(struct file *file, const char __
 
 #endif
 
-#define PROC_FOPS_RW(name)							\
+#define PROC_FOPS_RW(name)								\
 	static int mt_ ## name ## _proc_open(struct inode *inode, struct file *file)	\
-{									\
-	return single_open(file, mt_ ## name ## _proc_show, PDE_DATA(inode));	\
-}									\
-static const struct file_operations mt_ ## name ## _proc_fops = {		\
-	.owner		  = THIS_MODULE,				\
-	.open		   = mt_ ## name ## _proc_open,	\
-	.read		   = seq_read,					\
-	.llseek		 = seq_lseek,					\
-	.release		= single_release,				\
-	.write		  = mt_ ## name ## _proc_write,				\
+{											\
+	return single_open(file, mt_ ## name ## _proc_show, PDE_DATA(inode));		\
+}											\
+static const struct file_operations mt_ ## name ## _proc_fops = {			\
+	.owner		  = THIS_MODULE,						\
+	.open		   = mt_ ## name ## _proc_open,					\
+	.read		   = seq_read,							\
+	.llseek		 = seq_lseek,							\
+	.release		= single_release,					\
+	.write		  = mt_ ## name ## _proc_write,					\
 }
 
-#define PROC_FOPS_RO(name)							\
+#define PROC_FOPS_RO(name)								\
 	static int mt_ ## name ## _proc_open(struct inode *inode, struct file *file)	\
-{									\
-	return single_open(file, mt_ ## name ## _proc_show, PDE_DATA(inode));	\
-}									\
-static const struct file_operations mt_ ## name ## _proc_fops = {		\
-	.owner		  = THIS_MODULE,				\
-	.open		   = mt_ ## name ## _proc_open,	\
-	.read		   = seq_read,					\
-	.llseek		 = seq_lseek,					\
-	.release		= single_release,				\
+{											\
+	return single_open(file, mt_ ## name ## _proc_show, PDE_DATA(inode));		\
+}											\
+static const struct file_operations mt_ ## name ## _proc_fops = {			\
+	.owner		  = THIS_MODULE,						\
+	.open		   = mt_ ## name ## _proc_open,					\
+	.read		   = seq_read,							\
+	.llseek		 = seq_lseek,							\
+	.release		= single_release,					\
 }
 
 #define PROC_ENTRY(name)	{__stringify(name), &mt_ ## name ## _proc_fops}
@@ -3741,9 +3243,9 @@ static int mt_gpufreq_create_procfs(void)
 
 	for (i = 0; i < ARRAY_SIZE(entries); i++) {
 		if (!proc_create
-		    (entries[i].name, S_IRUGO | S_IWUSR | S_IWGRP, dir, entries[i].fops))
+			(entries[i].name, S_IRUGO | S_IWUSR | S_IWGRP, dir, entries[i].fops))
 			gpufreq_err("@%s: create /proc/gpufreq/%s failed\n", __func__,
-				    entries[i].name);
+					entries[i].name);
 	}
 
 	return 0;
@@ -3753,7 +3255,6 @@ static int mt_gpufreq_create_procfs(void)
 /**********************************
  * mediatek gpufreq initialization
  ***********************************/
- #if 1
 static int __init mt_gpufreq_init(void)
 {
 	int ret = 0;
@@ -3771,46 +3272,6 @@ static int __init mt_gpufreq_init(void)
 		goto out;
 
 #endif				/* CONFIG_PROC_FS */
-
-#if 0
-	clk_cfg_0 = DRV_Reg32(CLK_CFG_0);
-	clk_cfg_0 = (clk_cfg_0 & 0x00070000) >> 16;
-
-	gpufreq_dbg("clk_cfg_0 = %d\n", clk_cfg_0);
-
-	switch (clk_cfg_0) {
-	case 0x5:		/* 476Mhz */
-		g_cur_freq = GPU_MMPLL_D3;
-		break;
-	case 0x2:		/* 403Mhz */
-		g_cur_freq = GPU_SYSPLL_D2;
-		break;
-	case 0x6:		/* 357Mhz */
-		g_cur_freq = GPU_MMPLL_D4;
-		break;
-	case 0x4:		/* 312Mhz */
-		g_cur_freq = GPU_UNIVPLL1_D2;
-		break;
-	case 0x7:		/* 286Mhz */
-		g_cur_freq = GPU_MMPLL_D5;
-		break;
-	case 0x3:		/* 268Mhz */
-		g_cur_freq = GPU_SYSPLL_D3;
-		break;
-	case 0x1:		/* 238Mhz */
-		g_cur_freq = GPU_MMPLL_D6;
-		break;
-	case 0x0:		/* 156Mhz */
-		g_cur_freq = GPU_UNIVPLL1_D4;
-		break;
-	default:
-		break;
-	}
-
-
-	g_cur_freq_init_keep = g_cur_gpu_freq;
-	gpufreq_dbg("g_cur_freq_init_keep = %d\n", g_cur_freq_init_keep);
-#endif
 
 	/* register platform device/driver */
 #if !defined(CONFIG_OF)
@@ -3831,7 +3292,7 @@ static int __init mt_gpufreq_init(void)
 out:
 	return ret;
 }
-#endif
+
 static void __exit mt_gpufreq_exit(void)
 {
 	platform_driver_unregister(&mt_gpufreq_pdrv);

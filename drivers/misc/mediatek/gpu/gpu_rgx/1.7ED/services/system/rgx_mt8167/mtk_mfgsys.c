@@ -536,6 +536,8 @@ unsigned int MTKCommitFreqForPVR(unsigned long ui32NewFreq)
 
 static void MTKFreqInputBoostCB(unsigned int ui32BoostFreqID)
 {
+/* CJ Fix Me */
+#if 0
 	if (g_iSkipCount > 0)
 		return;
 
@@ -550,7 +552,7 @@ static void MTKFreqInputBoostCB(unsigned int ui32BoostFreqID)
 	}
 
 	OSLockRelease(ghDVFSLock);
-
+#endif
 }
 
 static void MTKFreqPowerLimitCB(unsigned int ui32LimitFreqID)
@@ -1038,7 +1040,12 @@ unsigned int MTKGetCustomUpBoundGpuFreq(void)
 
 static IMG_UINT32 MTKGetGpuLoading(IMG_VOID)
 {
+#ifndef ENABLE_COMMON_DVFS
 	return gpu_loading;
+#else
+	MTKCalGpuLoading(&gpu_loading, &gpu_block, &gpu_idle);
+	return gpu_loading;
+#endif
 }
 
 static IMG_UINT32 MTKGetGpuBlock(IMG_VOID)
