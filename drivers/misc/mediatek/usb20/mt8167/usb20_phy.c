@@ -141,13 +141,13 @@ void enable_phy_clock(bool enable)
 	/* USB phy 48M clock , UNIVPLL_CON0[26] */
 	if (enable) {
 		if (count == 0) {
-			DBG(0, "enable phy clock\n");
+			/*DBG(0, "enable phy clock\n");*/
 			clk_enable(usbpll_clk);
 		}
 		count++;
 	} else {
 		if (count == 1) {
-			DBG(0, "disable phy clock\n");
+			/*DBG(0, "disable phy clock\n");*/
 			clk_disable(usbpll_clk);
 		}
 		count = (count == 0) ? 0 : (count - 1);
@@ -164,13 +164,13 @@ void enable_mcu_clock(bool enable)
 	/* USB phy 48M clock , UNIVPLL_CON0[26] */
 	if (enable) {
 		if (count == 0) {
-			DBG(0, "enable mcu clock\n");
+			/*DBG(0, "enable mcu clock\n");*/
 			clk_enable(usbmcu_clk);
 		}
 		count++;
 	} else {
 		if (count == 1) {
-			DBG(0, "disable mcu clock\n");
+			/*DBG(0, "disable mcu clock\n");*/
 			clk_disable(usbmcu_clk);
 		}
 		count = (count == 0) ? 0 : (count - 1);
@@ -187,11 +187,11 @@ bool usb_enable_clock(bool enable)
 
 	if (enable && count == 0) {
 		enable_phy_clock(true);
-		DBG(0, "enable usb0 clock\n");
+		/*DBG(0, "enable usb0 clock\n");*/
 		clk_enable(usb_clk);
 		enable_mcu_clock(true);
 	} else if (!enable && count == 1) {
-		DBG(0, "disable usb0 clock\n");
+		/*DBG(0, "disable usb0 clock\n");*/
 		clk_disable(usb_clk);
 		enable_mcu_clock(false);
 		enable_phy_clock(false);
