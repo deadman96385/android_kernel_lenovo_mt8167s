@@ -14,21 +14,6 @@
 #ifndef _REG_ACCDEH_H_
 #define _REG_ACCDEH_H_
 /* Register address define */
-#define TOP_RST_ACCDET           0x0114
-#define TOP_RST_ACCDET_SET		 0x0116
-#define TOP_RST_ACCDET_CLR		 0x0118
-
-#define INT_CON_ACCDET           0x017E
-#define INT_CON_ACCDET_SET		 0x0180	/* 6320 Design */
-#define INT_CON_ACCDET_CLR       0x0182
-
-#define INT_STATUS_ACCDET        0x0186
-
-/* 6320 clock register */
-#define TOP_CKPDN		         0x0102
-#define TOP_CKPDN_SET            0x0104
-#define TOP_CKPDN_CLR            0x0106
-
 #define ACCDET_RSV               0x0
 
 #define ACCDET_CTRL              0x4

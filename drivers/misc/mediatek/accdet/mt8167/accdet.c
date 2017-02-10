@@ -185,8 +185,7 @@ static inline void enable_accdet(u32 state_swctrl)
 {
 	/*enable ACCDET unit*/
 	ACCDET_DEBUG("accdet: enable_accdet\n");
-	/*enable clock*/
-	accdet_write(TOP_CKPDN_CLR, RG_ACCDET_CLK_CLR);
+
 	accdet_write(ACCDET_STATE_SWCTRL, accdet_read(ACCDET_STATE_SWCTRL) | state_swctrl);
 	accdet_write(ACCDET_CTRL, accdet_read(ACCDET_CTRL) | ACCDET_ENABLE);
 
@@ -199,7 +198,6 @@ static inline void disable_accdet(void)
 	/* sync with accdet_irq_handler set clear accdet irq bit to avoid  set clear accdet irq bit after disable accdet
 	 * disable accdet irq
 	 */
-	accdet_write(INT_CON_ACCDET_CLR, RG_ACCDET_IRQ_CLR);
 	clear_accdet_interrupt();
 	udelay(200);
 	mutex_lock(&accdet_eint_irq_sync_mutex);
@@ -219,7 +217,6 @@ static inline void disable_accdet(void)
 	accdet_write(ACCDET_CTRL, ACCDET_DISABLE);
 	/*disable clock and Analog control*/
 	/*mt6331_upmu_set_rg_audmicbias1vref(0x0);*/
-	accdet_write(TOP_CKPDN_SET, RG_ACCDET_CLK_SET);
 #endif
 #ifdef CONFIG_ACCDET_EINT_IRQ
 	accdet_write(ACCDET_STATE_SWCTRL, ACCDET_EINT_PWM_EN);
@@ -251,39 +248,6 @@ static void disable_micbias_callback(struct work_struct *work)
 
 static void accdet_eint_work_callback(struct work_struct *work)
 {
-#ifdef CONFIG_ACCDET_EINT_IRQ
-	int irq_temp = 0;
-
-	if (cur_eint_state == EINT_PIN_PLUG_IN) {
-		ACCDET_DEBUG("[Accdet]DCC EINT func :plug-in, cur_eint_state = %d\n", cur_eint_state);
-		mutex_lock(&accdet_eint_irq_sync_mutex);
-		eint_accdet_sync_flag = 1;
-		mutex_unlock(&accdet_eint_irq_sync_mutex);
-		wake_lock_timeout(&accdet_timer_lock, 7 * HZ);
-
-		accdet_init();	/*do set pwm_idle on in accdet_init*/
-		/*set PWM IDLE  on*/
-		accdet_write(ACCDET_STATE_SWCTRL, (accdet_read(ACCDET_STATE_SWCTRL) | ACCDET_SWCTRL_IDLE_EN));
-		/*enable ACCDET unit*/
-		enable_accdet(ACCDET_SWCTRL_EN);
-	} else {
-/*EINT_PIN_PLUG_OUT*/
-/*Disable ACCDET*/
-		ACCDET_DEBUG("[Accdet]DCC EINT func :plug-out, cur_eint_state = %d\n", cur_eint_state);
-		mutex_lock(&accdet_eint_irq_sync_mutex);
-		eint_accdet_sync_flag = 0;
-		mutex_unlock(&accdet_eint_irq_sync_mutex);
-		del_timer_sync(&micbias_timer);
-		/*accdet_auxadc_switch(0);*/
-		disable_accdet();
-		headset_plug_out();
-		/*recover EINT irq clear bit */
-		/*TODO: need think~~~*/
-		irq_temp = accdet_read(ACCDET_IRQ_STS);
-		irq_temp = irq_temp & (~IRQ_EINT_CLR_BIT);
-		accdet_write(ACCDET_IRQ_STS, irq_temp);
-	}
-#else
 	/*KE under fastly plug in and plug out*/
 	if (cur_eint_state == EINT_PIN_PLUG_IN) {
 		ACCDET_DEBUG("[Accdet]ACC EINT func :plug-in, cur_eint_state = %d\n", cur_eint_state);
@@ -311,22 +275,28 @@ static void accdet_eint_work_callback(struct work_struct *work)
 		headset_plug_out();
 	}
 	enable_irq(accdet_irq);
-#endif
 }
 
 static irqreturn_t accdet_eint_func(int irq, void *data)
 {
-	ACCDET_ERROR("[Accdet]>>>>>>>>>>>>Enter accdet_eint_func.\n");
-	ACCDET_ERROR("[Accdet]cur_eint_state = %d\n", cur_eint_state);
+	ACCDET_INFO("[Accdet]>>>>>>>>>>>>Enter accdet_eint_func.\n");
+	ACCDET_INFO("[Accdet]cur_eint_state = %d\n", cur_eint_state);
+	ACCDET_INFO("[Accdet]current accdet_eint_type = %d\n", accdet_eint_type);
 
 	cur_eint_state = !cur_eint_state;
 
-	if (accdet_eint_type == IRQ_TYPE_LEVEL_HIGH)
+	if (gpio_get_value(gpiopin)) {
+		ACCDET_INFO("%s: gpio_get_value %d = %d\n", __func__, gpiopin, gpio_get_value(gpiopin));
 		accdet_eint_type = IRQ_TYPE_LEVEL_LOW;
-	else
+	} else {
+		ACCDET_INFO("%s: gpio_get_value %d = %d\n", __func__, gpiopin, gpio_get_value(gpiopin));
 		accdet_eint_type = IRQ_TYPE_LEVEL_HIGH;
+	}
 
 	irq_set_irq_type(accdet_irq, accdet_eint_type);
+
+	ACCDET_INFO("[Accdet][After] cur_eint_state = %d\n", cur_eint_state);
+	ACCDET_INFO("[Accdet][After] accdet_eint_type = %d\n", accdet_eint_type);
 
 	disable_irq_nosync(accdet_irq);
 
@@ -354,7 +324,6 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 {
 	struct device_node *node = NULL;
 	int ret;
-	u32 ints1[2] = { 0, 0 };
 
 	ACCDET_INFO("[Accdet]accdet_setup_eint\n");
 
@@ -371,10 +340,6 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 		accdet_irq = irq_of_parse_and_map(node, 1);
 		ACCDET_DEBUG("[accdet]accdet_irq=%d\n", accdet_irq);
 
-		of_property_read_u32_array(node, "interrupts", ints1, ARRAY_SIZE(ints1));
-		accdet_eint_type = ints1[1];
-		ACCDET_DEBUG("[accdet]accdet_eint_type = %d\n", accdet_eint_type);
-
 		gpiopin = of_get_named_gpio(node, "accdet-gpio", 0);
 		if (gpiopin < 0)
 			ACCDET_ERROR("[Accdet] not find accdet-gpio\n");
@@ -388,7 +353,7 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 		gpio_set_debounce(gpiopin, headsetdebounce);
 		ACCDET_DEBUG("[accdet]gpiopin = %d ,headsetdebounce = %d\n", gpiopin, headsetdebounce);
 
-		ret = request_irq(accdet_irq, accdet_eint_func, accdet_eint_type, "ACCDET-eint", NULL);
+		ret = request_irq(accdet_irq, accdet_eint_func, IRQ_TYPE_NONE, "ACCDET-eint", NULL);
 		if (ret > 0)
 			ACCDET_ERROR("[Accdet]EINT IRQ LINE NOT AVAILABLE\n");
 		else
@@ -1030,11 +995,7 @@ void accdet_get_dts_data(void)
 static inline void accdet_init(void)
 {
 		ACCDET_DEBUG("\n[Accdet]accdet hardware init\n");
-		accdet_write(TOP_CKPDN_CLR, RG_ACCDET_CLK_CLR);
-		/* reset the accdet unit */
 
-		accdet_write(TOP_RST_ACCDET_SET, ACCDET_RESET_SET);
-		accdet_write(TOP_RST_ACCDET_CLR, ACCDET_RESET_CLR);
 		/* init  pwm frequency and duty */
 		accdet_write(ACCDET_PWM_WIDTH, REGISTER_VALUE(cust_headset_settings->pwm_width));
 		accdet_write(ACCDET_PWM_THRESH, REGISTER_VALUE(cust_headset_settings->pwm_thresh));
@@ -1049,12 +1010,11 @@ static inline void accdet_init(void)
 		accdet_write(ACCDET_DEBOUNCE1, cust_headset_settings->debounce1);
 		accdet_write(ACCDET_DEBOUNCE3, cust_headset_settings->debounce3);
 		accdet_write(ACCDET_IRQ_STS, accdet_read(ACCDET_IRQ_STS) & (~IRQ_CLR_BIT));
-		accdet_write(INT_CON_ACCDET_SET, RG_ACCDET_IRQ_SET);
+
 		/* disable ACCDET unit */
 		pre_state_swctrl = accdet_read(ACCDET_STATE_SWCTRL);
 		accdet_write(ACCDET_CTRL, ACCDET_DISABLE);
 		accdet_write(ACCDET_STATE_SWCTRL, 0x0);
-		accdet_write(TOP_CKPDN_SET, RG_ACCDET_CLK_SET);
 }
 
 /*-----------------------------------sysfs-----------------------------------------*/
@@ -1421,8 +1381,7 @@ void mt_accdet_pm_restore_noirq(void)
 	ACCDET_DEBUG("[Accdet]accdet_pm_restore_noirq start!\n");
 	/*enable ACCDET unit*/
 	ACCDET_DEBUG("accdet: enable_accdet\n");
-	/*enable clock*/
-	accdet_write(TOP_CKPDN_CLR, RG_ACCDET_CLK_CLR);
+
 	enable_accdet(ACCDET_SWCTRL_EN);
 	accdet_write(ACCDET_STATE_SWCTRL, (accdet_read(ACCDET_STATE_SWCTRL) | ACCDET_SWCTRL_IDLE_EN));
 
@@ -1453,8 +1412,6 @@ void mt_accdet_pm_restore_noirq(void)
 #ifdef CONFIG_ACCDET_EINT
 		accdet_write(ACCDET_STATE_SWCTRL, 0);
 		accdet_write(ACCDET_CTRL, ACCDET_DISABLE);
-		/*disable clock*/
-		accdet_write(TOP_CKPDN_SET, RG_ACCDET_CLK_SET);
 #endif
 	}
 }
