@@ -425,8 +425,15 @@ static void do_connect_rescue_work(struct work_struct *work)
 	queue_delayed_work(mtk_musb->st_wq, &connection_work, 0);
 }
 
+/* build time force on */
+#if defined(CONFIG_FPGA_EARLY_PORTING) || defined(U3_COMPLIANCE) || defined(FOR_BRING_UP)
+#define BYPASS_PMIC_LINKAGE
+#endif
 
-/* #define BYPASS_PMIC_LINKAGE */
+/* to avoid build error due to PMIC module not ready */
+#ifndef CONFIG_MTK_SMART_BATTERY
+#define BYPASS_PMIC_LINKAGE
+#endif
 static CHARGER_TYPE musb_hal_get_charger_type(void)
 {
 	CHARGER_TYPE chg_type;
@@ -1356,6 +1363,12 @@ static int mt_usb_probe(struct platform_device *pdev)
 	*/
 	pr_info("USB probe done!\n");
 #endif
+
+	/* run time force on */
+#if defined(FPGA_PLATFORM) || defined(FOR_BRING_UP)
+	musb_force_on = 1;
+#endif
+
 	DBG(0, "[U2]success to register musb\n");
 	return 0;
 
