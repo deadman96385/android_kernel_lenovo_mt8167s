@@ -150,7 +150,7 @@ static void _power_calculation(struct mt_cpu_dvfs *p, int oppidx, int ncpu)
 	p->power_tbl[NR_MAX_OPP_TBL * (possible_cpu - 1 - ncpu) + oppidx].cpufreq_khz
 		= p->opp_tbl[oppidx].cpufreq_khz;
 	p->power_tbl[NR_MAX_OPP_TBL * (possible_cpu - 1 - ncpu) + oppidx].cpufreq_power
-		= p_dynamic * (ncpu + 1) / possible_cpu;
+		= ((p_dynamic * (ncpu + 1) / possible_cpu < 0)?0:p_dynamic * (ncpu + 1) / possible_cpu);
 }
 
 void init_mt_cpu_dvfs(struct mt_cpu_dvfs *p)
