@@ -26,6 +26,14 @@
 #include "mt8167-afe-controls.h"
 #include "mt8167-afe-debug.h"
 
+#define MT8167_I2S0_MCLK_MULTIPLIER 256
+#define MT8167_I2S1_MCLK_MULTIPLIER 256
+#define MT8167_I2S2_MCLK_MULTIPLIER 256
+#define MT8167_I2S3_MCLK_MULTIPLIER 256
+#define MT8167_HDMI_OUT_MCLK_MULTIPLIER 64
+#define MT8167_TDM_OUT_MCLK_MULTIPLIER 256
+#define MT8167_TDM_IN_MCLK_MULTIPLIER 256
+
 
 static const unsigned int mt8167_afe_backup_list[] = {
 	AUDIO_TOP_CON0,
@@ -809,7 +817,7 @@ static int mt8167_afe_i2s_prepare(struct snd_pcm_substream *substream,
 			afe->clocks[MT8167_CLK_AUD1] : afe->clocks[MT8167_CLK_AUD2]);
 
 		mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV1],
-				rate * 256, NULL, 0);
+				rate * MT8167_I2S1_MCLK_MULTIPLIER, NULL, 0);
 
 		mt8167_afe_set_i2s_out_enable(afe, true);
 	} else {
@@ -817,7 +825,7 @@ static int mt8167_afe_i2s_prepare(struct snd_pcm_substream *substream,
 			afe->clocks[MT8167_CLK_AUD1] : afe->clocks[MT8167_CLK_AUD2]);
 
 		mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV2],
-				rate * 256, NULL, 0);
+				rate * MT8167_I2S2_MCLK_MULTIPLIER, NULL, 0);
 
 		mt8167_afe_set_i2s_in_enable(afe, true);
 	}
@@ -931,7 +939,7 @@ static int mt8167_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 			afe->clocks[MT8167_CLK_AUD1] : afe->clocks[MT8167_CLK_AUD2]);
 
 		mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV3],
-				rate * 256, NULL, 0);
+				rate * MT8167_I2S3_MCLK_MULTIPLIER, NULL, 0);
 
 		mt8167_afe_set_2nd_i2s_out_enable(afe, true);
 	} else {
@@ -939,7 +947,7 @@ static int mt8167_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 			afe->clocks[MT8167_CLK_AUD1] : afe->clocks[MT8167_CLK_AUD2]);
 
 		mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV0],
-				rate * 256, NULL, 0);
+				rate * MT8167_I2S0_MCLK_MULTIPLIER, NULL, 0);
 
 		mt8167_afe_set_2nd_i2s_in_enable(afe, true);
 	}
@@ -1248,17 +1256,20 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 
 	if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI)
 		mt8167_afe_dais_set_clks(afe,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4], rate * 64,
+			      afe->clocks[MT8167_CLK_APLL12_DIV4],
+			      rate * MT8167_HDMI_OUT_MCLK_MULTIPLIER,
 			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
 			      rate * 2 * 32);
 	else if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S)
 		mt8167_afe_dais_set_clks(afe,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4], rate * 128,
+			      afe->clocks[MT8167_CLK_APLL12_DIV4],
+			      rate * MT8167_TDM_OUT_MCLK_MULTIPLIER,
 			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
 			      rate * 2 * bit_width);
 	else
 		mt8167_afe_dais_set_clks(afe,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4], rate * 128,
+			      afe->clocks[MT8167_CLK_APLL12_DIV4],
+			      rate * MT8167_TDM_OUT_MCLK_MULTIPLIER,
 			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
 			      rate * channels * bit_width);
 
@@ -1449,6 +1460,7 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 	const int bit_width = snd_pcm_format_width(runtime->format);
 	const unsigned int stream = substream->stream;
 	unsigned int val;
+	unsigned int bck;
 
 	if (be->prepared[stream]) {
 		dev_info(afe->dev, "%s prepared already\n", __func__);
@@ -1463,8 +1475,11 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 		clk_set_parent(afe->clocks[MT8167_CLK_I2S5_M_SEL], afe->clocks[MT8167_CLK_AUD2]);
 	}
 
-	mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV5], rate * 128,
-		afe->clocks[MT8167_CLK_APLL12_DIV5B], rate * channels * bit_width);
+	bck = ((channels == 6) ? 8 : channels) * rate * bit_width;
+
+	mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV5],
+		rate * MT8167_TDM_IN_MCLK_MULTIPLIER,
+		afe->clocks[MT8167_CLK_APLL12_DIV5B], bck);
 
 	val = AFE_TDM_IN_CON1_I2S;
 
