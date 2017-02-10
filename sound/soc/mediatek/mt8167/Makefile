@@ -5,7 +5,7 @@ subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat
 subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)
 
 snd-soc-mt8167-pcm-objs := \
-    mtk-afe-pcm.o mtk-afe-util.o mtk-afe-controls.o mtk-afe-debug.o
+    mt8167-afe-pcm.o mt8167-afe-util.o mt8167-afe-controls.o mt8167-afe-debug.o
 
 snd-soc-mt8167-mt6392-mach-objs := \
     mt8167_evb.o

@@ -13,9 +13,9 @@
  * GNU General Public License for more details.
  */
 
-#include "mtk-afe-util.h"
-#include "mtk-afe-regs.h"
-#include "mtk-afe-common.h"
+#include "mt8167-afe-util.h"
+#include "mt8167-afe-regs.h"
+#include "mt8167-afe-common.h"
 #ifdef IDLE_TASK_DRIVER_API
 #include <mt_idle.h>
 #endif

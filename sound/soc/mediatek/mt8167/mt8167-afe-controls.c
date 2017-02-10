@@ -13,10 +13,10 @@
  * GNU General Public License for more details.
  */
 
-#include "mtk-afe-controls.h"
-#include "mtk-afe-common.h"
-#include "mtk-afe-regs.h"
-#include "mtk-afe-util.h"
+#include "mt8167-afe-controls.h"
+#include "mt8167-afe-common.h"
+#include "mt8167-afe-regs.h"
+#include "mt8167-afe-util.h"
 #include <sound/soc.h>
 #include <linux/pm_runtime.h>
 
