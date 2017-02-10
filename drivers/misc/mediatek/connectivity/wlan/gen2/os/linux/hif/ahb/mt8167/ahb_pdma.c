@@ -72,24 +72,23 @@
 #endif /* defined(CONFIG_MTK_CLKMGR) */
 
 #include "hif.h"
-#include "hif_pdma.h"
+#include "hif_gdma.h"
 #include "gl_os.h"
 
 #ifdef CONFIG_MTK_EMI_MPU
 #include <mach/emi_mpu.h>
 #endif
 
-/* #if (CONF_MTK_AHB_DMA == 1) */
+#if (CONF_MTK_AHB_DMA == 1)
 
-/* #define PDMA_DEBUG_SUP */
+/* #define GDMA_DEBUG_SUP */
 
-#ifdef PDMA_DEBUG_SUP
-#define PDMA_DBG	pr_debug
+#ifdef GDMA_DEBUG_SUP
+#define GDMA_DBG	pr_debug
 #else
-#define PDMA_DBG(_fmt, ...)
-#endif /* PDMA_DEBUG_SUP */
+#define GDMA_DBG(_fmt, ...)
+#endif /* GDMA_DEBUG_SUP */
 
-static UINT32 gDmaReg[AP_DMA_HIF_0_LENGTH / 4 + 1];
 #if !defined(CONFIG_MTK_CLKMGR)
 struct clk *g_clk_wifi_pdma;
 #endif
@@ -113,23 +112,23 @@ struct clk *g_clk_wifi_pdma;
 *                   F U N C T I O N   D E C L A R A T I O N S
 ********************************************************************************
 */
-static VOID HifPdmaConfig(IN void *HifInfoSrc, IN void *Conf);
+static VOID HifGdmaConfig(IN void *HifInfoSrc, IN void *Conf);
 
-static VOID HifPdmaStart(IN void *HifInfoSrc);
+static VOID HifGdmaStart(IN void *HifInfoSrc);
 
-static VOID HifPdmaStop(IN void *HifInfoSrc);
+static VOID HifGdmaStop(IN void *HifInfoSrc);
 
-static MTK_WCN_BOOL HifPdmaPollStart(IN void *HifInfoSrc);
+static MTK_WCN_BOOL HifGdmaPollStart(IN void *HifInfoSrc);
 
-static MTK_WCN_BOOL HifPdmaPollIntr(IN void *HifInfoSrc);
+static MTK_WCN_BOOL HifGdmaPollIntr(IN void *HifInfoSrc);
 
-static VOID HifPdmaAckIntr(IN void *HifInfoSrc);
+static VOID HifGdmaAckIntr(IN void *HifInfoSrc);
 
-static VOID HifPdmaClockCtrl(IN UINT_32 FlgIsEnabled);
+static VOID HifGdmaClockCtrl(IN UINT_32 FlgIsEnabled);
 
-static VOID HifPdmaRegDump(IN void *HifInfoSrc);
+static VOID HifGdmaRegDump(IN void *HifInfoSrc);
 
-static VOID HifPdmaReset(IN void *HifInfoSrc);
+static VOID HifGdmaReset(IN void *HifInfoSrc);
 
 /*******************************************************************************
 *                            P U B L I C   D A T A
@@ -140,16 +139,16 @@ static VOID HifPdmaReset(IN void *HifInfoSrc);
 *                           P R I V A T E   D A T A
 ********************************************************************************
 */
-GL_HIF_DMA_OPS_T HifPdmaOps = {
-	.DmaConfig = HifPdmaConfig,
-	.DmaStart = HifPdmaStart,
-	.DmaStop = HifPdmaStop,
-	.DmaPollStart = HifPdmaPollStart,
-	.DmaPollIntr = HifPdmaPollIntr,
-	.DmaAckIntr = HifPdmaAckIntr,
-	.DmaClockCtrl = HifPdmaClockCtrl,
-	.DmaRegDump = HifPdmaRegDump,
-	.DmaReset = HifPdmaReset
+GL_HIF_DMA_OPS_T HifGdmaOps = {
+	.DmaConfig = HifGdmaConfig,
+	.DmaStart = HifGdmaStart,
+	.DmaStop = HifGdmaStop,
+	.DmaPollStart = HifGdmaPollStart,
+	.DmaPollIntr = HifGdmaPollIntr,
+	.DmaAckIntr = HifGdmaAckIntr,
+	.DmaClockCtrl = HifGdmaClockCtrl,
+	.DmaRegDump = HifGdmaRegDump,
+	.DmaReset = HifGdmaReset
 };
 
 /*******************************************************************************
@@ -159,40 +158,38 @@ GL_HIF_DMA_OPS_T HifPdmaOps = {
 
 /*----------------------------------------------------------------------------*/
 /*!
-* \brief Config PDMA TX/RX.
+* \brief Config GDMA TX/RX.
 *
-* \param[in] prGlueInfo         Pointer to the GLUE_INFO_T structure.
-* \param[in] Conf               Pointer to the settings.
+* \param[in] DmaRegBaseAddr     Pointer to the IO register base.
+* \param[in] Conf               Pointer to the DMA operator.
 *
 * \retval NONE
 */
 /*----------------------------------------------------------------------------*/
 VOID HifPdmaInit(GL_HIF_INFO_T *HifInfo)
 {
-	/* IO remap PDMA register memory */
+	/* IO remap GDMA register memory */
 	HifInfo->DmaRegBaseAddr = ioremap(AP_DMA_HIF_BASE, AP_DMA_HIF_0_LENGTH);
 
-	/* assign PDMA operators */
-	HifInfo->DmaOps = &HifPdmaOps;
+	/* assign GDMA operators */
+	HifInfo->DmaOps = &HifGdmaOps;
 
-	/* enable PDMA mode */
+	/* enable GDMA mode */
 	HifInfo->fgDmaEnable = TRUE;
 
 #ifdef CONFIG_MTK_EMI_MPU
-	/* MPU Setting */
+	/* MPU Setting, we need to enable it after MPU ready */
 	/* WIFI using TOP 512KB */
-	DBGLOG(INIT, INFO, "[wlan] MPU region 12, 0x%08x - 0x%08x\n", (UINT_32) gConEmiPhyBase,
+	DBGLOG(HAL, TRACE, "[wlan] MPU region 5, 0x%08x - 0x%08x\n", (UINT_32) gConEmiPhyBase,
 	       (UINT_32) (gConEmiPhyBase + 512 * 1024));
-	emi_mpu_set_region_protection(gConEmiPhyBase, gConEmiPhyBase + 512 * 1024 - 1, 6,
-				      SET_ACCESS_PERMISSON(FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN, FORBIDDEN,
-							   NO_PROTECTION, FORBIDDEN, FORBIDDEN));
+	emi_mpu_set_region_protection(gConEmiPhyBase, gConEmiPhyBase + 512 * 1024 - 1, 5,
+				      SET_ACCESS_PERMISSON(FORBIDDEN, NO_PROTECTION, FORBIDDEN, FORBIDDEN));
 #endif
 
 #if !defined(CONFIG_MTK_CLKMGR)
 	g_clk_wifi_pdma = HifInfo->clk_wifi_dma;
 #endif
-
-	PDMA_DBG("PDMA> HifPdmaInit ok!\n");
+	GDMA_DBG("GDMA> HifGdmaInit ok!\n");
 }
 
 /*******************************************************************************
@@ -202,7 +199,7 @@ VOID HifPdmaInit(GL_HIF_INFO_T *HifInfo)
 
 /*----------------------------------------------------------------------------*/
 /*!
-* \brief Config PDMA TX/RX.
+* \brief Config GDMA TX/RX.
 *
 * \param[in] HifInfo            Pointer to the GL_HIF_INFO_T structure.
 * \param[in] Param              Pointer to the settings.
@@ -210,196 +207,198 @@ VOID HifPdmaInit(GL_HIF_INFO_T *HifInfo)
 * \retval NONE
 */
 /*----------------------------------------------------------------------------*/
-static VOID HifPdmaConfig(IN void *HifInfoSrc, IN void *Param)
+static VOID HifGdmaConfig(IN void *HifInfoSrc, IN void *Param)
 {
 	GL_HIF_INFO_T *HifInfo = (GL_HIF_INFO_T *) HifInfoSrc;
 	MTK_WCN_HIF_DMA_CONF *Conf = (MTK_WCN_HIF_DMA_CONF *) Param;
 	UINT_32 RegVal;
 
 	/* Assign fixed value */
-	Conf->Burst = HIF_PDMA_BURST_4_4;	/* vs. HIF_BURST_4DW */
-	Conf->Fix_en = FALSE;
+	Conf->Ratio = HIF_GDMA_RATIO_1;
+	Conf->Connect = HIF_GDMA_CONNECT_SET1;
+	Conf->Wsize = HIF_GDMA_WRITE_2;
+	Conf->Burst = HIF_GDMA_BURST_4_8;
+	Conf->Fix_en = TRUE;
 
 	/* AP_P_DMA_G_DMA_2_CON */
-	PDMA_DBG("PDMA> Conf->Dir = %d\n", Conf->Dir);
+	GDMA_DBG("GDMA> Conf->Dir = %d\n", Conf->Dir);
 
-	/* AP_DMA_HIF_0_CON */
-	RegVal = HIF_DMAR_READL(HifInfo, AP_DMA_HIF_0_CON);
-	RegVal &= ~(ADH_CR_BURST_LEN | ADH_CR_FIX_EN | ADH_CR_DIR);
-	RegVal |= (((Conf->Burst << ADH_CR_BURST_LEN_OFFSET) & ADH_CR_BURST_LEN) |
-		   (Conf->Fix_en << ADH_CR_FIX_EN_OFFSET) | (Conf->Dir));
-	HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_CON, RegVal);
-	PDMA_DBG("PDMA> AP_DMA_HIF_0_CON = 0x%08x\n", RegVal);
+	RegVal = HIF_DMAR_READL(HifInfo, AP_P_DMA_G_DMA_2_CON);
+	RegVal &= ~(ADH_CR_FLAG_FINISH | ADH_CR_RSIZE | ADH_CR_WSIZE |
+		    ADH_CR_BURST_LEN | ADH_CR_WADDR_FIX_EN | ADH_CR_RADDR_FIX_EN);
+	if (Conf->Dir == HIF_DMA_DIR_TX) {
+		RegVal |= (((Conf->Wsize << ADH_CR_WSIZE_OFFSET) & ADH_CR_WSIZE) |
+			   ((Conf->Burst << ADH_CR_BURST_LEN_OFFSET) & ADH_CR_BURST_LEN) |
+			   ((Conf->Fix_en << ADH_CR_WADDR_FIX_EN_OFFSET) & ADH_CR_WADDR_FIX_EN));
+	} else {
+		RegVal |= (((Conf->Wsize << ADH_CR_RSIZE_OFFSET) & ADH_CR_RSIZE) |
+			   ((Conf->Burst << ADH_CR_BURST_LEN_OFFSET) & ADH_CR_BURST_LEN) |
+			   ((Conf->Fix_en << ADH_CR_RADDR_FIX_EN_OFFSET) & ADH_CR_RADDR_FIX_EN));
+	}
+	HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_CON, RegVal);
+	GDMA_DBG("GDMA> AP_P_DMA_G_DMA_2_CON = 0x%08x\n", RegVal);
+
+	/* AP_P_DMA_G_DMA_2_CONNECT */
+	RegVal = HIF_DMAR_READL(HifInfo, AP_P_DMA_G_DMA_2_CONNECT);
+	RegVal &= ~(ADH_CR_RATIO | ADH_CR_DIR | ADH_CR_CONNECT);
+	RegVal |= (((Conf->Ratio << ADH_CR_RATIO_OFFSET) & ADH_CR_RATIO) |
+		   ((Conf->Dir << ADH_CR_DIR_OFFSET) & ADH_CR_DIR) | (Conf->Connect & ADH_CR_CONNECT));
+	HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_CONNECT, RegVal);
+	GDMA_DBG("GDMA> AP_P_DMA_G_DMA_2_CONNECT = 0x%08x\n", RegVal);
 
 	/* AP_DMA_HIF_0_SRC_ADDR */
-	HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_SRC_ADDR, Conf->Src);
-	PDMA_DBG("PDMA> AP_DMA_HIF_0_SRC_ADDR = 0x%08lx\n", Conf->Src);
-
-	/* AP_DMA_HIF_0_SRC_ADDR2 */
-	HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_SRC_ADDR2, (ULONG)((UINT_64)(Conf->Src) >> 32));
-	PDMA_DBG("PDMA> AP_DMA_HIF_0_SRC_ADDR2 = 0x%08lx\n", (ULONG)((UINT_64)(Conf->Src) >> 32));
+	HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_SRC_ADDR, Conf->Src);
+	GDMA_DBG("GDMA> AP_P_DMA_G_DMA_2_SRC_ADDR = 0x%08lx\n", Conf->Src);
 
 	/* AP_DMA_HIF_0_DST_ADDR */
-	HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_DST_ADDR, Conf->Dst);
-	PDMA_DBG("PDMA> AP_DMA_HIF_0_DST_ADDR = 0x%08lx\n", Conf->Dst);
+	HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_DST_ADDR, Conf->Dst);
+	GDMA_DBG("GDMA> AP_P_DMA_G_DMA_2_DST_ADDR = 0x%08lx\n", Conf->Dst);
 
-	/* AP_DMA_HIF_0_DST_ADDR2 */
-	HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_DST_ADDR2, (ULONG)((UINT_64)(Conf->Dst) >> 32));
-	PDMA_DBG("PDMA> AP_DMA_HIF_0_DST_ADDR2 = 0x%08lx\n", (ULONG)((UINT_64)(Conf->Dst) >> 32));
+	/* AP_P_DMA_G_DMA_2_LEN1 */
+	HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_LEN1, (Conf->Count & ADH_CR_LEN));
+	GDMA_DBG("GDMA> AP_P_DMA_G_DMA_2_LEN1 = %u\n", (UINT_32)(Conf->Count & ADH_CR_LEN));
 
-
-	/* AP_DMA_HIF_0_LEN */
-	HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_LEN, (Conf->Count & ADH_CR_LEN));
-	PDMA_DBG("PDMA> AP_DMA_HIF_0_LEN = %u\n", (UINT_32)(Conf->Count & ADH_CR_LEN));
-
-}				/* End of HifPdmaConfig */
+}				/* End of HifGdmaConfig */
 
 /*----------------------------------------------------------------------------*/
 /*!
-* \brief Start PDMA TX/RX.
+* \brief Start GDMA TX/RX.
 *
 * \param[in] HifInfo            Pointer to the GL_HIF_INFO_T structure.
 *
 * \retval NONE
 */
 /*----------------------------------------------------------------------------*/
-static VOID HifPdmaStart(IN void *HifInfoSrc)
+static VOID HifGdmaStart(IN void *HifInfoSrc)
 {
 	GL_HIF_INFO_T *HifInfo = (GL_HIF_INFO_T *) HifInfoSrc;
-	UINT_32 RegVal, RegId, RegIdx;
+	UINT_32 RegVal;
 
 	/* Enable interrupt */
-	RegVal = HIF_DMAR_READL(HifInfo, AP_DMA_HIF_0_INT_EN);
-	HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_INT_EN, (RegVal | ADH_CR_INTEN_FLAG_0));
-
-	/* keep old register settings */
-	RegIdx = 0;
-	for (RegId = 0; RegId < AP_DMA_HIF_0_LENGTH; RegId += 4)
-		gDmaReg[RegIdx++] = HIF_DMAR_READL(HifInfo, RegId);
+	RegVal = HIF_DMAR_READL(HifInfo, AP_P_DMA_G_DMA_2_INT_EN);
+	HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_INT_EN, (RegVal | ADH_CR_INTEN_FLAG_0));
 
 	/* Start DMA */
-	RegVal = HIF_DMAR_READL(HifInfo, AP_DMA_HIF_0_EN);
-	HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_EN, (RegVal | ADH_CR_EN));
+	RegVal = HIF_DMAR_READL(HifInfo, AP_P_DMA_G_DMA_2_EN);
+	HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_EN, (RegVal | ADH_CR_EN | ADH_CR_CONN_BUR_EN));
 
-	PDMA_DBG("PDMA> HifPdmaStart...\n");
+	GDMA_DBG("GDMA> HifGdmaStart...\n");
 
-}				/* End of HifPdmaStart */
+}				/* End of HifGdmaStart */
 
 /*----------------------------------------------------------------------------*/
 /*!
-* \brief Stop PDMA TX/RX.
+* \brief Stop GDMA TX/RX.
 *
 * \param[in] HifInfo            Pointer to the GL_HIF_INFO_T structure.
 *
 * \retval NONE
 */
 /*----------------------------------------------------------------------------*/
-static VOID HifPdmaStop(IN void *HifInfoSrc)
+static VOID HifGdmaStop(IN void *HifInfoSrc)
 {
 	GL_HIF_INFO_T *HifInfo = (GL_HIF_INFO_T *) HifInfoSrc;
 	UINT_32 RegVal;
 /* UINT32 pollcnt; */
 
 	/* Disable interrupt */
-	RegVal = HIF_DMAR_READL(HifInfo, AP_DMA_HIF_0_INT_EN);
-	HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_INT_EN, (RegVal & ~(ADH_CR_INTEN_FLAG_0)));
+	RegVal = HIF_DMAR_READL(HifInfo, AP_P_DMA_G_DMA_2_INT_EN);
+	HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_INT_EN, (RegVal & ~(ADH_CR_INTEN_FLAG_0)));
 
 #if 0				/* DE says we donot need to do it */
 	/* Stop DMA */
-	RegVal = HIF_DMAR_READL(HifInfo, AP_DMA_HIF_0_STOP);
-	HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_STOP, (RegVal | ADH_CR_STOP));
+	RegVal = HIF_DMAR_READL(HifInfo, AP_P_DMA_G_DMA_2_STOP);
+	HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_STOP, (RegVal | ADH_CR_STOP));
 
 	/* Polling START bit turn to 0 */
 	pollcnt = 0;
 	do {
-		RegVal = HIF_DMAR_READL(HifInfo, AP_DMA_HIF_0_EN);
+		RegVal = HIF_DMAR_READL(HifInfo, AP_P_DMA_G_DMA_2_EN);
 		if (pollcnt++ > 100000)
-			; /* TODO: warm reset PDMA */
+			; /* TODO: warm reset GDMA */
 	} while (RegVal & ADH_CR_EN);
 #endif
 
-}				/* End of HifPdmaStop */
+}				/* End of HifGdmaStop */
 
 /*----------------------------------------------------------------------------*/
 /*!
-* \brief Enable PDMA TX/RX.
+* \brief Enable GDMA TX/RX.
 *
 * \param[in] HifInfo            Pointer to the GL_HIF_INFO_T structure.
 *
 * \retval NONE
 */
 /*----------------------------------------------------------------------------*/
-static MTK_WCN_BOOL HifPdmaPollStart(IN void *HifInfoSrc)
+static MTK_WCN_BOOL HifGdmaPollStart(IN void *HifInfoSrc)
 {
 	GL_HIF_INFO_T *HifInfo = (GL_HIF_INFO_T *) HifInfoSrc;
 	UINT_32 RegVal;
 
-	RegVal = HIF_DMAR_READL(HifInfo, AP_DMA_HIF_0_EN);
+	RegVal = HIF_DMAR_READL(HifInfo, AP_P_DMA_G_DMA_2_EN);
 	return ((RegVal & ADH_CR_EN) != 0) ? TRUE : FALSE;
 
-}				/* End of HifPdmaPollStart */
+}				/* End of HifGdmaPollStart */
 
 /*----------------------------------------------------------------------------*/
 /*!
-* \brief Poll PDMA TX/RX done.
+* \brief Poll GDMA TX/RX done.
 *
 * \param[in] HifInfo            Pointer to the GL_HIF_INFO_T structure.
 *
 * \retval NONE
 */
 /*----------------------------------------------------------------------------*/
-static MTK_WCN_BOOL HifPdmaPollIntr(IN void *HifInfoSrc)
+static MTK_WCN_BOOL HifGdmaPollIntr(IN void *HifInfoSrc)
 {
 	GL_HIF_INFO_T *HifInfo = (GL_HIF_INFO_T *) HifInfoSrc;
 	UINT_32 RegVal;
 
-	RegVal = HIF_DMAR_READL(HifInfo, AP_DMA_HIF_0_INT_FLAG);
+	RegVal = HIF_DMAR_READL(HifInfo, AP_P_DMA_G_DMA_2_INT_FLAG);
 	return ((RegVal & ADH_CR_FLAG_0) != 0) ? TRUE : FALSE;
 
-}				/* End of HifPdmaPollIntr */
+}				/* End of HifGdmaPollIntr */
 
 /*----------------------------------------------------------------------------*/
 /*!
-* \brief Acknowledge PDMA TX/RX done.
+* \brief Acknowledge GDMA TX/RX done.
 *
 * \param[in] HifInfo            Pointer to the GL_HIF_INFO_T structure.
 *
 * \retval NONE
 */
 /*----------------------------------------------------------------------------*/
-static VOID HifPdmaAckIntr(IN void *HifInfoSrc)
+static VOID HifGdmaAckIntr(IN void *HifInfoSrc)
 {
 	GL_HIF_INFO_T *HifInfo = (GL_HIF_INFO_T *) HifInfoSrc;
 	UINT_32 RegVal;
 
 	/* Write 0 to clear interrupt */
-	RegVal = HIF_DMAR_READL(HifInfo, AP_DMA_HIF_0_INT_FLAG);
-	HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_INT_FLAG, (RegVal & ~ADH_CR_FLAG_0));
+	RegVal = HIF_DMAR_READL(HifInfo, AP_P_DMA_G_DMA_2_INT_FLAG);
+	HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_INT_FLAG, (RegVal & ~ADH_CR_FLAG_0));
 
-}				/* End of HifPdmaAckIntr */
+}				/* End of HifGdmaAckIntr */
 
 /*----------------------------------------------------------------------------*/
 /*!
-* \brief Acknowledge PDMA TX/RX done.
+* \brief Acknowledge GDMA TX/RX done.
 *
 * \param[in] FlgIsEnabled       TRUE: enable; FALSE: disable
 *
 * \retval NONE
 */
 /*----------------------------------------------------------------------------*/
-static VOID HifPdmaClockCtrl(IN UINT_32 FlgIsEnabled)
+static VOID HifGdmaClockCtrl(IN UINT_32 FlgIsEnabled)
 {
-#if !defined(CONFIG_MTK_CLKMGR)
-	int ret = 0;
-#endif
 #if defined(CONFIG_MTK_CLKMGR)
 	if (FlgIsEnabled == TRUE)
-		enable_clock(MT_CG_INFRA_APDMA, "WLAN");
+		enable_clock(MT_CG_APDMA_SW_CG, "WLAN");
 	else
-		disable_clock(MT_CG_INFRA_APDMA, "WLAN");
+		disable_clock(MT_CG_APDMA_SW_CG, "WLAN");
 #else
 	if (FlgIsEnabled == TRUE) {
-		ret = clk_prepare_enable(g_clk_wifi_pdma);
+		int ret = clk_prepare_enable(g_clk_wifi_pdma);
+
 		if (ret)
 			DBGLOG(INIT, TRACE, "[CCF]clk_prepare_enable ret= %d\n", ret);
 	} else {
@@ -410,86 +409,72 @@ static VOID HifPdmaClockCtrl(IN UINT_32 FlgIsEnabled)
 
 /*----------------------------------------------------------------------------*/
 /*!
-* \brief Dump PDMA related registers.
+* \Dump PDMA related registers when there is abnormal, such as DMA timeout.
 *
 * \param[in] HifInfo            Pointer to the GL_HIF_INFO_T structure.
 *
 * \retval NONE
 */
 /*----------------------------------------------------------------------------*/
-static VOID HifPdmaRegDump(IN void *HifInfoSrc)
+static VOID HifGdmaRegDump(IN void *HifInfoSrc)
 {
 	GL_HIF_INFO_T *HifInfo = (GL_HIF_INFO_T *) HifInfoSrc;
 	INT_8 *pucIoAddr;
-	UINT_32 RegId, RegVal, RegIdx;
-	UINT_32 RegNum = 0;
+	UINT_32 regVal1, regVal2, regVal3;
 
-	DBGLOG(INIT, INFO, "PDMA> Register content before start 0x%x=\n\t", AP_DMA_HIF_BASE);
-	for (RegId = 0, RegIdx = 0; RegId < AP_DMA_HIF_0_LENGTH; RegId += 4) {
-		RegVal = gDmaReg[RegIdx++];
-		DBGLOG(INIT, INFO, "0x%08x ", RegVal);
-
-		if (RegNum++ >= 3) {
-			DBGLOG(INIT, INFO, "\n");
-			DBGLOG(INIT, INFO, "PDMA> Register content 0x%x=\n\t", AP_DMA_HIF_BASE + RegId + 4);
-			RegNum = 0;
-		}
-	}
-
-	DBGLOG(INIT, INFO, "PDMA> Register content after start 0x%x=\n\t", AP_DMA_HIF_BASE);
-	for (RegId = 0; RegId < AP_DMA_HIF_0_LENGTH; RegId += 4) {
-		RegVal = HIF_DMAR_READL(HifInfo, RegId);
-		DBGLOG(INIT, INFO, "0x%08x ", RegVal);
-
-		if (RegNum++ >= 3) {
-			DBGLOG(INIT, INFO, "\n");
-			DBGLOG(INIT, INFO, "PDMA> Register content 0x%x=\n\t", AP_DMA_HIF_BASE + RegId + 4);
-			RegNum = 0;
-		}
-	}
-
-	pucIoAddr = ioremap(0x10001000, 0x100);
-	if (pucIoAddr != 0) {
-		DBGLOG(INIT, INFO, "\nPDMA> clock status = 0x%x\n\n", *(volatile unsigned int *)(pucIoAddr + 0x94));
-		iounmap(pucIoAddr);
-	}
-	pucIoAddr = ioremap(0x10201180, 0x10);
-	if (pucIoAddr) {	/* DMA bus status */
-		DBGLOG(INIT, INFO, "0x10201180~0x10201090: 0x%x, 0x%x, 0x%x, 0x%x",
-		       *(volatile unsigned int *)pucIoAddr, *(volatile unsigned int *)(pucIoAddr + 4),
-		       *(volatile unsigned int *)(pucIoAddr + 8), *(volatile unsigned int *)(pucIoAddr + 12));
-		iounmap(pucIoAddr);
-	}
-	pucIoAddr = ioremap(0x1000320c, 0x8);
-	if (pucIoAddr) {
-		DBGLOG(INIT, INFO, "0x1000320C~0x10003214: 0x%x, 0x%x",
-		       *(volatile unsigned int *)pucIoAddr, *(volatile unsigned int *)(pucIoAddr + 4));
-		iounmap(pucIoAddr);
-	}
+	DBGLOG(INIT, INFO, "PDMA> Register content 0x%x=\n", AP_DMA_HIF_BASE);
+	/*
+	 * for (RegId = 0; RegId < AP_DMA_HIF_0_LENGTH; RegId += 4) {
+	 *     RegVal = HIF_DMAR_READL(HifInfo, RegId);
+	 *     DBGLOG(INIT, INFO, "0x%08x ", RegVal);
+	 *
+	 *     if (RegNum++ >= 3) {
+	 *         DBGLOG(INIT, INFO, "\n");
+	 *         DBGLOG(INIT, INFO, "PDMA> Register content 0x%x=\n\t", AP_DMA_HIF_BASE + RegId + 4);
+	 *         RegNum = 0;
+	 *     }
+	 * }
+	 */
 	pucIoAddr = ioremap(0x11000008, 0x4);
-	if (pucIoAddr) {	/* DMA global register status, to observe the channel status of all channels */
+	if (pucIoAddr) {/* DMA global register status, to observe the channel status of all channels */
 		UINT_16 chnlStatus = 0;
-		UINT_8 i = 1;
-		PUINT_8 pucChnlStatus = NULL;
+		UINT_8 i = 2;
+		UINT_8 *pucChnlStatus = NULL;
 
-		chnlStatus = (*(volatile PUINT_32)pucIoAddr) & 0xffff;
-		DBGLOG(INIT, INFO, "0x11000008: 0x%x", *(volatile unsigned int *)pucIoAddr);
+		chnlStatus = *(volatile unsigned short *)pucIoAddr;
 		iounmap(pucIoAddr);
-		for (; i < 16; i++) {
-			if ((chnlStatus >> i & 0x1) == 0)
-				continue;
-			pucChnlStatus = (PUINT_8) ioremap(AP_DMA_HIF_BASE + i * 0x80, 0x70);
+		DBGLOG(INIT, INFO, "global channel status: %x\n", chnlStatus);
+		if (chnlStatus & 2) {
+			pucChnlStatus = (UINT8 *)ioremap(AP_DMA_HIF_BASE + 0x80, 0x58);
 			if (pucChnlStatus) {
-				DBGLOG(INIT, INFO, "AP_DMA_BASE+%x, ioremap fail\n", i * 0x80);
-				continue;
+				DBGLOG(INIT, INFO, "channel 1 dir,0x18: %u\n",
+					*(volatile unsigned int *)(pucChnlStatus + 0x18));
+				DBGLOG(INIT, INFO, "channel 1 debug 0x50: %u\n",
+					*(volatile unsigned int *)(pucChnlStatus + 0x50));
+				DBGLOG(INIT, INFO, "channel 1 debug 0x54: %u\n",
+					*(volatile unsigned int *)(pucChnlStatus + 0x50));
+				iounmap(pucChnlStatus);
 			}
-			DBGLOG(INIT, INFO, "AP_DMA_BASE+%x status:\n", i * 0x80);
-			DBGLOG(INIT, INFO, "channel enabled: %u\n", *(volatile PUINT_32)(pucChnlStatus + 0x8));
-			DBGLOG(INIT, INFO, "channel direction: %u\n", *(volatile PUINT_32)(pucChnlStatus + 0x18));
-			DBGLOG(INIT, INFO, "channel debug status: %u\n", *(volatile PUINT_32)(pucChnlStatus + 0x50));
+		}
+		for (; i < 12; i++) {
+			/* channel 5 only used in test mode, no need to print */
+			if (i == 5 || (chnlStatus & 1<<i) == 0)
+				continue;
+			pucChnlStatus = (UINT8 *)ioremap(AP_DMA_HIF_BASE + i*0x80, 0x54);
+			if (!pucChnlStatus)
+				continue;
+			DBGLOG(INIT, INFO, "channel %d dir,0x18: %u\n", i,
+				*(volatile unsigned int *)(pucChnlStatus+0x18));
+			DBGLOG(INIT, INFO, "channel %d debug 0x50: %u\n", i,
+				*(volatile unsigned int *)(pucChnlStatus+0x50));
 			iounmap(pucChnlStatus);
 		}
 	}
+	regVal1 = HIF_DMAR_READL(HifInfo, 0x18);
+	regVal2 = HIF_DMAR_READL(HifInfo, 0x50);
+	regVal3 = HIF_DMAR_READL(HifInfo, 0x54);
+	DBGLOG(INIT, INFO, "HIF dir=%u, debug 0x50=%u, debug 0x54: %u\n", regVal1, regVal2, regVal3);
+	DBGLOG(INIT, INFO, "GDMA> clock status = 0x%x\n", *(volatile unsigned int *)0xF0000024);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -501,32 +486,32 @@ static VOID HifPdmaRegDump(IN void *HifInfoSrc)
 * \retval NONE
 */
 /*----------------------------------------------------------------------------*/
-static VOID HifPdmaReset(IN void *HifInfoSrc)
+static VOID HifGdmaReset(IN void *HifInfoSrc)
 {
 	GL_HIF_INFO_T *HifInfo = (GL_HIF_INFO_T *) HifInfoSrc;
 	UINT_32 LoopCnt;
 
 	/* do warm reset: DMA will wait for current traction finished */
-	DBGLOG(INIT, INFO, "\nDMA> do warm reset...\n");
+	DBGLOG(INIT, TRACE, "DMA> do warm reset...\n");
 
 	/* normally, we need to sure that bit0 of AP_P_DMA_G_DMA_2_EN is 1 here */
 
-	HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_RST, 0x01);
+	HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_RST, 0x01);
 
 	for (LoopCnt = 0; LoopCnt < 10000; LoopCnt++) {
-		if (!HifPdmaPollStart(HifInfo))
+		if (!HifGdmaPollStart(HifInfo))
 			break;	/* reset ok */
 	}
 
-	if (HifPdmaPollStart(HifInfo)) {
+	if (HifGdmaPollStart(HifInfo)) {
 		/* do hard reset because warm reset fails */
-		DBGLOG(INIT, INFO, "\nDMA> do hard reset...\n");
-		HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_RST, 0x02);
+		DBGLOG(INIT, INFO, "DMA> do hard reset...\n");
+		HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_RST, 0x02);
 		mdelay(1);
-		HIF_DMAR_WRITEL(HifInfo, AP_DMA_HIF_0_RST, 0x00);
+		HIF_DMAR_WRITEL(HifInfo, AP_P_DMA_G_DMA_2_RST, 0x00);
 	}
 }
 
-/* #endif */ /* CONF_MTK_AHB_DMA */
+#endif /* CONF_MTK_AHB_DMA */
 
-/* End of ahb_pdma.c */
+/* End of ahb_gdma.c */
