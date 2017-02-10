@@ -28,9 +28,9 @@ ifneq (,$(findstring tb8167p,$(ARCH_MTK_PROJECT)))
 ccflags-y += -DSUPPORT_I2C_BUS_NUM1=2
 ccflags-y += -DSUPPORT_I2C_BUS_NUM2=2
 ccflags-y += -DDEMO_BOARD_SUPPORT=1
-$(info "ARCH_MTK_PROJECT:$(ARCH_MTK_PROJECT), set I2C Bus num:2")
+#$(info "ARCH_MTK_PROJECT:$(ARCH_MTK_PROJECT), set I2C Bus num:2")
 else
-$(info "ARCH_MTK_PROJECT:$(ARCH_MTK_PROJECT)")
+#$(info "ARCH_MTK_PROJECT:$(ARCH_MTK_PROJECT)")
 endif
 
 obj-y				+= kd_sensorlist.o
@@ -39,4 +39,4 @@ obj-y				+= camera_hw/
 $(foreach drv,$(subst $\",,$(CONFIG_CUSTOM_KERNEL_IMGSENSOR)),$(eval $(call FILTER_PROJECT_DRV,$(drv))))
 custom_kernel_imgsensor := $(addsuffix /, $(shell echo $(platform_drv)))
 obj-y += $(custom_kernel_imgsensor)
-$(info imgsensor drv by platform $(platform_drv))
+#$(info imgsensor drv by platform $(platform_drv))
