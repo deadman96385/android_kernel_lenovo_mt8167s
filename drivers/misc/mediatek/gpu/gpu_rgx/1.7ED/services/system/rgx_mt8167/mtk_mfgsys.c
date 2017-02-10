@@ -107,6 +107,7 @@ static IMG_BOOL g_bDeviceInit = IMG_FALSE;
 
 static IMG_BOOL g_bUnsync = IMG_FALSE;
 static IMG_UINT32 g_ui32_unsync_freq_id;
+static IMG_BOOL bCoreinitSucceeded = IMG_FALSE;
 
 
 
@@ -1405,8 +1406,15 @@ int MTKRGXDeviceInit(void *pvOSDevice)
 	mutex_init(&mfg_base->set_power_state);
 	pdev->dev.platform_data = mfg_base;
 
+	bCoreinitSucceeded = IMG_TRUE;
 	return 0;
 }
+
+bool mt_gpucore_ready(void)
+{
+	return (bCoreinitSucceeded == IMG_TRUE);
+}
+EXPORT_SYMBOL(mt_gpucore_ready);
 
 
 #ifndef ENABLE_COMMON_DVFS
