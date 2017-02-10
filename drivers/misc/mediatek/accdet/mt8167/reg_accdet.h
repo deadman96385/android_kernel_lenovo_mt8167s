@@ -13,6 +13,14 @@
 
 #ifndef _REG_ACCDEH_H_
 #define _REG_ACCDEH_H_
+
+/* apmixedsys */
+#define AUDIO_CODEC_CON00        0x0700
+#define AUDIO_CODEC_CON01        0x0704
+#define AUDIO_CODEC_CON02        0x0708
+#define AUDIO_CODEC_CON03        0x070C
+#define AUDIO_CODEC_CON04        0x0710
+
 /* Register address define */
 #define ACCDET_RSV               0x0
 
