@@ -1280,7 +1280,6 @@ static int mtk_nand_work_thread(void *u)
 	struct worklist_ctrl *wlist_ctrl = &data_info->wlist_ctrl;
 
 	pr_err("%s started, PID %d\n", __func__, task_pid_nr(current));
-	set_freezable();
 	for (;;) {
 		wait_for_completion(&data_info->ops_ctrl);
 
