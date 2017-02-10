@@ -3441,7 +3441,7 @@ void *get_dsi_params_handle(uint32_t dsi_idx)
 	if (dsi_idx != PM_DSI1)
 		return (void *)(&_dsi_context[0].dsi_params);
 	else
-		return (void *)(&_dsi_context[1].dsi_params);
+		return (void *)(&_dsi_context[0].dsi_params);
 }
 
 int32_t DSI_ssc_enable(uint32_t dsi_index, uint32_t en)
@@ -3453,16 +3453,16 @@ int32_t DSI_ssc_enable(uint32_t dsi_index, uint32_t en)
 			      RG_DSI0_MPPLL_SDM_SSC_EN, en);
 		_dsi_context[0].dsi_params.ssc_disable = disable;
 	} else if (dsi_index == PM_DSI1) {
-		DSI_OUTREGBIT(NULL, struct MIPITX_DSI_PLL_CON1_REG, DSI_PHY_REG[1]->MIPITX_DSI_PLL_CON1,
+		DSI_OUTREGBIT(NULL, struct MIPITX_DSI_PLL_CON1_REG, DSI_PHY_REG[0]->MIPITX_DSI_PLL_CON1,
 			      RG_DSI0_MPPLL_SDM_SSC_EN, en);
-		_dsi_context[1].dsi_params.ssc_disable = disable;
+		_dsi_context[0].dsi_params.ssc_disable = disable;
 	} else if (dsi_index == PM_DSI_DUAL) {
 		DSI_OUTREGBIT(NULL, struct MIPITX_DSI_PLL_CON1_REG, DSI_PHY_REG[0]->MIPITX_DSI_PLL_CON1,
 			      RG_DSI0_MPPLL_SDM_SSC_EN, en);
-		DSI_OUTREGBIT(NULL, struct MIPITX_DSI_PLL_CON1_REG, DSI_PHY_REG[1]->MIPITX_DSI_PLL_CON1,
+		DSI_OUTREGBIT(NULL, struct MIPITX_DSI_PLL_CON1_REG, DSI_PHY_REG[0]->MIPITX_DSI_PLL_CON1,
 			      RG_DSI0_MPPLL_SDM_SSC_EN, en);
-		_dsi_context[0].dsi_params.ssc_disable = _dsi_context[1].dsi_params.ssc_disable =
-		    disable;
+		_dsi_context[0].dsi_params.ssc_disable = disable;
+		_dsi_context[0].dsi_params.ssc_disable = disable;
 	}
 	return 0;
 }
