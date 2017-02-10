@@ -94,7 +94,6 @@
 #include <mt-plat/mtk_smi.h>
 /*#include <mach/mt_freqhopping.h>*/
 
-typedef void (*fence_release_callback) (unsigned int data);
 unsigned int is_hwc_enabled;
 static int is_hwc_update_frame;
 unsigned int gEnableLowPowerFeature;
@@ -945,7 +944,7 @@ static void update_frm_seq_info(unsigned int addr, unsigned int addr_offset, uns
 	}
 }
 
-static int _config_wdma_output(struct WDMA_CONFIG_STRUCT *wdma_config, disp_path_handle disp_handle,
+int _config_wdma_output(struct WDMA_CONFIG_STRUCT *wdma_config, disp_path_handle disp_handle,
 			       struct cmdqRecStruct *cmdq_handle)
 {
 	struct disp_ddp_path_config *pconfig = dpmgr_path_get_last_config(disp_handle);
@@ -956,7 +955,7 @@ static int _config_wdma_output(struct WDMA_CONFIG_STRUCT *wdma_config, disp_path
 	return 0;
 }
 
-static int _config_rdma_input_data(struct RDMA_CONFIG_STRUCT *rdma_config, disp_path_handle disp_handle,
+int _config_rdma_input_data(struct RDMA_CONFIG_STRUCT *rdma_config, disp_path_handle disp_handle,
 				   struct cmdqRecStruct *cmdq_handle)
 {
 	struct disp_ddp_path_config *pconfig = dpmgr_path_get_last_config(disp_handle);
@@ -2402,13 +2401,13 @@ static int config_display_m4u_port(void)
 }
 #endif
 
-static struct disp_internal_buffer_info *allocat_decouple_buffer(int size)
+struct disp_internal_buffer_info *allocat_decouple_buffer(int size)
 {
 	void *buffer_va = NULL;
 	unsigned int buffer_mva = 0;
 	unsigned int mva_size = 0;
 
-	struct ion_client *client = NULL;
+	static struct ion_client *client;
 	struct ion_handle *handle = NULL;
 	struct disp_internal_buffer_info *buf_info = NULL;
 
@@ -2416,7 +2415,8 @@ static struct disp_internal_buffer_info *allocat_decouple_buffer(int size)
 
 	memset((void *)&mm_data, 0, sizeof(struct ion_mm_data));
 
-	client = ion_client_create(g_ion_device, "disp_decouple");
+	if (!client)
+		client = ion_client_create(g_ion_device, "disp_decouple");
 
 	buf_info = kzalloc(sizeof(struct disp_internal_buffer_info), GFP_KERNEL);
 	if (buf_info) {
@@ -2483,7 +2483,7 @@ static int init_decouple_buffers(void)
 		if (decouple_buffer_info[i] != NULL) {
 			pgc->dc_buf[i] = decouple_buffer_info[i]->mva;
 			dc_vAddr[i] = (unsigned long)decouple_buffer_info[i]->va;
-
+			DISPMSG("primary alloc decouple buffer: 0x%x\n", pgc->dc_buf[i]);
 		}
 	}
 
@@ -3184,6 +3184,7 @@ int _trigger_ovl_to_memory(disp_path_handle disp_handle, struct cmdqRecStruct *c
 {
 	unsigned int rdma_pitch_sec;
 
+	DISPMSG("start trigger ovl to mem --- primary\n");
 	dpmgr_wdma_path_force_power_on();
 	dpmgr_path_trigger(disp_handle, cmdq_handle, CMDQ_ENABLE);
 	cmdqRecWaitNoClear(cmdq_handle, CMDQ_EVENT_DISP_WDMA0_EOF);
@@ -4561,6 +4562,7 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 
 	mmprofile_log_ex(ddp_mmp_get_events()->session_release, MMPROFILE_FLAG_START, 1, userdata);
 
+	DISPMSG("primary ovl->wdma frame done\n");
 
 	/* releaes OVL1 when primary setting */
 	if (ovl_get_status() == DDP_OVL1_STATUS_PRIMARY_RELEASED)
@@ -5084,7 +5086,7 @@ unsigned long get_dim_layer_mva_addr(void)
 }
 
 #ifndef MTK_FB_CMDQ_DISABLE
-static int init_cmdq_slots(cmdqBackupSlotHandle *pSlot, int count, int init_val)
+int init_cmdq_slots(cmdqBackupSlotHandle *pSlot, int count, int init_val)
 {
 	int i;
 
@@ -6776,6 +6778,7 @@ static int _config_ovl_input(struct disp_session_input_config *session_input,
 
 #if defined(OVL_TIME_SHARING)
 		data_config->roi_dirty = 1;
+		data_config->dst_dirty = 1;
 #endif
 	}
 
@@ -6804,7 +6807,8 @@ static int _config_ovl_input(struct disp_session_input_config *session_input,
 		/* for dim_layer/disable_layer/no_fence_layer, just release all fences configured */
 		/* for other layers, release current_fence-1 */
 		if (input_cfg->buffer_source == DISP_BUFFER_ALPHA || input_cfg->layer_enable == 0 ||
-		    cur_fence == -1 || DISP_SESSION_TYPE(session_input->session_id) == DISP_SESSION_MEMORY)
+		    cur_fence == -1 || DISP_SESSION_TYPE(session_input->session_id) == DISP_SESSION_MEMORY ||
+		    _is_decouple_mode(pgc->session_mode))
 			cmdqRecBackupUpdateSlot(cmdq_handle, *p_subtractor_when_free, layer, 0);
 		else
 			cmdqRecBackupUpdateSlot(cmdq_handle, *p_subtractor_when_free, layer, 1);

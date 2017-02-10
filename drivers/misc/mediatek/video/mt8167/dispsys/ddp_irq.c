@@ -422,12 +422,13 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 			DDPIRQ("IRQ: WDMA%d frame done! (cnt%d)\n", index, cnt_wdma_framedone[index]++);
 
 		if (reg_val & (1 << 1)) {
-			DDPERR("IRQ: WDMA%d underrun! cnt=%d\n", index,
-			       cnt_wdma_underflow[index]++);
+			DDPERR("IRQ: WDMA%d underrun! cnt=%d, src_size(0x%x)\n", index,
+			       cnt_wdma_underflow[index]++, DISP_REG_GET(DISP_REG_WDMA_SRC_SIZE));
 			disp_irq_log_module |= 1 << module;
 		}
 		if (reg_val & (1 << 2))
-			DDPERR("IRQ: WDMA%d FIFO full!\n", index);
+			DDPERR("IRQ: WDMA%d FIFO full!, src_size(0x%x)\n", index,
+					DISP_REG_GET(DISP_REG_WDMA_SRC_SIZE));
 		/* clear intr */
 		DISP_CPU_REG_SET(DISP_REG_WDMA_INTSTA + index * DISP_WDMA_INDEX_OFFSET,
 				 ~reg_val);

@@ -83,7 +83,7 @@ extern char dprec_error_log_buffer[];
 	do {	\
 		dprec_logger_pr(DPREC_LOGGER_DEBUG, string, ##args); \
 		if (g_mobilelog) \
-			pr_debug("[DISP]"string, ##args); \
+			pr_err("[DISP]"string, ##args); \
 	} while (0)
 #define DISPDBG(string, args...)  \
 	do {	\

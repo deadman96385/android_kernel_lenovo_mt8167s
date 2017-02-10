@@ -246,6 +246,7 @@ struct sec_session_node {
 };
 
 typedef int (*PRIMARY_DISPLAY_CALLBACK) (unsigned int user_data);
+typedef void (*fence_release_callback) (unsigned int data);
 
 int primary_display_init(char *lcm_name, unsigned int lcm_fps);
 int primary_display_config(unsigned long pa, unsigned long mva);
@@ -376,3 +377,9 @@ int primary_display_set_secondary_display(int add, enum DISP_SESSION_TYPE type);
 int init_ext_decouple_buffers(void);
 int deinit_ext_decouple_buffers(void);
 int primary_display_get_session_mode(void);
+struct disp_internal_buffer_info *allocat_decouple_buffer(int size);
+int _config_wdma_output(struct WDMA_CONFIG_STRUCT *wdma_config, disp_path_handle disp_handle,
+					struct cmdqRecStruct *cmdq_handle);
+int _config_rdma_input_data(struct RDMA_CONFIG_STRUCT *rdma_config, disp_path_handle disp_handle,
+					struct cmdqRecStruct *cmdq_handle);
+int init_cmdq_slots(cmdqBackupSlotHandle *pSlot, int count, int init_val);

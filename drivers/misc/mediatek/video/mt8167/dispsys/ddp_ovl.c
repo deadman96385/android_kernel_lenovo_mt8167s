@@ -440,8 +440,8 @@ int ovl_roi(enum DISP_MODULE_ENUM module,
 	}
 
 	DISP_REG_SET(handle, idx_offset + DISP_REG_OVL_ROI_SIZE, bg_h << 16 | bg_w);
-
 	DISP_REG_SET(handle, idx_offset + DISP_REG_OVL_ROI_BGCLR, bg_color);
+	DDPMSG("update ROI(%dx%d)\n", bg_w, bg_h);
 
 	return 0;
 }
@@ -539,9 +539,11 @@ int ovl_layer_config(enum DISP_MODULE_ENUM module,
 		ASSERT(0);
 	}
 
-	DDPDBG("ovl%d, layer=%d source=%s off(x=%d, y=%d), dst(%d, %d, %d, %d), pitch=%d, fmt=%s, addr=0x%lx\n",
-			idx, layer, (source == 0) ? "memory" : "dim", src_x, src_y, dst_x, dst_y,
-	       dst_w, dst_h, src_pitch, ovl_intput_format_name(fmt, input_swap), addr);
+	DDPMSG("ovl%d, layer=%d source=%s off(x=%d, y=%d), dst(%d, %d, %d, %d) ",
+			idx, layer, (source == 0) ? "memory" : "dim",
+			src_x, src_y, dst_x, dst_y, dst_w, dst_h);
+	DDPMSG("pitch=%d, fmt=%s, addr=0x%lx, sec = %d\n",
+			src_pitch, ovl_intput_format_name(fmt, input_swap), addr, sec);
 
 	/*
 	DDPPRINT(
@@ -1001,9 +1003,10 @@ static int ovl_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_confi
 		cmdqRecSecureEnablePortSecurity(handle, (1LL << cmdq_engine));
 		cmdqRecSetSecureMode(handle, mode);
 		/* cmdqRecSecureEnableDAPC(handle, (1LL << cmdq_engine)); */
-		if (ovl_is_sec[ovl_idx] == 0)
+		if (ovl_is_sec[ovl_idx] == 0) {
 			pr_err("[SVP] switch ovl%d to sec\n", ovl_idx);
-		ovl_is_sec[ovl_idx] = 1;
+			ovl_is_sec[ovl_idx] = 1;
+		}
 	} else {
 		if (ovl_is_sec[ovl_idx] == 1) {
 			/* ovl is in sec stat, we need to switch it to nonsec */
@@ -1059,8 +1062,8 @@ static int ovl_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_confi
 			cmdqRecFlushAsync(nonsec_switch_handle);
 			cmdqRecDestroy(nonsec_switch_handle);
 			pr_err("[SVP] switch ovl%d to nonsec\n", ovl_idx);
+			ovl_is_sec[ovl_idx] = 0;
 		}
-		ovl_is_sec[ovl_idx] = 0;
 	}
 
 	for (i = 0; i < OVL_LAYER_NUM; i++) {
