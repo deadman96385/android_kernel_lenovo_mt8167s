@@ -202,12 +202,20 @@ static inline void disable_accdet(void)
 	/*disable ACCDET unit*/
 	ACCDET_DEBUG("accdet: disable_accdet\n");
 	pre_state_swctrl = accdet_read(ACCDET_STATE_SWCTRL);
-#ifdef CONFIG_ACCDET_EINT
-	accdet_write(ACCDET_STATE_SWCTRL, 0);
+	accdet_write(ACCDET_CTRL, accdet_read(ACCDET_CTRL) | (1<<1));
+	udelay(150);
+	accdet_write(ACCDET_CTRL, accdet_read(ACCDET_CTRL) & (~(1<<1)));
 	accdet_write(ACCDET_CTRL, ACCDET_DISABLE);
+	ACCDET_DEBUG("[Accdet]ACCDET_STATE_RG = 0x%08x\n", accdet_read(ACCDET_STATE_RG));
+
+#ifdef CONFIG_ACCDET_EINT
+
+	accdet_write(ACCDET_STATE_SWCTRL, 0);
 	/*disable clock and Analog control*/
 	/*mt6331_upmu_set_rg_audmicbias1vref(0x0);*/
+	ACCDET_DEBUG("[Accdet]ACCDET_STATE_RG = 0x%08x\n", accdet_read(ACCDET_STATE_RG));
 #endif
+
 #ifdef CONFIG_ACCDET_EINT_IRQ
 	accdet_write(ACCDET_STATE_SWCTRL, ACCDET_EINT_PWM_EN);
 	accdet_write(ACCDET_CTRL, accdet_read(ACCDET_CTRL) & (~(ACCDET_ENABLE)));
@@ -283,6 +291,13 @@ static irqreturn_t accdet_eint_func(int irq, void *data)
 	}
 
 	irq_set_irq_type(accdet_irq, accdet_eint_type);
+
+	if (cur_eint_state == EINT_PIN_PLUG_IN) {
+		gpio_set_debounce(gpiopin, accdet_dts_data.accdet_plugout_debounce * 1000);
+		ACCDET_INFO("[Accdet][After] cur_eint_state = %d\n", cur_eint_state);
+	} else{
+		gpio_set_debounce(gpiopin, headsetdebounce);
+	}
 
 	ACCDET_INFO("[Accdet][After] cur_eint_state = %d\n", cur_eint_state);
 	ACCDET_INFO("[Accdet][After] accdet_eint_type = %d\n", accdet_eint_type);
