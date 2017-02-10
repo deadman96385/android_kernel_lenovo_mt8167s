@@ -146,6 +146,7 @@ struct cam_power g_cam[2];
 #endif
 
 struct clk *g_camclk_camtg_sel;
+struct clk *g_camclk_mipi_26m;	/* Add for CSI2 calibration clock source */
 struct clk *g_camclk_camtg;
 struct clk *g_camclk_48m;
 struct clk *g_camclk_208m;
@@ -2311,6 +2312,9 @@ static inline void Get_ccf_clk(struct platform_device *pdev)
 	g_camclk_camtg_sel = devm_clk_get(&pdev->dev, "TOP_CAMTG_SEL");
 	if (IS_ERR(g_camclk_camtg_sel))
 		PK_ERR("get g_camclk_camtg_sel : invalid...\n");
+	g_camclk_mipi_26m = devm_clk_get(&pdev->dev, "TOP_CAM_MIPI_26M");
+	if (IS_ERR(g_camclk_mipi_26m))
+		PK_ERR("get g_camclk_mipi_26m : invalid...\n");
 	g_camclk_camtg = devm_clk_get(&pdev->dev, "TOP_CAMTG");
 	if (IS_ERR(g_camclk_camtg))
 		PK_ERR("get g_camclk_camtg : invalid...\n");
@@ -2332,6 +2336,11 @@ static inline int Check_ccf_clk(void)
 
 	if (IS_ERR(g_camclk_camtg_sel)) {
 		PK_ERR("g_camclk_camtg_sel invalid...\n");
+		return 0;
+	}
+
+	if (IS_ERR(g_camclk_mipi_26m)) {
+		PK_ERR("g_camclk_mipi_26m invalid...\n");
 		return 0;
 	}
 
@@ -2372,12 +2381,14 @@ static inline int kdSetSensorMclk(int *pBuf)
 		return 0;
 	}
 	if (pSensorCtrl->on == 1) {
+		clk_prepare_enable(g_camclk_mipi_26m);
 		clk_prepare_enable(g_camclk_camtg);
 		if (pSensorCtrl->freq == 1 /*CAM_PLL_48_GROUP */)
 			clk_set_parent(g_camclk_camtg_sel, g_camclk_48m);
 		else if (pSensorCtrl->freq == 2 /*CAM_PLL_52_GROUP */)
 			clk_set_parent(g_camclk_camtg_sel, g_camclk_208m);
 	} else {
+		clk_disable_unprepare(g_camclk_mipi_26m);
 		clk_disable_unprepare(g_camclk_camtg);
 	}
 	return ret;
