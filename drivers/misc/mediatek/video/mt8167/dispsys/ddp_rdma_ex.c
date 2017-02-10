@@ -595,7 +595,9 @@ static int rdma_config(enum DISP_MODULE_ENUM module,
 		       enum DP_COLOR_ENUM inFormat,
 		       unsigned pitch,
 		       unsigned width,
-		       unsigned height, unsigned ufoe_enable, enum DISP_BUFFER_TYPE sec, void *handle)
+		       unsigned height, unsigned ufoe_enable,
+		       enum DISP_BUFFER_TYPE sec, void *handle,
+		       bool is_interlace, bool is_top_filed)
 {
 
 	unsigned int output_is_yuv = 0;
@@ -618,6 +620,11 @@ static int rdma_config(enum DISP_MODULE_ENUM module,
 	if ((width > RDMA_MAX_WIDTH) || (height > RDMA_MAX_HEIGHT))
 		DDPERR("RDMA input overflow, w=%d, h=%d, max_w=%d, max_h=%d\n", width, height,
 		       RDMA_MAX_WIDTH, RDMA_MAX_HEIGHT);
+
+	if (is_interlace) {
+		height /= 2;
+		pitch *= 2;
+	}
 
 	if (input_is_yuv == 1 && output_is_yuv == 0) {
 		DISP_REG_SET_FIELD(NULL, SIZE_CON_0_FLD_MATRIX_ENABLE, &size_con_reg, 1);
@@ -646,18 +653,26 @@ static int rdma_config(enum DISP_MODULE_ENUM module,
 			   ((mode == RDMA_MODE_DIRECT_LINK) ? 0 : input_swap));
 
 	if (sec != DISP_SECURE_BUFFER) {
-		DISP_REG_SET(handle, idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_START_ADDR, address);
+		if (is_interlace && is_top_filed)
+			DISP_REG_SET(handle, idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_START_ADDR,
+						address + pitch/2);
+		else
+			DISP_REG_SET(handle, idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_START_ADDR,
+						address);
 	} else {
 		int m4u_port;
-		unsigned int size = pitch * height;
+		unsigned int size = 0;
+		unsigned int offset = 0;
 
 		m4u_port = idx == 0 ? M4U_PORT_DISP_RDMA0 : M4U_PORT_DISP_RDMA1;
+		if (is_interlace && is_top_filed)
+			offset = pitch/2;
 		/* for sec layer, addr variable stores sec handle */
 		/* we need to pass this handle and offset to cmdq driver */
 		/* cmdq sec driver will help to convert handle to correct address */
 		cmdqRecWriteSecure(handle,
 				   disp_addr_convert(idx * DISP_RDMA_INDEX_OFFSET + DISP_REG_RDMA_MEM_START_ADDR),
-				   CMDQ_SAM_H_2_MVA, address, 0, size, m4u_port);
+				   CMDQ_SAM_H_2_MVA, address, offset, size, m4u_port);
 		/* DISP_REG_SET(handle,idx*DISP_RDMA_INDEX_OFFSET+DISP_REG_RDMA_MEM_START_ADDR,*/
 		/*		address-0xbc000000+0x8c00000);*/
 	}
@@ -847,7 +862,8 @@ static int do_rdma_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_c
 	rdma_config(module, mode, (mode == RDMA_MODE_DIRECT_LINK) ? 0 : r_config->address, /* address */
 		    (mode == RDMA_MODE_DIRECT_LINK) ? eRGB888 : r_config->inputFormat, /* inputFormat */
 		    (mode == RDMA_MODE_DIRECT_LINK) ? 0 : r_config->pitch, /* pitch */
-		    width, height, lcm_param->dsi.ufoe_enable, r_config->security, handle);
+		    width, height, lcm_param->dsi.ufoe_enable, r_config->security, handle,
+		    r_config->is_interlace, r_config->is_top_filed);
 
 	return 0;
 }

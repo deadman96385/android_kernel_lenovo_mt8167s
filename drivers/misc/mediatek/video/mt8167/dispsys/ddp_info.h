@@ -85,6 +85,8 @@ struct RDMA_CONFIG_STRUCT {
 	unsigned width;
 	unsigned height;
 	enum DISP_BUFFER_TYPE security;
+	bool is_interlace;
+	bool is_top_filed;
 };
 
 struct WDMA_CONFIG_STRUCT {
