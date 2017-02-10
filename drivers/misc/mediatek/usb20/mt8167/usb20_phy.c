@@ -592,6 +592,9 @@ void Charger_Detect_Init(void)
 
 	}
 	/* turn on USB reference clock. */
+	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	mt_usb_clock_prepare();
+	#endif
 	usb_enable_clock(true);
 	/* wait 50 usec. */
 	udelay(50);
@@ -621,6 +624,9 @@ void Charger_Detect_Release(void)
 	udelay(1);
 	/* 4 14. turn off internal 48Mhz PLL. */
 	usb_enable_clock(false);
+	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	mt_usb_clock_unprepare();
+	#endif
 
 	if (do_lock)
 		spin_unlock_irqrestore(&mtk_musb->lock, flags);

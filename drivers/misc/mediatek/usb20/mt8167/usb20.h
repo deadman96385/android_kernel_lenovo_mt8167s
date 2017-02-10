@@ -25,6 +25,10 @@ extern void mt_usb_check_reconnect(void);
 #ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE
 extern void musb_id_pin_sw_work(bool host_mode);
 #endif
+#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+extern void mt_usb_clock_prepare(void);
+extern void mt_usb_clock_unprepare(void);
+#endif
 
 #ifdef CONFIG_USB_MTK_OTG
 #ifdef ID_PIN_USE_EX_EINT
