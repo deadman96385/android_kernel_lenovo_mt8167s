@@ -164,7 +164,7 @@
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
-			<&imgsys CLK_IMG_VENC>,
+			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,

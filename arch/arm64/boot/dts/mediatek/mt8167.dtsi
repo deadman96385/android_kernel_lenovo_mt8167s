@@ -1435,6 +1435,8 @@
 			compatible = "mediatek,mt8167-venc";
 			reg = <0 0x15009000 0 0x1000>;
 			interrupts = <GIC_SPI 179 IRQ_TYPE_LEVEL_LOW>;
+			clocks = <&imgsys CLK_IMG_VENC>;
+			clock-names = "img_venc";
 		};
 
 		vdecsys: vdecsys@16000000 {
