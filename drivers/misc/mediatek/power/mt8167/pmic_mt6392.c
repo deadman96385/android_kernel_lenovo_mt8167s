@@ -88,7 +88,7 @@ u32 g_reg_value;
 static ssize_t show_pmic_access(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	pr_notice("[show_pmic_access] 0x%x\n", g_reg_value);
-	return sprintf(buf, "%u\n", g_reg_value);
+	return sprintf(buf, "%04X\n", g_reg_value);
 }
 
 static ssize_t store_pmic_access(struct device *dev, struct device_attribute *attr, const char *buf,
