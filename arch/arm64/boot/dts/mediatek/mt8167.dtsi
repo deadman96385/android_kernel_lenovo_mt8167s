@@ -516,13 +516,6 @@
 			reg = <0 0x10206000 0 0x1000>;
 		};
 
-		gcpu: gcpu@10210000 {
-			compatible = "mediatek,mt8167-gcpu";
-			reg = <0 0x10210000 0 0x1000>;
-			clocks = <&infracfg CLK_INFRA_GCPU>;
-			clock-names = "main";
-		};
-
 		ddrphy: ddrphy@10211000 {
 			compatible = "mediatek,mt8167-ddrphy", "mediatek,ddrphy";
 			reg = <0 0x10211000 0 0x1000>;
@@ -552,7 +545,7 @@
 			infra_na4_base = <0x10040000 12 0xffff0000>;
 			scp_base = <0x10050000 13 0xffff0000>;
 			mcucfg_base = <0x10200000 14 0xffff0000>;
-			gcpu_base = <0x10210000 15 0xffff0000>;
+			gcpu_base = <0x1020d000 15 0xffff0000>;
 			usb0_base = <0x11200000 16 0xffff0000>;
 			usb_sif_base = <0x11210000 17 0xffff0000>;
 			audio_base = <0x11220000 18 0xffff0000>;
@@ -1643,7 +1636,7 @@
 
 		mtee {
 			compatible = "mediatek,mtee";
-			clocks = <&infracfg CLK_INFRA_GCPU>;
+			clocks = <&infracfg CLK_TOP_GCPU_B>;
 			clock-names = "GCPU";
 		};
 
