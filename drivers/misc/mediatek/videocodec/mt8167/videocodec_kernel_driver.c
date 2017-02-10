@@ -1436,9 +1436,6 @@ static long vcodec_unlocked_ioctl(struct file *file, unsigned int cmd, unsigned 
 	case VCODEC_DEINITHWLOCK:
 	{
 		MODULE_MFV_LOGE("VCODEC_DEINITHWLOCK [EMPTY] + - tid = %d\n", current->pid);
-		MODULE_MFV_LOGD("[venc-clk] disable power/clock when deinithwlock\n");
-		venc_power_off();
-		break;
 		MODULE_MFV_LOGE("VCODEC_DEINITHWLOCK [EMPTY] - - tid = %d\n", current->pid);
 	}
 	break;
@@ -2008,10 +2005,6 @@ static long vcodec_unlocked_compat_ioctl(struct file *file, unsigned int cmd, un
 		}
 		break;
 
-	case VCODEC_INITHWLOCK:
-		MODULE_MFV_LOGD("[venc-clk] enable power/clock when inithwlock\n");
-		venc_power_on();
-		break;
 	default:
 		{
 			return vcodec_unlocked_ioctl(file, cmd, arg);
