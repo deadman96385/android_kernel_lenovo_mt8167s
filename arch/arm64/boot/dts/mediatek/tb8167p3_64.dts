@@ -110,10 +110,10 @@
 };
 
 &accdet {
-	interrupt-parent = <&pio>;
-	interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
-	eint-debounce = <256>;
-	accdet-gpio = <&pio 26 0>;
+	interrupts-extended = <&sysirq GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>,
+				<&pio 19 IRQ_TYPE_LEVEL_LOW>;
+	eint-debounce = <256000>;
+	accdet-gpio = <&pio 19 0>;
 	accdet-mic-vol = <7>;
 	headset-mode-setting = <0x500 0x200 1 0x1f0 0x800 0x800 0x20>;
 	accdet-plugout-debounce = <20>;
@@ -123,9 +123,6 @@
 	headset-three-key-threshold = <0 80 220 500>;
 	/*0--MD_MAX--VOICE_MAX--UP_MAX--DW_MAX*/
 	headset-four-key-threshold = <0 58 121 192 450>;
-	pinctrl-names = "default", "state_eint_as_int";
-	pinctrl-0 = <&accdet_pins_default>;
-	pinctrl-1 = <&accdet_pins_eint_as_int>;
 	status = "okay";
 };
 
@@ -381,12 +378,6 @@
 			slew-rate = <1>;
 			output-low;
 		};
-	};
-
-	accdet_pins_default: eint4default {
-	};
-
-	accdet_pins_eint_as_int: eint4 {
 	};
 
 	aud_pins_extamp_on: audexampon {

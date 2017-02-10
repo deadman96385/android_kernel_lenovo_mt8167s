@@ -349,6 +349,12 @@
 			reg = <0 0x10018f00 0 0x100>;
 		};
 
+		accdet: accdet@1001b000 {
+			compatible = "mediatek,mt8167-accdet";
+			reg = <0 0x1001b000 0 0x1000>;
+			status = "disabled";
+		};
+
 		mcucfg: mcucfg@10200000 {
 			compatible = "mediatek,mt8173-mcucfg", "syscon";
 			reg = <0 0x10200000 0 0x1000>;
@@ -1218,11 +1224,6 @@
 			interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_LOW>;
 			clocks = <&topckgen CLK_TOP_APDMA>;
 			clock-names = "wifi-dma";
-		};
-
-		accdet: accdet@ {
-			compatible = "mediatek,mt8167-accdet";
-			status = "disabled";
 		};
 
 		touch: touch@ {
