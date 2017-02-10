@@ -50,6 +50,7 @@
 #include "ddp_manager.h"
 #include "ddp_dsi.h"
 #include "disp_assert_layer.h"
+#include "external_display.h"
 
 struct MTKFB_MMP_Events_t MTKFB_MMP_Events;
 
@@ -902,6 +903,16 @@ static void process_dbg_opt(const char *opt)
 
 		pr_debug("process_dbg_opt(), set backlight level = %ld\n", level);
 		primary_display_setbacklight(level);
+	} else if (strncmp(opt, "hdmilog:", 8) == 0) {
+		char *p = (char *)opt + 8;
+		unsigned long int level = 0;
+
+		ret = kstrtoul(p, 10, &level);
+		if (ret)
+			pr_err("DISP/%s: errno %d\n", __func__, ret);
+
+		pr_debug("process_dbg_opt(), set backlight level = %ld\n", level);
+		ext_disp_enable_log(level);
 	}
 }
 

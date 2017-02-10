@@ -691,45 +691,11 @@ static int rdma_config(enum DISP_MODULE_ENUM module,
 
 int rdma_clock_on(enum DISP_MODULE_ENUM module, void *handle)
 {
-	unsigned int idx = rdma_index(module);
-#ifdef ENABLE_CLK_MGR
-	if (idx == 0) {
-#ifdef CONFIG_MTK_CLKMGR
-		enable_clock(MT_CG_DISP0_DISP_RDMA0, "RDMA0");
-#else
-		ddp_clk_enable(DISP0_DISP_RDMA0);
-#endif
-	} else {
-#ifdef CONFIG_MTK_CLKMGR
-		enable_clock(MT_CG_DISP0_DISP_RDMA1, "RDMA1");
-#else
-		ddp_clk_enable(DISP0_DISP_RDMA1);
-#endif
-	}
-#endif
-	DDPMSG("rdma_%d_clock_on CG 0x%x\n", idx, DISP_REG_GET(DISP_REG_CONFIG_MMSYS_CG_CON0));
 	return 0;
 }
 
 int rdma_clock_off(enum DISP_MODULE_ENUM module, void *handle)
 {
-	unsigned int idx = rdma_index(module);
-#ifdef ENABLE_CLK_MGR
-	if (idx == 0) {
-#ifdef CONFIG_MTK_CLKMGR
-		disable_clock(MT_CG_DISP0_DISP_RDMA0, "RDMA0");
-#else
-		ddp_clk_disable(DISP0_DISP_RDMA0);
-#endif
-	} else {
-#ifdef CONFIG_MTK_CLKMGR
-		disable_clock(MT_CG_DISP0_DISP_RDMA1, "RDMA1");
-#else
-		ddp_clk_disable(DISP0_DISP_RDMA1);
-#endif
-	}
-#endif
-	DDPMSG("rdma_%d_clock_off CG 0x%x\n", idx, DISP_REG_GET(DISP_REG_CONFIG_MMSYS_CG_CON0));
 	return 0;
 }
 

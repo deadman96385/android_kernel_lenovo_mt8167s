@@ -127,4 +127,5 @@ int ext_disp_path_change(enum EXTD_OVL_REQ_STATUS action, unsigned int session);
 int ext_disp_wait_ovl_available(int ovl_num);
 bool ext_disp_path_source_is_RDMA(unsigned int session);
 int ext_disp_is_dim_layer(unsigned long mva);
+void ext_disp_enable_log(bool en);
 #endif
