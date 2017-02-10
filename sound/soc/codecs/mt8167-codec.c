@@ -1735,6 +1735,12 @@ static void mt8167_codec_init_regs(struct mt8167_codec_priv *codec_data)
 {
 	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
 
+	/* disable chopper of uplink */
+	snd_soc_update_bits(codec_data->codec,
+		AUDIO_CODEC_CON00, BIT(17), 0x0);
+	snd_soc_update_bits(codec_data->codec,
+		AUDIO_CODEC_CON01, BIT(31), 0x0);
+
 	mt8167_codec_hp_depop_setup(codec_data);
 }
 
