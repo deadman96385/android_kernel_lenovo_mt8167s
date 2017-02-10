@@ -77,13 +77,13 @@
 /**
  * Enable Multipass support.
  */
-/* #define OVL_MULTIPASS_SUPPORT */
+#define OVL_MULTIPASS_SUPPORT
 
 /**
  * Enable Ovl time-sharing.
  * turned off for FPGA and bringup
  */
-/* #define OVL_TIME_SHARING */
+#define OVL_TIME_SHARING
 
 /**
  * Build CMDQ command in trigger stage.
@@ -218,7 +218,7 @@ enum DISP_SESSION_ENUM {
 
 	#define DISP_INTERNAL_BUFFER_COUNT 1
 #else
-	#define DISP_HW_MODE_CAP DISP_OUTPUT_CAP_DIRECT_LINK
+	#define DISP_HW_MODE_CAP DISP_OUTPUT_CAP_SWITCHABLE
 	#ifdef OVL_MULTIPASS_SUPPORT
 		#define DISP_HW_PASS_MODE DISP_OUTPUT_CAP_MULTI_PASS
 	#else
