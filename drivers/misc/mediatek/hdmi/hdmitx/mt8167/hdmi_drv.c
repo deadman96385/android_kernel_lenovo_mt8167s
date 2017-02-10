@@ -665,38 +665,22 @@ int hdmi_internal_power_on(void)
 #endif
 	hdmi_hotplugstate = HDMI_STATE_HOT_PLUG_OUT;
 
-	/* vWriteINFRASYS(INFRA_PDN1, CEC_PDN1); */
-	/* vWritePeriSYS(PREICFG_PDN_CLR, DDC_PDN_CLR); */
-
-	/* _stAvdAVInfo.fgHdmiTmdsEnable = 0; */
-	/* av_hdmiset(HDMI_SET_TURN_OFF_TMDS, &_stAvdAVInfo, 1); */
-
-#ifdef GPIO_HDMI_POWER_CONTROL
-	pr_err("[hdmi]hdmi control pin number is %d\n", GPIO_HDMI_POWER_CONTROL);
-	mt_set_gpio_mode(GPIO_HDMI_POWER_CONTROL, GPIO_MODE_00);
-	mt_set_gpio_dir(GPIO_HDMI_POWER_CONTROL, GPIO_DIR_OUT);
-	mt_set_gpio_out(GPIO_HDMI_POWER_CONTROL, GPIO_OUT_ONE);
-#endif
-#if 1
 	if (hdmi_power_control_pin > 0) {
 		pr_err("[hdmi]hdmi control pin number is %d\n", hdmi_power_control_pin);
 		gpio_direction_output(hdmi_power_control_pin, 1);
 		gpio_set_value(hdmi_power_control_pin, 1);
 	}
-#endif
 
 	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_01, HDMI_PCLK_FREE_RUN, HDMI_PCLK_FREE_RUN);
 	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_01, HDMI_OUT_FIFO_EN, HDMI_OUT_FIFO_EN);
 	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_00, ANLG_ON | HDMI_SPIDIF_ON, ANLG_ON | HDMI_SPIDIF_ON);
-
 	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_01, HDMI_PSECURE_EN, HDMI_PSECURE_EN_MASK);
-
-
 	vInitHdcpKeyGetMethod(NON_HOST_ACCESS_FROM_EEPROM);
 
 	/* HDMI_DisableIrq(); */
 	port_hpd_value_bak = 0xff;
 	HDMI_EnableIrq();
+
 	memset((void *)&r_hdmi_timer, 0, sizeof(r_hdmi_timer));
 	r_hdmi_timer.expires = jiffies + 1000 / (1000 / HZ);
 	r_hdmi_timer.function = hdmi_poll_isr;
@@ -976,8 +960,7 @@ static irqreturn_t hdmi_irq_handler(int irq, void *dev_id)
 	unsigned char port_hpd_value;
 
 	HDMI_DRV_FUNC();
-	/* vClear_cec_irq(); */
-	bClearGRLInt(0xff);
+	vClear_cec_irq();
 	HDMI_DisableIrq();
 
 	if (hdmi_cec_on == 1)
@@ -1046,18 +1029,12 @@ int hdmi_internal_probe(struct platform_device *pdev)
 	}
 
 	/*get IRQ ID and request IRQ */
-
-	HDMI_DRV_LOG("get IRQ ID and request IRQ\n");
 	hdmi_irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
-
 	HDMI_DRV_LOG("hdmi_irq = %d\n", hdmi_irq);
-
-#if 1
 	if (hdmi_irq > 0) {
 		if (request_irq(hdmi_irq, hdmi_irq_handler, IRQF_TRIGGER_LOW, "mtkhdmi", NULL) < 0)
 			pr_err("request interrupt failed.\n");
 	}
-#endif
 
 	/* Get 5V DDC Power Control Pin */
 	pinctrl = devm_pinctrl_get(&pdev->dev);
@@ -1074,13 +1051,13 @@ int hdmi_internal_probe(struct platform_device *pdev)
 		}
 	}
 	np = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-hdmitx");
-#if 1
 	/* Get 5V DDC Power Control Pin */
 	hdmi_power_control_pin = of_get_named_gpio(np, "hdmi_power_control", 0);
-	ret = gpio_request(hdmi_power_control_pin, "hdmi power control pin");
-	if (ret)
-		pr_err("hdmi power control pin, failure of setting\n");
-#endif
+	if (hdmi_power_control_pin > 0) {
+		ret = gpio_request(hdmi_power_control_pin, "hdmi power control pin");
+		if (ret)
+			pr_err("hdmi power control pin, failure of setting\n");
+	}
 	/* Get PLL/TOPCK/INFRA_SYS/MMSSYS /GPIO/EFUSE  phy base address and iomap virtual address */
 	for (i = 0; i < HDMI_REF_REG_NUM; i++) {
 		np = of_find_compatible_node(NULL, NULL, hdmi_use_module_name_spy(i));
@@ -1125,18 +1102,6 @@ static struct platform_driver hdmi_of_driver = {
 static int hdmi_internal_init(void)
 {
 	HDMI_DRV_FUNC();
-
-	init_waitqueue_head(&hdmi_timer_wq);
-	hdmi_timer_task = kthread_create(hdmi_timer_kthread, NULL, "hdmi_timer_kthread");
-	wake_up_process(hdmi_timer_task);
-
-	init_waitqueue_head(&cec_timer_wq);
-	cec_timer_task = kthread_create(cec_timer_kthread, NULL, "cec_timer_kthread");
-	wake_up_process(cec_timer_task);
-
-	init_waitqueue_head(&hdmi_irq_wq);
-	hdmi_irq_task = kthread_create(hdmi_irq_kthread, NULL, "hdmi_irq_kthread");
-	wake_up_process(hdmi_irq_task);
 
 #if defined(CONFIG_HAS_EARLYSUSPEND)
 	register_early_suspend(&hdmi_hdmi_early_suspend_desc);
@@ -1545,6 +1510,18 @@ static int __init mtk_hdmitx_init(void)
 
 	HDMI_DRV_FUNC();
 
+	init_waitqueue_head(&hdmi_timer_wq);
+	hdmi_timer_task = kthread_create(hdmi_timer_kthread, NULL, "hdmi_timer_kthread");
+	wake_up_process(hdmi_timer_task);
+
+	init_waitqueue_head(&cec_timer_wq);
+	cec_timer_task = kthread_create(cec_timer_kthread, NULL, "cec_timer_kthread");
+	wake_up_process(cec_timer_task);
+
+	init_waitqueue_head(&hdmi_irq_wq);
+	hdmi_irq_task = kthread_create(hdmi_irq_kthread, NULL, "hdmi_irq_kthread");
+	wake_up_process(hdmi_irq_task);
+
 	if (platform_driver_register(&hdmi_of_driver)) {
 		pr_err("failed to register disp driver\n");
 		ret = -1;
@@ -1558,7 +1535,7 @@ static void __exit mtk_hdmitx_exit(void)
 	HDMI_DRV_FUNC();
 }
 
-module_init(mtk_hdmitx_init);
+late_initcall(mtk_hdmitx_init);
 module_exit(mtk_hdmitx_exit);
 MODULE_AUTHOR("Junzhi, Zhao <junzhi.zhao@mediatek.com>");
 MODULE_DESCRIPTION("mtk hdmi Driver");
