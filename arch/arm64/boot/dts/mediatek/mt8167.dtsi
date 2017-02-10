@@ -739,6 +739,40 @@
 			reg = <0 0x11140000 0 0x1000>,
 			      <0 0x11141000 0 0x9000>;
 			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_LOW>;
+			clocks = <&topckgen CLK_TOP_AUDIO>,
+				<&topckgen CLK_TOP_APLL12_DIV0>,
+				<&topckgen CLK_TOP_APLL12_DIV1>,
+				<&topckgen CLK_TOP_APLL12_DIV2>,
+				<&topckgen CLK_TOP_APLL12_DIV3>,
+				<&topckgen CLK_TOP_APLL12_DIV4>,
+				<&topckgen CLK_TOP_APLL12_DIV4B>,
+				<&topckgen CLK_TOP_APLL12_DIV5>,
+				<&topckgen CLK_TOP_APLL12_DIV5B>,
+				<&topckgen CLK_TOP_APLL12_DIV6>,
+				<&topckgen CLK_TOP_RG_AUD_SPDIF_IN>,
+				<&topckgen CLK_TOP_RG_AUD_ENGEN1>,
+				<&topckgen CLK_TOP_RG_AUD_ENGEN2>;
+			clock-names = "top_pdn_audio",
+				"apll12_div0",
+				"apll12_div1",
+				"apll12_div2",
+				"apll12_div3",
+				"apll12_div4",
+				"apll12_div4b",
+				"apll12_div5",
+				"apll12_div5b",
+				"apll12_div6",
+				"spdif_in",
+				"engen1",
+				"engen2";
+			assigned-clocks = <&topckgen CLK_TOP_AUD1_SEL>,
+				<&topckgen CLK_TOP_AUD2_SEL>,
+				<&topckgen CLK_TOP_AUD_ENGEN1_SEL>,
+				<&topckgen CLK_TOP_AUD_ENGEN2_SEL>;
+			assigned-clock-parents = <&topckgen CLK_TOP_APLL1>,
+				<&topckgen CLK_TOP_APLL2>,
+				<&topckgen CLK_TOP_RG_APLL1_D8_EN>,
+				<&topckgen CLK_TOP_RG_APLL2_D8_EN>;
 		};
 
 		mfg: mfg@13000000 {
