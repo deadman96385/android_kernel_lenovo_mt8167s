@@ -42,7 +42,7 @@
 #include <linux/clk.h>
 #include <mt-plat/aee.h>
 #include <inc/mtk_thermal.h>
-#include "mt_ptp.h"
+#include "mtk_ptp.h"
 
 #ifdef CONFIG_MTK_INHOUSE_GPU
 #include "mt_gpufreq.h"
