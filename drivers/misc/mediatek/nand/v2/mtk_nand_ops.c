@@ -399,7 +399,7 @@ static int mtk_nand_erase_blocks(struct mtk_nand_chip_operation *ops0,
 	struct nand_chip *chip = mtd->priv;
 	struct mtk_nand_chip_info *info = &data_info->chip_info;
 	unsigned int page_addr0, page_addr1;
-	int status;
+	int status, status_mask;
 	int ret = 0;
 
 	nand_debug("block0= 0x%x", ops0->block);
@@ -434,21 +434,32 @@ static int mtk_nand_erase_blocks(struct mtk_nand_chip_operation *ops0,
 
 	if (ops0->block < info->data_block_num) {
 		devinfo.tlcControl.slcopmodeEn = FALSE;
+		if (ops1->block >= info->data_block_num)
+			nand_err("Error!!!Invalid argu ops0->block:%d, ops1->block:%d\n",
+				ops0->block, ops1->block);
 	} else {
 		nand_debug("erase SLC mode");
 		devinfo.tlcControl.slcopmodeEn = TRUE;
+		if (ops1->block < info->data_block_num)
+			nand_err("Error!!!Invalid argu ops0->block:%d, ops1->block:%d\n",
+				ops0->block, ops1->block);
 	}
 
 	chip->select_chip(mtd, 0);
 
 	status = mtk_chip_erase_blocks(mtd, page_addr0, page_addr1);
 
-	/* See if block erase succeeded */
-	if (status & NAND_STATUS_FAIL) {
-		nand_debug("%s: failed erase, page_addr0 0x%x\n",
-			__func__, page_addr0);
-		ret = -ENANDERASE;
-	}
+	if (!(status & NAND_STATUS_READY))
+		nand_err("SR[6] is not ready state, status:0x%x\n", status);
+
+	if (status & (NAND_STATUS_FAIL | SLC_MODE_OP_FALI))
+		nand_err("warning erase, ops0->block:%d, ops1->block:%d, status:0x%x\n",
+				ops0->block, ops1->block, status);
+
+	/* See if block erase is successful */
+	status_mask = ((devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC) &&
+			devinfo.tlcControl.slcopmodeEn) ? SLC_MODE_OP_FALI : NAND_STATUS_FAIL;
+	ret = (status & status_mask) ? (-ENANDERASE) : 0;
 
 	nand_debug("%s: done start page_addr0= 0x%x page_addr1= 0x%x",
 			__func__, page_addr0, page_addr1);
@@ -457,7 +468,10 @@ static int mtk_nand_erase_blocks(struct mtk_nand_chip_operation *ops0,
 	chip->select_chip(mtd, -1);
 	mtk_nand_release_device(mtd);
 
-	/* Return more or less happy */
+	if (ret == -ENANDERASE)
+		nand_err("erase fail,ops0->block:%d,ops1->block:%d,status:0x%x\n",
+			ops0->block, ops1->block, status);
+
 	return ret;
 }
 
