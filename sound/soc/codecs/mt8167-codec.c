@@ -99,15 +99,15 @@ static const struct mt8167_codec_rate mt8167_codec_ul_rates[] = {
 };
 
 static const struct mt8167_codec_rate mt8167_codec_dl_rates[] = {
-	{ .rate =   8000, .regvalue =  0 },
-	{ .rate =  11025, .regvalue =  1 },
-	{ .rate =  12000, .regvalue =  2 },
-	{ .rate =  16000, .regvalue =  4 },
-	{ .rate =  22025, .regvalue =  5 },
-	{ .rate =  24000, .regvalue =  6 },
-	{ .rate =  32000, .regvalue =  8 },
-	{ .rate =  44100, .regvalue =  9 },
-	{ .rate =  48000, .regvalue = 10 },
+	{ .rate =   8000, .regvalue = 0 },
+	{ .rate =  11025, .regvalue = 1 },
+	{ .rate =  12000, .regvalue = 2 },
+	{ .rate =  16000, .regvalue = 3 },
+	{ .rate =  22025, .regvalue = 4 },
+	{ .rate =  24000, .regvalue = 5 },
+	{ .rate =  32000, .regvalue = 6 },
+	{ .rate =  44100, .regvalue = 7 },
+	{ .rate =  48000, .regvalue = 8 },
 };
 
 static int mt8167_codec_ul_rate_to_val(struct mt8167_codec_priv *codec_data,
