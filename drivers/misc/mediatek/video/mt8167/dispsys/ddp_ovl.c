@@ -951,8 +951,12 @@ static int ovl_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_confi
 			struct cmdqRecStruct *nonsec_switch_handle;
 			int ret;
 
+			/* because always de-couple, */
+			/* ovl->wdma use CMDQ_SCENARIO_PRIMARY_MEMOUT, */
+			/* the secure hw thread will be CMDQ_THREAD_SEC_SUB_DISP, */
+			/* disable secure path should use the same hw thread. */
 			ret =
-				cmdqRecCreate(CMDQ_SCENARIO_DISP_PRIMARY_DISABLE_SECURE_PATH,
+				cmdqRecCreate(CMDQ_SCENARIO_DISP_SUB_DISABLE_SECURE_PATH,
 					&(nonsec_switch_handle));
 			if (ret)
 				DDPAEE("[SVP]fail to create disable handle %s ret=%d\n",

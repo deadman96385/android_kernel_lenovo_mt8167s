@@ -862,8 +862,13 @@ static int setup_rdma_sec(enum DISP_MODULE_ENUM module, struct disp_ddp_path_con
 				struct cmdqRecStruct *nonsec_switch_handle;
 				int ret;
 
-				ret =
+				if (rdma_idx == 0)
+					ret =
 				    cmdqRecCreate(CMDQ_SCENARIO_DISP_PRIMARY_DISABLE_SECURE_PATH,
+						  &(nonsec_switch_handle));
+				else
+					ret =
+				    cmdqRecCreate(CMDQ_SCENARIO_DISP_SUB_DISABLE_SECURE_PATH,
 						  &(nonsec_switch_handle));
 				if (ret)
 					DDPAEE("[SVP]fail to create disable handle %s ret=%d\n",
