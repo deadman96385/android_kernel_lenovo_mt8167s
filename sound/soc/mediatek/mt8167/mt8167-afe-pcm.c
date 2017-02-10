@@ -1277,6 +1277,9 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	      AFE_TDM_CON1_1_BCK_DELAY |
 	      AFE_TDM_CON1_MSB_ALIGNED;
 
+	if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI)
+		val |= AFE_TDM_CON1_LRCK_INV;
+
 	/* bit width related */
 	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) || (bit_width > 16)) {
 		val |= AFE_TDM_CON1_WLEN_32BIT |
