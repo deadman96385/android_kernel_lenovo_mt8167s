@@ -14,11 +14,15 @@
  */
 
 #include <sound/soc.h>
+#include <linux/delay.h>
 #include <linux/dma-mapping.h>
 #include "mt8167-codec.h"
 #include "mt8167-codec-utils.h"
 #ifdef CONFIG_MTK_SPEAKER
 #include "mt6392-codec.h"
+#endif
+#ifdef CONFIG_MTK_AUXADC
+#include "mtk_auxadc.h"
 #endif
 
 enum auxadc_channel_id {
@@ -315,7 +319,9 @@ static uint32_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
 #ifdef CONFIG_MTK_AUXADC
 	int32_t auxadc_on_val = 0;
 	int32_t auxadc_off_val = 0;
-	int32_t auxadc_data[4];
+	int32_t auxadc_val_sum = 0;
+	int32_t count = 0;
+	int32_t countlimit = 5;
 #endif
 
 	dev_dbg(codec->dev, "%s\n", __func__);
@@ -323,34 +329,65 @@ static uint32_t mt8167_codec_get_hp_cali_val(struct snd_soc_codec *codec,
 	mt8167_codec_setup_cali_path(codec, &dma_buf);
 
 #ifdef CONFIG_MTK_AUXADC
-	IMM_GetOneChannelValue(auxadc_channel, auxadc_data, &auxadc_off_val);
+	IMM_GetOneChannelValue_Cali(auxadc_channel, &auxadc_off_val);
 	dev_dbg(codec->dev, "%s auxadc_off_val: 0x%x\n",
 		__func__, auxadc_off_val);
 #endif
 
 	mt8167_codec_enable_cali_path(codec);
 
+	usleep_range(10 * 1000, 15 * 1000);
+
 #ifdef CONFIG_MTK_AUXADC
-	/* TODO: calibration process */
-	IMM_GetOneChannelValue(auxadc_channel, auxadc_data, &auxadc_on_val);
-	dev_dbg(codec->dev, "%s auxadc_on_val: 0x%x\n",
-		__func__, auxadc_on_val);
+	for (count = 0 ; count < countlimit ; count++) {
+		IMM_GetOneChannelValue_Cali(auxadc_channel, &auxadc_on_val);
+		auxadc_val_sum += auxadc_on_val;
+		dev_dbg(codec->dev, "%s auxadc_on_val: %d, auxadc_val_sum: %d\n",
+			__func__, auxadc_on_val, auxadc_val_sum);
+	}
+
+	cali_val = (auxadc_val_sum / countlimit) - auxadc_off_val;
+	cali_val = cali_val/1000; /* mV */
 #endif
+
 	mt8167_codec_disable_cali_path(codec);
 	mt8167_codec_cleanup_cali_path(codec, &dma_buf);
 
 	return cali_val;
 }
 
-uint32_t mt8167_codec_get_hpl_cali_val(struct snd_soc_codec *codec)
+uint32_t mt8167_codec_conv_dc_offset_to_comp_val(uint32_t dc_offset)
 {
-	return mt8167_codec_get_hp_cali_val(codec, AUXADC_CH_AU_HPL);
+	uint32_t dccomp_val = 0;
+
+	/* transform to 1.8V scale */
+	dc_offset = (dc_offset * 18) / 10;
+
+	/*
+	 * ABB_AFE_CON3, 1 step is (1/32768) * 1800 mV = 0.0549
+	 * dccomp_val = dc_cali_value/0.0549 = dc_cali_value * 18
+	 */
+	dccomp_val = dc_offset * 18;
+
+	return dccomp_val;
+}
+EXPORT_SYMBOL_GPL(mt8167_codec_convert_offset_to_comp_val);
+
+int mt8167_codec_get_hpl_cali_val(struct snd_soc_codec *codec,
+	uint32_t *dccomp_val, uint32_t *dc_offset)
+{
+	*dc_offset = mt8167_codec_get_hp_cali_val(codec, AUXADC_CH_AU_HPL);
+	*dccomp_val = mt8167_codec_conv_dc_offset_to_comp_val(*dc_offset);
+	return 0;
 }
 EXPORT_SYMBOL_GPL(mt8167_codec_get_hpl_cali_val);
 
-uint32_t mt8167_codec_get_hpr_cali_val(struct snd_soc_codec *codec)
+int mt8167_codec_get_hpr_cali_val(struct snd_soc_codec *codec,
+	uint32_t *dccomp_val, uint32_t *dc_offset)
 {
-	return mt8167_codec_get_hp_cali_val(codec, AUXADC_CH_AU_HPR);
+	*dc_offset = mt8167_codec_get_hp_cali_val(codec, AUXADC_CH_AU_HPR);
+	*dccomp_val = mt8167_codec_conv_dc_offset_to_comp_val(*dc_offset);
+	return 0;
 }
 EXPORT_SYMBOL_GPL(mt8167_codec_get_hpr_cali_val);
 
