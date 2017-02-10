@@ -37,79 +37,99 @@ static const char * const mt8516_p1_pinctrl_pin_str[PIN_STATE_MAX] = {
 	"default",
 };
 
-static int mt8516_p1_mic1_event(struct snd_soc_dapm_widget *w,
-	struct snd_kcontrol *kcontrol, int event)
+static int master_volume_info(struct snd_kcontrol *kctl,
+	struct snd_ctl_elem_info *uinfo)
 {
-	struct snd_soc_dapm_context *dapm = w->dapm;
-	struct snd_soc_card *card = dapm->card;
-
-	dev_dbg(card->dev, "%s, event %d\n", __func__, event);
-
-	switch (event) {
-	case SND_SOC_DAPM_PRE_PMU:
-		break;
-	case SND_SOC_DAPM_POST_PMD:
-		break;
-	default:
-		break;
-	}
-
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 100;
 	return 0;
 }
 
-static int mt8516_p1_mic2_event(struct snd_soc_dapm_widget *w,
-	struct snd_kcontrol *kcontrol, int event)
+static int master_volume_get(struct snd_kcontrol *kctl,
+	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_dapm_context *dapm = w->dapm;
-	struct snd_soc_card *card = dapm->card;
-
-	dev_dbg(card->dev, "%s, event %d\n", __func__, event);
-
-	switch (event) {
-	case SND_SOC_DAPM_PRE_PMU:
-		break;
-	case SND_SOC_DAPM_POST_PMD:
-		break;
-	default:
-		break;
-	}
-
+	ucontrol->value.integer.value[0] = 100;
 	return 0;
 }
 
-static int mt8516_p1_headset_mic_event(struct snd_soc_dapm_widget *w,
-	struct snd_kcontrol *kcontrol, int event)
+static int master_volume_put(struct snd_kcontrol *kctl,
+	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_dapm_context *dapm = w->dapm;
-	struct snd_soc_card *card = dapm->card;
-
-	dev_dbg(card->dev, "%s, event %d\n", __func__, event);
-
-	switch (event) {
-	case SND_SOC_DAPM_PRE_PMU:
-		break;
-	case SND_SOC_DAPM_POST_PMD:
-		break;
-	default:
-		break;
-	}
-
 	return 0;
 }
 
-static const struct snd_soc_dapm_widget mt8516_p1_dapm_widgets[] = {
-	SND_SOC_DAPM_MIC("Mic 1", mt8516_p1_mic1_event),
-	SND_SOC_DAPM_MIC("Mic 2", mt8516_p1_mic2_event),
-	SND_SOC_DAPM_MIC("Headset Mic", mt8516_p1_headset_mic_event),
-};
+static int master_switch_info(struct snd_kcontrol *kctl,
+	struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
 
-static const struct snd_soc_dapm_route mt8516_p1_audio_map[] = {
-	/* Uplink */
+static int master_switch_get(struct snd_kcontrol *kctl,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = 1;
+	return 0;
+}
 
-	{"AU_VIN0", NULL, "Mic 1"},
-	{"AU_VIN2", NULL, "Mic 2"},
+static int master_switch_put(struct snd_kcontrol *kctl,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	return 0;
+}
 
-	{"AU_VIN1", NULL, "Headset Mic"},
+static int pcm_state_info(struct snd_kcontrol *kctl,
+	struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 10;
+	return 0;
+}
+
+static int pcm_state_get(struct snd_kcontrol *kctl,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	return 0;
+}
+
+static int pcm_state_put(struct snd_kcontrol *kctl,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	return 0;
+}
+
+static const struct snd_kcontrol_new mt8516_p1_soc_controls[] = {
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Master Volume",
+		.index = 0,
+		.info = master_volume_info,
+		.get = master_volume_get,
+		.put = master_volume_put,
+	},
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Master Switch",
+		.index = 0,
+		.info = master_switch_info,
+		.get = master_switch_get,
+		.put = master_switch_put,
+	},
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "PCM State",
+		.index = 0,
+		.info = pcm_state_info,
+		.get = pcm_state_get,
+		.put = pcm_state_put,
+	},
 };
 
 /* Digital audio interface glue - connects codec <---> CPU */
@@ -177,10 +197,8 @@ static struct snd_soc_card mt8516_p1_card = {
 	.owner = THIS_MODULE,
 	.dai_link = mt8516_p1_dais,
 	.num_links = ARRAY_SIZE(mt8516_p1_dais),
-	.dapm_widgets = mt8516_p1_dapm_widgets,
-	.num_dapm_widgets = ARRAY_SIZE(mt8516_p1_dapm_widgets),
-	.dapm_routes = mt8516_p1_audio_map,
-	.num_dapm_routes = ARRAY_SIZE(mt8516_p1_audio_map),
+	.controls = mt8516_p1_soc_controls,
+	.num_controls = ARRAY_SIZE(mt8516_p1_soc_controls),
 };
 
 static int mt8516_p1_gpio_probe(struct snd_soc_card *card)
