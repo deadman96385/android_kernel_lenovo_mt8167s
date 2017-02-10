@@ -2425,7 +2425,6 @@ static int mtk_uart_syscore_suspend(void)
 		/* tx pin:  idle->high   power down->low */
 		mtk_uart_switch_tx_to_gpio(uart);
 		spin_unlock_irqrestore(&mtk_uart_bt_lock, flags);
-		pr_debug("[UART%d] Suspend(%d)!\n", uart->nport, ret);
 	}
 	return ret;
 }
@@ -2459,7 +2458,6 @@ static int mtk_uart_suspend(struct platform_device *pdev, pm_message_t state)
 		mtk_uart_save(uart);
 	if (uart && (uart->nport < UART_NR) && (uart != bt_port)) {
 		ret = uart_suspend_port(&mtk_uart_drv, &uart->port);
-		pr_debug("[UART%d] Suspend(%d)!\n", uart->nport, ret);
 		mtk_uart_switch_rx_to_gpio(uart);
 	}
 	return ret;
@@ -2474,7 +2472,6 @@ static int mtk_uart_resume(struct platform_device *pdev)
 	if (uart && (uart->nport < UART_NR) && (uart != bt_port)) {
 		mtk_uart_switch_to_rx(uart);
 		ret = uart_resume_port(&mtk_uart_drv, &uart->port);
-		pr_debug("[UART%d] Resume(%d)!\n", uart->nport, ret);
 	}
 	return ret;
 }
