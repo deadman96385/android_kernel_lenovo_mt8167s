@@ -443,8 +443,8 @@ static void mmsys_config_dump_analysis(void)
 	int len = 0;
 	unsigned int valid0, valid1, ready0, ready1, greq;
 
-	pr_debug("==DISP MMSYS_CONFIG ANALYSIS==\n");
-	pr_debug("[ddp] mmsys_clock=0x%x\n", DISP_REG_GET(DISP_REG_CLK_CFG_0_MM_CLK));
+	DDPDUMP("==DISP MMSYS_CONFIG ANALYSIS==\n");
+	DDPDUMP("[ddp] mmsys_clock=0x%x\n", DISP_REG_GET(DISP_REG_CLK_CFG_0_MM_CLK));
 #ifdef CONFIG_MTK_CLKMGR
 	pr_debug("larb0_force_on=%d, smi_common_force_on=%d\n",
 		 clk_is_force_on(MT_CG_DISP0_SMI_LARB0), clk_is_force_on(MT_CG_DISP0_SMI_COMMON));
