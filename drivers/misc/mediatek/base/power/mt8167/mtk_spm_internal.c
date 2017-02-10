@@ -382,7 +382,7 @@ wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
 		}
 	}
 
-	spm_warn("wake up by%s, timer_out = %u, r13 = 0x%x, debug_flag = 0x%x, apsrc_cnt = 0x%x\n",
+	spm_warn("wake up by%s, timer_out = %u, r13 = 0x%x, debug_flag = 0x%x, apsrc_cnt = %d\n",
 		  buf, wakesta->timer_out, wakesta->r13, wakesta->debug_flag, wakesta->apsrc_cnt);
 
 	spm_warn(
