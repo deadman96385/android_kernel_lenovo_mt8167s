@@ -468,7 +468,7 @@ static void get_all_clock_state(u32 clks[NR_GRPS])
 		clks[i] = 0;
 
 	if (is_valid_reg(topckgen_base)) {
-		clks[CG_CTRL0] = ~idle_readl(CLK_GATING_CTRL0) ^ (~BIT(4));
+		clks[CG_CTRL0] = ~idle_readl(CLK_GATING_CTRL0) ^ BIT(4);
 		clks[CG_CTRL1] = ~idle_readl(CLK_GATING_CTRL1);
 		clks[CG_CTRL2] = ~idle_readl(CLK_GATING_CTRL2);
 		clks[CG_CTRL8] = ~idle_readl(CLK_GATING_CTRL8);
