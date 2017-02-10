@@ -1227,7 +1227,7 @@
 		};
 
 		touch: touch@ {
-			compatible = "mediatek,mt8167-touch";
+			compatible = "mediatek,mt8167-touch", "mediatek,mt8163-touch";
 		};
 
 		gps {
