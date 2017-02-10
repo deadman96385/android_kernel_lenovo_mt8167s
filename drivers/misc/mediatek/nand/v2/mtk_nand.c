@@ -79,6 +79,7 @@
 #include <linux/clk.h>
 #include <linux/regulator/consumer.h>
 #endif
+#include <linux/debugfs.h>
 
 #ifdef CONFIG_MNTL_SUPPORT
 #include "mtk_nand_ops.h"
@@ -10842,12 +10843,29 @@ static const struct file_operations mtk_nand_rd_para_fops = {
 	.llseek = seq_lseek,
 	.release = single_release,
 };
+static struct dentry *debugfs_root;
+static void nand_init_device_debugfs(void)
+{
+	debugfs_root = debugfs_create_dir("nand", NULL);
+	if (IS_ERR(debugfs_root) || !debugfs_root) {
+		nand_err("failed to create debugfs directory\n");
+		debugfs_root = NULL;
+		return;
+	}
 
+	debugfs_create_file("rd_para", S_IFREG | S_IRUGO,
+						debugfs_root, NULL, &mtk_nand_rd_para_fops);
+}
+
+static void nand_init_device_procfs(void)
+{
+	struct proc_dir_entry *entry;
+	entry = proc_create(PROCNAME, 0664, NULL, &mtk_nand_fops);
+	if (!entry)
+		nand_err("create proc nand file fail!!!\n");
+}
 static int __init mtk_nand_init(void)
 {
-	struct proc_dir_entry *nand_dir;
-	struct proc_dir_entry *entry;
-
 	g_i4Interrupt = 1;
 	if (g_i4Interrupt)
 		pr_debug("Enable IRQ for NFI module!\n");
@@ -10870,18 +10888,8 @@ static int __init mtk_nand_init(void)
 	g_mtk_otp_fuc.OTPWrite = samsung_OTPWrite;
 #endif
 
-	nand_dir = proc_mkdir(PROCNAME, NULL);
-	if (!nand_dir) {
-		pr_err("create nand folder fail!!!\n");
-	} else {
-		entry = proc_create("basic_info", 0664, nand_dir, &mtk_nand_fops);
-		if (!entry)
-			pr_err("create nand\basic file fail!!!\n");
-		entry = proc_create("rd_para", 0664, nand_dir,
-			&mtk_nand_rd_para_fops);
-		if (!entry)
-			pr_err("create nand\rd_para file fail!!!\n");
-	}
+	nand_init_device_procfs();
+	nand_init_device_debugfs();
 
 	return platform_driver_register(&mtk_nand_driver);
 }
