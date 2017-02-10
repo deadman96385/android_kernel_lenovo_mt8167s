@@ -1083,7 +1083,7 @@ static long vcodec_unlockhw(unsigned long arg)
 			grVcodecEncHWLock.eDriverType = VAL_DRIVER_TYPE_NONE;
 			if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC ||
 				rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC) {
-				disable_irq(VENC_IRQ_ID);
+				disable_irq_nosync(VENC_IRQ_ID);
 				/* turn venc power off */
 #ifndef KS_POWER_WORKAROUND
 				venc_power_off();
