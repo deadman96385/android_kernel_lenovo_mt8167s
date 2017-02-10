@@ -11,6 +11,8 @@
  * GNU General Public License for more details.
  */
 
+#ifndef _REG_ACCDEH_H_
+#define _REG_ACCDEH_H_
 /* Register address define */
 #define TOP_RST_ACCDET           0x0114
 #define TOP_RST_ACCDET_SET		 0x0116
@@ -106,3 +108,4 @@
 #define ACCDET_2V8_MODE_OFF       0x5090
 
 /* #define ACCDET_DEFVAL_SEL        (1<<15) */
+#endif
