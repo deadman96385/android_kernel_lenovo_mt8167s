@@ -122,31 +122,18 @@ struct mt_cpu_freq_info opp_tbl_default[] = {
 static void _power_calculation(struct mt_cpu_dvfs *p, int oppidx, int ncpu)
 {
 /* TBD, need MN confirm */
-#define CA53_8CORE_REF_POWER	2286	/* mW  */
-#define CA53_6CORE_REF_POWER	1736	/* mW  */
-#define CA53_4CORE_REF_POWER	1159	/* mW  */
-#define CA53_REF_FREQ	1690000 /* KHz */
-#define CA53_REF_VOLT	1000000	/* mV * 1000 */
+#define CA35_4CORE_REF_POWER	709		/* mW  */
+#define CA35_REF_FREQ	1300000	/* KHz */
+#define CA35_REF_VOLT	1150000	/* mV * 1000 */
 
 	int ref_freq, ref_volt;
 	int	p_dynamic = 0, p_leakage = 0;
 	int possible_cpu = NR_MAX_CPU;
 
-	ref_freq  = CA53_REF_FREQ;
-	ref_volt  = CA53_REF_VOLT;
+	ref_freq  = CA35_REF_FREQ;
+	ref_volt  = CA35_REF_VOLT;
 
-	switch (possible_cpu) {
-	case 4:
-		p_dynamic = CA53_4CORE_REF_POWER;
-		break;
-	case 6:
-		p_dynamic = CA53_6CORE_REF_POWER;
-		break;
-	case 8:
-	default:
-		p_dynamic = CA53_8CORE_REF_POWER;
-		break;
-	}
+	p_dynamic = CA35_4CORE_REF_POWER;
 
 	p_leakage = mt_spower_get_leakage(MT_SPOWER_CA7, p->opp_tbl[oppidx].cpufreq_volt / 1000, 65);
 
