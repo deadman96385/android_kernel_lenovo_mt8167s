@@ -186,13 +186,12 @@ struct ISP_CLK_STRUCT {
 struct ISP_CLK_STRUCT ispclk[] = {
 #ifndef CONFIG_MTK_SMI_VARIANT
 	{"MM_SMI_COMMON", NULL},
-	{"IMG_LARB2_SMI", NULL},
+	{"IMG_LARB_SMI", NULL}, /* Change to generic clock name to avoid changing everytime */
 #endif
 	{"IMG_CAM_SMI", NULL},
 	{"IMG_CAM_CAM", NULL},
 	{"IMG_SEN_TG", NULL},
 	{"IMG_SEN_CAM", NULL},
-	{"IMG_CAM_SV", NULL},
 };
 
 /* MTCMOS/Clock check +++ */
@@ -1771,9 +1770,9 @@ static inline void Prepare_Enable_ccf_clock(void)
 	/* Through this API, it opens power & clock of Larb#2 & its parents */
 	/* Return : 0 is successful, Others is failed.*/
 	/*LOG_DBG("ISP power/clock on by SMI ==>");*/
-	ret = mtk_smi_larb_clock_on(2, true);
+	ret = mtk_smi_larb_clock_on(1, true);	/* 8167 clock system is from ranier, change to LARB1 */
 	if (ret != 0)
-		LOG_ERR("mtk_smi_larb_clock_on(Larb2, true) fail, ret = %d\n", ret);
+		LOG_ERR("mtk_smi_larb_clock_on(Larb1, true) fail, ret = %d\n", ret);
 #endif
 
 	for (i = 0; i < ARRAY_SIZE(ispclk); i++) {
@@ -1802,7 +1801,7 @@ static inline void Disable_Unprepare_ccf_clock(void)
 
 #else
 	/*LOG_DBG("ISP power/clock off by SMI <==");*/
-	mtk_smi_larb_clock_off(2, true);
+	mtk_smi_larb_clock_off(1, true); /* 8167 clock system is from ranier, change to LARB1 */
 #endif
 
 }
@@ -6734,7 +6733,7 @@ m4u_callback_ret_t ISP_M4U_TranslationFault_callback(int port, unsigned int mva,
 		(unsigned int)ISP_RD32(ISP_ADDR + 0x007c));
 
 	switch (port) {
-	case M4U_PORT_IMGO:
+	case M4U_PORT_CAM_IMGO:
 		LOG_DBG("[TF_IMGO]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x0300),
 			(unsigned int)ISP_RD32(ISP_ADDR + 0x0300));
 		LOG_DBG("[TF_IMGO]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x0304),
@@ -6748,7 +6747,7 @@ m4u_callback_ret_t ISP_M4U_TranslationFault_callback(int port, unsigned int mva,
 		LOG_DBG("[TF_IMGO]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x031C),
 			(unsigned int)ISP_RD32(ISP_ADDR + 0x031C));
 		break;
-	case M4U_PORT_IMG2O:
+	case M4U_PORT_CAM_IMG2O:
 		LOG_DBG("[TF_IMG2O]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x0320),
 			(unsigned int)ISP_RD32(ISP_ADDR + 0x0320));
 		LOG_DBG("[TF_IMG2O]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x0324),
@@ -6762,7 +6761,7 @@ m4u_callback_ret_t ISP_M4U_TranslationFault_callback(int port, unsigned int mva,
 		LOG_DBG("[TF_IMG2O]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x033C),
 			(unsigned int)ISP_RD32(ISP_ADDR + 0x033C));
 		break;
-	case M4U_PORT_LSCI:
+	case M4U_PORT_CAM_LSCI:
 		LOG_DBG("[TF_LSCI]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x00A8),
 			(unsigned int)ISP_RD32(ISP_ADDR + 0x00A8));
 		LOG_DBG("[TF_LSCI]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x00B8),
@@ -6786,7 +6785,7 @@ m4u_callback_ret_t ISP_M4U_TranslationFault_callback(int port, unsigned int mva,
 		LOG_DBG("[TF_LSCI]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x027c),
 			(unsigned int)ISP_RD32(ISP_ADDR + 0x027c));
 		break;
-	case M4U_PORT_IMGI:
+	case M4U_PORT_CAM_IMGI:
 		LOG_DBG("[TF_IMGI]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x0050),
 			(unsigned int)ISP_RD32(ISP_ADDR + 0x0050));
 		LOG_DBG("[TF_IMGI]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x0054),
@@ -6806,7 +6805,7 @@ m4u_callback_ret_t ISP_M4U_TranslationFault_callback(int port, unsigned int mva,
 		LOG_DBG("[TF_IMGI]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x0240),
 			(unsigned int)ISP_RD32(ISP_ADDR + 0x0240));
 		break;
-	case M4U_PORT_ESFKO:
+	case M4U_PORT_CAM_ESFKO:
 		LOG_DBG("[TF_ESFKO]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x035C),
 			(unsigned int)ISP_RD32(ISP_ADDR + 0x035C));
 		LOG_DBG("[TF_ESFKO]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x0360),
@@ -6826,7 +6825,7 @@ m4u_callback_ret_t ISP_M4U_TranslationFault_callback(int port, unsigned int mva,
 		LOG_DBG("[TF_ESFKO]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x037C),
 			(unsigned int)ISP_RD32(ISP_ADDR + 0x037C));
 		break;
-	case M4U_PORT_AAO:
+	case M4U_PORT_CAM_AAO:
 		LOG_DBG("[TF_AAO]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x0388),
 			(unsigned int)ISP_RD32(ISP_ADDR + 0x0388));
 		LOG_DBG("[TF_AAO]0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + 0x038C),
@@ -6907,12 +6906,12 @@ static MINT32 __init ISP_Init(MVOID)
 
 	/* Register M4U callback dump */
 	LOG_DBG("register M4U callback dump");
-	m4u_register_fault_callback(M4U_PORT_IMGO, ISP_M4U_TranslationFault_callback, NULL);
-	m4u_register_fault_callback(M4U_PORT_IMG2O, ISP_M4U_TranslationFault_callback, NULL);
-	m4u_register_fault_callback(M4U_PORT_LSCI, ISP_M4U_TranslationFault_callback, NULL);
-	m4u_register_fault_callback(M4U_PORT_IMGI, ISP_M4U_TranslationFault_callback, NULL);
-	m4u_register_fault_callback(M4U_PORT_ESFKO, ISP_M4U_TranslationFault_callback, NULL);
-	m4u_register_fault_callback(M4U_PORT_AAO, ISP_M4U_TranslationFault_callback, NULL);
+	m4u_register_fault_callback(M4U_PORT_CAM_IMGO, ISP_M4U_TranslationFault_callback, NULL);
+	m4u_register_fault_callback(M4U_PORT_CAM_IMG2O, ISP_M4U_TranslationFault_callback, NULL);
+	m4u_register_fault_callback(M4U_PORT_CAM_LSCI, ISP_M4U_TranslationFault_callback, NULL);
+	m4u_register_fault_callback(M4U_PORT_CAM_IMGI, ISP_M4U_TranslationFault_callback, NULL);
+	m4u_register_fault_callback(M4U_PORT_CAM_ESFKO, ISP_M4U_TranslationFault_callback, NULL);
+	m4u_register_fault_callback(M4U_PORT_CAM_AAO, ISP_M4U_TranslationFault_callback, NULL);
 
 	ISP_Init_FrmB();
 

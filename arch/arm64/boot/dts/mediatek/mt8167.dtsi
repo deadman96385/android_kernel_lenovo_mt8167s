@@ -1315,20 +1315,18 @@
 			interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_LOW>, /* CAM0 */
 				     <GIC_SPI 183 IRQ_TYPE_LEVEL_LOW>; /* SENINF */
 
-			clocks = <&imgsys CLK_IMG_LARB2_SMI>,
+			clocks = <&imgsys CLK_IMG_LARB1_SMI>,
 				 <&imgsys CLK_IMG_CAM_SMI>,
 				 <&imgsys CLK_IMG_CAM_CAM>,
 				 <&imgsys CLK_IMG_SEN_TG>,
 				 <&imgsys CLK_IMG_SEN_CAM>,
-				 <&imgsys CLK_IMG_CAM_SV>,
 				 <&mmsys CLK_MM_SMI_COMMON>;
 
-			clock-names = "IMG_LARB2_SMI",
+			clock-names = "IMG_LARB_SMI",
 				      "IMG_CAM_SMI",
 				      "IMG_CAM_CAM",
 				      "IMG_SEN_TG",
 				      "IMG_SEN_CAM",
-				      "IMG_CAM_SV",
 				      "MM_SMI_COMMON";
 
 			/* Power domains */
