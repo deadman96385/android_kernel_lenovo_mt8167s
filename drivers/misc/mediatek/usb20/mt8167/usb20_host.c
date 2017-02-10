@@ -32,8 +32,7 @@
 #include "usb20.h"
 #if defined(CONFIG_MTK_DUAL_INPUT_CHARGER_SUPPORT)
 #include <mt-plat/diso.h>
-#include <mt-plat/mt_boot.h>
-#include <mach/mt_diso.h>
+#include <mach/mtk_diso.h>
 #endif
 #ifdef CONFIG_OF
 #include <linux/of_irq.h>
