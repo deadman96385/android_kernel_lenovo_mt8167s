@@ -108,7 +108,6 @@ static IMG_BOOL g_bDeviceInit = IMG_FALSE;
 static IMG_BOOL g_bUnsync = IMG_FALSE;
 static IMG_UINT32 g_ui32_unsync_freq_id;
 static IMG_BOOL bCoreinitSucceeded = IMG_FALSE;
-static IMG_BOOL bfirstPowerOn = IMG_FALSE;
 
 
 static struct platform_device *sPVRLDMDev;
@@ -271,18 +270,6 @@ static IMG_VOID mtk_mfg_enable_clock(void)
 {
 	struct mtk_mfg_base *mfg_base = GET_MTK_MFG_BASE(sPVRLDMDev);
 	int i;
-
-#if 1
-		/* CJ, workaround to disbale the power doamin to reduce the reference count to 0*/
-		/* Suspend mfg power domain */
-		if (bfirstPowerOn == IMG_FALSE) {
-			pm_runtime_put_sync(&mfg_base->pdev->dev);
-			pm_runtime_put_sync(&mfg_base->mfg_2d_pdev->dev);
-			pm_runtime_put_sync(&mfg_base->mfg_async_pdev->dev);
-			bfirstPowerOn = IMG_TRUE;
-			pr_info("first time in mtk_mfg_enable_clock to disable the clk first\n");
-		}
-#endif
 
 	ged_dvfs_gpu_clock_switch_notify(1);
 
@@ -1369,11 +1356,6 @@ static int mtk_mfg_bind_device_resource(struct platform_device *pdev,
 	pm_runtime_enable(&pdev->dev);
 
 	mfg_base->pdev = pdev;
-	/*CJ, Fix, Me, it's workaround way to enable mfg power domain immediately*/
-	pr_err("pvr_trace mtk_enable_power_domain\n");
-	pm_runtime_get_sync(&mfg_base->mfg_async_pdev->dev);
-	pm_runtime_get_sync(&mfg_base->mfg_2d_pdev->dev);
-	pm_runtime_get_sync(&mfg_base->pdev->dev);
 	return 0;
 
 err_iounmap_reg_base:
