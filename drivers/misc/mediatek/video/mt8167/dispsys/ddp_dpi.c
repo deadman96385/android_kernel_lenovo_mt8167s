@@ -92,12 +92,6 @@ static int dpi_vsync_irq_count[DPI_INTERFACE_NUM];
 static int dpi_undflow_irq_count[DPI_INTERFACE_NUM];
 /*static struct DPI_REGS regBackup;*/
 struct DPI_REGS *DPI_REG[2];
-/*
-*
-unsigned long DPI_TVDPLL_CON0 = 0;
-unsigned long DPI_TVDPLL_CON1 = 0;
-*/
-
 
 static LCM_UTIL_FUNCS lcm_utils_dpi;
 
@@ -153,33 +147,6 @@ static void lcm_send_data(uint32_t data)
 {
 	/*DPI_OUTREG32(0, LCD_BASE+0x0F90, data); */
 }
-
-/*
-*
-static void _BackupDPIRegisters(enum DISP_MODULE_ENUM module)
-{
-    UINT32 i;
-    DPI_REGS *reg = &regBackup;
-
-    for (i = 0; i < ARY_SIZE(BACKUP_DPI_REG_OFFSETS); ++i)
-    {
-	DPI_OUTREG32(0, REG_ADDR(reg, BACKUP_DPI_REG_OFFSETS[i]),
-		 AS_UINT32(REG_ADDR(DPI_REG[DPI_IDX(module)], BACKUP_DPI_REG_OFFSETS[i])));
-    }
-}
-
-static void _RestoreDPIRegisters(enum DISP_MODULE_ENUM module)
-{
-    UINT32 i;
-    DPI_REGS *reg = &regBackup;
-
-    for (i = 0; i < ARY_SIZE(BACKUP_DPI_REG_OFFSETS); ++i)
-    {
-	DPI_OUTREG32(0, REG_ADDR(DPI_REG[DPI_IDX(module)], BACKUP_DPI_REG_OFFSETS[i]),
-		 AS_UINT32(REG_ADDR(reg, BACKUP_DPI_REG_OFFSETS[i])));
-    }
-}
-*/
 
 /*the functions declare*/
 /*DPI clock setting - use TVDPLL provide DPI clock for HDMI*/
@@ -305,10 +272,6 @@ enum DPI_STATUS ddp_dpi_ConfigPclk(enum DISP_MODULE_ENUM module, struct cmdqRecS
 #endif
 #ifdef CONFIG_MTK_CLKMGR
 	clkmux_sel(MT_MUX_DPI1, ck_div, "dpi1");	/*CLK_CFG_7  bit0~2 */
-#else
-	ddp_clk_enable(MUX_DPI1_SEL);
-	ddp_clk_set_parent(MUX_DPI1_SEL, clksrc);
-	ddp_clk_disable(MUX_DPI1_SEL);
 #endif
 	/*IO driving setting */
 	/* MASKREG32(DISPSYS_IO_DRIVING, 0x3C00, 0x0); // 0x1400 for 8mA, 0x0 for 4mA */
@@ -516,7 +479,6 @@ enum DPI_STATUS ddp_dpi_ConfigHDMI(enum DISP_MODULE_ENUM module, struct cmdqRecS
 }
 
 /*
-*
 DPI_VIDEO_1920x1080i_50Hz
 DPI_VIDEO_1920x1080i_60Hz
 */
@@ -562,7 +524,6 @@ enum DPI_STATUS ddp_dpi_ConfigVsync_REVEN(enum DISP_MODULE_ENUM module, struct c
 
 	return DPI_STATUS_OK;
 }
-
 
 int Is_interlace_resolution(uint32_t resolution)
 {
@@ -814,26 +775,33 @@ int ddp_dpi_ioctl(enum DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int 
 void LVDS_PLL_Init(enum DISP_MODULE_ENUM module, void *cmdq_handle, uint32_t PLL_CLK, uint32_t SSC_range,
 		   bool SSC_disable)
 {
-	unsigned int pixel_clock = 0;
-	unsigned long bclk = 0;	/*delta1 = 5, pdelta1 = 0; */
+	unsigned long bclk = 0;
 	enum eDDP_CLK_ID clksrc = 0;
 
-	pixel_clock = PLL_CLK * 4;
-	if (pixel_clock > 500) {
-		DISPCHECK("lvds pll clock exceed limitation(%d)\n", pixel_clock);
+	if (PLL_CLK > 250) {
+		DISPCHECK("lvds pll clock exceed high limitation(%d)\n", PLL_CLK);
 		ASSERT(0);
-	} else if (pixel_clock >= 63) {
+	} else if (PLL_CLK >= 125) {
+		bclk = PLL_CLK << 1;
+		clksrc = APMIXED_LVDSPLL;
+	} else if (PLL_CLK >= 63) {
+		bclk = PLL_CLK << 2;
 		clksrc = TOP_LVDSPLL_D2;
-		bclk = pixel_clock * 1000000;
-	} else if (pixel_clock >= 16) {
+	} else if (PLL_CLK >= 32) {
+		bclk = PLL_CLK << 3;
 		clksrc = TOP_LVDSPLL_D4;
-		bclk = pixel_clock * 2 * 1000000;
+	} else if (PLL_CLK >= 16) {
+		bclk = PLL_CLK << 4;
+		clksrc = TOP_LVDSPLL_D8;
 	} else {
-		DISPCHECK("lvds pll clock exceed limitation(%d)\n", pixel_clock);
+		DISPCHECK("lvds pll clock exceed low limitation(%d)\n", PLL_CLK);
 		ASSERT(0);
 	}
 
-	pr_warn("DPI0 LVDSPLL_init: pll_clock = %d, bclk = %ld\n", pixel_clock/4, bclk);
+	pr_warn("DPI0 LVDSPLL_init: pll_clock = %d MHz, bclk = %ld MHz\n", PLL_CLK, bclk);
+
+	bclk = bclk * 1000000;
+
 	ddp_clk_prepare_enable(MUX_DPI0_SEL);
 	ddp_clk_set_parent(MUX_DPI0_SEL, clksrc);
 	ddp_clk_disable_unprepare(MUX_DPI0_SEL);
@@ -844,7 +812,6 @@ void LVDS_PLL_Init(enum DISP_MODULE_ENUM module, void *cmdq_handle, uint32_t PLL
 
 	/*LVDS PLL SSC, 30k, range -8~0,default: 5 */
 	/*
-	*
 	if (1 != SSC_disable) {
 	   OUTREG32(clk_apmixed_base + 0x2d0, (1 << 17) | 0x1B1);
 	   if (0 != SSC_range)
@@ -1110,7 +1077,6 @@ bool ddp_dpi_is_top_filed(enum DISP_MODULE_ENUM module)
 
 	return false;
 }
-
 
 struct DDP_MODULE_DRIVER ddp_driver_dpi0 = {
 	.module = DISP_MODULE_DPI0,
