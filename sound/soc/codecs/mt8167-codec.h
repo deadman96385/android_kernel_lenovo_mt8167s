@@ -26,6 +26,19 @@ enum mt8167_codec_loopback_type {
 	CODEC_LOOPBACK_HEADSET_MIC_TO_HP,
 };
 
+enum hp_channel_id {
+	HP_LEFT = 1,   /* AU_HPL */
+	HP_RIGHT,      /* AU_HPR */
+	HP_LEFT_RIGHT, /* AU_HPL/AU_HPR */
+};
+
+enum hp_sequence_id {
+	HP_ON_SEQ = 0,
+	HP_OFF_SEQ,
+};
+
+#define HP_PGA_GAIN_NUMS (8)
+
 #define AFE_OFFSET               (0xA0000000)
 #define APMIXED_OFFSET           (0x0B000000)
 
