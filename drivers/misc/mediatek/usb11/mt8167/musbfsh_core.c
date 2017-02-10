@@ -109,6 +109,30 @@
 #include "musbfsh_dma.h"
 #include "musbfsh_hsdma.h"
 #include "musbfsh_mt65xx.h"
+#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+#include "musbfsh_qmu.h"
+#include "mtk11_qmu.h"
+u32 mtk11_dma_burst_setting, mtk11_qmu_ioc_setting;
+/*struct musbfsh_hw_ep *mtk11_qmu_isoc_ep;*/
+int mtk11_qmu_dbg_level = LOG_CRIT;
+int mtk11_qmu_max_gpd_num;
+int mtk11_isoc_ep_start_idx = 4;
+int mtk11_isoc_ep_gpd_count = 3000;
+int mtk11_host_qmu_concurrent = 1;
+int mtk11_host_qmu_pipe_msk = (PIPE_ISOCHRONOUS + 1) | (PIPE_BULK + 1) /*| (PIPE_INTERRUPT+ 1) */;
+int mtk11_host_qmu_max_active_isoc_gpd;
+int mtk11_host_qmu_max_number_of_pkts;
+
+module_param(mtk11_qmu_dbg_level, int, 0644);
+module_param(mtk11_host_qmu_concurrent, int, 0644);
+module_param(mtk11_host_qmu_pipe_msk, int, 0644);
+module_param(mtk11_host_qmu_max_active_isoc_gpd, int, 0644);
+module_param(mtk11_host_qmu_max_number_of_pkts, int, 0644);
+#endif
+
+int musbfsh_host_dynamic_fifo = 1;
+int musbfsh_host_dynamic_fifo_usage_msk;
+module_param(musbfsh_host_dynamic_fifo, int, 0644);
 
 #ifdef CONFIG_MUSBFSH_PIO_ONLY
 #undef CONFIG_MUSBFSH_PIO_ONLY
@@ -334,6 +358,10 @@ void musbfsh_load_testpacket(struct musbfsh *musbfsh)
 	musbfsh_writew(regs, MUSBFSH_CSR0, MUSBFSH_CSR0_TXPKTRDY);
 }
 
+static struct musbfsh_fifo_cfg ep0_cfg = {
+	.style = FIFO_RXTX, .maxpacket = 64,
+};
+
 /*-------------------------------------------------------------------------*/
 /*
  * Interrupt Service Routine to record USB "global" interrupts.
@@ -476,6 +504,12 @@ static irqreturn_t musbfsh_stage0_irq(struct musbfsh *musbfsh, u8 int_usb, u8 de
 					   | USB_PORT_STAT_HIGH_SPEED | USB_PORT_STAT_ENABLE);
 		musbfsh->port1_status |= USB_PORT_STAT_CONNECTION
 		    | (USB_PORT_STAT_C_CONNECTION << 16);
+		if (musbfsh_host_dynamic_fifo)
+			musbfsh_host_dynamic_fifo_usage_msk = 0;
+
+#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+		musbfsh_disable_q_all(musbfsh);
+#endif
 
 		/* high vs full speed is just a guess until after reset */
 		if (devctl & MUSBFSH_DEVCTL_LSDEV)
@@ -491,6 +525,10 @@ static irqreturn_t musbfsh_stage0_irq(struct musbfsh *musbfsh, u8 int_usb, u8 de
 
 	if (int_usb & MUSBFSH_INTR_DISCONNECT) {
 		WARNING("DISCONNECT !devctl %02x\n", devctl);
+#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+		musbfsh_disable_q_all(musbfsh);
+#endif
+
 		handled = IRQ_HANDLED;
 		usb_hcd_resume_root_hub(musbfsh_to_hcd(musbfsh));
 		musbfsh_root_disconnect(musbfsh);
@@ -538,7 +576,11 @@ void musbfsh_start(struct musbfsh *musbfsh)
 	musbfsh_writew(regs, MUSBFSH_INTRRXE, musbfsh->epmask & 0xfffe);
 	musbfsh_writeb(regs, MUSBFSH_INTRUSBE, 0xf7);
 	/* enable level 1 interrupts */
+	#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	musbfsh_writew(regs, USB11_L1INTM, 0x002f);
+	#else
 	musbfsh_writew(regs, USB11_L1INTM, 0x000f);
+	#endif
 	int_level1 = musbfsh_readw(musbfsh->mregs, USB11_L1INTM);
 	INFO("Level 1 Interrupt Mask 0x%x\n", int_level1);
 	int_level1 = musbfsh_readw(musbfsh->mregs, USB11_L1INTP);
@@ -666,11 +708,6 @@ static struct musbfsh_fifo_cfg epx_cfg[] __initdata = {
 	{.hw_ep_num = 7, .style = FIFO_RX, .maxpacket = 512, .mode = BUF_SINGLE},
 };
 
-static struct musbfsh_fifo_cfg ep0_cfg __initdata = {
-	.style = FIFO_RXTX,
-	.maxpacket = 64,
-};
-
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -755,6 +792,9 @@ static int __init ep_config_from_table(struct musbfsh *musbfsh)
 	unsigned n = 0;
 	int offset;
 	struct musbfsh_hw_ep *hw_ep = musbfsh->endpoints;
+
+	if (musbfsh_host_dynamic_fifo)
+		musbfsh_host_dynamic_fifo_usage_msk = 0;
 
 	INFO("++\n");
 	if (musbfsh->config->fifo_cfg) {
@@ -856,6 +896,9 @@ void musbfsh_read_clear_generic_interrupt(struct musbfsh *musbfsh)
 	musbfsh->int_tx = musbfsh_readw(musbfsh->mregs, MUSBFSH_INTRTX);
 	musbfsh->int_rx = musbfsh_readw(musbfsh->mregs, MUSBFSH_INTRRX);
 	musbfsh->int_dma = musbfsh_readb(musbfsh->mregs, MUSBFSH_HSDMA_INTR);
+	#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	musbfsh->int_queue = musbfsh_readl(musbfsh->mregs, MUSBFSH_QISAR);
+	#endif
 	INFO("** musbfsh::IRQ! usb%04x tx%04x rx%04x dma%04x\n",
 	     musbfsh->int_usb, musbfsh->int_tx, musbfsh->int_rx, musbfsh->int_dma);
 	/* clear interrupt status */
@@ -863,6 +906,10 @@ void musbfsh_read_clear_generic_interrupt(struct musbfsh *musbfsh)
 	musbfsh_writew(musbfsh->mregs, MUSBFSH_INTRRX, musbfsh->int_rx);
 	musbfsh_writeb(musbfsh->mregs, MUSBFSH_INTRUSB, musbfsh->int_usb);
 	musbfsh_writeb(musbfsh->mregs, MUSBFSH_HSDMA_INTR, musbfsh->int_dma);
+	#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	musbfsh_writel(musbfsh->mregs, MUSBFSH_QISAR, musbfsh->int_queue);
+	musbfsh->int_queue &= ~(musbfsh_readl(musbfsh->mregs, MUSBFSH_QIMR));
+	#endif
 }
 
 static irqreturn_t generic_interrupt(int irq, void *__hci)
@@ -879,8 +926,14 @@ static irqreturn_t generic_interrupt(int irq, void *__hci)
 	int_level1 = musbfsh_readw(musbfsh->mregs, USB11_L1INTS);
 	INFO("Level 1 Interrupt Status 0x%x\r\n", int_level1);
 
+#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	if (musbfsh->int_usb || musbfsh->int_tx || musbfsh->int_rx || musbfsh->int_queue)
+		retval = musbfsh_interrupt(musbfsh);
+#else
 	if (musbfsh->int_usb || musbfsh->int_tx || musbfsh->int_rx)
 		retval = musbfsh_interrupt(musbfsh);
+#endif
+
 #ifndef CONFIG_MUSBFSH_PIO_ONLY
 	if (musbfsh->int_dma)
 		retval = musbfsh_dma_controller_irq(irq, musbfsh->musbfsh_dma_controller);
@@ -920,6 +973,14 @@ irqreturn_t musbfsh_interrupt(struct musbfsh *musbfsh)
 	/* handle endpoint 0 first */
 	if (musbfsh->int_tx & 1)
 		retval |= musbfsh_h_ep0_irq(musbfsh);
+
+#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	/* process generic queue interrupt */
+	if (musbfsh->int_queue) {
+		musbfsh_q_irq(musbfsh);
+		retval = IRQ_HANDLED;
+	}
+#endif
 
 	/* RX on endpoints 1-15 */
 	reg = musbfsh->int_rx >> 1;
@@ -1029,6 +1090,11 @@ static void musbfsh_free(struct musbfsh *musbfsh)
 	 * cleanup after everything's been de-activated.
 	 */
 	INFO("++\n");
+	#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	musbfsh_disable_q_all(musbfsh);
+	musbfsh_qmu_exit(musbfsh);
+	#endif
+
 	if (musbfsh->nIrq >= 0) {
 		if (musbfsh->irq_wake)
 			disable_irq_wake(musbfsh->nIrq);
@@ -1054,9 +1120,9 @@ static void musbfsh_free(struct musbfsh *musbfsh)
  */
 #ifdef CONFIG_OF
 static int
-musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl, void __iomem *ctrlp)
+musbfsh_init_controller(struct device *dev, int nIrq, void __iomem *ctrl, void __iomem *ctrlp)
 #else
-static int musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
+static int musbfsh_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 #endif
 {
 	int status;
@@ -1158,13 +1224,17 @@ static int musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl
 		goto fail2;
 	}
 
+	#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	musbfsh_qmu_init(musbfsh);
+	#endif
+
 	/* attach to the IRQ */
 	INFO("[Flow][USB11]%s:%d ,request_irq %d\n", __func__, __LINE__, nIrq);
 	/*wx? usb_add_hcd will also try do request_irq, if hcd_driver.irq is set*/
 	if (request_irq(nIrq, musbfsh->isr, IRQF_TRIGGER_LOW, dev_name(dev), musbfsh)) {
 		dev_err(dev, "musbfsh::request_irq %d failed!\n", nIrq);
 		status = -ENODEV;
-		goto fail2;
+		goto fail3;
 	}
 	musbfsh->nIrq = nIrq;	/*update the musbfsh->nIrq after request_irq !*/
 	/* FIXME this handles wakeup irqs wrong */
@@ -1189,13 +1259,13 @@ static int musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl
 
 	if (status < 0) {
 		ERR("usb_add_hcd fail!");
-		goto fail2;
+		goto fail3;
 	}
 	status = musbfsh_init_debugfs(musbfsh);
 
 	if (status < 0) {
 		ERR("usb_add_debugfs fail!");
-		goto fail3;
+		goto fail4;
 	}
 	dev_info(dev, "USB controller at %p using %s, IRQ %d\n",
 		 ctrl, (is_dma_capable() && musbfsh->dma_controller)
@@ -1204,10 +1274,13 @@ static int musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl
 	return 0;
 
 
-fail3:
+fail4:
 	musbfsh_exit_debugfs(musbfsh);
 
-
+fail3:
+	#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	musbfsh_qmu_exit(musbfsh);
+	#endif
 
 fail2:
 	if (musbfsh->irq_wake)
@@ -1272,11 +1345,11 @@ static int __init musbfsh_probe(struct platform_device *pdev)
 #endif
 
 #ifdef CONFIG_OF
-	status = musb_init_controller(dev, irq, base, (void __iomem *)pbase);
+	status = musbfsh_init_controller(dev, irq, base, (void __iomem *)pbase);
 #else
 	INFO("[Flow][USB11]%s:%d, base == %p\n", __func__, __LINE__, USB_BASE);
 	base = (void *)USB_BASE;
-	status = musb_init_controller(dev, irq, base);
+	status = musbfsh_init_controller(dev, irq, base);
 #endif
 
 
@@ -1328,6 +1401,10 @@ static void musbfsh_save_context(struct musbfsh *musbfsh)
 	void __iomem *musbfsh_base = musbfsh->mregs;
 	void __iomem *epio;
 
+#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	mtk11_dma_burst_setting = musbfsh_readl(musbfsh->mregs, 0x204);
+	mtk11_qmu_ioc_setting = musbfsh_readl((musbfsh->mregs + MUSBFSH_QISAR), 0x30);
+#endif
 	musbfsh->context.power = musbfsh_readb(musbfsh_base, MUSBFSH_POWER);
 	musbfsh->context.intrtxe = musbfsh_readw(musbfsh_base, MUSBFSH_INTRTXE);
 	musbfsh->context.intrrxe = musbfsh_readw(musbfsh_base, MUSBFSH_INTRRXE);
@@ -1372,6 +1449,11 @@ static void musbfsh_restore_context(struct musbfsh *musbfsh)
 	int i;
 	void __iomem *musbfsh_base = musbfsh->mregs;
 	void __iomem *epio;
+
+#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	musbfsh_writel(musbfsh->mregs, 0x204, mtk11_dma_burst_setting);
+	musbfsh_writel((musbfsh->mregs + MUSBFSH_QISAR), 0x30, mtk11_qmu_ioc_setting);
+#endif
 
 	musbfsh_writeb(musbfsh_base, MUSBFSH_POWER, musbfsh->context.power);
 	musbfsh_writew(musbfsh_base, MUSBFSH_INTRTXE, musbfsh->context.intrtxe);
