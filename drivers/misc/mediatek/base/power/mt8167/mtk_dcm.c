@@ -629,7 +629,7 @@ int dcm_emi(ENUM_EMI_DCM on)
 		dcm_emi_slow_down_ratio(EMI_DCM_SLOW_DOWN_RATIO_DIV_32);
 		reg_write(EMI_CONM, and(reg_read(EMI_CONM), ~EMI_DCM_DIS));
 		reg_write(TOPEMI_DCMCTL, aor(reg_read(TOPEMI_DCMCTL),
-					     ~EMIDCM_EN_MASK, EMIDCM_EN_ON | EMIDCM_APB_SEL_DCM));
+					     ~EMIDCM_EN_MASK, EMIDCM_EN_OFF | EMIDCM_APB_SEL_DCM));
 	} else {
 		dcm_emi_dbc(0, 0);
 		dcm_emi_slow_down_ratio(EMI_DCM_SLOW_DOWN_RATIO_DIV_32);
