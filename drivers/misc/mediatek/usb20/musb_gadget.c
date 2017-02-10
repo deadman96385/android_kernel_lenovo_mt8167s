@@ -2094,7 +2094,7 @@ int check_delay_done = 1;
 static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 {
 	struct musb *musb = gadget_to_musb(gadget);
-	unsigned long        flags;
+	/*unsigned long        flags;*/
 	bool usb_in = false;
 
 	DBG(0, "is_on=%d, softconnect=%d ++\n", is_on, musb->softconnect);
@@ -2114,12 +2114,13 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 	/* be aware this could not be used in non-sleep context */
 	usb_in = usb_cable_connected();
 
-	spin_lock_irqsave(&musb->lock, flags);
+	/* Remove spin_lock to prevent dead lock */
+	/*spin_lock_irqsave(&musb->lock, flags);*/
 	if (is_on != musb->softconnect) {
 		musb->softconnect = is_on;
 		musb_pullup(musb, is_on, usb_in);
 	}
-	spin_unlock_irqrestore(&musb->lock, flags);
+	/*spin_unlock_irqrestore(&musb->lock, flags);*/
 
 	pm_runtime_put(musb->controller);
 
