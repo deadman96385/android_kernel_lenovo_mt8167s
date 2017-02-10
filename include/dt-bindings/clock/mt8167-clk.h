@@ -264,11 +264,11 @@
 
 /* MFGCFG */
 
-#define CLK_MFGCFG_BAXI			0
-#define CLK_MFGCFG_BMEM			1
-#define CLK_MFGCFG_BG3D			2
-#define CLK_MFGCFG_B26M			3
-#define CLK_MFGCFG_NR_CLK		4
+#define CLK_MFG_BAXI			0
+#define CLK_MFG_BMEM			1
+#define CLK_MFG_BG3D			2
+#define CLK_MFG_B26M			3
+#define CLK_MFG_NR_CLK			4
 
 /* MMSYS */
 
