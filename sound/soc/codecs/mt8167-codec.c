@@ -29,8 +29,6 @@
 #endif
 
 #define HP_CALI_ITEMS    (HP_CALI_NUMS * HP_PGA_GAIN_NUMS)
-#define HP_DC_OFFSET_MAX (100)
-#define HP_DC_OFFSET_MIN (-100)
 
 enum regmap_module_id {
 	REGMAP_AFE = 0,
@@ -108,8 +106,7 @@ static const struct mt8167_codec_rate mt8167_codec_dl_rates[] = {
 	{ .rate =  48000, .regvalue = 8 },
 };
 
-static int mt8167_codec_ul_rate_to_val(struct mt8167_codec_priv *codec_data,
-	int rate)
+static int mt8167_codec_ul_rate_to_val(struct snd_soc_codec *codec, int rate)
 {
 	int i;
 
@@ -117,14 +114,12 @@ static int mt8167_codec_ul_rate_to_val(struct mt8167_codec_priv *codec_data,
 		if (mt8167_codec_ul_rates[i].rate == rate)
 			return mt8167_codec_ul_rates[i].regvalue;
 
-	dev_err(codec_data->codec->dev, "%s unsupported ul rate %d\n",
-			__func__, rate);
+	dev_err(codec->dev, "%s unsupported ul rate %d\n", __func__, rate);
 
 	return -EINVAL;
 }
 
-static int mt8167_codec_dl_rate_to_val(struct mt8167_codec_priv *codec_data,
-	int rate)
+static int mt8167_codec_dl_rate_to_val(struct snd_soc_codec *codec, int rate)
 {
 	int i;
 
@@ -132,101 +127,78 @@ static int mt8167_codec_dl_rate_to_val(struct mt8167_codec_priv *codec_data,
 		if (mt8167_codec_dl_rates[i].rate == rate)
 			return mt8167_codec_dl_rates[i].regvalue;
 
-	dev_err(codec_data->codec->dev, "%s unsupported dl rate %d\n",
-			__func__, rate);
+	dev_err(codec->dev, "%s unsupported dl rate %d\n", __func__, rate);
 
 	return -EINVAL;
 }
 
-static int mt8167_codec_valid_new_rate(struct mt8167_codec_priv *codec_data)
+static int mt8167_codec_valid_new_rate(struct snd_soc_codec *codec)
 {
 	uint32_t abb_afe_con11_val = 0;
 
 	abb_afe_con11_val = ABB_AFE_CON11_TOP_CTRL;
 
 	/* toggle top_ctrl status */
-	if (snd_soc_read(codec_data->codec, ABB_AFE_CON11) &
+	if (snd_soc_read(codec, ABB_AFE_CON11) &
 			ABB_AFE_CON11_TOP_CTRL_STATUS)
-		snd_soc_update_bits(codec_data->codec,
-			ABB_AFE_CON11,
+		snd_soc_update_bits(codec, ABB_AFE_CON11,
 			ABB_AFE_CON11_TOP_CTRL, 0x0);
 	else
-		snd_soc_update_bits(codec_data->codec,
-			ABB_AFE_CON11,
+		snd_soc_update_bits(codec, ABB_AFE_CON11,
 			ABB_AFE_CON11_TOP_CTRL, abb_afe_con11_val);
 
 	return 0;
 }
 
-static int mt8167_codec_setup_ul_rate(struct snd_soc_dai *codec_dai, int rate)
+static int mt8167_codec_setup_ul_rate(struct snd_soc_codec *codec, int rate)
 {
-	struct mt8167_codec_priv *codec_data =
-			snd_soc_codec_get_drvdata(codec_dai->codec);
 	uint32_t val = 0;
 
-	if (mt8167_codec_ul_rate_to_val(codec_data, rate) < 0) {
-		dev_err(codec_dai->codec->dev,
-			"%s error to get ul rate\n", __func__);
+	if (mt8167_codec_ul_rate_to_val(codec, rate) < 0) {
+		dev_err(codec->dev, "%s error to get ul rate\n", __func__);
 		return -EINVAL;
 	}
 
-	val = mt8167_codec_ul_rate_to_val(codec_data, rate);
-	snd_soc_update_bits(codec_data->codec,
-			ABB_AFE_CON1, (0xF << 4), (val << 4));
-	mt8167_codec_valid_new_rate(codec_data);
+	val = mt8167_codec_ul_rate_to_val(codec, rate);
+	snd_soc_update_bits(codec, ABB_AFE_CON1, (0xF << 4), (val << 4));
+	mt8167_codec_valid_new_rate(codec);
 
 	return 0;
 }
 
-static int mt8167_codec_setup_dl_rate(struct snd_soc_dai *codec_dai, int rate)
+static int mt8167_codec_setup_dl_rate(struct snd_soc_codec *codec, int rate)
 {
-	struct mt8167_codec_priv *codec_data =
-			snd_soc_codec_get_drvdata(codec_dai->codec);
 	uint32_t val = 0;
 
-	if (mt8167_codec_dl_rate_to_val(codec_data, rate) < 0) {
-		dev_err(codec_dai->codec->dev,
-			"%s error to get dl rate\n", __func__);
+	if (mt8167_codec_dl_rate_to_val(codec, rate) < 0) {
+		dev_err(codec->dev, "%s error to get dl rate\n", __func__);
 		return -EINVAL;
 	}
 
-	val = mt8167_codec_dl_rate_to_val(codec_data, rate);
-	snd_soc_update_bits(codec_data->codec,
-			ABB_AFE_CON1, GENMASK(3, 0), val);
-	mt8167_codec_valid_new_rate(codec_data);
+	val = mt8167_codec_dl_rate_to_val(codec, rate);
+	snd_soc_update_bits(codec, ABB_AFE_CON1, GENMASK(3, 0), val);
+	mt8167_codec_valid_new_rate(codec);
 
 	return 0;
-}
-
-static void mt8167_codec_setup_dc_comp(struct snd_soc_dai *codec_dai)
-{
-	struct snd_soc_codec *codec = codec_dai->codec;
-
-	/*  L-ch DC compensation value */
-	snd_soc_update_bits(codec, ABB_AFE_CON3, GENMASK(15, 0), 0);
-	/*  R-ch DC compensation value */
-	snd_soc_update_bits(codec, ABB_AFE_CON4, GENMASK(15, 0), 0);
-	/* DC compensation enable */
-	snd_soc_update_bits(codec, ABB_AFE_CON10, 0x1, 0x1);
-	mt8167_codec_valid_new_dc_comp(codec);
 }
 
 static int mt8167_codec_hw_params(struct snd_pcm_substream *substream,
 			struct snd_pcm_hw_params *params,
 			struct snd_soc_dai *codec_dai)
 {
+	struct snd_soc_codec *codec = codec_dai->codec;
 	int ret = 0;
 	int rate = params_rate(params);
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		dev_dbg(codec_dai->codec->dev,
-			"%s capture rate = %d\n", __func__, rate);
-		ret = mt8167_codec_setup_ul_rate(codec_dai, rate);
+		dev_dbg(codec->dev, "%s capture rate = %d\n", __func__, rate);
+		ret = mt8167_codec_setup_ul_rate(codec, rate);
 	} else if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		dev_dbg(codec_dai->codec->dev,
-			"%s playback rate = %d\n", __func__, rate);
-		ret = mt8167_codec_setup_dl_rate(codec_dai, rate);
-		mt8167_codec_setup_dc_comp(codec_dai);
+		dev_dbg(codec->dev, "%s playback rate = %d\n", __func__, rate);
+		ret = mt8167_codec_setup_dl_rate(codec, rate);
+		/* DC compensation enable */
+		snd_soc_update_bits(codec, ABB_AFE_CON10, 0x1, 0x1);
+		mt8167_codec_update_dc_comp(codec, HP_LEFT_RIGHT, 0, 0);
 	}
 
 	return ret;
@@ -364,7 +336,7 @@ static int mt8167_codec_left_audio_dac_event(struct snd_soc_dapm_widget *w,
 		codec_data->stamp_ldac_on = sched_clock();
 #endif
 		/* ramp down after DAC on */
-		mt8167_codec_dc_offset_ramp(codec_data->codec,
+		mt8167_codec_dc_offset_ramp(codec,
 			HP_CALI_VCM_TO_DAC, HP_LEFT, HP_ON_SEQ,
 			codec_data->lch_dccomp_val,
 			codec_data->rch_dccomp_val,
@@ -373,7 +345,7 @@ static int mt8167_codec_left_audio_dac_event(struct snd_soc_dapm_widget *w,
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		/* ramp up before DAC off */
-		mt8167_codec_dc_offset_ramp(codec_data->codec,
+		mt8167_codec_dc_offset_ramp(codec,
 			HP_CALI_VCM_TO_DAC, HP_LEFT, HP_OFF_SEQ,
 			codec_data->lch_dccomp_val,
 			codec_data->rch_dccomp_val,
@@ -410,7 +382,7 @@ static int mt8167_codec_right_audio_dac_event(struct snd_soc_dapm_widget *w,
 		codec_data->stamp_rdac_on = sched_clock();
 #endif
 		/* ramp down after DAC on */
-		mt8167_codec_dc_offset_ramp(codec_data->codec,
+		mt8167_codec_dc_offset_ramp(codec,
 			HP_CALI_VCM_TO_DAC, HP_RIGHT, HP_ON_SEQ,
 			codec_data->lch_dccomp_val,
 			codec_data->rch_dccomp_val,
@@ -419,7 +391,7 @@ static int mt8167_codec_right_audio_dac_event(struct snd_soc_dapm_widget *w,
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		/* ramp up before DAC off */
-		mt8167_codec_dc_offset_ramp(codec_data->codec,
+		mt8167_codec_dc_offset_ramp(codec,
 			HP_CALI_VCM_TO_DAC, HP_RIGHT, HP_OFF_SEQ,
 			codec_data->lch_dccomp_val,
 			codec_data->rch_dccomp_val,
@@ -621,62 +593,49 @@ static int mt8167_codec_ul_vref24_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
-static void mt8167_codec_hp_depop_setup(
-			struct mt8167_codec_priv *codec_data)
+static void mt8167_codec_hp_depop_setup(struct snd_soc_codec *codec)
 {
 	/* Set audio DAC bias current */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON01, (0x1F << 6), 0x0);
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON01, (0x1F << 6), 0x0);
 	/* Set the charge option of depop VCM gen. to "charge type" */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, BIT(18), BIT(18));
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(18), BIT(18));
 	/* Set the 22uA current step of depop VCM gen. to charge 22uF cap. */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, GENMASK(20, 19), (0x1 << 19));
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, GENMASK(20, 19), BIT(19));
 	/* Set the depop VCM voltage of depop VCM gen. to 1.35V. */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, BIT(21), 0x0);
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(21), 0x0);
 	/* Enable the depop VCM generator. */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, BIT(22), BIT(22));
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(22), BIT(22));
 	/* Set the series resistor of depop mux of HP drivers to 62.5 Ohm. */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, (0x3 << 23), (0x3 << 23));
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, (0x3 << 23), (0x3 << 23));
 	/* Disable audio DAC clock. */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, BIT(27), 0x0);
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(27), 0x0);
 	/* Enable the depop mux of HP drivers. */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, BIT(25), BIT(25));
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(25), BIT(25));
 }
 
-static void mt8167_codec_hp_depop_cleanup(
-			struct mt8167_codec_priv *codec_data)
+static void mt8167_codec_hp_depop_cleanup(struct snd_soc_codec *codec)
 {
 	/* Set the charge option of depop VCM gen. to "dis-charge type" */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, BIT(18), 0x0);
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(18), 0x0);
 	/* Set the 33uF cap current step of depop VCM gen to dis-charge */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, (0x2 << 19), (0x2 << 19));
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, (0x2 << 19), (0x2 << 19));
 	/* Disable the depop VCM generator */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, BIT(22), 0x0);
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(22), 0x0);
 }
 
 /* PRE_PMD */
 static void mt8167_codec_hp_depop_enable(
 			struct mt8167_codec_priv *codec_data)
 {
+	struct snd_soc_codec *codec = codec_data->codec;
+
 	/* Enable depop VCM gen */
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
-			BIT(22), BIT(22));
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(22), BIT(22));
 	/* Enable the depop mux of HP drivers */
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
-			BIT(25), BIT(25));
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(25), BIT(25));
 
 	/* ramp down before OP off */
-	mt8167_codec_dc_offset_ramp(codec_data->codec,
+	mt8167_codec_dc_offset_ramp(codec,
 		HP_CALI_OP_TO_VCM, HP_LEFT_RIGHT, HP_OFF_SEQ,
 		codec_data->lch_dccomp_val,
 		codec_data->rch_dccomp_val,
@@ -684,14 +643,14 @@ static void mt8167_codec_hp_depop_enable(
 		codec_data->pga_gain[HP_R_PGA_GAIN]);
 
 	/* Reset HP Pre-charge function */
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
-			BIT(28), 0x0);
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(28), 0x0);
 }
 
 /* POST_PMU */
 static void mt8167_codec_hp_depop_disable(
 			struct mt8167_codec_priv *codec_data)
 {
+	struct snd_soc_codec *codec = codec_data->codec;
 #ifdef TIMESTAMP_INFO
 	uint64_t latency_ldac_to_op = 0;
 	uint64_t latency_rdac_to_op = 0;
@@ -704,30 +663,27 @@ static void mt8167_codec_hp_depop_disable(
 	latency_rdac_to_op =
 		codec_data->stamp_op_on - codec_data->stamp_rdac_on;
 
-	dev_dbg(codec_data->codec->dev,
+	dev_dbg(codec->dev,
 		"latency_ldac_to_op %llu us, latency_rdac_to_op %llu us\n",
 		latency_ldac_to_op/1000, latency_rdac_to_op/1000);
 
-	dev_dbg(codec_data->codec->dev,
+	dev_dbg(codec->dev,
 		"latency_cali_ldac_to_op %llu us, latency_cali_rdac_to_op %llu us\n",
 		codec_data->latency_cali_ldac_to_op/1000,
 		codec_data->latency_cali_rdac_to_op/1000);
 #endif
 
 	/* restore gain */
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON01,
-			GENMASK(2, 0),
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON01, GENMASK(2, 0),
 			codec_data->pga_gain[HP_L_PGA_GAIN]);
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON01,
-			GENMASK(5, 3),
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON01, GENMASK(5, 3),
 			(codec_data->pga_gain[HP_R_PGA_GAIN]) << 3);
 
 	/* HP Pre-charge function release */
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
-			BIT(28), BIT(28));
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(28), BIT(28));
 
 	/* ramp up after OP on */
-	mt8167_codec_dc_offset_ramp(codec_data->codec,
+	mt8167_codec_dc_offset_ramp(codec,
 		HP_CALI_OP_TO_VCM, HP_LEFT_RIGHT, HP_ON_SEQ,
 		codec_data->lch_dccomp_val,
 		codec_data->rch_dccomp_val,
@@ -735,11 +691,9 @@ static void mt8167_codec_hp_depop_disable(
 		codec_data->pga_gain[HP_R_PGA_GAIN]);
 
 	/* Disable the depop mux of HP drivers */
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
-			BIT(25), 0x0);
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(25), 0x0);
 	/* Disable the depop VCM gen */
-	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
-			BIT(22), 0x0);
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(22), 0x0);
 }
 
 /* HP Depop VCM */
@@ -1005,6 +959,7 @@ static int mt8167_codec_pga_gain_put(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct mt8167_codec_priv *codec_data =
 			snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = codec_data->codec;
 	struct soc_enum *e = (struct soc_enum *)kcontrol->private_value;
 	int id = mt8167_codec_get_gain_enum_id(kcontrol->id.name);
 	uint32_t value = ucontrol->value.integer.value[0];
@@ -1012,28 +967,27 @@ static int mt8167_codec_pga_gain_put(struct snd_kcontrol *kcontrol,
 	if (value >= e->items)
 		return -EINVAL;
 
-	dev_dbg(codec_data->codec->dev,
-		"%s id %d, value %u\n", __func__, id, value);
+	dev_dbg(codec->dev, "%s id %d, value %u\n", __func__, id, value);
 
 	switch (id) {
 	case HP_L_PGA_GAIN:
-		snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON01,
+		snd_soc_update_bits(codec, AUDIO_CODEC_CON01,
 			GENMASK(2, 0), value);
 		break;
 	case HP_R_PGA_GAIN:
-		snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON01,
+		snd_soc_update_bits(codec, AUDIO_CODEC_CON01,
 			GENMASK(5, 3), value << 3);
 		break;
 	case LOUT_PGA_GAIN:
-		snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
+		snd_soc_update_bits(codec, AUDIO_CODEC_CON02,
 			GENMASK(12, 9), value << 9);
 		break;
 	case UL_L_PGA_GAIN:
-		snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON00,
+		snd_soc_update_bits(codec, AUDIO_CODEC_CON00,
 			GENMASK(27, 25), value << 25);
 		break;
 	case UL_R_PGA_GAIN:
-		snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON00,
+		snd_soc_update_bits(codec, AUDIO_CODEC_CON00,
 			GENMASK(9, 7), value << 7);
 		break;
 	default:
@@ -1067,8 +1021,9 @@ static int mt8167_codec_loopback_get(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct mt8167_codec_priv *codec_data =
 			snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = codec_data->codec;
 
-	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
+	dev_dbg(codec->dev, "%s\n", __func__);
 	ucontrol->value.integer.value[0] = codec_data->loopback_type;
 	return 0;
 }
@@ -1079,22 +1034,21 @@ static int mt8167_codec_loopback_put(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct mt8167_codec_priv *codec_data =
 			snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = codec_data->codec;
 	uint32_t prev_lpbk_type = codec_data->loopback_type;
 	uint32_t next_lpbk_type = ucontrol->value.integer.value[0];
 
-	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
+	dev_dbg(codec->dev, "%s\n", __func__);
 
 	if (next_lpbk_type == prev_lpbk_type) {
-		dev_dbg(codec_data->codec->dev, "%s dummy action\n", __func__);
+		dev_dbg(codec->dev, "%s dummy action\n", __func__);
 		return 0;
 	}
 
 	if (prev_lpbk_type != CODEC_LOOPBACK_NONE)
-		mt8167_codec_turn_off_lpbk_path(
-			codec_data->codec, prev_lpbk_type);
+		mt8167_codec_turn_off_lpbk_path(codec, prev_lpbk_type);
 	if (next_lpbk_type != CODEC_LOOPBACK_NONE)
-		mt8167_codec_turn_on_lpbk_path(
-			codec_data->codec, next_lpbk_type);
+		mt8167_codec_turn_on_lpbk_path(codec, next_lpbk_type);
 
 	codec_data->loopback_type = ucontrol->value.integer.value[0];
 	return 0;
@@ -1106,8 +1060,6 @@ static int mt8167_codec_hp_dc_offsets_info(struct snd_kcontrol *kcontrol,
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = HP_CALI_ITEMS * 2;
-	uinfo->value.integer.min = HP_DC_OFFSET_MIN;
-	uinfo->value.integer.max = HP_DC_OFFSET_MAX;
 	return 0;
 }
 
@@ -1117,6 +1069,7 @@ static int mt8167_codec_hp_dc_offsets_get(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct mt8167_codec_priv *codec_data =
 		snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = codec_data->codec;
 	long *lch_dc_offsets = (long *) codec_data->lch_dc_offset;
 	long *rch_dc_offsets = (long *) codec_data->rch_dc_offset;
 
@@ -1125,7 +1078,7 @@ static int mt8167_codec_hp_dc_offsets_get(struct snd_kcontrol *kcontrol,
 #ifdef TIMESTAMP_INFO
 		codec_data->latency_cali_ldac_to_op =
 #endif
-		mt8167_codec_get_hp_cali_comp_val(codec_data->codec,
+		mt8167_codec_get_hp_cali_comp_val(codec,
 			codec_data->lch_dccomp_val,
 			codec_data->lch_dc_offset,
 			HP_LEFT);
@@ -1138,7 +1091,7 @@ static int mt8167_codec_hp_dc_offsets_get(struct snd_kcontrol *kcontrol,
 #ifdef TIMESTAMP_INFO
 		codec_data->latency_cali_rdac_to_op =
 #endif
-		mt8167_codec_get_hp_cali_comp_val(codec_data->codec,
+		mt8167_codec_get_hp_cali_comp_val(codec,
 			codec_data->rch_dccomp_val,
 			codec_data->rch_dc_offset,
 			HP_RIGHT);
@@ -1165,6 +1118,7 @@ static int mt8167_codec_hp_dc_offsets_put(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct mt8167_codec_priv *codec_data =
 		snd_soc_component_get_drvdata(component);
+	struct snd_soc_codec *codec = codec_data->codec;
 	long *lch_dc_offsets = (long *) codec_data->lch_dc_offset;
 	long *rch_dc_offsets = (long *) codec_data->rch_dc_offset;
 
@@ -1172,14 +1126,14 @@ static int mt8167_codec_hp_dc_offsets_put(struct snd_kcontrol *kcontrol,
 	memcpy(lch_dc_offsets,
 		ucontrol->value.integer.value,
 		HP_CALI_ITEMS * sizeof(long));
-	mt8167_codec_gather_comp_val(codec_data->codec,
+	mt8167_codec_gather_comp_val(codec,
 		codec_data->lch_dccomp_val, codec_data->lch_dc_offset);
 
 	/* right channel */
 	memcpy(rch_dc_offsets,
 		ucontrol->value.integer.value + HP_CALI_ITEMS,
 		HP_CALI_ITEMS * sizeof(long));
-	mt8167_codec_gather_comp_val(codec_data->codec,
+	mt8167_codec_gather_comp_val(codec,
 		codec_data->rch_dccomp_val, codec_data->rch_dc_offset);
 
 	return 0;
@@ -1530,32 +1484,34 @@ static const struct snd_soc_dapm_route mt8167_codec_dapm_routes[] = {
 	{"AIF RX", NULL, "SDM Tone Gen"},
 };
 
-static int afe_reg_read(void *context, unsigned int reg, unsigned int *val)
+static int module_reg_read(void *context, unsigned int reg, unsigned int *val,
+	enum regmap_module_id id, unsigned int offset)
 {
 	struct mt8167_codec_priv *codec_data =
 			(struct mt8167_codec_priv *) context;
 	int ret = 0;
 
-	if (!(codec_data && codec_data->regmap_modules[REGMAP_AFE]))
+	if (!(codec_data && codec_data->regmap_modules[id]))
 		return -1;
 
-	ret = regmap_read(codec_data->regmap_modules[REGMAP_AFE],
-			(reg & (~AFE_OFFSET)), val);
+	ret = regmap_read(codec_data->regmap_modules[id],
+			(reg & (~offset)), val);
 
 	return ret;
 }
 
-static int afe_reg_write(void *context, unsigned int reg, unsigned int val)
+static int module_reg_write(void *context, unsigned int reg, unsigned int val,
+	enum regmap_module_id id, unsigned int offset)
 {
 	struct mt8167_codec_priv *codec_data =
 			(struct mt8167_codec_priv *) context;
 	int ret = 0;
 
-	if (!(codec_data && codec_data->regmap_modules[REGMAP_AFE]))
+	if (!(codec_data && codec_data->regmap_modules[id]))
 		return -1;
 
-	ret = regmap_write(codec_data->regmap_modules[REGMAP_AFE],
-			(reg & (~AFE_OFFSET)), val);
+	ret = regmap_write(codec_data->regmap_modules[id],
+			(reg & (~offset)), val);
 
 	return ret;
 }
@@ -1568,38 +1524,6 @@ static bool reg_is_in_afe(unsigned int reg)
 		return false;
 }
 
-static int apmixedsys_reg_read(void *context,
-			unsigned int reg, unsigned int *val)
-{
-	struct mt8167_codec_priv *codec_data =
-			(struct mt8167_codec_priv *) context;
-	int ret = 0;
-
-	if (!(codec_data && codec_data->regmap_modules[REGMAP_APMIXEDSYS]))
-		return -1;
-
-	ret = regmap_read(codec_data->regmap_modules[REGMAP_APMIXEDSYS],
-			(reg & (~APMIXED_OFFSET)), val);
-
-	return ret;
-}
-
-static int apmixedsys_reg_write(void *context,
-			unsigned int reg, unsigned int val)
-{
-	struct mt8167_codec_priv *codec_data =
-			(struct mt8167_codec_priv *) context;
-	int ret = 0;
-
-	if (!(codec_data && codec_data->regmap_modules[REGMAP_APMIXEDSYS]))
-		return -1;
-
-	ret = regmap_write(codec_data->regmap_modules[REGMAP_APMIXEDSYS],
-			(reg & (~APMIXED_OFFSET)), val);
-
-	return ret;
-}
-
 static bool reg_is_in_apmixedsys(unsigned int reg)
 {
 	if (reg & APMIXED_OFFSET)
@@ -1609,38 +1533,6 @@ static bool reg_is_in_apmixedsys(unsigned int reg)
 }
 
 #ifdef CONFIG_MTK_SPEAKER
-static int pwrap_reg_read(void *context,
-			unsigned int reg, unsigned int *val)
-{
-	struct mt8167_codec_priv *codec_data =
-			(struct mt8167_codec_priv *) context;
-	int ret = 0;
-
-	if (!(codec_data && codec_data->regmap_modules[REGMAP_PWRAP]))
-		return -1;
-
-	ret = regmap_read(codec_data->regmap_modules[REGMAP_PWRAP],
-			(reg & (~PMIC_OFFSET)), val);
-
-	return ret;
-}
-
-static int pwrap_reg_write(void *context,
-			unsigned int reg, unsigned int val)
-{
-	struct mt8167_codec_priv *codec_data =
-			(struct mt8167_codec_priv *) context;
-	int ret = 0;
-
-	if (!(codec_data && codec_data->regmap_modules[REGMAP_PWRAP]))
-		return -1;
-
-	ret = regmap_write(codec_data->regmap_modules[REGMAP_PWRAP],
-			(reg & (~PMIC_OFFSET)), val);
-
-	return ret;
-}
-
 static bool reg_is_in_pmic(unsigned int reg)
 {
 	if (reg & PMIC_OFFSET)
@@ -1654,37 +1546,53 @@ static bool reg_is_in_pmic(unsigned int reg)
 static int codec_reg_read(void *context,
 		unsigned int reg, unsigned int *val)
 {
-	int ret = 0;
+	enum regmap_module_id id;
+	unsigned int offset;
 
-	if (reg_is_in_afe(reg))
-		ret = afe_reg_read(context, reg, val);
-	else if (reg_is_in_apmixedsys(reg))
-		ret = apmixedsys_reg_read(context, reg, val);
+	if (reg_is_in_afe(reg)) {
+		id = REGMAP_AFE;
+		offset = AFE_OFFSET;
+	} else if (reg_is_in_apmixedsys(reg)) {
+		id = REGMAP_APMIXEDSYS;
+		offset = APMIXED_OFFSET;
+	}
 #ifdef CONFIG_MTK_SPEAKER
-	else if (reg_is_in_pmic(reg))
-		ret = pwrap_reg_read(context, reg, val);
+	else if (reg_is_in_pmic(reg)) {
+		id = REGMAP_PWRAP;
+		offset = PMIC_OFFSET;
+	}
 #endif
 	else
-		ret = -1;
-	return ret;
+		return -1;
+
+	return module_reg_read(context, reg, val,
+			id, offset);
 }
 
 static int codec_reg_write(void *context,
 			unsigned int reg, unsigned int val)
 {
-	int ret = 0;
+	enum regmap_module_id id;
+	unsigned int offset;
 
-	if (reg_is_in_afe(reg))
-		ret = afe_reg_write(context, reg, val);
-	else if (reg_is_in_apmixedsys(reg))
-		ret = apmixedsys_reg_write(context, reg, val);
+	if (reg_is_in_afe(reg)) {
+		id = REGMAP_AFE;
+		offset = AFE_OFFSET;
+	} else if (reg_is_in_apmixedsys(reg)) {
+		id = REGMAP_APMIXEDSYS;
+		offset = APMIXED_OFFSET;
+	}
 #ifdef CONFIG_MTK_SPEAKER
-	else if (reg_is_in_pmic(reg))
-		ret = pwrap_reg_write(context, reg, val);
+	else if (reg_is_in_pmic(reg)) {
+		id = REGMAP_PWRAP;
+		offset = PMIC_OFFSET;
+	}
 #endif
 	else
-		ret = -1;
-	return ret;
+		return -1;
+
+	return module_reg_write(context, reg, val,
+			id, offset);
 }
 
 static void codec_regmap_lock(void *lock_arg)
@@ -1781,26 +1689,24 @@ static const struct file_operations mt8167_codec_debug_ops = {
 
 static void mt8167_codec_init_regs(struct mt8167_codec_priv *codec_data)
 {
-	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
+	struct snd_soc_codec *codec = codec_data->codec;
+
+	dev_dbg(codec->dev, "%s\n", __func__);
 
 	/* disable chopper of uplink */
-	snd_soc_update_bits(codec_data->codec,
-		AUDIO_CODEC_CON00, BIT(17), 0x0);
-	snd_soc_update_bits(codec_data->codec,
-		AUDIO_CODEC_CON01, BIT(31), 0x0);
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON00, BIT(17), 0x0);
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON01, BIT(31), 0x0);
 
 	/* Audio buffer quasi-current  */
-	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, GENMASK(31, 30), 0x0);
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, GENMASK(31, 30), 0x0);
 
 	/* setup default gain */
 	/* +4dB for voice buf gain */
 	codec_data->pga_gain[LOUT_PGA_GAIN] = 0xB;
-	snd_soc_update_bits(codec_data->codec,
-		AUDIO_CODEC_CON02, GENMASK(12, 9),
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, GENMASK(12, 9),
 		(codec_data->pga_gain[LOUT_PGA_GAIN]) << 9);
 
-	mt8167_codec_hp_depop_setup(codec_data);
+	mt8167_codec_hp_depop_setup(codec);
 }
 
 static struct regmap *mt8167_codec_get_regmap_from_dt(const char *phandle_name,
@@ -2010,8 +1916,9 @@ static int mt8167_codec_dev_probe(struct platform_device *pdev)
 static int mt8167_codec_dev_remove(struct platform_device *pdev)
 {
 	struct mt8167_codec_priv *codec_data = dev_get_drvdata(&pdev->dev);
+	struct snd_soc_codec *codec = codec_data->codec;
 
-	mt8167_codec_hp_depop_cleanup(codec_data);
+	mt8167_codec_hp_depop_cleanup(codec);
 
 	snd_soc_unregister_codec(&pdev->dev);
 	return 0;
