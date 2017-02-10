@@ -15,6 +15,9 @@ ccflags-y  += -I$(THERMAL_CHIP_DRIVER_DIR)/inc
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/gpu/hal/
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/thermal/fakeHeader/
+ccflags-y  += -I$(srctree)/drivers/misc/mediatek/video/include/
+ccflags-y  += -I$(srctree)/drivers/misc/mediatek/gpu/ged/include/
+
 obj-  := dummy.o
 
 ifeq ($(CONFIG_THERMAL), y)
@@ -24,6 +27,8 @@ endif
 
 obj-$(CONFIG_THERMAL) += mtk_thermal_platform.o
 obj-$(CONFIG_THERMAL) += mtk_thermal_timer.o
+
+obj-$(CONFIG_THERMAL) += mtk_cooler_fps.o
 
 ifneq ($(CONFIG_MTK_COMBO_WIFI),)
     obj-$(CONFIG_THERMAL) += mtk_ts_wmt.o
@@ -37,6 +42,4 @@ endif
 
 obj-$(CONFIG_THERMAL) += mtk_ts_bts.o
 obj-$(CONFIG_THERMAL) += mtk_ts_cpu.o
-#obj-$(CONFIG_THERMAL) += mtk_ts_abb.o
-#obj-$(CONFIG_THERMAL) += mtk_ts_all_ts.o
 obj-$(CONFIG_THERMAL) += mtk_ts_pmic6392.o
