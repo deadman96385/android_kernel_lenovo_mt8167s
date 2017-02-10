@@ -27,7 +27,7 @@
 /*
  * Config and Parameter
  */
-#define CONFIG_SUPPORT_PCM_ALLINONE		1
+#define CONFIG_SUPPORT_PCM_ALLINONE		0
 
 #ifdef MTK_FORCE_CLUSTER1
 #define SPM_CTRL_BIG_CPU	1
