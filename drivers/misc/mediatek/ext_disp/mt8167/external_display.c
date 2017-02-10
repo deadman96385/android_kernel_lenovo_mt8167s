@@ -1508,7 +1508,8 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 		}
 
 		layer_info = _get_sync_info(pgc->session, 0);
-		cmdqRecBackupUpdateSlot(cmdq_handle, pgc->rdma_info, 0, layer_info->fence_idx);
+		if (layer_info)
+			cmdqRecBackupUpdateSlot(cmdq_handle, pgc->rdma_info, 0, layer_info->fence_idx);
 
 		if (pgc->ovl_req_state == EXTD_OVL_REMOVE_REQ) {
 			EXT_DISP_LOG("config M4U Port DISP_MODULE_RDMA1\n");

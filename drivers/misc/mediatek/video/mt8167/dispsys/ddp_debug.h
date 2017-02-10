@@ -18,28 +18,6 @@
 #include "ddp_mmp.h"
 #include "ddp_dump.h"
 
-#ifndef STR_CONVERT
-#define STR_CONVERT(p, val, base)\
-do {            \
-	int ret = 0;    \
-	const char *tmp;    \
-	tmp = strsep(p, ","); \
-	if (tmp == NULL) \
-		break; \
-	if (strcmp(#base, "int") == 0)\
-		ret = kstrtoint(tmp, 0, (int *)val); \
-	else if (strcmp(#base, "uint") == 0)\
-		ret = kstrtouint(tmp, 0, (unsigned int *)val); \
-	else if (strcmp(#base, "ul") == 0)\
-		ret = kstrtoul(tmp, 0, (unsigned long *)val); \
-	if (ret != 0) {\
-		sprintf(buf, "kstrtoint/kstrtouint/kstrtoul return error: %d\n" \
-		"  file : %s, line : %d\n",     \
-		ret, __FILE__, __LINE__);\
-	} \
-} while (0)
-#endif
-
 extern unsigned int gResetRDMAEnable;
 extern unsigned int gOVLBackground;
 extern unsigned int gEnableIRQ;

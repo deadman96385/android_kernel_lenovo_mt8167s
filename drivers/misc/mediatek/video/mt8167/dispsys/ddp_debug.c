@@ -165,7 +165,8 @@ static unsigned int is_reg_addr_valid(unsigned int isVa, unsigned long addr)
 	for (i = 0; i < DISP_REG_NUM; i++) {
 		if ((isVa == 1) && (addr >= dispsys_reg[i]) && (addr <= dispsys_reg[i] + 0x1000))
 			break;
-		if ((isVa == 0) && (addr >= ddp_reg_pa_base[i]) && (addr <= ddp_reg_pa_base[i] + 0x1000))
+		if ((isVa == 0) && (addr >= ddp_reg_pa_base[i])
+		    && (addr <= ddp_reg_pa_base[i] + 0x1000))
 			break;
 	}
 
@@ -184,11 +185,13 @@ static void process_dbg_opt(const char *opt)
 	char *buf = dbg_buf + strlen(dbg_buf);
 	int ret = 0;
 	char *p;
+	char *tmp;
 
 	if (strncmp(opt, "regr:", 5) == 0) {
 		unsigned long addr = 0;
 
-		STR_CONVERT(&p, &addr, ul);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &addr);
 		if (is_reg_addr_valid(1, addr) == 1) {	/* (addr >= 0xf0000000U && addr <= 0xff000000U) */
 			unsigned int regVal = DISP_REG_GET(addr);
 
@@ -202,28 +205,33 @@ static void process_dbg_opt(const char *opt)
 		unsigned long addr = 0;
 		unsigned long val = 0;
 
-		STR_CONVERT(&p, &addr, ul);
-		STR_CONVERT(&p, &val, ul);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &addr);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &val);
 		if (is_reg_addr_valid(1, addr) == 1) {	/* (addr >= 0xf0000000U && addr <= 0xff000000U) */
 			unsigned int regVal;
 
 			DISP_CPU_REG_SET(addr, val);
 			regVal = DISP_REG_GET(addr);
-			DDPMSG("regw: 0x%lx, 0x%08X = 0x%08X\n", addr, (int) val, regVal);
-			sprintf(buf, "regw: 0x%lx, 0x%08X = 0x%08X\n", addr, (int) val, regVal);
+			DDPMSG("regw: 0x%lx, 0x%08X = 0x%08X\n", addr, (int)val, regVal);
+			sprintf(buf, "regw: 0x%lx, 0x%08X = 0x%08X\n", addr, (int)val, regVal);
 		} else {
 			sprintf(buf, "regw, invalid address 0x%lx\n", addr);
 			goto Error;
 		}
 	} else if (strncmp(opt, "rdma_ultra:", 11) == 0) {
 		p = (char *)opt + 11;
-		STR_CONVERT(&p, &gRDMAUltraSetting, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &gRDMAUltraSetting);
 		DISP_CPU_REG_SET(DISP_REG_RDMA_MEM_GMC_SETTING_0, gRDMAUltraSetting);
 		sprintf(buf, "rdma_ultra, gRDMAUltraSetting=0x%x, reg=0x%x\n",
-			(unsigned int)gRDMAUltraSetting, DISP_REG_GET(DISP_REG_RDMA_MEM_GMC_SETTING_0));
+			(unsigned int)gRDMAUltraSetting,
+			DISP_REG_GET(DISP_REG_RDMA_MEM_GMC_SETTING_0));
 	} else if (strncmp(opt, "rdma_fifo:", 10) == 0) {
 		p = (char *)opt + 10;
-		STR_CONVERT(&p, &gRDMAFIFOLen, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &gRDMAFIFOLen);
 		DISP_CPU_REG_SET_FIELD(FIFO_CON_FLD_OUTPUT_VALID_FIFO_THRESHOLD,
 				       DISP_REG_RDMA_FIFO_CON, gRDMAFIFOLen);
 		sprintf(buf, "rdma_fifo, gRDMAFIFOLen=0x%x, reg=0x%x\n",
@@ -234,8 +242,9 @@ static void process_dbg_opt(const char *opt)
 		unsigned long reg_pa = 0;
 
 		p = (char *)opt + 7;
-		STR_CONVERT(&p, &reg_pa, ul);
-		if (reg_pa < 0x10000000 || reg_pa > 0x18000000) {
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &reg_pa);
+		if (reg_pa == 0) {
 			sprintf(buf, "g_regr, invalid pa=0x%lx\n", reg_pa);
 		} else {
 			reg_va = (unsigned long)ioremap_nocache(reg_pa, sizeof(unsigned long));
@@ -255,19 +264,23 @@ static void process_dbg_opt(const char *opt)
 		unsigned long reg_pa = 0;
 
 		p = (char *)opt + 7;
-		STR_CONVERT(&p, &reg_pa, ul);
-		if (reg_pa < 0x10000000 || reg_pa > 0x18000000) {
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &reg_pa);
+		if (reg_pa == 0) {
 			sprintf(buf, "g_regw, invalid pa=0x%lx\n", reg_pa);
 		} else {
-			STR_CONVERT(&p, &val, uint);
+			tmp = strsep(&p, ",");
+			ret = kstrtoul(tmp, 0, &val);
 			reg_va = (unsigned long)ioremap_nocache(reg_pa, sizeof(unsigned long));
 			reg_va_before = DISP_REG_GET(reg_va);
 			DISP_CPU_REG_SET(reg_va, val);
 			reg_va_after = DISP_REG_GET(reg_va);
 
-			pr_debug("g_regw, pa=%lx, va=0x%lx, value=0x%x, reg_val_before=0x%x, reg_val_after=0x%x\n",
-				 reg_pa, reg_va, (unsigned int)val, reg_va_before, reg_va_after);
-			sprintf(buf, "g_regw, pa=%lx, va=0x%lx, value=0x%x, reg_val_before=0x%x, reg_val_after=0x%x\n",
+			pr_debug
+			    ("g_regw, pa=%lx, va=0x%lx, value=0x%x, reg_val_before=0x%x, reg_val_after=0x%x\n",
+			     reg_pa, reg_va, (unsigned int)val, reg_va_before, reg_va_after);
+			sprintf(buf,
+				"g_regw, pa=%lx, va=0x%lx, value=0x%x, reg_val_before=0x%x, reg_val_after=0x%x\n",
 				reg_pa, reg_va, (unsigned int)val, reg_va_before, reg_va_after);
 
 			iounmap((void *)reg_va);
@@ -276,7 +289,8 @@ static void process_dbg_opt(const char *opt)
 		unsigned long int enable = 0;
 
 		p = (char *)opt + 8;
-		STR_CONVERT(&p, &enable, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &enable);
 		if (enable)
 			dbg_log_level = 1;
 		else
@@ -287,7 +301,9 @@ static void process_dbg_opt(const char *opt)
 		unsigned long int enable = 0;
 
 		p = (char *)opt + 8;
-		STR_CONVERT(&p, &enable, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &enable);
+
 		if (enable)
 			irq_log_level = 1;
 		else
@@ -300,23 +316,25 @@ static void process_dbg_opt(const char *opt)
 		int rdma1_mode = 0;
 
 		p = (char *)opt + 7;
-		STR_CONVERT(&p, &met_on, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &met_on);
 		if (strncmp(p, "1", 1) == 0)
 			met_on = 1;
 
 		ddp_init_met_tag((unsigned int)met_on, rdma0_mode, rdma1_mode);
 		DDPMSG("process_dbg_opt, met_on=%d,rdma0_mode %d, rdma1 %d\n",
-			(unsigned int)met_on, rdma0_mode, rdma1_mode);
+		       (unsigned int)met_on, rdma0_mode, rdma1_mode);
 		sprintf(buf, "met_on:%d,rdma0_mode:%d,rdma1_mode:%d\n",
 			(unsigned int)met_on, rdma0_mode, rdma1_mode);
 	} else if (strncmp(opt, "backlight:", 10) == 0) {
 		unsigned long level = 0;
 
 		p = (char *)opt + 10;
-		STR_CONVERT(&p, &level, ul);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &level);
 		if (level) {
 			disp_bls_set_backlight(level);
-			sprintf(buf, "backlight: %d\n", (int) level);
+			sprintf(buf, "backlight: %d\n", (int)level);
 		} else {
 			goto Error;
 		}
@@ -324,7 +342,8 @@ static void process_dbg_opt(const char *opt)
 		unsigned long int level = 0;
 
 		p = (char *)opt + 5;
-		STR_CONVERT(&p, &level, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &level);
 		if (level) {
 			disp_pwm_id_t pwm_id = DISP_PWM0;
 
@@ -337,7 +356,8 @@ static void process_dbg_opt(const char *opt)
 			goto Error;
 		}
 	} else if (strncmp(opt, "aal_dbg:", 8) == 0) {
-		STR_CONVERT(&p, &aal_dbg_en, int);
+		tmp = strsep(&p, ",");
+		ret = kstrtoint(tmp, 0, &aal_dbg_en);
 		sprintf(buf, "aal_dbg_en = 0x%x\n", aal_dbg_en);
 	} else if (strncmp(opt, "aal_test:", 9) == 0) {
 		aal_test(opt + 9, buf);
@@ -347,7 +367,8 @@ static void process_dbg_opt(const char *opt)
 		unsigned long int module = 0;
 
 		p = (char *)opt + 9;
-		STR_CONVERT(&p, &module, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &module);
 		DDPMSG("process_dbg_opt, module=%d\n", (unsigned int)module);
 		if (module < DISP_MODULE_NUM) {
 			ddp_dump_reg(module);
@@ -361,7 +382,8 @@ static void process_dbg_opt(const char *opt)
 		unsigned long int mutex_idx = 0;
 
 		p = (char *)opt + 10;
-		STR_CONVERT(&p, &mutex_idx, uint);
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &mutex_idx);
 		DDPMSG("process_dbg_opt, path mutex=%d\n", (unsigned int)mutex_idx);
 		dpmgr_debug_path_status((unsigned int)mutex_idx);
 		sprintf(buf, "dump_path: %d\n", (unsigned int)mutex_idx);
@@ -502,11 +524,14 @@ void ddp_debug_init(void)
 {
 	if (!debug_init) {
 		debug_init = 1;
-		debugfs = debugfs_create_file("dispsys", S_IFREG | S_IRUGO, NULL, (void *)0, &debug_fops);
+		debugfs =
+		    debugfs_create_file("dispsys", S_IFREG | S_IRUGO, NULL, (void *)0, &debug_fops);
 
 		debugDir = debugfs_create_dir("disp", NULL);
 		if (debugDir)
-			debugfs_dump = debugfs_create_file("dump", S_IFREG | S_IRUGO, debugDir, NULL, &debug_fops_dump);
+			debugfs_dump =
+			    debugfs_create_file("dump", S_IFREG | S_IRUGO, debugDir, NULL,
+						&debug_fops_dump);
 	}
 }
 
@@ -626,7 +651,7 @@ unsigned int ddp_dump_reg_to_buf(unsigned int start_module, unsigned long *addr)
 	unsigned long reg_addr;
 
 	switch (start_module) {
-	case 0:	/* DISP_MODULE_WDMA0: */
+	case 0:		/* DISP_MODULE_WDMA0: */
 		reg_addr = DISP_REG_WDMA_INTEN;
 
 		while (reg_addr <= DISP_REG_WDMA_PRE_ADD2) {
@@ -634,7 +659,7 @@ unsigned int ddp_dump_reg_to_buf(unsigned int start_module, unsigned long *addr)
 			reg_addr += 4;
 		}
 		/* fallthrough */
-	case 1:	/* DISP_MODULE_OVL: */
+	case 1:		/* DISP_MODULE_OVL: */
 		reg_addr = DISP_REG_OVL_STA;
 
 		while (reg_addr <= DISP_REG_OVL_L3_PITCH) {
@@ -659,7 +684,7 @@ unsigned int ddp_dump_lcm_param_to_buf(unsigned int start_module, unsigned long 
 {
 	unsigned int cnt = 0;
 
-	if (start_module == 3) {/*3 correspond dbg4*/
+	if (start_module == 3) {	/*3 correspond dbg4 */
 		addr[cnt++] = primary_display_get_width();
 		addr[cnt++] = primary_display_get_height();
 	}
