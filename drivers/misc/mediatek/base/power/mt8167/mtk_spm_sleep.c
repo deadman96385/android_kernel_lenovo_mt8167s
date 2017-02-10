@@ -389,6 +389,9 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	set_pwrctrl_pcm_flags(pwrctrl, spm_flags);
 	set_pwrctrl_pcm_data(pwrctrl, spm_data);
 
+	if (!mt_xo_has_ext_crystal())
+		pwrctrl->pcm_flags |= SPM_32K_LESS;
+
 #if SPM_PWAKE_EN
 	sec = spm_get_wake_period(-1 /* FIXME */, last_wr);
 #endif
