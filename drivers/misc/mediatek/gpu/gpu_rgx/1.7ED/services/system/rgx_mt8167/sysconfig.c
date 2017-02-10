@@ -260,7 +260,7 @@ dump_stack();
 #endif
 
 	/*  power management on  HW system */
-#if 1 /*MTK_PM_SUPPORT */
+#if MTK_PM_SUPPORT
 	gsDevices[0].pfnPrePowerState       = MTKDevPrePowerState;
 	gsDevices[0].pfnPostPowerState      = MTKDevPostPowerState;
 #else

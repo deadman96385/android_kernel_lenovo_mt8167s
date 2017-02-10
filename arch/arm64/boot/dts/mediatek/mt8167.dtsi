@@ -965,20 +965,24 @@
 			interrupts = <GIC_SPI 185 IRQ_TYPE_LEVEL_LOW>;
 			interrupt-names = "RGX";
 			power-domains =  <&scpsys MT8167_POWER_DOMAIN_MFG>;
-			clocks = <&apmixedsys CLK_APMIXED_MMPLL>,
-				 <&topckgen CLK_TOP_MFG_MM_SEL>,
+			clocks = <&topckgen CLK_TOP_MFG_MM_SEL>,
 				 <&topckgen CLK_TOP_AXI_MFG_IN_SEL>,
 				 <&topckgen CLK_TOP_SLOW_MFG_SEL>,
 				 <&topckgen CLK_TOP_RG_SLOW_MFG>,
 				 <&topckgen CLK_TOP_RG_AXI_MFG>,
-				 <&topckgen CLK_TOP_MFG_MM>;
-			clock-names = "mmpll_clk",
-				      "mfg_mm_in_sel",
+				 <&topckgen CLK_TOP_MFG_MM>,
+				 <&topckgen CLK_TOP_CLK26M>,
+				 <&topckgen CLK_TOP_UNIVPLL_D24>,
+				 <&topckgen CLK_TOP_CSW_MUX_MFG_SEL>;
+			clock-names = "mfg_mm_in_sel",
 				      "mfg_axi_in_sel",
 				      "mfg_slow_in_sel",
 				      "top_slow",
 				      "top_axi",
-				      "top_mm";
+				      "top_mm",
+				      "slow",
+				      "bus",
+				      "engine";
 			clock-frequency = <500000000>;
 		};
 
