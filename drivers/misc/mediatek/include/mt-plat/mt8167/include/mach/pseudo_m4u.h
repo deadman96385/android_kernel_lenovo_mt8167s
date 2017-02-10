@@ -298,7 +298,7 @@ int m4u_alloc_mva(M4U_MODULE_ID_ENUM eModuleID,
 		  unsigned long BufAddr,
 		  unsigned int BufSize,
 		  int security, int cache_coherent, unsigned int *pRetMVABuf);
-struct sg_table *pseudo_get_sg(unsigned long va, int size);
+struct sg_table *pseudo_get_sg(int portid, unsigned long va, int size);
 int pseudo_alloc_mva(m4u_client_t *client, M4U_PORT_ID port,
 			  unsigned long va, struct sg_table *sg_table,
 			  unsigned int size, unsigned int prot, unsigned int flags, unsigned int *pMva);
