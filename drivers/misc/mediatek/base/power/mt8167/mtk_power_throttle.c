@@ -13,9 +13,9 @@
 
 #include <linux/kernel.h> /* ARRAY_SIZE */
 #include <linux/slab.h> /* kzalloc */
-#include "mt_static_power.h"	/* static power */
+#include "mtk_static_power.h"	/* static power */
 #include <linux/cpufreq.h>
-#include "mt_power_throttle.h"
+#include "mtk_power_throttle.h"
 
 #define NR_MAX_OPP_TBL  8
 #define NR_MAX_CPU      4

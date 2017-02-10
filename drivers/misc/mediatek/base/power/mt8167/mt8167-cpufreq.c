@@ -23,7 +23,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/thermal.h>
-#include "mt_power_throttle.h"
+#include "mtk_power_throttle.h"
 
 
 #define MIN_VOLT_SHIFT		(100000)
