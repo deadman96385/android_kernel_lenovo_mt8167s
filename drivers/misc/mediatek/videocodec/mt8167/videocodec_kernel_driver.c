@@ -249,8 +249,8 @@ struct platform_device *pvenc_dev;
 struct platform_device *pvenclt_dev;
 
 #endif
-/*static int venc_enableIRQ(VAL_HW_LOCK_T *prHWLock);*/
-/*static int venc_disableIRQ(VAL_HW_LOCK_T *prHWLock);*/
+static int venc_enableIRQ(VAL_HW_LOCK_T *prHWLock);
+static int venc_disableIRQ(VAL_HW_LOCK_T *prHWLock);
 
 static struct platform_device *vcodec_get_pdev(char *dev_name)
 {
@@ -835,15 +835,6 @@ static long vcodec_lockhw(unsigned long arg)
 		rHWLock.eDriverType == VAL_DRIVER_TYPE_JPEG_ENC) {
 		/* TODO: for hybrid */
 		/* LQ-TO-DO   hardware */
-		#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
-		MODULE_MFV_LOGE(
-			"[Hybrid][VCODEC_LOCKHW] ENC CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT!!type=%d\n",
-			rHWLock.eDriverType);
-		if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC) {
-			venc_power_on();
-			/*break;*/
-		}
-		#endif
 		while (bLockedHW == VAL_FALSE) {
 			/* Early break for JPEG VENC */
 			if (rHWLock.u4TimeoutMs == 0) {
@@ -929,10 +920,7 @@ static long vcodec_lockhw(unsigned long arg)
 					bLockedHW = VAL_TRUE;
 					if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC ||
 						rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC) {
-#ifndef KS_POWER_WORKAROUND
-						venc_power_on();
-#endif
-						enable_irq(VENC_IRQ_ID);
+						venc_enableIRQ(&rHWLock);
 					}
 				}
 			} else { /* someone use HW, and check timeout value */
@@ -1067,15 +1055,6 @@ static long vcodec_unlockhw(unsigned long arg)
 		rHWLock.eDriverType == VAL_DRIVER_TYPE_JPEG_ENC) {
 		/* TODO: for hybrid */
 		/* LQ-TO-DO   hardware */
-		#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
-		MODULE_MFV_LOGE(
-			"[Hybrid][VCODEC_LOCKHW] ENC CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT!!type=%d\n",
-			rHWLock.eDriverType);
-		if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC) {
-			venc_power_off();
-			/*break;*/
-		}
-		#endif
 		mutex_lock(&VencHWLock);
 		/* Current owner give up hw lock */
 		if (grVcodecEncHWLock.pvHandle == (VAL_VOID_T *)pmem_user_v2p_video((VAL_ULONG_T)rHWLock.pvHandle)) {
@@ -1083,11 +1062,8 @@ static long vcodec_unlockhw(unsigned long arg)
 			grVcodecEncHWLock.eDriverType = VAL_DRIVER_TYPE_NONE;
 			if (rHWLock.eDriverType == VAL_DRIVER_TYPE_H264_ENC ||
 				rHWLock.eDriverType == VAL_DRIVER_TYPE_HEVC_ENC) {
-				disable_irq_nosync(VENC_IRQ_ID);
 				/* turn venc power off */
-#ifndef KS_POWER_WORKAROUND
-				venc_power_off();
-#endif
+				venc_disableIRQ(&rHWLock);
 			}
 		} else { /* Not current owner */
 			/* [TODO] error handling */
@@ -2370,7 +2346,7 @@ static int vcodec_probe(struct platform_device *pdev)
 
 	vcodec_device = device_create(vcodec_class, NULL, vcodec_devno, NULL, VCODEC_DEVNAME);
 
-#if 0 /*def CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT*/
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
 #else
 	/* if (request_irq(MT_VDEC_IRQ_ID , (irq_handler_t)video_intr_dlr,
 	* IRQF_TRIGGER_LOW, VCODEC_DEVNAME, NULL) < 0)
@@ -2403,11 +2379,6 @@ static int vcodec_probe(struct platform_device *pdev)
 		MODULE_MFV_LOGD("[VCODEC_DEBUG] success to request enc_LT irq: %d\n", VENC_LT_IRQ_ID);
 	}
 	#endif
-
-#endif
-
-#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
-#else
 	/* disable_irq(MT_VDEC_IRQ_ID); */
 	disable_irq(VDEC_IRQ_ID);
 	/* disable_irq(MT_VENC_IRQ_ID); */
@@ -2416,93 +2387,68 @@ static int vcodec_probe(struct platform_device *pdev)
 	disable_irq(VENC_LT_IRQ_ID);
 	#endif
 #endif
+
 	MODULE_MFV_LOGD("[VCODEC_DEBUG] vcodec_probe Done\n");
 
 	return 0;
 }
 
-/* static int venc_probe(struct platform_device *pdev)
-	* {
-	* #ifdef CONFIG_OF
-	* int ret;
-	* struct class_device *class_dev = NULL;
-	* MODULE_MFV_LOGD("+venc_probe\n");
-	* pvenc_dev = pdev;
-	* ret = alloc_chrdev_region(&venc_devno, 0, 1, VENC_DEVNAME);
-	* if (ret)
-	* MODULE_MFV_LOGE("Error: Can't Get Major number for VENC_DEVNAME Device\n");
-	* else
-	* MODULE_MFV_LOGD("Get VENC Device Major number (%d)\n", venc_devno);
-	* venc_cdev = cdev_alloc();
-	* venc_cdev->owner = THIS_MODULE;
-	* venc_cdev->ops = NULL;
-	* ret = cdev_add(venc_cdev, venc_devno, 1);
-	* venc_class = class_create(THIS_MODULE, VENC_DEVNAME);
-	* class_dev =
-	* (struct class_device *)device_create(venc_class, NULL, venc_devno, NULL, VENC_DEVNAME);
-	* #endif
-	* return 0;
-	* }
-	*/
+static int venc_disableIRQ(VAL_HW_LOCK_T *prHWLock)
+{
+	 VAL_UINT32_T  u4IrqId = VENC_IRQ_ID;
 
-/* static int venc_disableIRQ(VAL_HW_LOCK_T *prHWLock)
-	* {
-	* VAL_UINT32_T  u4IrqId = VENC_IRQ_ID;
+	 /*if (VAL_DRIVER_TYPE_H264_ENC == prHWLock->eDriverType
+	 *	 || VAL_DRIVER_TYPE_HEVC_ENC == prHWLock->eDriverType)
+	 *	 u4IrqId = VENC_IRQ_ID;
+	 * else if (VAL_DRIVER_TYPE_VP8_ENC == prHWLock->eDriverType)
+	 *	u4IrqId = VENC_LT_IRQ_ID;
+     */
 
-	* if (VAL_DRIVER_TYPE_H264_ENC == prHWLock->eDriverType
-		* || VAL_DRIVER_TYPE_HEVC_ENC == prHWLock->eDriverType)
-		* u4IrqId = VENC_IRQ_ID;
-	* else if (VAL_DRIVER_TYPE_VP8_ENC == prHWLock->eDriverType)
-		* u4IrqId = VENC_LT_IRQ_ID;
+ #ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+	if (prHWLock->bSecureInst == VAL_FALSE)
+		free_irq(u4IrqId, NULL);
+ #else
+	 /*disable_irq(u4IrqId);*/
+	 disable_irq_nosync(u4IrqId);
+ #endif
+	 venc_power_off();
+	 return 0;
+}
 
+static int venc_enableIRQ(VAL_HW_LOCK_T *prHWLock)
+{
+	VAL_UINT32_T  u4IrqId = VENC_IRQ_ID;
 
-	* #ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
-	* if (prHWLock->bSecureInst == VAL_FALSE) {
-	* free_irq(u4IrqId, NULL);
-	* }
-	* #else
-	* disable_irq(u4IrqId);
-	* #endif
-	* venc_power_off();
-	* return 0;
-	* }
-	*/
+	MODULE_MFV_LOGD("venc_enableIRQ+\n");
+	/*if (VAL_DRIVER_TYPE_H264_ENC == prHWLock->eDriverType
+	 *  || VAL_DRIVER_TYPE_HEVC_ENC == prHWLock->eDriverType)
+	 *	 u4IrqId = VENC_IRQ_ID;
+	 *else if (VAL_DRIVER_TYPE_VP8_ENC == prHWLock->eDriverType)
+	 *	 u4IrqId = VENC_LT_IRQ_ID;
+     */
+	 venc_power_on();
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+	MODULE_MFV_LOGD("[VCODEC_LOCKHW] ENC rHWLock.bSecureInst 0x%x\n", prHWLock->bSecureInst);
+	if (prHWLock->bSecureInst == VAL_FALSE) {
+		MODULE_MFV_LOGD("[VCODEC_LOCKHW]  ENC Request IR by type 0x%x\n", prHWLock->eDriverType);
+		if (request_irq(
+			u4IrqId,
+			(irq_handler_t)video_intr_dlr2,
+			IRQF_TRIGGER_LOW,
+			VCODEC_DEVNAME, NULL) < 0)	{
+			MODULE_MFV_LOGE("[VCODEC_LOCKHW] ENC [MFV_DEBUG][ERROR] error to request enc irq\n");
+		 } else{
+			 MODULE_MFV_LOGD("[VCODEC_LOCKHW] ENC [MFV_DEBUG] success to request enc irq\n");
+		 }
+	 }
+#else
+	enable_irq(u4IrqId);
+#endif
 
-/* static int venc_enableIRQ(VAL_HW_LOCK_T *prHWLock)
-* {
-	* VAL_UINT32_T  u4IrqId = VENC_IRQ_ID;
+	MODULE_MFV_LOGD("venc_enableIRQ-\n");
+	return 0;
+}
 
-	* MODULE_MFV_LOGD("venc_enableIRQ+\n");
-	* if (VAL_DRIVER_TYPE_H264_ENC == prHWLock->eDriverType
-		* || VAL_DRIVER_TYPE_HEVC_ENC == prHWLock->eDriverType)
-		* u4IrqId = VENC_IRQ_ID;
-	* else if (VAL_DRIVER_TYPE_VP8_ENC == prHWLock->eDriverType)
-		* u4IrqId = VENC_LT_IRQ_ID;
-
-	* venc_power_on();
-* #ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
-	* MODULE_MFV_LOGD("[VCODEC_LOCKHW] ENC rHWLock.bSecureInst 0x%x\n", prHWLock->bSecureInst);
-	* if (prHWLock->bSecureInst == VAL_FALSE) {
-		* MODULE_MFV_LOGD("[VCODEC_LOCKHW]  ENC Request IR by type 0x%x\n", prHWLock->eDriverType);
-		* if (request_irq(
-			* u4IrqId ,
-			* (irq_handler_t)video_intr_dlr2,
-			* IRQF_TRIGGER_LOW,
-			* VCODEC_DEVNAME, NULL) < 0)	{
-			* MODULE_MFV_LOGE("[VCODEC_LOCKHW] ENC [MFV_DEBUG][ERROR] error to request enc irq\n");
-		* } else{
-			* MODULE_MFV_LOGD("[VCODEC_LOCKHW] ENC [MFV_DEBUG] success to request enc irq\n");
-		* }
-	* }
-
-* #else
-	* enable_irq(u4IrqId);
-* #endif
-
-	* MODULE_MFV_LOGD("venc_enableIRQ-\n");
-	* return 0;
-* }
-*/
 
 static int vcodec_remove(struct platform_device *pDev)
 {
@@ -2808,10 +2754,12 @@ static void __exit vcodec_driver_exit(void)
 
 	/* [TODO] free IRQ here */
 	/* free_irq(MT_VENC_IRQ_ID, NULL); */
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+#else
 	free_irq(VENC_IRQ_ID, NULL);
 	/* free_irq(MT_VDEC_IRQ_ID, NULL); */
 	free_irq(VDEC_IRQ_ID, NULL);
-
+#endif
 	 /* MT6589_HWLockEvent part */
 	eValHWLockRet = eVideoCloseEvent(&DecHWLockEvent, sizeof(VAL_EVENT_T));
 	if (eValHWLockRet != VAL_RESULT_NO_ERROR)
