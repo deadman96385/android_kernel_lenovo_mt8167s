@@ -426,16 +426,121 @@ out:
 	up(&mtk_musb->musb_lock);
 }
 
+#ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE
+void musb_id_pin_sw_work(bool host_mode)
+{
+	u8 devctl = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&mtk_musb->lock, flags);
+	musb_generic_disable(mtk_musb);
+	spin_unlock_irqrestore(&mtk_musb->lock, flags);
+
+	down(&mtk_musb->musb_lock);
+	DBG(0, "work start, is_host=%d\n", mtk_musb->is_host);
+	if (mtk_musb->in_ipo_off) {
+		DBG(0, "do nothing due to in_ipo_off\n");
+		goto out;
+	}
+
+	mtk_musb->is_host = host_mode;
+	musb_platform_enable(mtk_musb);
+	DBG(0, "musb is as %s\n", mtk_musb->is_host?"host":"device");
+	switch_set_state((struct switch_dev *)&otg_state, mtk_musb->is_host);
+
+	if (mtk_musb->is_host) {
+		/*setup fifo for host mode*/
+		ep_config_from_table_for_host(mtk_musb);
+		wake_lock(&mtk_musb->usb_lock);
+		musb_platform_set_vbus(mtk_musb, 1);
+
+		/* for no VBUS sensing IP*/
+#if 1
+		/* wait VBUS ready */
+		msleep(100);
+		/* clear session*/
+		devctl = musb_readb(mtk_musb->mregs, MUSB_DEVCTL);
+		musb_writeb(mtk_musb->mregs, MUSB_DEVCTL, (devctl&(~MUSB_DEVCTL_SESSION)));
+		/* USB MAC OFF*/
+		/* VBUSVALID=0, AVALID=0, BVALID=0, SESSEND=1, IDDIG=X */
+		USBPHY_SET8(0x6c, 0x10);
+		USBPHY_CLR8(0x6c, 0x2e);
+		USBPHY_SET8(0x6d, 0x3e);
+		DBG(0, "force PHY to idle, 0x6d=%x, 0x6c=%x\n", USBPHY_READ8(0x6d), USBPHY_READ8(0x6c));
+		/* wait */
+		mdelay(5);
+
+		/* remove babble: NOISE_STILL_SOF:1, BABBLE_CLR_EN:0 */
+		devctl = musb_readb(mtk_musb->mregs, MUSB_ULPI_REG_DATA);
+		devctl = devctl | 0x80;
+		devctl = devctl & 0xbf;
+		musb_writeb(mtk_musb->mregs, MUSB_ULPI_REG_DATA, devctl);
+		mdelay(5);
+
+		/* restart session */
+		devctl = musb_readb(mtk_musb->mregs, MUSB_DEVCTL);
+		musb_writeb(mtk_musb->mregs, MUSB_DEVCTL, (devctl | MUSB_DEVCTL_SESSION));
+		/* USB MAC ONand Host Mode*/
+		/* VBUSVALID=1, AVALID=1, BVALID=1, SESSEND=0, IDDIG=0 */
+		USBPHY_CLR8(0x6c, 0x10);
+		USBPHY_SET8(0x6c, 0x2c);
+		USBPHY_SET8(0x6d, 0x3e);
+		DBG(0, "force PHY to host mode, 0x6d=%x, 0x6c=%x\n", USBPHY_READ8(0x6d), USBPHY_READ8(0x6c));
+#endif
+
+		musb_start(mtk_musb);
+		MUSB_HST_MODE(mtk_musb);
+		switch_int_to_device(mtk_musb);
+
+#ifdef CONFIG_PM_RUNTIME
+		mtk_musb->is_active = 0;
+		DBG(0, "set active to 0 in Pm runtime issue\n");
+#endif
+	} else {
+		DBG(0, "devctl is %x\n", musb_readb(mtk_musb->mregs, MUSB_DEVCTL));
+		musb_writeb(mtk_musb->mregs, MUSB_DEVCTL, 0);
+		if (wake_lock_active(&mtk_musb->usb_lock))
+			wake_unlock(&mtk_musb->usb_lock);
+		musb_platform_set_vbus(mtk_musb, 0);
+
+	/* for no VBUS sensing IP */
+#if 1
+		/* USB MAC OFF*/
+		/* VBUSVALID=0, AVALID=0, BVALID=0, SESSEND=1, IDDIG=X */
+		USBPHY_SET8(0x6c, 0x10);
+		USBPHY_CLR8(0x6c, 0x2e);
+		USBPHY_SET8(0x6d, 0x3e);
+		DBG(0, "force PHY to idle, 0x6d=%x, 0x6c=%x\n", USBPHY_READ8(0x6d), USBPHY_READ8(0x6c));
+#endif
+
+#if !defined(MTK_HDMI_SUPPORT)
+		musb_stop(mtk_musb);
+#else
+		mt_usb_check_reconnect();/*ALPS01688604, IDDIG noise caused by MHL init*/
+#endif
+		mtk_musb->state = OTG_STATE_B_IDLE;
+		mtk_musb->xceiv->otg->state = OTG_STATE_B_IDLE;
+
+		MUSB_DEV_MODE(mtk_musb);
+		switch_int_to_host(mtk_musb);
+	}
+out:
+	DBG(0, "work end, is_host=%d\n", mtk_musb->is_host);
+	up(&mtk_musb->musb_lock);
+}
+#endif
 
 /*static void mt_usb_ext_iddig_int(void)*/
 static irqreturn_t mt_usb_ext_iddig_int(int irq, void *dev_id)
 {
+#ifndef CONFIG_MTK_MUSB_SW_WITCH_MODE
 	if (!mtk_musb->is_ready) {
 		/* dealy 5 sec if usb function is not ready */
 		schedule_delayed_work(&mtk_musb->id_pin_work, 7000*HZ/1000);
 	} else {
 		schedule_delayed_work(&mtk_musb->id_pin_work, sw_deboun_time*HZ/1000);
 	}
+#endif
 	disable_irq_nosync(usb_iddig_number);
 	DBG(0, "disable iddig irq @lin %d\n", __LINE__);
 	DBG(0, "id pin interrupt assert\n");
