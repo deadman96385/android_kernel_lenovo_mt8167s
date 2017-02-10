@@ -15,8 +15,209 @@
 
 #include <linux/module.h>
 #include <sound/soc.h>
-#include <linux/gpio.h>
 
+enum PINCTRL_PIN_STATE {
+	PIN_STATE_DEFAULT = 0,
+	PIN_STATE_EXTAMP_ON,
+	PIN_STATE_EXTAMP_OFF,
+	PIN_STATE_MAX
+};
+
+struct mt8167_evb_priv {
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *pin_states[PIN_STATE_MAX];
+};
+
+static const char * const mt8167_evb_pinctrl_pin_str[PIN_STATE_MAX] = {
+	"default",
+	"extamp_on",
+	"extamp_off",
+};
+
+static int mt8167_evb_mic1_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_dapm_context *dapm = w->dapm;
+	struct snd_soc_card *card = dapm->card;
+
+	dev_dbg(card->dev, "%s, event %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int mt8167_evb_mic2_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_dapm_context *dapm = w->dapm;
+	struct snd_soc_card *card = dapm->card;
+
+	dev_dbg(card->dev, "%s, event %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int mt8167_evb_headset_mic_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_dapm_context *dapm = w->dapm;
+	struct snd_soc_card *card = dapm->card;
+
+	dev_dbg(card->dev, "%s, event %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		break;
+	case SND_SOC_DAPM_POST_PMD:
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/* HP Ext Amp Switch */
+static const struct snd_kcontrol_new mt8167_evb_hp_ext_amp_switch_ctrl =
+	SOC_DAPM_SINGLE_VIRT("Switch", 1);
+
+/* HP Spk Amp */
+static int mt8167_evb_hp_spk_amp_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_dapm_context *dapm = w->dapm;
+	struct snd_soc_card *card = dapm->card;
+	struct mt8167_evb_priv *card_data = snd_soc_card_get_drvdata(card);
+	int ret = 0;
+
+	dev_dbg(card->dev, "%s, event %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		if (!IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_ON])) {
+			ret = pinctrl_select_state(
+				card_data->pinctrl,
+				card_data->pin_states[PIN_STATE_EXTAMP_ON]);
+			if (ret)
+				dev_err(card->dev, "%s failed to select state %d\n",
+					__func__, ret);
+		}
+		break;
+	case SND_SOC_DAPM_PRE_PMD:
+		if (!IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_OFF])) {
+			ret = pinctrl_select_state(
+				card_data->pinctrl,
+				card_data->pin_states[PIN_STATE_EXTAMP_OFF]);
+			if (ret)
+				dev_err(card->dev, "%s failed to select state %d\n",
+					__func__, ret);
+		}
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/* LINEOUT Ext Amp Switch */
+static const struct snd_kcontrol_new mt8167_evb_lineout_ext_amp_switch_ctrl =
+	SOC_DAPM_SINGLE_VIRT("Switch", 1);
+
+/* Ext Spk Amp */
+static int mt8167_evb_ext_spk_amp_wevent(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_dapm_context *dapm = w->dapm;
+	struct snd_soc_card *card = dapm->card;
+	struct mt8167_evb_priv *card_data = snd_soc_card_get_drvdata(card);
+	int ret = 0;
+
+	dev_dbg(card->dev, "%s, event %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		if (!IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_ON])) {
+			ret = pinctrl_select_state(
+				card_data->pinctrl,
+				card_data->pin_states[PIN_STATE_EXTAMP_ON]);
+			if (ret)
+				dev_err(card->dev, "%s failed to select state %d\n",
+					__func__, ret);
+		}
+		break;
+	case SND_SOC_DAPM_PRE_PMD:
+		if (!IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_OFF])) {
+			ret = pinctrl_select_state(
+				card_data->pinctrl,
+				card_data->pin_states[PIN_STATE_EXTAMP_OFF]);
+			if (ret)
+				dev_err(card->dev, "%s failed to select state %d\n",
+					__func__, ret);
+		}
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static const struct snd_soc_dapm_widget mt8167_evb_dapm_widgets[] = {
+	SND_SOC_DAPM_MIC("Mic 1", mt8167_evb_mic1_event),
+	SND_SOC_DAPM_MIC("Mic 2", mt8167_evb_mic2_event),
+	SND_SOC_DAPM_MIC("Headset Mic", mt8167_evb_headset_mic_event),
+	SND_SOC_DAPM_SPK("HP Spk Amp", mt8167_evb_hp_spk_amp_event),
+	SND_SOC_DAPM_SWITCH("HP Ext Amp",
+		SND_SOC_NOPM, 0, 0, &mt8167_evb_hp_ext_amp_switch_ctrl),
+	SND_SOC_DAPM_SPK("Ext Spk Amp", mt8167_evb_ext_spk_amp_wevent),
+	SND_SOC_DAPM_SWITCH("LINEOUT Ext Amp",
+		SND_SOC_NOPM, 0, 0, &mt8167_evb_lineout_ext_amp_switch_ctrl),
+};
+
+static const struct snd_soc_dapm_route mt8167_evb_audio_map[] = {
+	/* Uplink */
+
+	{"AU_VIN0", NULL, "Mic 1"},
+	{"AU_VIN2", NULL, "Mic 2"},
+
+	{"AU_VIN1", NULL, "Headset Mic"},
+
+	/* Downlink */
+
+	/* use external spk amp via AU_HPL/AU_HPR */
+	{"HP Ext Amp", "Switch", "AU_HPL"},
+	{"HP Ext Amp", "Switch", "AU_HPR"},
+
+	{"HP Spk Amp", NULL, "HP Ext Amp"},
+	{"HP Spk Amp", NULL, "HP Ext Amp"},
+
+#ifdef CONFIG_MTK_SPEAKER
+	/* use internal spk amp of MT6392 */
+	{"Int Spk Amp", NULL, "AU_LOL"},
+#endif
+
+	/* use external spk amp via AU_LOL */
+	{"LINEOUT Ext Amp", "Switch", "AU_LOL"},
+	{"Ext Spk Amp", NULL, "LINEOUT Ext Amp"},
+};
 
 /* Digital audio interface glue - connects codec <---> CPU */
 static struct snd_soc_dai_link mt8167_evb_dais[] = {
@@ -190,13 +391,60 @@ static struct snd_soc_card mt8167_evb_card = {
 	.owner = THIS_MODULE,
 	.dai_link = mt8167_evb_dais,
 	.num_links = ARRAY_SIZE(mt8167_evb_dais),
+	.dapm_widgets = mt8167_evb_dapm_widgets,
+	.num_dapm_widgets = ARRAY_SIZE(mt8167_evb_dapm_widgets),
+	.dapm_routes = mt8167_evb_audio_map,
+	.num_dapm_routes = ARRAY_SIZE(mt8167_evb_audio_map),
 };
+
+static int mt8167_evb_gpio_probe(struct snd_soc_card *card)
+{
+	struct mt8167_evb_priv *card_data;
+	int ret = 0;
+	int i;
+
+	card_data = snd_soc_card_get_drvdata(card);
+
+	card_data->pinctrl = devm_pinctrl_get(card->dev);
+	if (IS_ERR(card_data->pinctrl)) {
+		ret = PTR_ERR(card_data->pinctrl);
+		dev_err(card->dev, "%s pinctrl_get failed %d\n",
+			__func__, ret);
+		goto exit;
+	}
+
+	for (i = 0 ; i < PIN_STATE_MAX ; i++) {
+		card_data->pin_states[i] =
+			pinctrl_lookup_state(card_data->pinctrl,
+				mt8167_evb_pinctrl_pin_str[i]);
+		if (IS_ERR(card_data->pin_states[i])) {
+			ret = PTR_ERR(card_data->pin_states[i]);
+			dev_err(card->dev, "%s pinctrl_lookup_state %s failed %d\n",
+				__func__, mt8167_evb_pinctrl_pin_str[i], ret);
+		}
+	}
+
+	/* default state */
+	if (!IS_ERR(card_data->pin_states[PIN_STATE_DEFAULT])) {
+		ret = pinctrl_select_state(card_data->pinctrl,
+				card_data->pin_states[PIN_STATE_DEFAULT]);
+		if (ret) {
+			dev_err(card->dev, "%s failed to select state %d\n",
+				__func__, ret);
+			goto exit;
+		}
+	}
+
+exit:
+	return ret;
+}
 
 static int mt8167_evb_dev_probe(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = &mt8167_evb_card;
 	struct device_node *platform_node;
 	int ret, i;
+	struct mt8167_evb_priv *card_data;
 
 	platform_node = of_parse_phandle(pdev->dev.of_node,
 					 "mediatek,platform", 0);
@@ -212,6 +460,22 @@ static int mt8167_evb_dev_probe(struct platform_device *pdev)
 	}
 
 	card->dev = &pdev->dev;
+
+	card_data = devm_kzalloc(&pdev->dev,
+		sizeof(struct mt8167_evb_priv), GFP_KERNEL);
+
+	if (!card_data) {
+		ret = -ENOMEM;
+		dev_err(&pdev->dev,
+			"%s allocate card private data fail %d\n",
+			__func__, ret);
+		return ret;
+	}
+
+	snd_soc_card_set_drvdata(card, card_data);
+	if (mt8167_evb_gpio_probe(card))
+		dev_err(&pdev->dev,
+			"%s mt8167_evb_gpio_probe fail\n", __func__);
 
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret)
