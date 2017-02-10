@@ -68,7 +68,6 @@ int ext_disp_use_m4u;
 enum EXT_DISP_PATH_MODE ext_disp_mode;
 
 static int is_context_inited;
-static int init_roi;
 
 struct ext_disp_path_context {
 	enum EXTD_POWER_STATE state;
@@ -140,7 +139,6 @@ void ext_disp_path_set_mode(enum EXT_DISP_PATH_MODE mode, unsigned int session)
 	EXT_DISP_LOG("ext_disp_path_set_mode: %d\n", mode);
 	ext_disp_mode = mode;
 	pgc->mode = mode;
-	init_roi = (mode <= EXTD_DECOUPLE_MODE ? 1 : 0);
 }
 
 static void _ext_disp_path_lock(void)
@@ -486,19 +484,19 @@ static int _build_path_ovl_to_wdma(void)
 						     pgc->cmdq_handle_ovl2mem_config);
 #endif
 
-	ovl2mem_path_handle = pgc->ovl2mem_path_handle;
-
-	dpmgr_enable_event(pgc->ovl2mem_path_handle, DISP_PATH_EVENT_FRAME_COMPLETE);
-	dpmgr_enable_event(pgc->ovl2mem_path_handle, DISP_PATH_EVENT_FRAME_START);
-
 	if (pgc->ovl2mem_path_handle) {
 		EXT_DISP_LOG("dpmgr create ovl memout path SUCCESS\n");
 	} else {
 		EXT_DISP_LOG("dpmgr create path FAIL\n");
 		return -1;
 	}
+
+	ovl2mem_path_handle = pgc->ovl2mem_path_handle;
+
+	dpmgr_enable_event(pgc->ovl2mem_path_handle, DISP_PATH_EVENT_FRAME_COMPLETE);
+	dpmgr_enable_event(pgc->ovl2mem_path_handle, DISP_PATH_EVENT_FRAME_START);
 	dpmgr_path_set_video_mode(pgc->ovl2mem_path_handle, 0);
-	dpmgr_path_init(pgc->ovl2mem_path_handle, CMDQ_DISABLE);
+
 	is_path_exist = true;
 
 build_end:
@@ -555,6 +553,7 @@ static int _build_path_decouple(void)
 	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_DONE);
 
 	_build_path_ovl_to_wdma();
+	msleep(500);
 
 	EXT_DISP_LOG("build decouple finished\n");
 	return ret;
@@ -958,11 +957,13 @@ static int ext_disp_rdma_update_kthread(void *data)
 		if (kthread_should_stop())
 			break;
 
+		_ext_disp_path_lock();
 		if (pgc->state != EXTD_INIT && pgc->state != EXTD_RESUME && pgc->suspend_config != 1) {
 			EXT_DISP_LOG("ext disp is already slept, state:%d\n", pgc->state);
+			_ext_disp_path_unlock();
 			continue;
 		}
-		_ext_disp_path_lock();
+
 		data_config = dpmgr_path_get_last_config(pgc->dpmgr_handle);
 		data_config->rdma_config.is_interlace = true;
 		data_config->rdma_config.is_top_filed = ddp_dpi_is_top_filed(DISP_MODULE_DPI1);
@@ -984,7 +985,7 @@ void ext_disp_probe(void)
 	ext_disp_use_cmdq = CMDQ_DISABLE;
 #endif
 	ext_disp_use_m4u = 1;
-	ext_disp_mode = EXTD_DIRECT_LINK_MODE;
+	ext_disp_mode = EXTD_DECOUPLE_MODE;
 }
 
 int ext_disp_init(char *lcm_name, unsigned int session)
@@ -1063,9 +1064,9 @@ int ext_disp_init(char *lcm_name, unsigned int session)
 		data_config->dst_w = extd_lcm_params.dpi.width;
 		data_config->dst_h = extd_lcm_params.dpi.height;
 		data_config->dst_dirty = 1;
-		init_roi = 0;
 		ret = dpmgr_path_config(pgc->dpmgr_handle, data_config, CMDQ_DISABLE);
 		EXT_DISP_LOG("ext_disp_init roi w:%d, h:%d\n", data_config->dst_w, data_config->dst_h);
+		vfree(data_config);
 	} else
 		EXT_DISP_LOG("allocate buffer failed!!!\n");
 
@@ -1105,16 +1106,14 @@ int ext_disp_deinit(unsigned int session)
 	if (pgc->state == EXTD_SUSPEND)
 		dpmgr_path_power_on(pgc->dpmgr_handle, CMDQ_DISABLE);
 
+	pgc->state = EXTD_DEINIT;
+
 	dpmgr_path_deinit(pgc->dpmgr_handle, CMDQ_DISABLE);
 	dpmgr_destroy_path(pgc->dpmgr_handle, NULL);
-
 	cmdqRecDestroy(pgc->cmdq_handle_config);
 	cmdqRecDestroy(pgc->cmdq_handle_ovl2mem_config);
 	cmdqRecDestroy(pgc->cmdq_handle_trigger);
-
 	ext_deinit_decouple_buffer();
-
-	pgc->state = EXTD_DEINIT;
 
  deinit_exit:
 	_ext_disp_path_unlock();
@@ -1163,7 +1162,7 @@ int ext_disp_suspend(unsigned int session)
 	_ext_disp_path_lock();
 
 	if (pgc->state == EXTD_DEINIT || pgc->state == EXTD_SUSPEND || session != pgc->session) {
-		EXT_DISP_ERR("status is not EXTD_RESUME or session is not match\n");
+		EXT_DISP_ERR("status is not EXTD_RESUME\n");
 		goto done;
 	}
 
@@ -1310,13 +1309,14 @@ int ext_disp_trigger(int blocking, void *callback, unsigned int userdata, unsign
 
 	EXT_DISP_FUNC();
 
+	_ext_disp_path_lock();
+
 	if (pgc->state == EXTD_DEINIT || pgc->state == EXTD_SUSPEND || pgc->need_trigger_overlay < 1) {
 		EXT_DISP_LOG("%s ext display is already slept\n", __func__);
 		mmprofile_log_ex(ddp_mmp_get_events()->Extd_ErrorInfo, MMPROFILE_FLAG_PULSE, Trigger, 0);
+		_ext_disp_path_unlock();
 		return -1;
 	}
-
-	_ext_disp_path_lock();
 
 	if (pgc->mode == EXTD_DECOUPLE_MODE) {
 		/* because primary secure ovl->wdma use sync */
@@ -1343,15 +1343,16 @@ int ext_disp_suspend_trigger(void *callback, unsigned int userdata, unsigned int
 
 	EXT_DISP_FUNC();
 
+	_ext_disp_path_lock();
+
 	if (pgc->state != EXTD_RESUME) {
 		EXT_DISP_LOG("%s ext display is already slept\n", __func__);
 		mmprofile_log_ex(ddp_mmp_get_events()->Extd_ErrorInfo, MMPROFILE_FLAG_PULSE, Trigger, 0);
+		_ext_disp_path_unlock();
 		return -1;
 	}
 
 	mmprofile_log_ex(ddp_mmp_get_events()->Extd_State, MMPROFILE_FLAG_PULSE, Suspend, 0);
-
-	_ext_disp_path_lock();
 
 	if (_should_reset_cmdq_config_handle())
 		_cmdq_reset_config_handle();
@@ -1447,15 +1448,16 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 
 	struct disp_ddp_path_config *data_config;
 
+	_ext_disp_path_lock();
+
 	if (pgc->state != EXTD_INIT && pgc->state != EXTD_RESUME && pgc->suspend_config != 1) {
 		EXT_DISP_LOG("config ext disp is already slept, state:%d\n", pgc->state);
 		mmprofile_log_ex(ddp_mmp_get_events()->Extd_ErrorInfo, MMPROFILE_FLAG_PULSE, Config, idx);
+		_ext_disp_path_unlock();
 		return -2;
 	}
 
-	EXT_DISP_LOG("ext_disp_config_input_multiple, pgc->ovl2mem_path_handle = 0x%p\n", pgc->ovl2mem_path_handle);
-
-	_ext_disp_path_lock();
+	EXT_DISP_LOG("ext_disp_config_input_multiple\n");
 
 	if (pgc->mode == EXTD_DECOUPLE_MODE) {
 		disp_handle = pgc->ovl2mem_path_handle;
@@ -1559,7 +1561,6 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 	}
 	/* this is used for decouple mode, to indicate whether we need to trigger ovl */
 	/* pgc->need_trigger_overlay = 1; */
-	/* init_roi = 0; */
 
 	if (data_config->ovl_dirty) {
 		EXT_DISP_LOG("config_input_multiple idx:%d -w:%d, h:%d, pitch:%d\n",

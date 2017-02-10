@@ -314,33 +314,11 @@ static int wdma_config(enum DISP_MODULE_ENUM module,
 
 static int wdma_clock_on(enum DISP_MODULE_ENUM module, void *handle)
 {
-	unsigned int idx = wdma_index(module);
-	/* DDPMSG("wmda%d_clock_on\n",idx); */
-#ifdef ENABLE_CLK_MGR
-	if (idx == 0) {
-#ifdef CONFIG_MTK_CLKMGR
-		enable_clock(MT_CG_DISP0_DISP_WDMA0, "WDMA0");
-#else
-		ddp_clk_enable(DISP0_DISP_WDMA0);
-#endif
-	}
-#endif
 	return 0;
 }
 
 static int wdma_clock_off(enum DISP_MODULE_ENUM module, void *handle)
 {
-	unsigned int idx = wdma_index(module);
-	/* DDPMSG("wdma%d_clock_off\n",idx); */
-#ifdef ENABLE_CLK_MGR
-	if (idx == 0) {
-#ifdef CONFIG_MTK_CLKMGR
-		disable_clock(MT_CG_DISP0_DISP_WDMA0, "WDMA0");
-#else
-		ddp_clk_disable(DISP0_DISP_WDMA0);
-#endif
-	}
-#endif
 	return 0;
 }
 
