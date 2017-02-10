@@ -77,7 +77,7 @@
 /**
  * Enable Multipass support.
  */
-#define OVL_MULTIPASS_SUPPORT
+/* #define OVL_MULTIPASS_SUPPORT */
 
 /**
  * Enable Ovl time-sharing.

@@ -3186,8 +3186,6 @@ int _trigger_ovl_to_memory(disp_path_handle disp_handle, struct cmdqRecStruct *c
 
 	dpmgr_wdma_path_force_power_on();
 	dpmgr_path_trigger(disp_handle, cmdq_handle, CMDQ_ENABLE);
-	DISP_REG_SET(NULL, DISP_REG_CONFIG_MUTEX_EN(1), 1);
-	DISP_REG_SET(NULL, DISP_REG_CONFIG_MUTEX_EN(2), 1);
 	cmdqRecWaitNoClear(cmdq_handle, CMDQ_EVENT_DISP_WDMA0_EOF);
 
 	cmdqRecBackupUpdateSlot(cmdq_handle, pgc->rdma_buff_info, 0, mem_config.addr);
@@ -5485,7 +5483,7 @@ done:
 #endif
 
 #ifndef WDMA_PATH_CLOCK_DYNAMIC_SWITCH
-#if defined(MTK_FB_SODI_SUPPORT)
+#if defined(MTK_FB_SODI_SUPPORT) && defined(CONFIG_MTK_CLKMGR)
 	enable_soidle_by_bit(MT_CG_DISP0_DISP_WDMA0);
 #endif
 #endif
@@ -6337,8 +6335,6 @@ int primary_display_trigger(int blocking, void *callback, unsigned int userdata)
 					    pgc->cmdq_handle_ovl1to2_config);
 			mmprofile_log_ex(ddp_mmp_get_events()->primary_wdma_config,
 				       MMPROFILE_FLAG_PULSE, pgc->dc_buf_id, writing_mva);
-			DISPMSG("%s, config wdma address 0x%lx\n", __func__,
-				decouple_wdma_config.dstAddress);
 			/*
 			 * At the last round of multipass, the session mode would be configured as DECOUPLE MODE.
 			 * Need to set data as DISP_SESSION_DECOUPLE_MULTIPASS_MODE to _ovl_fence_release_callback.
