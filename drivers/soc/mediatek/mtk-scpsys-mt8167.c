@@ -23,6 +23,9 @@
 
 #include <dt-bindings/power/mt8167-power.h>
 
+#include <linux/regmap.h>
+#define INFRA_TOPAXI_SI1_CTL		0x0204
+
 #define SPM_VDE_PWR_CON			0x0210
 #define SPM_MFG_PWR_CON			0x0214
 #define SPM_VEN_PWR_CON			0x0230
@@ -87,6 +90,7 @@ struct scp_domain_data {
 	u32 sram_pdn_bits;
 	u32 sram_pdn_ack_bits;
 	u32 bus_prot_mask;
+	u32 axi_si1_way_en;
 	enum clk_id clk_id[MAX_CLKS];
 	bool active_wakeup;
 };
@@ -158,6 +162,10 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 		}
 	}
 
+	if (scpd->data->axi_si1_way_en)
+		mtk_infracfg_set_axi_si1_way_en(scp->infracfg,
+						scpd->data->axi_si1_way_en);
+
 	val = readl(ctl_addr);
 	val |= PWR_ON_BIT;
 	writel(val, ctl_addr);
@@ -221,6 +229,10 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 	return 0;
 
 err_pwr_ack:
+	if (scpd->data->axi_si1_way_en)
+		mtk_infracfg_clear_axi_si1_way_en(scp->infracfg,
+						scpd->data->axi_si1_way_en);
+
 	for (i = MAX_CLKS - 1; i >= 0; i--) {
 		if (scpd->clk[i])
 			clk_disable_unprepare(scpd->clk[i]);
@@ -305,6 +317,10 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
 		if (time_after(jiffies, timeout))
 			expired = true;
 	}
+
+	if (scpd->data->axi_si1_way_en)
+		mtk_infracfg_clear_axi_si1_way_en(scp->infracfg,
+						scpd->data->axi_si1_way_en);
 
 	for (i = 0; i < MAX_CLKS && scpd->clk[i]; i++)
 		clk_disable_unprepare(scpd->clk[i]);
@@ -521,6 +537,7 @@ static const struct scp_domain_data scp_domain_data_mt8167[] = {
 		.sram_pdn_bits = 0,
 		.sram_pdn_ack_bits = 0,
 		.bus_prot_mask = BIT(2) | BIT(5),
+		.axi_si1_way_en = BIT(7),
 		.clk_id = {CLK_MFG, CLK_AXI_MFG},
 		.active_wakeup = true,
 	},
