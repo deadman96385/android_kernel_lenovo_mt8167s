@@ -418,9 +418,11 @@ static void send_key_event(int keycode, int flag)
 		ACCDET_DEBUG("[accdet]KEY_VOLUMEUP %d\n", flag);
 		break;
 	case MD_KEY:
-		input_report_key(kpd_accdet_dev, KEY_PLAYPAUSE, flag);
-		input_sync(kpd_accdet_dev);
-		ACCDET_DEBUG("[accdet]KEY_PLAYPAUSE %d\n", flag);
+		if (eint_accdet_sync_flag == 1) {
+			input_report_key(kpd_accdet_dev, KEY_PLAYPAUSE, flag);
+			input_sync(kpd_accdet_dev);
+			ACCDET_DEBUG("[accdet]KEY_PLAYPAUSE %d\n", flag);
+		}
 		break;
 	case AS_KEY:
 		input_report_key(kpd_accdet_dev, KEY_VOICECOMMAND, flag);
