@@ -490,7 +490,7 @@ static struct pmic_wrap_setting pw = {
 };
 
 static struct regmap *pmic_regmap;
-static void spm_get_pwrap_base(void)
+static int __init spm_get_pwrap_base(void)
 {
 	struct device_node *node, *pwrap_node;
 
@@ -513,7 +513,10 @@ static void spm_get_pwrap_base(void)
 	} else {
 		spm_err("pwrap node has not register regmap\n");
 	}
+
+	return 0;
 }
+late_initcall(spm_get_pwrap_base);
 
 static void spm_pmic_table_init(void)
 {
@@ -540,7 +543,6 @@ void __spm_set_pmic_phase(enum pmic_wrap_phase_id phase)
 
 	if (pw.addr[0].cmd_addr == 0) {
 		spm_warn("pmic table not initialized\n");
-		spm_get_pwrap_base();
 		spm_pmic_table_init();
 	}
 
