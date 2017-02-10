@@ -58,6 +58,10 @@ static int usb_rdy;
 struct regmap *mt_regmap;
 #endif
 
+#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+static bool usb_shutdown;
+#endif
+
 void set_usb_rdy(void)
 {
 	DBG(0, "set usb_rdy, wake up bat\n");
@@ -684,6 +688,13 @@ static irqreturn_t mt_usb_interrupt(int irq, void *dev_id)
 	irqreturn_t status = IRQ_NONE;
 	struct musb	*musb = (struct musb *)dev_id;
 	u32 usb_l1_ints;
+
+#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	if (usb_shutdown) {
+		pr_err("%s, already shut down\n", __func__);
+		return IRQ_HANDLED;
+	}
+#endif
 
 	usb_l1_ints = musb_readl(musb->mregs, USB_L1INTS) & musb_readl(mtk_musb->mregs, USB_L1INTM); /*gang  REVISIT*/
 	DBG(1, "usb interrupt assert %x %x  %x %x %x\n", usb_l1_ints,
@@ -1616,6 +1627,15 @@ static int mt_usb_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+static void mt_usb_shutdown(struct platform_device *pdev)
+{
+	pr_err("%s, start to shut down\n", __func__);
+	usb_shutdown = true;
+
+}
+#endif
+
 static int mt_usb_dts_remove(struct platform_device *pdev)
 {
 	struct mt_usb_glue		*glue = platform_get_drvdata(pdev);
@@ -1640,6 +1660,9 @@ static struct platform_driver mt_usb_driver = {
 	.driver		= {
 		.name	= "mt_usb",
 	},
+	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	.shutdown = mt_usb_shutdown,
+	#endif
 };
 
 static struct platform_driver mt_usb_dts_driver = {

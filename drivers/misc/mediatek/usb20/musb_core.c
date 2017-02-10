@@ -1366,7 +1366,7 @@ static void musb_shutdown(struct platform_device *pdev)
 	unsigned long flags;
 
 	DBG(0, "shut down\n");
-
+	pr_err("%s, start to shut down\n", __func__);
 	pm_runtime_get_sync(musb->controller);
 
 	/* musb_gadget_cleanup(musb); */
@@ -1374,6 +1374,7 @@ static void musb_shutdown(struct platform_device *pdev)
 	spin_lock_irqsave(&musb->lock, flags);
 	musb_generic_disable(musb);
 	musb_platform_disable(musb);
+	pr_err("%s, musb has already disable\n", __func__);
 	spin_unlock_irqrestore(&musb->lock, flags);
 
 	if (musb->is_host) {
