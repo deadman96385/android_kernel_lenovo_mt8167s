@@ -1621,7 +1621,6 @@ static void codec_regmap_unlock(void *lock_arg)
 static struct regmap_config mt8167_codec_regmap_config = {
 	.reg_bits = 32,
 	.val_bits = 32,
-	.reg_stride = 4,
 	.reg_read = codec_reg_read,
 	.reg_write = codec_reg_write,
 	.lock = codec_regmap_lock,
