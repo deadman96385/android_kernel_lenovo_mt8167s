@@ -248,10 +248,11 @@ void cmdq_core_unlock_resource(struct work_struct *workItem)
 			/* print error message */
 			CMDQ_LOG("[Res]: available CB func is NULL, event:%d\n", pResource->lockEvent);
 		} else {
+			CmdqResourceAvailableCB cb_func = pResource->availableCB;
+
 			/* before call callback, release lock at first */
 			mutex_unlock(&gCmdqResourceMutex);
-			status =
-				pResource->availableCB(pResource->lockEvent);
+			status = cb_func(pResource->lockEvent);
 			mutex_lock(&gCmdqResourceMutex);
 
 			if (status < 0) {
@@ -3622,8 +3623,15 @@ static int32_t cmdq_core_find_a_free_HW_thread(uint64_t engineFlag,
 			/* thread 0 - CMDQ_MAX_HIGH_PRIORITY_THREAD_COUNT are preserved for DISPSYS */
 			const bool isDisplayThread = thread_prio > CMDQ_THR_PRIO_DISPLAY_TRIGGER;
 			int startIndex = isDisplayThread ? 0 : CMDQ_MAX_HIGH_PRIORITY_THREAD_COUNT;
+#ifdef CMDQ_SECURE_PATH_SUPPORT
 			int endIndex = isDisplayThread ?
-			    CMDQ_MAX_HIGH_PRIORITY_THREAD_COUNT : CMDQ_MAX_THREAD_COUNT;
+			    CMDQ_MAX_HIGH_PRIORITY_THREAD_COUNT :
+			    CMDQ_MAX_THREAD_COUNT - CMDQ_MAX_SECURE_THREAD_COUNT;
+#else
+			int endIndex = isDisplayThread ?
+			    CMDQ_MAX_HIGH_PRIORITY_THREAD_COUNT :
+			    CMDQ_MAX_THREAD_COUNT;
+#endif
 
 			for (index = startIndex; index < endIndex; ++index) {
 
@@ -5298,7 +5306,7 @@ static void cmdq_core_dump_error_buffer(const struct TaskStruct *pTask, uint32_t
 				cmd_size = CMDQ_CMD_BUFFER_SIZE - pTask->buf_available_size;
 			else
 				cmd_size = CMDQ_CMD_BUFFER_SIZE;
-			if (hwPC >= cmd_buffer->pVABase && hwPC < cmd_buffer->pVABase + cmd_size) {
+			if (hwPC >= cmd_buffer->pVABase && hwPC < (u32 *)(((u8 *)cmd_buffer->pVABase) + cmd_size)) {
 				/* because hwPC points to "start" of the instruction */
 				/* add offset 1 */
 				print_hex_dump(KERN_ERR, "", DUMP_PREFIX_ADDRESS, 16, 4,
@@ -5662,6 +5670,7 @@ static int32_t cmdq_core_remove_task_from_thread_array_when_secure_submit_fail(s
 								int32_t index)
 {
 	struct TaskStruct *pTask = NULL;
+	unsigned long flags = 0L;
 
 	if ((pThread == NULL) || (index < 0) || (index >= CMDQ_MAX_TASK_IN_THREAD)) {
 		CMDQ_ERR
@@ -5685,10 +5694,12 @@ static int32_t cmdq_core_remove_task_from_thread_array_when_secure_submit_fail(s
 	}
 
 	CMDQ_VERBOSE("remove task, slot[%d]\n", index);
+	spin_lock_irqsave(&gCmdqExecLock, flags);
 	pTask = NULL;
 	pThread->pCurTask[index] = NULL;
 	pThread->taskCount--;
 	pThread->nextCookie--;
+	spin_unlock_irqrestore(&gCmdqExecLock, flags);
 
 	if (pThread->taskCount < 0) {
 		/* Error status print */
@@ -6225,6 +6236,7 @@ static int32_t cmdq_core_handle_wait_task_result_secure_impl(struct TaskStruct *
 	cmdq_sec_lock_secure_path();
 
 	do {
+		unsigned long flags = 0L;
 		/* check if this task has finished */
 		if (cmdq_core_check_task_finished(pTask))
 			break;
@@ -6283,6 +6295,7 @@ static int32_t cmdq_core_handle_wait_task_result_secure_impl(struct TaskStruct *
 		cmdq_core_reset_hw_engine(pTask->engineFlag);
 
 		/* remove all tasks in tread since we have reset HW thread in SWd */
+		spin_lock_irqsave(&gCmdqExecLock, flags);
 		for (i = 0; i < cmdq_core_max_task_in_thread(thread); i++) {
 			pTask = pThread->pCurTask[i];
 			if (pTask) {
@@ -6292,6 +6305,7 @@ static int32_t cmdq_core_handle_wait_task_result_secure_impl(struct TaskStruct *
 		}
 		pThread->taskCount = 0;
 		pThread->waitCookie = pThread->nextCookie;
+		spin_unlock_irqrestore(&gCmdqExecLock, flags);
 	} while (0);
 
 	/* unlock cmdqSecLock */
@@ -6698,6 +6712,7 @@ static int32_t cmdq_core_exec_task_async_secure_impl(struct TaskStruct *pTask, i
 	int32_t msgMAXSize;
 	uint32_t *pVABase = NULL;
 	dma_addr_t MVABase = 0;
+	unsigned long flags = 0L;
 
 	cmdq_core_longstring_init(longMsg, &msgOffset, &msgMAXSize);
 	cmdq_core_get_task_first_buffer(pTask, &pVABase, &MVABase);
@@ -6731,6 +6746,7 @@ static int32_t cmdq_core_exec_task_async_secure_impl(struct TaskStruct *pTask, i
 
 		/* insert task to pThread's task lsit, and */
 		/* delay HW config when entry SWd */
+		spin_lock_irqsave(&gCmdqExecLock, flags);
 		if (pThread->taskCount <= 0) {
 			cookie = 1;
 			cmdq_core_insert_task_from_thread_array_by_cookie(pTask, pThread, cookie,
@@ -6741,6 +6757,7 @@ static int32_t cmdq_core_exec_task_async_secure_impl(struct TaskStruct *pTask, i
 			cmdq_core_insert_task_from_thread_array_by_cookie(pTask, pThread, cookie,
 									  false);
 		}
+		spin_unlock_irqrestore(&gCmdqExecLock, flags);
 
 		pTask->trigger = sched_clock();
 
