@@ -31,6 +31,7 @@
 #include <linux/clk-provider.h>
 #include "mtk_thermal_typedefs.h"
 #include "inc/mtk_thermal.h"
+#include "mtk_power_throttle.h"
 
 #include <linux/time.h>
 #include <linux/uidgid.h>
@@ -233,7 +234,7 @@ static int tp_ratio_low_fall;
 #endif
 /* -ASC- */
 
-static int mtktscpu_debug_log;
+int mtktscpu_debug_log;
 static int kernelmode;
 static int g_THERMAL_TRIP[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
@@ -896,9 +897,9 @@ static void thermal_config_Bank1_TS(void)
 {
 	/* tscpu_dprintk( "thermal_config_Bank1_TS\n"); */
 
-	THERMAL_WRAP_WR32(0x2, TEMPADCPNP0);
+	THERMAL_WRAP_WR32(0x0, TEMPADCPNP0);
 
-	THERMAL_WRAP_WR32(0x10, TEMPADCPNP1);
+	THERMAL_WRAP_WR32(0x1, TEMPADCPNP1);
 
 	THERMAL_WRAP_WR32(TS_CON1_P, TEMPPNPMUXADDR);	/* AHB address for pnp sensor mux selection */
 
@@ -909,13 +910,11 @@ static void thermal_config_Bank1_TS(void)
 static void thermal_config_Bank2_TS(void)
 {
 
-	THERMAL_WRAP_WR32(0x3, TEMPADCPNP0);
+	THERMAL_WRAP_WR32(0x0, TEMPADCPNP0);
 
 	THERMAL_WRAP_WR32(0x1, TEMPADCPNP1);
 
 	THERMAL_WRAP_WR32(0x2, TEMPADCPNP2);
-
-	THERMAL_WRAP_WR32(0x10, TEMPADCPNP3);
 
 	THERMAL_WRAP_WR32(TS_CON1_P, TEMPPNPMUXADDR);	/* AHB address for pnp sensor mux selection */
 
@@ -1272,14 +1271,13 @@ static void thermal_cal_prepare(void)
 {
 	U32 temp0 = 0, temp1 = 0, temp2 = 0;
 
+	/* temp0 = DRV_Reg32(0x10009184); */
+	/* temp1 = DRV_Reg32(0x10009180); */
+	/* temp2 = DRV_Reg32(0x10009188); */
 
-	/* temp0 = DRV_Reg32(0xF0206184); */
-	/* temp1 = DRV_Reg32(0xF0206180); */
-	/* temp2 = DRV_Reg32(0xF0206188); */
-
-	temp0 = get_devinfo_with_index(8);
-	temp1 = get_devinfo_with_index(7);
-	temp2 = get_devinfo_with_index(9);
+	temp0 = get_devinfo_with_index(61);
+	temp1 = get_devinfo_with_index(60);
+	temp2 = get_devinfo_with_index(62);
 
 
 	tscpu_dprintk("[calibration] devinfo idx7=0x%x, idx8=0x%x, idx9=0x%x\n", temp1, temp0,
@@ -2866,6 +2864,8 @@ static int tscpu_read_atm(struct seq_file *m, void *v)
 	seq_printf(m, "tp_ratio_low_rise = %d\n", tp_ratio_low_rise);
 	seq_printf(m, "tp_ratio_low_fall = %d\n", tp_ratio_low_fall);
 
+	dump_power_table();
+
 	return 0;
 }
 
@@ -4238,10 +4238,9 @@ static int thermal_fast_init(void)
 
 	DRV_WriteReg32(TEMPMSRCTL0, 0x0000000);	/* temperature measurement sampling control */
 	/* this value will be stored to TEMPPNPMUXADDR (TEMPSPARE0) automatically by hw */
-	DRV_WriteReg32(TEMPADCPNP0, 0x1);
-	DRV_WriteReg32(TEMPADCPNP1, 0x2);
-	DRV_WriteReg32(TEMPADCPNP2, 0x3);
-	DRV_WriteReg32(TEMPADCPNP3, 0x4);
+	DRV_WriteReg32(TEMPADCPNP0, 0x0);
+	DRV_WriteReg32(TEMPADCPNP1, 0x1);
+	DRV_WriteReg32(TEMPADCPNP2, 0x2);
 
 #if 0
 	DRV_WriteReg32(TEMPPNPMUXADDR, 0x1100B420);	/* AHB address for pnp sensor mux selection */

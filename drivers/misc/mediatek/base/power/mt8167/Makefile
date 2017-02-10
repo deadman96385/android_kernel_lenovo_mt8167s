@@ -13,6 +13,7 @@
 
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/mt8167
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/thermal/mt8167/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/hps_v1/
 obj-$(CONFIG_MACH_MT8167) += mt8167-cpufreq.o
 obj-$(CONFIG_MACH_MT8167) += mtk_static_power.o
 obj-$(CONFIG_MACH_MT8167) += mtk_power_throttle.o
