@@ -1278,6 +1278,17 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
 			      rate * channels * bit_width);
 
+	if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S &&
+			(be->fmt_mode & SND_SOC_DAIFMT_FORMAT_MASK) == SND_SOC_DAIFMT_I2S)
+		val = AFE_TDM_CON1_BCK_INV |
+		      AFE_TDM_CON1_1_BCK_DELAY |
+		      AFE_TDM_CON1_MSB_ALIGNED |
+		      AFE_TDM_CON1_LRCK_INV;
+	else if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S &&
+			(be->fmt_mode & SND_SOC_DAIFMT_FORMAT_MASK) == SND_SOC_DAIFMT_LEFT_J)
+		val = AFE_TDM_CON1_BCK_INV |
+		      AFE_TDM_CON1_MSB_ALIGNED;
+	else
 	val = AFE_TDM_CON1_BCK_INV |
 	      AFE_TDM_CON1_1_BCK_DELAY |
 	      AFE_TDM_CON1_MSB_ALIGNED;
@@ -1407,6 +1418,26 @@ static int mt8167_afe_hdmi_trigger(struct snd_pcm_substream *substream, int cmd,
 	default:
 		return -EINVAL;
 	}
+}
+
+static int mt8167_afe_hdmi_set_fmt(struct snd_soc_dai *dai,
+				unsigned int fmt)
+{
+	struct mtk_afe *afe = snd_soc_dai_get_drvdata(dai);
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
+
+	be->fmt_mode = 0;
+	/* set DAI format */
+	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+	case SND_SOC_DAIFMT_I2S:
+	case SND_SOC_DAIFMT_LEFT_J:
+		be->fmt_mode |= fmt & SND_SOC_DAIFMT_FORMAT_MASK;
+		break;
+	default:
+		dev_err(afe->dev, "invalid dai format\n");
+		return -EINVAL;
+	}
+	return 0;
 }
 
 static int mt8167_afe_tdm_in_startup(struct snd_pcm_substream *substream,
@@ -1883,6 +1914,7 @@ static const struct snd_soc_dai_ops mt8167_afe_hdmi_ops = {
 	.shutdown	= mt8167_afe_hdmi_shutdown,
 	.prepare	= mt8167_afe_hdmi_prepare,
 	.trigger	= mt8167_afe_hdmi_trigger,
+	.set_fmt	= mt8167_afe_hdmi_set_fmt,
 };
 
 static const struct snd_soc_dai_ops mt8167_afe_tdm_in_ops = {
