@@ -89,6 +89,10 @@ static DEFINE_SPINLOCK(kdsensor_drv_lock);
 #define SUPPORT_I2C_BUS_NUM2        1
 #endif
 
+#ifndef DEMO_BOARD_SUPPORT
+#define DEMO_BOARD_SUPPORT	    0
+#endif
+
 /* If need workaround for fpga, then modify them=== START*/
 #define WORKAROUND_FOR_PMIC	0
 
@@ -106,10 +110,11 @@ static DEFINE_SPINLOCK(kdsensor_drv_lock);
 #define CAMERA_HW_DRVNAME2  "kd_camera_hw_bus2"
 
 /* use GPIO API instead of pinctl*/
-unsigned int GPIO_CAM0_RST;
+#if (DEMO_BOARD_SUPPORT == 1)
+unsigned int GPIO_CAM_RST; /* main & sub share the same RST */
 unsigned int GPIO_CAM0_PDN;
-unsigned int GPIO_CAM1_RST;
 unsigned int GPIO_CAM1_PDN;
+#endif
 
 #if defined(CONFIG_MTK_LEGACY)
 static struct i2c_board_info i2c_devs1 __initdata = {
@@ -141,6 +146,7 @@ struct cam_power g_cam[2];
 #endif
 
 struct clk *g_camclk_camtg_sel;
+struct clk *g_camclk_camtg;
 struct clk *g_camclk_48m;
 struct clk *g_camclk_208m;
 
@@ -2305,6 +2311,9 @@ static inline void Get_ccf_clk(struct platform_device *pdev)
 	g_camclk_camtg_sel = devm_clk_get(&pdev->dev, "TOP_CAMTG_SEL");
 	if (IS_ERR(g_camclk_camtg_sel))
 		PK_ERR("get g_camclk_camtg_sel : invalid...\n");
+	g_camclk_camtg = devm_clk_get(&pdev->dev, "TOP_CAMTG");
+	if (IS_ERR(g_camclk_camtg))
+		PK_ERR("get g_camclk_camtg : invalid...\n");
 	g_camclk_48m = devm_clk_get(&pdev->dev, "TOP_CAM_TG_48M");
 	if (IS_ERR(g_camclk_48m))
 		PK_ERR("get g_camclk_48m : invalid...\n");
@@ -2323,6 +2332,11 @@ static inline int Check_ccf_clk(void)
 
 	if (IS_ERR(g_camclk_camtg_sel)) {
 		PK_ERR("g_camclk_camtg_sel invalid...\n");
+		return 0;
+	}
+
+	if (IS_ERR(g_camclk_camtg)) {
+		PK_ERR("g_camclk_camtg invalid...\n");
 		return 0;
 	}
 
@@ -2358,13 +2372,13 @@ static inline int kdSetSensorMclk(int *pBuf)
 		return 0;
 	}
 	if (pSensorCtrl->on == 1) {
-		clk_prepare_enable(g_camclk_camtg_sel);
+		clk_prepare_enable(g_camclk_camtg);
 		if (pSensorCtrl->freq == 1 /*CAM_PLL_48_GROUP */)
 			clk_set_parent(g_camclk_camtg_sel, g_camclk_48m);
 		else if (pSensorCtrl->freq == 2 /*CAM_PLL_52_GROUP */)
 			clk_set_parent(g_camclk_camtg_sel, g_camclk_208m);
 	} else {
-		clk_disable_unprepare(g_camclk_camtg_sel);
+		clk_disable_unprepare(g_camclk_camtg);
 	}
 	return ret;
 /* #endif */
@@ -3699,7 +3713,7 @@ struct i2c_driver CAMERA_HW_i2c_driver2 = {
 ********************************************************************************/
 static int CAMERA_HW_probe(struct platform_device *pdev)
 {
-#if !BYPASS_GPIO && !defined(CONFIG_MTK_LEGACY)
+#if !BYPASS_GPIO && !defined(CONFIG_MTK_LEGACY) && (DEMO_BOARD_SUPPORT == 1)
 	struct device *dev = &pdev->dev;
 #endif
 
@@ -3727,30 +3741,26 @@ static int CAMERA_HW_probe(struct platform_device *pdev)
 	PK_DBG(" == MTKCAM_USING_CCF ==\n");
 	Get_ccf_clk(pdev);
 
-#if !BYPASS_GPIO && !defined(CONFIG_MTK_LEGACY)
+#if !BYPASS_GPIO && !defined(CONFIG_MTK_LEGACY) && (DEMO_BOARD_SUPPORT == 1)
 	/* request GPIO RST/PDN */
-	GPIO_CAM0_RST = of_get_named_gpio(dev->of_node, "cam0_rst", 0);
+	GPIO_CAM_RST = of_get_named_gpio(dev->of_node, "cam0_rst", 0);
 	GPIO_CAM0_PDN = of_get_named_gpio(dev->of_node, "cam0_pdn", 0);
-	GPIO_CAM1_RST = of_get_named_gpio(dev->of_node, "cam0_rst", 0);
-	GPIO_CAM1_PDN = of_get_named_gpio(dev->of_node, "cam0_pdn", 0);
+	GPIO_CAM1_PDN = of_get_named_gpio(dev->of_node, "cam1_pdn", 0);
 
-	ret = gpio_request(GPIO_CAM0_RST, "cam0_rst");
+	ret = gpio_request(GPIO_CAM_RST, "cam0_rst");
 	if (ret < 0)
-		pr_err("[Camera][ERROR] Unable to request GPIO_CAM0_RST\n");
+		pr_err("[Camera][ERROR] Unable to request GPIO_CAM_RST\n");
 
 	ret = gpio_request(GPIO_CAM0_PDN, "cam0_pdn");
 	if (ret < 0)
 		pr_err("[Camera][ERROR] Unable to request GPIO_CAM0_PDN\n");
 
-	ret = gpio_request(GPIO_CAM1_RST, "cam1_rst");
-	if (ret < 0)
-		pr_err("[Camera][ERROR] Unable to request GPIO_CAM1_RST\n");
-
 	ret = gpio_request(GPIO_CAM1_PDN, "cam1_pdn");
 	if (ret < 0)
 		pr_err("[Camera][ERROR] Unable to request GPIO_CAM1_PDN\n");
-	mtkcam_gpio_init(pdev);
 #endif
+	mtkcam_gpio_init(pdev);
+
 	return i2c_add_driver(&CAMERA_HW_i2c_driver);
 }
 
@@ -3759,17 +3769,16 @@ static int CAMERA_HW_probe(struct platform_device *pdev)
 ********************************************************************************/
 static int CAMERA_HW_remove(struct platform_device *pdev)
 {
-#if !BYPASS_GPIO && !defined(CONFIG_MTK_LEGACY)
+#if !BYPASS_GPIO && !defined(CONFIG_MTK_LEGACY) && (DEMO_BOARD_SUPPORT == 1)
 
-	if (gpio_is_valid(GPIO_CAM0_RST))
-		gpio_free(GPIO_CAM0_RST);
+	if (gpio_is_valid(GPIO_CAM_RST))
+		gpio_free(GPIO_CAM_RST);
 	if (gpio_is_valid(GPIO_CAM0_PDN))
 		gpio_free(GPIO_CAM0_PDN);
-	if (gpio_is_valid(GPIO_CAM1_RST))
-		gpio_free(GPIO_CAM1_RST);
 	if (gpio_is_valid(GPIO_CAM1_PDN))
 		gpio_free(GPIO_CAM1_PDN);
 #endif
+
 	i2c_del_driver(&CAMERA_HW_i2c_driver);
 	return 0;
 }

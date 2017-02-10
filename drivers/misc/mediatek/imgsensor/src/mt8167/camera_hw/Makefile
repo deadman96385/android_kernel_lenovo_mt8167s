@@ -37,3 +37,7 @@ else
 $(warning "camera power on/off Use project folder: $(ARCH_MTK_PROJECT)")
 obj-y 				+= camera_project/$(ARCH_MTK_PROJECT)/
 endif
+
+ifneq (,$(findstring tb8167p,$(ARCH_MTK_PROJECT)))
+ccflags-y += -DDEMO_BOARD_SUPPORT=1
+endif

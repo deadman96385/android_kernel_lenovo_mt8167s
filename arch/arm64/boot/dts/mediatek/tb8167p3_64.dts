@@ -207,16 +207,6 @@
 	pinctrl-0 = <&i2c1_pins_a>;
 	status = "okay";
 
-	kd_camera_hw2@30 {
-		compatible = "mediatek,camera_sub";
-		reg = <0x30>;
-	};
-
-	kd_camera_hw1@36 {
-		compatible = "mediatek,camera_main";
-		reg = <0x36>;
-	};
-
 	vproc: sym827@60 {
 		compatible = "silergy,sym827-regulator";
 		reg = <0x60>;
@@ -240,6 +230,16 @@
 		compatible = "mediatek,msensor";
 		reg = <0x0c>;
 		rst-gpio = <&pio 52 0>;
+	};
+
+	kd_camera_hw2@30 {
+		compatible = "mediatek,camera_sub";
+		reg = <0x30>;
+	};
+
+	kd_camera_hw1@36 {
+		compatible = "mediatek,camera_main";
+		reg = <0x36>;
 	};
 
 	gsensor@68 {
