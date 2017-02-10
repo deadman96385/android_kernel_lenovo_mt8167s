@@ -319,9 +319,9 @@
 			compatible = "mediatek,mt8167-pwrap";
 			reg = <0 0x1000f000 0 0x1000>;
 			reg-names = "pwrap";
-			interrupts = <GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&topckgen CLK_TOP_PMICSPI_SEL>,
-				 <&infracfg CLK_INFRA_PMIC_AP>;
+			interrupts = <GIC_SPI 204 IRQ_TYPE_LEVEL_LOW>;
+			clocks = <&topckgen CLK_TOP_PMICWRAP_26M>,
+				 <&topckgen CLK_TOP_PMICWRAP_AP>;
 			clock-names = "spi",
 				      "wrap";
 			status = "disabled";
