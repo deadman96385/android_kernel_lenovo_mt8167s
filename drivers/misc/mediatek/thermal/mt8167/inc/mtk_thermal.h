@@ -252,6 +252,10 @@ struct TS_PTPOD {
 	unsigned int ts_BTS;
 };
 
+struct mtk_gpu_power_info {
+	unsigned int gpufreq_khz;
+	unsigned int gpufreq_power;
+};
 
 extern void get_thermal_slope_intercept(struct TS_PTPOD *ts_info, enum thermal_bank_name ts_bank);
 extern void set_taklking_flag(bool flag);
@@ -297,7 +301,7 @@ enum MTK_THERMAL_SENSOR_CPU_ID_MET {
 
 
 extern int tscpu_get_cpu_temp_met(enum MTK_THERMAL_SENSOR_CPU_ID_MET id);
-
+extern int mtk_gpufreq_register(struct mtk_gpu_power_info *freqs, int num);
 
 typedef void (*met_thermalsampler_funcMET)(void);
 void mt_thermalsampler_registerCB(met_thermalsampler_funcMET pCB);

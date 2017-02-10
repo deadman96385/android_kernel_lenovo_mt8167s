@@ -32,6 +32,7 @@
 #include "mtk_thermal_typedefs.h"
 #include "inc/mtk_thermal.h"
 #include "mtk_power_throttle.h"
+#include "mtk_gpufreq.h"
 
 #include <linux/time.h>
 #include <linux/uidgid.h>
@@ -395,10 +396,6 @@ struct mtk_cpu_power_info {
 	unsigned int cpufreq_ncpu;
 	unsigned int cpufreq_power;
 };
-struct mtk_gpu_power_info {
-	unsigned int gpufreq_khz;
-	unsigned int gpufreq_power;
-};
 
 #if THERMAL_DRV_UPDATE_TEMP_DIRECT_TO_MET
 static int a_tscpu_all_temp[THERMAL_SENSOR_NUM] = { 0 };
@@ -464,7 +461,7 @@ static void set_static_cpu_power_limit(unsigned int limit)
 	final_limit = MIN(adaptive_cpu_power_limit, static_cpu_power_limit);
 
 	if (prv_stc_cpu_pwr_lim != static_cpu_power_limit) {
-		tscpu_printk("set_static_cpu_power_limit %d, T=%d,%d,%d,%d,%d,%d\n",
+		pr_info("set_static_cpu_power_limit %d, T=%d,%d,%d,%d,%d,%d\n",
 				(final_limit != 0x7FFFFFFF) ? final_limit : 0, CPU_TS_MCU1_T,
 				CPU_TS_MCU2_T, GPU_TS_MCU2_T, SOC_TS_MCU1_T, SOC_TS_MCU2_T,
 				SOC_TS_MCU3_T);
@@ -494,7 +491,7 @@ static void set_static_gpu_power_limit(unsigned int limit)
 
 	static_gpu_power_limit = (limit != 0) ? limit : 0x7FFFFFFF;
 	final_limit = MIN(adaptive_gpu_power_limit, static_gpu_power_limit);
-	tscpu_printk("set_static_gpu_power_limit %d\n",
+	pr_info("set_static_gpu_power_limit %d\n",
 			(final_limit != 0x7FFFFFFF) ? final_limit : 0);
 	mt_gpufreq_thermal_protect((final_limit != 0x7FFFFFFF) ? final_limit : 0);
 }
@@ -1233,7 +1230,7 @@ int mtk_gpufreq_register(struct mtk_gpu_power_info *freqs, int num)
 {
 	int i = 0;
 
-	tscpu_dprintk("mtk_gpufreq_register\n");
+	pr_info("mtk_gpufreq_register\n");
 	mtk_gpu_power = kzalloc((num) * sizeof(struct mtk_gpu_power_info), GFP_KERNEL);
 	if (mtk_gpu_power == NULL)
 		return -ENOMEM;
@@ -1242,7 +1239,7 @@ int mtk_gpufreq_register(struct mtk_gpu_power_info *freqs, int num)
 		mtk_gpu_power[i].gpufreq_khz = freqs[i].gpufreq_khz;
 		mtk_gpu_power[i].gpufreq_power = freqs[i].gpufreq_power;
 
-		tscpu_dprintk("[%d].gpufreq_khz=%u, .gpufreq_power=%u\n",
+		pr_info("[%d].gpufreq_khz=%u, .gpufreq_power=%u\n",
 				i, freqs[i].gpufreq_khz, freqs[i].gpufreq_power);
 	}
 
