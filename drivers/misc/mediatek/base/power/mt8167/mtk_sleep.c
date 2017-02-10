@@ -198,10 +198,8 @@ static int slp_suspend_ops_valid(suspend_state_t state)
 static int slp_suspend_ops_begin(suspend_state_t state)
 {
 	/* legacy log */
-	slp_notice("@@@@@@@@@@@@@@@@@@@@\n");
-	slp_notice("Chip_pm_begin(%u)(%u)\n", is_cpu_pdn(slp_spm_flags),
-		   is_infra_pdn(slp_spm_flags));
-	slp_notice("@@@@@@@@@@@@@@@@@@@@\n");
+	slp_notice("@@@@@@@@@@@@@@@@@@@@\tChip_pm_begin(%u)(%u)\t@@@@@@@@@@@@@@@@@@@@\n",
+		is_cpu_pdn(slp_spm_flags), is_infra_pdn(slp_spm_flags));
 
 	slp_wake_reason = WR_NONE;
 
@@ -211,9 +209,7 @@ static int slp_suspend_ops_begin(suspend_state_t state)
 static int slp_suspend_ops_prepare(void)
 {
 	/* legacy log */
-	slp_notice("@@@@@@@@@@@@@@@@@@@@\n");
-	slp_crit2("Chip_pm_prepare\n");
-	slp_notice("@@@@@@@@@@@@@@@@@@@@\n");
+	slp_notice("@@@@@@@@@@@@@@@@@@@@\tChip_pm_prepare\t@@@@@@@@@@@@@@@@@@@@\n");
 
 #if 0
 	if (slp_chk_golden)
@@ -240,10 +236,7 @@ static int slp_suspend_ops_enter(suspend_state_t state)
 		fm_radio_is_playing = 1;
 
 	/* legacy log */
-	slp_notice("@@@@@@@@@@@@@@@@@@@@\n");
-	slp_crit2("Chip_pm_enter\n");
-	slp_notice("@@@@@@@@@@@@@@@@@@@@\n");
-
+	slp_notice("@@@@@@@@@@@@@@@@@@@@\tChip_pm_enter\t@@@@@@@@@@@@@@@@@@@@\n");
 
 #if 0 /* !defined(CONFIG_MTK_FPGA) */
 	if (slp_dump_gpio)
@@ -304,17 +297,14 @@ LEAVE_SLEEP:
 static void slp_suspend_ops_finish(void)
 {
 	/* legacy log */
-	slp_notice("@@@@@@@@@@@@@@@@@@@@\n");
-	slp_crit2("Chip_pm_finish\n");
-	slp_notice("@@@@@@@@@@@@@@@@@@@@\n");
+	slp_notice("@@@@@@@@@@@@@@@@@@@@\tChip_pm_finish\t@@@@@@@@@@@@@@@@@@@@\n");
 }
 
 static void slp_suspend_ops_end(void)
 {
 	/* legacy log */
-	slp_notice("@@@@@@@@@@@@@@@@@@@@\n");
-	slp_notice("Chip_pm_end\n");
-	slp_notice("@@@@@@@@@@@@@@@@@@@@\n");
+	slp_notice("@@@@@@@@@@@@@@@@@@@@\tChip_pm_end\t@@@@@@@@@@@@@@@@@@@@\n");
+
 #ifdef ENABLE_AUTO_SUSPEND_TEST
 	if (slp_auto_suspend_resume == 1) {
 		slp_crit2("slp_auto_suspend_resume_cnt = %d\n", slp_auto_suspend_resume_cnt);
