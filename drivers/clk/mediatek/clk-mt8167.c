@@ -37,6 +37,7 @@ static const struct mtk_fixed_clk fixed_clks[] __initconst = {
 
 static const struct mtk_fixed_factor top_divs[] __initconst = {
 	FACTOR(CLK_TOP_DMPLL, "dmpll_ck", "mempll", 1, 1),
+	FACTOR(CLK_TOP_MAINPLL_D2, "mainpll_d2", "mainpll", 1, 2),
 	FACTOR(CLK_TOP_MAINPLL_D4, "mainpll_d4", "mainpll", 1, 4),
 	FACTOR(CLK_TOP_MAINPLL_D8, "mainpll_d8", "mainpll", 1, 8),
 	FACTOR(CLK_TOP_MAINPLL_D16, "mainpll_d16", "mainpll", 1, 16),
@@ -630,6 +631,13 @@ static const struct mtk_composite top_muxes[] __initconst = {
 		0x07c, 13, 3),
 };
 
+static const char * const ifr_mux1_parents[] __initconst = {
+	"clk26m_ck",
+	"armpll",
+	"univpll",
+	"mainpll_d2"
+};
+
 static const char * const ifr_eth_25m_parents[] __initconst = {
 	"eth_d2_ck",
 	"rg_eth"
@@ -641,14 +649,16 @@ static const char * const ifr_i2c0_parents[] __initconst = {
 };
 
 static const struct mtk_composite ifr_muxes[] __initconst = {
-	MUX(CLK_IFR_ETH_25M_SEL, "ifr_eth_25m_sel", ifr_eth_25m_parents,
-		0x080, 0, 1),
-	MUX(CLK_IFR_I2C0_SEL, "ifr_i2c0_sel", ifr_i2c0_parents,
-		0x080, 1, 1),
-	MUX(CLK_IFR_I2C1_SEL, "ifr_i2c1_sel", ifr_i2c0_parents,
-		0x080, 2, 1),
-	MUX(CLK_IFR_I2C2_SEL, "ifr_i2c2_sel", ifr_i2c0_parents,
-		0x080, 3, 1),
+	MUX(CLK_IFR_MUX1_SEL, "ifr_mux1_sel", ifr_mux1_parents, 0x000,
+		2, 2),
+	MUX(CLK_IFR_ETH_25M_SEL, "ifr_eth_25m_sel", ifr_eth_25m_parents, 0x080,
+		0, 1),
+	MUX(CLK_IFR_I2C0_SEL, "ifr_i2c0_sel", ifr_i2c0_parents, 0x080,
+		1, 1),
+	MUX(CLK_IFR_I2C1_SEL, "ifr_i2c1_sel", ifr_i2c0_parents, 0x080,
+		2, 1),
+	MUX(CLK_IFR_I2C2_SEL, "ifr_i2c2_sel", ifr_i2c0_parents, 0x080,
+		3, 1),
 };
 
 
