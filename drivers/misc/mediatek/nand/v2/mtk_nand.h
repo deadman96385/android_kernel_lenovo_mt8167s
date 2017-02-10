@@ -588,6 +588,8 @@ struct mtk_nand_host {
 	struct mtd_info mtd;
 	struct mtk_nand_host_hw *hw;
 	struct read_sleep_para rd_para;
+	bool pre_wb_cmd;
+	u16 wb_cmd;
 #ifdef CONFIG_PM
 	struct nfi_saved_para saved_para;
 #endif

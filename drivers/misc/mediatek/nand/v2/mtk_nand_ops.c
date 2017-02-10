@@ -203,9 +203,9 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 				ops0->block, ops1->block);
 			return -EIO;
 		}
-		if (mtk_isbad_block(ops1->block))
+		if (mtk_isbad_block(ops1->block)) {
 			page_addr1 = 0;
-		else {
+		} else {
 			if ((devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
 				&& (ops1->block >= info->data_block_num)) {
 				page_addr1 = (ops1->block+data_info->bmt.start_block)*info->data_page_num
@@ -220,7 +220,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 	}
 
 	if ((devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
-		&& (ops0->block >= info->data_block_num))
+		&& (ops0->block >= info->data_block_num))/* Log block*/
 		page_addr0 = (ops0->block+data_info->bmt.start_block)*info->data_page_num
 				+ ops0->page*MTK_TLC_DIV;
 	else
@@ -229,21 +229,18 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 
 	nand_debug("page_addr0= 0x%x page_addr1=0x%x",
 		page_addr0, page_addr1);
-#if 0
-	/* Grab the lock and see if the device is available */
-	nand_get_device(mtd, FL_WRITING);
-	/* Select the NAND device */
-	chip->select_chip(mtd, 0);
-#endif
+
 	/* For log area access */
 	if (ops0->block < info->data_block_num) {
 		page_size = info->data_page_size;
 		devinfo.tlcControl.slcopmodeEn = FALSE;
 		oob_size = info->data_oob_size;
+		host->wb_cmd = PROGRAM_LEFT_PLANE_CMD;
 	} else {
 		nand_debug("write SLC mode");
 		page_size = info->log_page_size;
 		devinfo.tlcControl.slcopmodeEn = TRUE;
+		host->wb_cmd = NAND_CMD_PAGEPROG;
 		oob_size = info->log_oob_size;
 	}
 
@@ -313,7 +310,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 				tlc_snd_phyplane = FALSE;
 			}
 		} else {
-			tlc_snd_phyplane = FALSE;
+			host->pre_wb_cmd = true;
 			memcpy(fdm_buf, ops0->oob_buffer, oob_size);
 			temp_page_buf = ops0->data_buffer;
 			temp_fdm_buf = fdm_buf;
@@ -328,7 +325,10 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 					&& ((devinfo.advancedmode & MULTI_PLANE) && page_addr1)) {
 				nand_debug("write Multi_plane mode page_addr0:0x%x page_addr1:0x%x",
 					page_addr0, page_addr1);
-				tlc_snd_phyplane = TRUE;
+				if (ops1->page % 3 == WL_HIGH_PAGE)
+					host->wb_cmd = NAND_CMD_PAGEPROG;
+				else
+					host->wb_cmd = PROGRAM_RIGHT_PLANE_CMD;
 				memcpy(fdm_buf, ops1->oob_buffer, oob_size);
 
 				temp_page_buf = ops1->data_buffer;
@@ -340,13 +340,12 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 					nand_err("write failed for page_addr1:0x%x", page_addr1);
 					goto exit;
 				}
-				tlc_snd_phyplane = FALSE;
 			}
 		}
 	} else
 #endif
 	{
-		tlc_snd_phyplane = FALSE;
+		host->pre_wb_cmd = true;
 		memcpy(fdm_buf, ops0->oob_buffer, oob_size);
 
 		ret = mtk_nand_exec_write_page_hw(mtd, page_addr0,
@@ -357,13 +356,12 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 		}
 
 		if ((devinfo.advancedmode & MULTI_PLANE)  && page_addr1) {
+			host->wb_cmd = NAND_CMD_PAGEPROG;
 			nand_debug("write Multi_plane mode page_addr0:0x%x page_addr1:0x%x",
 				page_addr0, page_addr1);
-			tlc_snd_phyplane = TRUE;
 			memcpy(fdm_buf, ops1->oob_buffer, oob_size);
 			ret = mtk_nand_exec_write_page_hw(mtd, page_addr1,
 						page_size, ops1->data_buffer, fdm_buf);
-			tlc_snd_phyplane = FALSE;
 			if (ret != 0) {
 				nand_err("write failed for page_addr1:0x%x", page_addr1);
 				goto exit;
@@ -374,13 +372,8 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 
 exit:
 	kfree(fdm_buf);
+	host->pre_wb_cmd = false;
 
-#if 0
-	/* Deselect and wake up anyone waiting on the device */
-	chip->select_chip(mtd, -1);
-	mtk_nand_release_device(mtd);
-#endif
-	/* Return more or less happy */
 	return ret;
 }
 
