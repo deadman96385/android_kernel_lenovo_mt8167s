@@ -1462,7 +1462,7 @@ static void ext_disp_path_blank_svp(int enCmdq)
 static void ext_disp_update_rdma(enum DISP_MODULE_ENUM module, unsigned int param)
 {
 	if (param & 0x2) {
-		if (pgc->is_interlace) {
+		if (pgc->is_interlace && !pgc->is_secure) {
 			atomic_set(&rdma_update_event, 1);
 			wake_up_interruptible(&rdma_update_wq);
 		}
