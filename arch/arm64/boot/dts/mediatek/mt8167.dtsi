@@ -694,8 +694,11 @@
 			compatible = "mediatek,mt8167-auxadc";
 			reg = <0 0x11003000 0 0x1000>;
 			interrupts = <GIC_SPI 75 IRQ_TYPE_EDGE_FALLING>;
-			clocks = <&topckgen CLK_TOP_AUX_ADC>;
-			clock-names = "auxadc-main";
+			clocks = <&topckgen CLK_TOP_AUX_ADC>,
+				 <&topckgen CLK_TOP_AUXADC1>,
+				 <&topckgen CLK_TOP_AUXADC2>,
+				 <&topckgen CLK_TOP_AUX_TP>;
+			clock-names = "auxadc-main", "auxadc1", "auxadc2", "auxadc-tp";
 		};
 
 		uart0: uart0@11005000 {
