@@ -165,6 +165,14 @@ struct pcm_desc {
 	u32 vec5;		/* event vector 5 config */
 	u32 vec6;		/* event vector 6 config */
 	u32 vec7;		/* event vector 7 config */
+	u32 vec8;		/* event vector 8 config */
+	u32 vec9;               /* event vector 9 config */
+	u32 vec10;               /* event vector A config */
+	u32 vec11;               /* event vector B config */
+	u32 vec12;               /* event vector C config */
+	u32 vec13;               /* event vector D config */
+	u32 vec14;               /* event vector E config */
+	u32 vec15;               /* event vector F config */
 };
 
 struct pwr_ctrl {
@@ -291,9 +299,9 @@ extern struct spm_lp_scen *spm_check_talking_get_lpscen(struct spm_lp_scen *lpsc
  **************************************/
 #define EVENT_VEC(event, resume, imme, pc)	\
 	(((pc) << 16) |				\
-	 (!!(imme) << 6) |			\
-	 (!!(resume) << 5) |			\
-	 ((event) & 0x1f))
+	 (!!(imme) << 7) |			\
+	 (!!(resume) << 6) |			\
+	 ((event) & 0x3f))
 
 #define spm_emerg(fmt, args...)		pr_emerg("[SPM] " fmt, ##args)
 #define spm_alert(fmt, args...)		pr_alert("[SPM] " fmt, ##args)

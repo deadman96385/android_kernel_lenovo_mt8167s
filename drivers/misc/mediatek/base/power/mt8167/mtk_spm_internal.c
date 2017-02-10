@@ -175,6 +175,14 @@ void __spm_init_event_vector(const struct pcm_desc *pcmdesc)
 	spm_write(SPM_PCM_EVENT_VECTOR5, pcmdesc->vec5);
 	spm_write(SPM_PCM_EVENT_VECTOR6, pcmdesc->vec6);
 	spm_write(SPM_PCM_EVENT_VECTOR7, pcmdesc->vec7);
+	spm_write(SPM_PCM_EVENT_VECTOR8, pcmdesc->vec8);
+	spm_write(SPM_PCM_EVENT_VECTOR9, pcmdesc->vec9);
+	spm_write(SPM_PCM_EVENT_VECTORA, pcmdesc->vec10);
+	spm_write(SPM_PCM_EVENT_VECTORB, pcmdesc->vec11);
+	spm_write(SPM_PCM_EVENT_VECTORC, pcmdesc->vec12);
+	spm_write(SPM_PCM_EVENT_VECTORD, pcmdesc->vec13);
+	spm_write(SPM_PCM_EVENT_VECTORE, pcmdesc->vec14);
+	spm_write(SPM_PCM_EVENT_VECTORF, pcmdesc->vec15);
 
 	/* event vector will be enabled by PCM itself */
 }
@@ -198,10 +206,6 @@ void __spm_set_power_control(const struct pwr_ctrl *pwrctrl)
 		  (!pwrctrl->dsi1_ddr_en_mask << 1) | (!pwrctrl->dsi0_ddr_en_mask << 0));
 
 	/* set CPU WFI mask */
-	spm_write(SPM_SLEEP_CA15_WFI0_EN, !!pwrctrl->ca15_wfi0_en);
-	spm_write(SPM_SLEEP_CA15_WFI1_EN, !!pwrctrl->ca15_wfi1_en);
-	spm_write(SPM_SLEEP_CA15_WFI2_EN, !!pwrctrl->ca15_wfi2_en);
-	spm_write(SPM_SLEEP_CA15_WFI3_EN, !!pwrctrl->ca15_wfi3_en);
 	spm_write(SPM_SLEEP_CA7_WFI0_EN, !!pwrctrl->ca7_wfi0_en);
 	spm_write(SPM_SLEEP_CA7_WFI1_EN, !!pwrctrl->ca7_wfi1_en);
 	spm_write(SPM_SLEEP_CA7_WFI2_EN, !!pwrctrl->ca7_wfi2_en);
