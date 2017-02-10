@@ -1005,7 +1005,7 @@
 				      "slow",
 				      "bus",
 				      "engine";
-			clock-frequency = <500000000>;
+			clock-frequency = <400000000>;
 		};
 
 		mfgcfg: mfgcfg@13ffe000 {
