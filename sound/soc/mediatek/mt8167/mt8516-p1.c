@@ -190,6 +190,16 @@ static struct snd_soc_dai_link mt8516_p1_dais[] = {
 		.codec_dai_name = "mt8167-codec-dai",
 		.dpcm_capture = 1,
 	},
+	{
+		.name = "TDM IN BE",
+		.cpu_dai_name = "TDM_IN_IO",
+		.no_pcm = 1,
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.dai_fmt = SND_SOC_DAIFMT_LEFT_J | SND_SOC_DAIFMT_IB_IF |
+			   SND_SOC_DAIFMT_CBS_CFS,
+		.dpcm_capture = 1,
+	},
 };
 
 static struct snd_soc_card mt8516_p1_card = {
