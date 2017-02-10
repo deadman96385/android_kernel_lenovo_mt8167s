@@ -26,9 +26,7 @@
 #include <linux/of_address.h>
 #endif
 
-#if SODI_SUPPORT_IRQ
-#include <linux/irqchip/mt-gic.h>
-#endif
+#include <mt-plat/mtk_cirq.h>
 #include "mt_cpuidle.h"
 #include "mt_spm_idle.h"
 #include "mt_spm_internal.h"
@@ -349,9 +347,8 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 {
 	struct wake_status wakesta;
 	unsigned long flags;
-#if SODI_SUPPORT_IRQ
 	struct mtk_irq_mask mask;
-#endif
+	struct irq_desc *desc = irq_to_desc(spm_irq_0);
 	wake_reason_t wr = WR_NONE;
 	struct pcm_desc *pcmdesc = __spm_sodi.pcmdesc;
 	struct pwr_ctrl *pwrctrl = __spm_sodi.pwrctrl;
@@ -388,12 +385,11 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	lockdep_off();
 	spin_lock_irqsave(&__spm_lock, flags);
 
-#if SODI_SUPPORT_IRQ
 	mt_irq_mask_all(&mask);
-	mt_irq_unmask_for_sleep(SPM_IRQ0_ID);
+	if (desc)
+		unmask_irq(desc);
 	mt_cirq_clone_gic();
 	mt_cirq_enable();
-#endif
 
 #if SPM_AEE_RR_REC
 	aee_rr_rec_sodi_val(aee_rr_curr_sodi_val() | (1 << SPM_SODI_ENTER_SPM_FLOW));
@@ -572,11 +568,9 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	aee_rr_rec_sodi_val(aee_rr_curr_sodi_val() | (1 << SPM_SODI_LEAVE_SPM_FLOW));
 #endif
 
-#if SODI_SUPPORT_IRQ
 	mt_cirq_flush();
 	mt_cirq_disable();
 	mt_irq_mask_restore(&mask);
-#endif
 
 	spin_unlock_irqrestore(&__spm_lock, flags);
 	lockdep_on();
