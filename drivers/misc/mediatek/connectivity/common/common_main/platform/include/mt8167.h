@@ -41,7 +41,7 @@
 */
 
 /*tag start:new platform need to make sure these define */
-#define PLATFORM_SOC_CHIP 0x6757
+#define PLATFORM_SOC_CHIP 0x8167
 /*tag end*/
 
 /*device tree mode*/
