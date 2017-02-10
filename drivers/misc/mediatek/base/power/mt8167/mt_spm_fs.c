@@ -80,12 +80,12 @@ static ssize_t dpidle_pcm_show(struct kobject *kobj, struct kobj_attribute *attr
 {
 	return show_pcm_desc(__spm_dpidle.pcmdesc, buf);
 }
-#if 0
+
 static ssize_t sodi_pcm_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	return show_pcm_desc(__spm_sodi.pcmdesc, buf);
 }
-#endif
+
 static ssize_t ddrdfs_pcm_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 /* For bring up */
@@ -181,12 +181,12 @@ static ssize_t dpidle_ctrl_show(struct kobject *kobj, struct kobj_attribute *att
 {
 	return show_pwr_ctrl(__spm_dpidle.pwrctrl, buf);
 }
-#if 0
+
 static ssize_t sodi_ctrl_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	return show_pwr_ctrl(__spm_sodi.pwrctrl, buf);
 }
-#endif
+
 static ssize_t ddrdfs_ctrl_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 /* for bring up */
@@ -342,13 +342,13 @@ static ssize_t dpidle_ctrl_store(struct kobject *kobj, struct kobj_attribute *at
 {
 	return store_pwr_ctrl(__spm_dpidle.pwrctrl, buf, count);
 }
-#if 0
+
 static ssize_t sodi_ctrl_store(struct kobject *kobj, struct kobj_attribute *attr,
 			       const char *buf, size_t count)
 {
 	return store_pwr_ctrl(__spm_sodi.pwrctrl, buf, count);
 }
-#endif
+
 static ssize_t ddrdfs_ctrl_store(struct kobject *kobj, struct kobj_attribute *attr,
 				 const char *buf, size_t count)
 {
@@ -384,7 +384,7 @@ static ssize_t golden_dump_show(struct kobject *kobj, struct kobj_attribute *att
  */
 DEFINE_ATTR_RO(suspend_pcm);
 DEFINE_ATTR_RO(dpidle_pcm);
-/* DEFINE_ATTR_RO(sodi_pcm); */
+DEFINE_ATTR_RO(sodi_pcm);
 DEFINE_ATTR_RO(ddrdfs_pcm);
 #if defined(SPM_VCORE_EN)
 DEFINE_ATTR_RO(vcorefs_pcm);
@@ -392,7 +392,7 @@ DEFINE_ATTR_RO(vcorefs_pcm);
 
 DEFINE_ATTR_RW(suspend_ctrl);
 DEFINE_ATTR_RW(dpidle_ctrl);
-/* DEFINE_ATTR_RW(sodi_ctrl); */
+DEFINE_ATTR_RW(sodi_ctrl);
 DEFINE_ATTR_RW(ddrdfs_ctrl);
 #if defined(SPM_VCORE_EN)
 DEFINE_ATTR_RW(vcorefs_ctrl);
@@ -404,7 +404,7 @@ static struct attribute *spm_attrs[] = {
 	/* for spm_lp_scen.pcmdesc */
 	__ATTR_OF(suspend_pcm),
 	__ATTR_OF(dpidle_pcm),
-/*	__ATTR_OF(sodi_pcm), */
+	__ATTR_OF(sodi_pcm),
 	__ATTR_OF(ddrdfs_pcm),
 #if defined(SPM_VCORE_EN)
 	__ATTR_OF(vcorefs_pcm),
@@ -413,7 +413,7 @@ static struct attribute *spm_attrs[] = {
 	/* for spm_lp_scen.pwrctrl */
 	__ATTR_OF(suspend_ctrl),
 	__ATTR_OF(dpidle_ctrl),
-/*	__ATTR_OF(sodi_ctrl), */
+	__ATTR_OF(sodi_ctrl),
 	__ATTR_OF(ddrdfs_ctrl),
 #if defined(SPM_VCORE_EN)
 	__ATTR_OF(vcorefs_ctrl),
