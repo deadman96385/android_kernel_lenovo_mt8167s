@@ -25,6 +25,31 @@
 	#address-cells = <2>;
 	#size-cells = <2>;
 
+	cluster0_opp: opp_table0 {
+		compatible = "operating-points-v2";
+		opp-shared;
+		opp00 {
+			opp-hz = /bits/ 64 <598000000>;
+			opp-microvolt = <1150000>;
+		};
+		opp01 {
+			opp-hz = /bits/ 64 <747500000>;
+			opp-microvolt = <1150000>;
+		};
+		opp02 {
+			opp-hz = /bits/ 64 <1040000000>;
+			opp-microvolt = <1200000>;
+		};
+		opp03 {
+			opp-hz = /bits/ 64 <1196000000>;
+			opp-microvolt = <1250000>;
+		};
+		opp04 {
+			opp-hz = /bits/ 64 <1300000000>;
+			opp-microvolt = <1300000>;
+		};
+	};
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -39,13 +64,7 @@
 			clocks = <&topckgen CLK_TOP_RTC_SEL>,
 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
 			clock-names = "cpu", "intermediate";
-			operating-points = <
-				598000  1150000
-				747500  1150000
-				1040000 1200000
-				1196000 1250000
-				1300000 1300000
-			>;
+			operating-points-v2 = <&cluster0_opp>;
 			cpu-release-addr = <0x0 0x40000200>;
 			clock-frequency = <1300000000>;
 		};
@@ -60,13 +79,7 @@
 			clocks = <&topckgen CLK_TOP_RTC_SEL>,
 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
 			clock-names = "cpu", "intermediate";
-			operating-points = <
-				598000  1150000
-				747500  1150000
-				1040000 1200000
-				1196000 1250000
-				1300000 1300000
-			>;
+			operating-points-v2 = <&cluster0_opp>;
 			cpu-release-addr = <0x0 0x40000200>;
 			clock-frequency = <1300000000>;
 		};
@@ -81,13 +94,7 @@
 			clocks = <&topckgen CLK_TOP_RTC_SEL>,
 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
 			clock-names = "cpu", "intermediate";
-			operating-points = <
-				598000  1150000
-				747500  1150000
-				1040000 1200000
-				1196000 1250000
-				1300000 1300000
-			>;
+			operating-points-v2 = <&cluster0_opp>;
 			cpu-release-addr = <0x0 0x40000200>;
 			clock-frequency = <1300000000>;
 		};
@@ -102,13 +109,7 @@
 			clocks = <&topckgen CLK_TOP_RTC_SEL>,
 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
 			clock-names = "cpu", "intermediate";
-			operating-points = <
-				598000  1150000
-				747500  1150000
-				1040000 1200000
-				1196000 1250000
-				1300000 1300000
-			>;
+			operating-points-v2 = <&cluster0_opp>;
 			cpu-release-addr = <0x0 0x40000200>;
 			clock-frequency = <1300000000>;
 		};
