@@ -5663,14 +5663,24 @@ int mtk_nand_exec_write_page_hw(struct mtd_info *mtd, u32 u4RowAddr, u32 u4PageS
 		mtk_nand_dma_start_write(mtd, buf, true);
 
 		if (host->wb_cmd == NAND_CMD_PAGEPROG) {
-			if (!wait_for_completion_timeout(&g_comp_Busy_Ret, msecs_to_jiffies(20))) {
-				nand_err("timeout!!!\n");
-				while (DRV_Reg32(NFI_STA_REG32) & STA_NAND_BUSY)
-					;
+			if (!wait_for_completion_timeout(&g_comp_Busy_Ret, msecs_to_jiffies(NFI_TIMEOUT_MS))) {
+				nand_err("timeout!!!slcopmodeEn:%d, u4RowAddr:%d\n",
+					devinfo.tlcControl.slcopmodeEn, u4RowAddr);
+				dump_nfi();
+#if defined(CONFIG_MTK_TLC_NAND_SUPPORT)
+				if (devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC) {
+					reg_val = DRV_Reg16(NFI_DEBUG_CON1_REG16);
+					reg_val &= (~0x4000);
+					DRV_WriteReg16(NFI_DEBUG_CON1_REG16, reg_val);
+				}
+#endif
+				mtk_nand_reset();
+				return -EIO;
 			}
 		} else {
-			if (!wait_for_completion_timeout(&g_comp_AHB_Done, msecs_to_jiffies(10))) {
-				nand_err("timeout!!!\n");
+			if (!wait_for_completion_timeout(&g_comp_AHB_Done, msecs_to_jiffies(NFI_TIMEOUT_MS))) {
+				nand_err("ahb timeout!!!slcopmodeEn:%d, u4RowAddr:%d\n",
+					devinfo.tlcControl.slcopmodeEn, u4RowAddr);
 				mtk_nand_handle_write_ahb_done();
 			}
 			while (DRV_Reg32(NFI_STA_REG32) & STA_NAND_BUSY)
