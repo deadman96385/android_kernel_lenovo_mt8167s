@@ -113,7 +113,7 @@
 
 &accdet {
 	interrupts-extended = <&sysirq GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>,
-				<&pio 19 IRQ_TYPE_LEVEL_LOW>;
+				<&pio 19 IRQ_TYPE_LEVEL_HIGH>;
 	eint-debounce = <256000>;
 	accdet-gpio = <&pio 19 0>;
 	accdet-mic-vol = <7>;
