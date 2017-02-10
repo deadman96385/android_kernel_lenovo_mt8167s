@@ -383,14 +383,10 @@
 			compatible = "mediatek,mt8167-scpsys", "syscon";
 			#power-domain-cells = <1>;
 			reg = <0 0x10006000 0 0x1000>;
-			interrupts =	<GIC_SPI 163 IRQ_TYPE_LEVEL_LOW>,
-					<GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>,
-					<GIC_SPI 165 IRQ_TYPE_LEVEL_LOW>,
-					<GIC_SPI 166 IRQ_TYPE_LEVEL_LOW>,
-					<GIC_SPI 167 IRQ_TYPE_LEVEL_LOW>,
-					<GIC_SPI 168 IRQ_TYPE_LEVEL_LOW>,
-					<GIC_SPI 169 IRQ_TYPE_LEVEL_LOW>,
-					<GIC_SPI 170 IRQ_TYPE_LEVEL_LOW>;
+			interrupts =	<GIC_SPI 128 IRQ_TYPE_LEVEL_LOW>,
+					<GIC_SPI 129 IRQ_TYPE_LEVEL_LOW>,
+					<GIC_SPI 130 IRQ_TYPE_LEVEL_LOW>,
+					<GIC_SPI 131 IRQ_TYPE_LEVEL_LOW>;
 			infracfg = <&infracfg>;
 			clocks = <&topckgen CLK_TOP_RG_SLOW_MFG>,
 				 <&topckgen CLK_TOP_SMI_MM>;

@@ -158,9 +158,9 @@ static void spm_register_init(void)
 	unsigned long flags;
 	struct device_node *node;
 
-	node = of_find_compatible_node(NULL, NULL, "mediatek,SLEEP");
+	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-scpsys");
 	if (!node)
-		spm_err("find SLEEP node failed\n");
+		spm_err("find mt8167-scpsys node failed\n");
 	spm_base = of_iomap(node, 0);
 	if (!spm_base)
 		spm_err("base spm_base failed\n");
