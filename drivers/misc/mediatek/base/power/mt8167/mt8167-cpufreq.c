@@ -51,8 +51,11 @@ struct mtk_cpu_dvfs_info {
 	struct clk *cpu_clk;
 	struct clk *inter_clk;
 	struct thermal_cooling_device *cdev;
+	struct mutex lock;
+	struct notifier_block opp_nb;
 	struct list_head list_head;
 	int intermediate_voltage;
+	unsigned long opp_freq;
 	bool need_voltage_tracking;
 };
 
@@ -214,6 +217,34 @@ static int mtk_cpufreq_set_voltage(struct mtk_cpu_dvfs_info *info, int vproc)
 					     vproc + VOLT_TOL);
 }
 
+static int mtk_cpufreq_opp_notifier(struct notifier_block *nb,
+unsigned long event, void *data)
+{
+	struct dev_pm_opp *opp = data;
+	struct mtk_cpu_dvfs_info *info = container_of(nb, struct mtk_cpu_dvfs_info, opp_nb);
+	unsigned long freq, volt;
+	int ret = 0;
+
+	if (event == OPP_EVENT_ADJUST_VOLTAGE) {
+		rcu_read_lock();
+		freq = dev_pm_opp_get_freq(opp);
+		rcu_read_unlock();
+
+		mutex_lock(&info->lock);
+		if (info->opp_freq == freq) {
+			rcu_read_lock();
+			volt = dev_pm_opp_get_voltage(opp);
+			rcu_read_unlock();
+			ret = mtk_cpufreq_set_voltage(info, volt);
+			if (ret)
+				dev_err(info->cpu_dev, "failed to scale voltage: %d\n", ret);
+		}
+		mutex_unlock(&info->lock);
+	}
+
+	return notifier_from_errno(ret);
+}
+
 static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
 				  unsigned int index)
 {
@@ -248,6 +279,8 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
 	vproc = dev_pm_opp_get_voltage(opp);
 	rcu_read_unlock();
 
+	mutex_lock(&info->lock);
+
 	/*
 	 * If the new voltage or the intermediate voltage is higher than the
 	 * current voltage, scale up voltage first.
@@ -259,6 +292,7 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
 			pr_err("cpu%d: failed to scale up voltage!\n",
 			       policy->cpu);
 			mtk_cpufreq_set_voltage(info, old_vproc);
+			mutex_unlock(&info->lock);
 			return ret;
 		}
 	}
@@ -270,6 +304,7 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
 		       policy->cpu);
 		mtk_cpufreq_set_voltage(info, old_vproc);
 		WARN_ON(1);
+		mutex_unlock(&info->lock);
 		return ret;
 	}
 
@@ -280,6 +315,7 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
 		       policy->cpu);
 		clk_set_parent(cpu_clk, armpll);
 		mtk_cpufreq_set_voltage(info, old_vproc);
+		mutex_unlock(&info->lock);
 		return ret;
 	}
 
@@ -290,6 +326,7 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
 		       policy->cpu);
 		mtk_cpufreq_set_voltage(info, inter_vproc);
 		WARN_ON(1);
+		mutex_unlock(&info->lock);
 		return ret;
 	}
 
@@ -305,9 +342,13 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
 			clk_set_parent(cpu_clk, info->inter_clk);
 			clk_set_rate(armpll, old_freq_hz);
 			clk_set_parent(cpu_clk, armpll);
+			mutex_unlock(&info->lock);
 			return ret;
 		}
 	}
+
+	info->opp_freq = freq_hz;
+	mutex_unlock(&info->lock);
 
 	return 0;
 }
@@ -371,6 +412,7 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
 	struct dev_pm_opp *opp;
 	unsigned long rate;
 	int ret;
+	struct srcu_notifier_head *opp_srcu_head;
 
 	cpu_dev = get_cpu_device(cpu);
 	if (!cpu_dev) {
@@ -402,7 +444,7 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
 		goto out_free_resources;
 	}
 
-	proc_reg = regulator_get_exclusive(cpu_dev, "proc");
+	proc_reg = regulator_get_optional(cpu_dev, "proc");
 	if (IS_ERR(proc_reg)) {
 		if (PTR_ERR(proc_reg) == -EPROBE_DEFER)
 			pr_warn("proc regulator for cpu%d not ready, retry.\n",
@@ -443,6 +485,18 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
 		goto out_free_opp_table;
 	}
 	info->intermediate_voltage = dev_pm_opp_get_voltage(opp);
+
+	opp_srcu_head = dev_pm_opp_get_notifier(cpu_dev);
+	if (IS_ERR(opp_srcu_head)) {
+		ret = PTR_ERR(opp_srcu_head);
+		goto out_free_opp_table;
+	}
+
+	info->opp_nb.notifier_call = mtk_cpufreq_opp_notifier;
+	ret = srcu_notifier_chain_register(opp_srcu_head, &info->opp_nb);
+	if (ret)
+		goto out_free_opp_table;
+
 	rcu_read_unlock();
 
 	info->cpu_dev = cpu_dev;
@@ -450,6 +504,9 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
 	info->sram_reg = IS_ERR(sram_reg) ? NULL : sram_reg;
 	info->cpu_clk = cpu_clk;
 	info->inter_clk = inter_clk;
+	info->opp_freq = clk_get_rate(cpu_clk);
+
+	mutex_init(&info->lock);
 
 	/*
 	 * If SRAM regulator is present, software "voltage tracking" is needed
