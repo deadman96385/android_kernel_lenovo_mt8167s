@@ -599,8 +599,15 @@ static void mt8167_codec_hp_depop_setup(struct snd_soc_codec *codec)
 	snd_soc_update_bits(codec, AUDIO_CODEC_CON01, (0x1F << 6), 0x0);
 	/* Set the charge option of depop VCM gen. to "charge type" */
 	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(18), BIT(18));
-	/* Set the 22uA current step of depop VCM gen. to charge 22uF cap. */
-	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, GENMASK(20, 19), BIT(19));
+	/*
+	 * Set the 22uA current step of depop VCM gen. to charge 22uF cap.
+	 *        cap <= 10uF: (0 << 19)
+	 * 10uF < cap <= 22uF: (1 << 19)
+	 * 22uF < cap <= 33uF: (2 << 19)
+	 * 33uF < cap <= 47uF: (3 << 19)
+	 */
+	snd_soc_update_bits(codec, AUDIO_CODEC_CON02,
+		GENMASK(20, 19), (1 << 19));
 	/* Set the depop VCM voltage of depop VCM gen. to 1.35V. */
 	snd_soc_update_bits(codec, AUDIO_CODEC_CON02, BIT(21), 0x0);
 	/* Enable the depop VCM generator. */
