@@ -1368,6 +1368,9 @@
 				      "IMG_SEN_CAM",
 				      "MM_SMI_COMMON";
 
+			/* for iommu changes */
+			mediatek,smilarb = <&larb1>;
+
 			/* Power domains */
 			/*power-domains = <&scpsys MT8167_POWER_DOMAIN_ISP>;*/
 		};
