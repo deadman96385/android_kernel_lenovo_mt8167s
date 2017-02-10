@@ -19,7 +19,7 @@
 #include "kd_camera_typedef.h"
 
 
-#if 0/*defined CONFIG_MTK_LEGACY*/
+#if 0				/*defined CONFIG_MTK_LEGACY */
 #include <mach/mt_gpio.h>
 #include <mach/mt_pm_ldo.h>
 #include "pmic_drv.h"
@@ -40,8 +40,8 @@
 
 /* Main sensor */
     /* Common phone's reset pin uses extension GPIO10 of mt6306 */
-    #define CAMERA_CMRST_PIN            GPIO_CAMERA_CMRST_PIN
-    #define CAMERA_CMRST_PIN_M_GPIO     GPIO_CAMERA_CMRST_PIN_M_GPIO
+#define CAMERA_CMRST_PIN            GPIO_CAMERA_CMRST_PIN
+#define CAMERA_CMRST_PIN_M_GPIO     GPIO_CAMERA_CMRST_PIN_M_GPIO
 
 
 #define CAMERA_CMPDN_PIN            GPIO_CAMERA_CMPDN_PIN
@@ -79,7 +79,7 @@
 int mtkcam_gpio_set(int PinIdx, int PwrType, int Val);
 int mtkcam_gpio_init(struct platform_device *pdev);
 
-#endif /* End of #if defined CONFIG_MTK_LEGACY */
+#endif				/* End of #if defined CONFIG_MTK_LEGACY */
 
 typedef enum KD_REGULATOR_TYPE_TAG {
 	VCAMA,
@@ -103,7 +103,11 @@ extern bool _hwPowerOn(int PinIdx, KD_REGULATOR_TYPE_T PwrType, int Voltage);
 extern void ISP_MCLK1_EN(BOOL En);
 
 /* use GPIO API instead of pinctl*/
-extern unsigned int GPIO_CAM_RST;
+extern int CamUseSameRst;
+
+extern unsigned int GPIO_CAM0_RST;
+extern unsigned int GPIO_CAM1_RST;
+
 extern unsigned int GPIO_CAM0_PDN;
 extern unsigned int GPIO_CAM1_PDN;
 

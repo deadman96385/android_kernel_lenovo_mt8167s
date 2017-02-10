@@ -1,33 +1,20 @@
-/*
- * Copyright (C) 2015 MediaTek Inc.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- */
-
 /*****************************************************************************
  *
  * Filename:
  * ---------
- *	 OV5693mipi_Sensor.h
+ *   IMX135mipi_Sensor.h
  *
  * Project:
  * --------
- *	 ALPS
+ *   ALPS
  *
  * Description:
  * ------------
- *	 CMOS sensor header file
+ *   CMOS sensor header file
  *
  ****************************************************************************/
-#ifndef _IMX219MIPI_SENSOR_H
-#define _IMX219MIPI_SENSOR_H
+#ifndef _SP2509mipi_SENSOR_H
+#define _SP2509mipi_SENSOR_H
 
 
 typedef enum {
@@ -55,10 +42,10 @@ typedef struct imgsensor_mode_struct {
 	kal_uint16 grabwindow_width;	/* record different mode's width of grabwindow */
 	kal_uint16 grabwindow_height;	/* record different mode's height of grabwindow */
 
-	/*       following for MIPIDataLowPwr2HighSpeedSettleDelayCount by different scenario   */
+	/*   following for MIPIDataLowPwr2HighSpeedSettleDelayCount by different scenario   */
 	kal_uint8 mipi_data_lp2hs_settle_dc;
 
-	/*       following for GetDefaultFramerateByScenario()  */
+	/*   following for GetDefaultFramerateByScenario()  */
 	kal_uint16 max_framerate;
 
 } imgsensor_mode_struct;
@@ -88,6 +75,8 @@ typedef struct imgsensor_struct {
 	kal_uint8 ihdr_en;	/* ihdr enable or disable */
 
 	kal_uint8 i2c_write_id;	/* record current sensor's i2c write id */
+	kal_uint8 update_sensor_otp_awb;	/* Update sensor awb from otp or not */
+	kal_uint8 update_sensor_otp_lsc;	/* Update sensor lsc from otp or not */
 } imgsensor_struct;
 
 /* SENSOR PRIVATE STRUCT FOR CONSTANT*/
@@ -96,7 +85,7 @@ typedef struct imgsensor_info_struct {
 	kal_uint32 checksum_value;	/* checksum value for Camera Auto Test */
 	imgsensor_mode_struct pre;	/* preview scenario relative information */
 	imgsensor_mode_struct cap;	/* capture scenario relative information */
-	imgsensor_mode_struct cap1;
+	imgsensor_mode_struct cap1;	/* capture for PIP 24fps relative information */
 	imgsensor_mode_struct normal_video;	/* normal video  scenario relative information */
 	imgsensor_mode_struct hs_video;	/* high speed video scenario relative information */
 	imgsensor_mode_struct slim_video;	/* slim video for VT scenario relative information */
@@ -132,7 +121,7 @@ typedef struct imgsensor_info_struct {
 	kal_uint8 sensor_interface_type;	/* sensor_interface_type */
 	kal_uint8 mipi_sensor_type;
 	kal_uint8 mipi_settle_delay_mode;
-	kal_uint8 sensor_output_dataformat;	/* sensor output first pixel color */
+	kal_uint8 sensor_output_dataformat;
 	kal_uint8 mclk;		/* mclk value, suggest 24 or 26 for 24Mhz or 26Mhz */
 
 	kal_uint8 mipi_lane_num;	/* mipi lane num */
@@ -150,5 +139,6 @@ extern int iReadRegI2C(u8 *a_pSendData, u16 a_sizeSendData, u8 *a_pRecvData, u16
 		       u16 i2cId);
 extern int iWriteRegI2C(u8 *a_pSendData, u16 a_sizeSendData, u16 i2cId);
 extern void kdSetI2CSpeed(u16 i2cSpeed);
+
 
 #endif

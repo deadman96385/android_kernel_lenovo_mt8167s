@@ -1,21 +1,8 @@
-/*
- * Copyright (C) 2015 MediaTek Inc.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- */
-
 /*****************************************************************************
  *
  * Filename:
  * ---------
- *	 OV5693mipi_Sensor.h
+ *	 OV5675mipi_Sensor.h
  *
  * Project:
  * --------
@@ -26,8 +13,8 @@
  *	 CMOS sensor header file
  *
  ****************************************************************************/
-#ifndef _IMX219MIPI_SENSOR_H
-#define _IMX219MIPI_SENSOR_H
+#ifndef _OV5675MIPI_SENSOR_H
+#define _OV5675MIPI_SENSOR_H
 
 
 typedef enum {
@@ -37,11 +24,6 @@ typedef enum {
 	IMGSENSOR_MODE_VIDEO,
 	IMGSENSOR_MODE_HIGH_SPEED_VIDEO,
 	IMGSENSOR_MODE_SLIM_VIDEO,
-	IMGSENSOR_MODE_CUSTOM1,
-	IMGSENSOR_MODE_CUSTOM2,
-	IMGSENSOR_MODE_CUSTOM3,
-	IMGSENSOR_MODE_CUSTOM4,
-	IMGSENSOR_MODE_CUSTOM5,
 } IMGSENSOR_MODE;
 
 typedef struct imgsensor_mode_struct {
@@ -100,11 +82,6 @@ typedef struct imgsensor_info_struct {
 	imgsensor_mode_struct normal_video;	/* normal video  scenario relative information */
 	imgsensor_mode_struct hs_video;	/* high speed video scenario relative information */
 	imgsensor_mode_struct slim_video;	/* slim video for VT scenario relative information */
-	imgsensor_mode_struct custom1;	/* custom1 scenario relative information */
-	imgsensor_mode_struct custom2;	/* custom2 scenario relative information */
-	imgsensor_mode_struct custom3;	/* custom3 scenario relative information */
-	imgsensor_mode_struct custom4;	/* custom4 scenario relative information */
-	imgsensor_mode_struct custom5;	/* custom5 scenario relative information */
 
 	kal_uint8 ae_shut_delay_frame;	/* shutter delay frame for AE cycle */
 	kal_uint8 ae_sensor_gain_delay_frame;	/* sensor gain delay frame for AE cycle */
@@ -118,11 +95,6 @@ typedef struct imgsensor_info_struct {
 	kal_uint8 video_delay_frame;	/* enter video delay frame num */
 	kal_uint8 hs_video_delay_frame;	/* enter high speed video  delay frame num */
 	kal_uint8 slim_video_delay_frame;	/* enter slim video delay frame num */
-	kal_uint8 custom1_delay_frame;	/* enter custom1 delay frame num */
-	kal_uint8 custom2_delay_frame;	/* enter custom1 delay frame num */
-	kal_uint8 custom3_delay_frame;	/* enter custom1 delay frame num */
-	kal_uint8 custom4_delay_frame;	/* enter custom1 delay frame num */
-	kal_uint8 custom5_delay_frame;	/* enter custom1 delay frame num */
 
 	kal_uint8 margin;	/* sensor framelength & shutter margin */
 	kal_uint32 min_shutter;	/* min shutter */
@@ -137,7 +109,6 @@ typedef struct imgsensor_info_struct {
 
 	kal_uint8 mipi_lane_num;	/* mipi lane num */
 	kal_uint8 i2c_addr_table[5];	/* record sensor support all write id addr, only supprt 4must end with 0xff */
-	kal_uint32 i2c_speed;	/* i2c speed */
 } imgsensor_info_struct;
 
 /* SENSOR READ/WRITE ID */
@@ -149,6 +120,7 @@ typedef struct imgsensor_info_struct {
 extern int iReadRegI2C(u8 *a_pSendData, u16 a_sizeSendData, u8 *a_pRecvData, u16 a_sizeRecvData,
 		       u16 i2cId);
 extern int iWriteRegI2C(u8 *a_pSendData, u16 a_sizeSendData, u16 i2cId);
-extern void kdSetI2CSpeed(u16 i2cSpeed);
+
+static kal_uint32 set_test_pattern_mode(kal_bool enable);
 
 #endif

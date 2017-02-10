@@ -35,7 +35,7 @@ ifeq ($(wildcard $(MTK_CUSTOM_PATH)/imgsensor/src/$(MTK_PLATFORM)/camera_hw/came
 obj-y				+= kd_camera_hw.o
 else
 $(warning "camera power on/off Use project folder: $(ARCH_MTK_PROJECT)")
-obj-y 				+= camera_project/$(ARCH_MTK_PROJECT)/
+obj-y				+= camera_project/$(ARCH_MTK_PROJECT)/
 endif
 
 ifneq (,$(findstring tb8167p,$(ARCH_MTK_PROJECT)))
