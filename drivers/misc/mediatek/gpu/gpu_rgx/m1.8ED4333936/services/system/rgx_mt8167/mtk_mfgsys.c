@@ -122,10 +122,16 @@ static const char * const top_mfg_clk_sel_name[] = {
 	"mfg_mm_in_sel",
 };
 
+static const char * const top_mfg_clk_sel_parent_name_e1[] = {
+	"slow_clk26m",
+	"bus_univpll_d24",
+	"engine_csw_mux",
+};
+
 static const char * const top_mfg_clk_sel_parent_name[] = {
-	"slow",
-	"bus",
-	"engine",
+	"slow_clk26m",
+	"bus_mainpll_d11",
+	"engine_csw_mux",
 };
 
 static const char * const top_mfg_clk_name[] = {
@@ -845,8 +851,6 @@ void MTKSetICVerion(void)
 {
 	if (mt_get_chip_sw_ver() == 0) /* E1 */
 		strcat(rgx_fw_name, ".e1");
-
-	PVR_DPF((PVR_DBG_ERROR, "rgx_fw_name: %s", rgx_fw_name));
 }
 
 PVRSRV_ERROR MTKDevPrePowerState(IMG_HANDLE hSysData, PVRSRV_DEV_POWER_STATE eNewPowerState,
@@ -1299,13 +1303,24 @@ static int mtk_mfg_bind_device_resource(struct platform_device *pdev,
 	}
 
 	for (i = 0; i < MAX_TOP_MFG_CLK; i++) {
-		mfg_base->top_clk_sel_parent[i] = devm_clk_get(&pdev->dev,
-						    top_mfg_clk_sel_parent_name[i]);
-		if (IS_ERR(mfg_base->top_clk_sel_parent[i])) {
-			err = PTR_ERR(mfg_base->top_clk_sel_parent[i]);
-			dev_err(&pdev->dev, "devm_clk_get %s failed !!!\n",
-				top_mfg_clk_sel_parent_name[i]);
-			goto err_iounmap_reg_base;
+		if (mt_get_chip_sw_ver() == 0) { /* E1 */
+			mfg_base->top_clk_sel_parent[i] = devm_clk_get(&pdev->dev,
+						top_mfg_clk_sel_parent_name_e1[i]);
+			if (IS_ERR(mfg_base->top_clk_sel_parent[i])) {
+				err = PTR_ERR(mfg_base->top_clk_sel_parent[i]);
+				dev_err(&pdev->dev, "devm_clk_get %s failed !!!\n",
+					top_mfg_clk_sel_parent_name_e1[i]);
+				goto err_iounmap_reg_base;
+			}
+		} else {
+			mfg_base->top_clk_sel_parent[i] = devm_clk_get(&pdev->dev,
+						top_mfg_clk_sel_parent_name[i]);
+			if (IS_ERR(mfg_base->top_clk_sel_parent[i])) {
+				err = PTR_ERR(mfg_base->top_clk_sel_parent[i]);
+				dev_err(&pdev->dev, "devm_clk_get %s failed !!!\n",
+					top_mfg_clk_sel_parent_name[i]);
+				goto err_iounmap_reg_base;
+			}
 		}
 	}
 

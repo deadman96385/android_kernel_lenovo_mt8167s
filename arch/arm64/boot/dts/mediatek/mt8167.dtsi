@@ -1020,6 +1020,7 @@
 				 <&topckgen CLK_TOP_MFG_MM>,
 				 <&topckgen CLK_TOP_CLK26M>,
 				 <&topckgen CLK_TOP_UNIVPLL_D24>,
+				 <&topckgen CLK_TOP_MAINPLL_D11>,
 				 <&topckgen CLK_TOP_CSW_MUX_MFG_SEL>;
 			clock-names = "mfg_mm_in_sel",
 				      "mfg_axi_in_sel",
@@ -1027,9 +1028,10 @@
 				      "top_slow",
 				      "top_axi",
 				      "top_mm",
-				      "slow",
-				      "bus",
-				      "engine";
+				      "slow_clk26m",
+				      "bus_univpll_d24",
+				      "bus_mainpll_d11",
+				      "engine_csw_mux";
 			clock-frequency = <400000000>;
 		};
 
