@@ -53,7 +53,7 @@ do {												\
 #define DISPDBGFUNC() DISPDBG("[DISP]func|%s\n", __func__)	/* default on, err msg */
 #define DISPCHECK(string, args...) pr_debug("[DISPCHECK]"string, ##args)
 
-#if defined(CONFIG_MT_ENG_BUILD)
+#if defined(CONFIG_MTK_ENG_BUILD)
 extern char dprec_error_log_buffer[];
 #define DISPPR(string, args...)										\
 	do {												\
@@ -130,7 +130,7 @@ do {												\
 			pr_debug("[DISPCHECK]"string, ##args); \
 	} while (0)
 
-#if defined(CONFIG_MT_ENG_BUILD)
+#if defined(CONFIG_MTK_ENG_BUILD)
 extern char dprec_error_log_buffer[];
 #define DISPPR(string, args...)										\
 	do {												\
