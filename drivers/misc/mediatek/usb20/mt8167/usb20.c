@@ -423,19 +423,16 @@ void do_connection_work(struct work_struct *data)
 	}
 	else if (mtk_musb->power && (usb_in == false)) {
 		/* disable usb */
-		musb_stop(mtk_musb);
 		#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-		spin_lock_irqsave(&mtk_musb->lock, flags);
+		spin_unlock_irqrestore(&mtk_musb->lock, flags);
 		#endif
+		musb_stop(mtk_musb);
 		if (wake_lock_active(&mtk_musb->usb_lock)) {
 			DBG(0, "unlock\n");
 			wake_unlock(&mtk_musb->usb_lock);
 		} else {
 			DBG(0, "lock not active\n");
 		}
-		#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-		spin_unlock_irqrestore(&mtk_musb->lock, flags);
-		#endif
 	} else {
 		DBG(0, "do nothing, usb_in:%d, power:%d\n",
 				usb_in, mtk_musb->power);
