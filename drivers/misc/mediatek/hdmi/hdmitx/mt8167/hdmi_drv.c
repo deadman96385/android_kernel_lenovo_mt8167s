@@ -141,6 +141,7 @@ static struct HDMI_UTIL_FUNCS hdmi_util = { 0 };
 static int hdmi_timer_kthread(void *data);
 static int cec_timer_kthread(void *data);
 static int hdmi_irq_kthread(void *data);
+static void hdmi_invoke_cable_callbacks(enum HDMI_STATE state);
 
 const char *szHdmiPordStatusStr[] = {
 	"HDMI_PLUG_OUT=0",
@@ -1509,24 +1510,28 @@ static void vNotifyAppHdmiState(unsigned char u1hdmistate)
 	switch (u1hdmistate) {
 	case HDMI_PLUG_OUT:
 		hdmi_util.state_callback(HDMI_STATE_NO_DEVICE);
+		hdmi_invoke_cable_callbacks(HDMI_STATE_NO_DEVICE);
 		hdmi_SetPhysicCECAddress(0xffff, 0x0);
 		/* hdmi_util.cec_state_callback(HDMI_CEC_STATE_PLUG_OUT); */
 		break;
 
 	case HDMI_PLUG_IN_AND_SINK_POWER_ON:
 		hdmi_util.state_callback(HDMI_STATE_ACTIVE);
+		hdmi_invoke_cable_callbacks(HDMI_STATE_ACTIVE);
 		hdmi_SetPhysicCECAddress(get_info.ui2_sink_cec_address, 0x4);
 		/* hdmi_util.cec_state_callback(HDMI_CEC_STATE_GET_PA); */
 		break;
 
 	case HDMI_PLUG_IN_ONLY:
 		hdmi_util.state_callback(HDMI_STATE_PLUGIN_ONLY);
+		hdmi_invoke_cable_callbacks(HDMI_STATE_NO_DEVICE);
 		hdmi_SetPhysicCECAddress(get_info.ui2_sink_cec_address, 0xf);
 		/*  hdmi_util.cec_state_callback(HDMI_CEC_STATE_GET_PA); */
 		break;
 
 	case HDMI_PLUG_IN_CEC:
 		hdmi_util.state_callback(HDMI_STATE_CEC_UPDATE);
+		hdmi_invoke_cable_callbacks(HDMI_STATE_NO_DEVICE);
 		break;
 
 	default:
@@ -1842,6 +1847,65 @@ static int hdmi_irq_kthread(void *data)
 	return 0;
 }
 
+#define HDMI_MAX_INSERT_CALLBACK   10
+static CABLE_INSERT_CALLBACK hdmi_callback_table[HDMI_MAX_INSERT_CALLBACK];
+void hdmi_register_cable_insert_callback(CABLE_INSERT_CALLBACK cb)
+{
+	int i = 0;
+
+	for (i = 0; i < HDMI_MAX_INSERT_CALLBACK; i++) {
+		if (hdmi_callback_table[i] == cb)
+			break;
+	}
+	if (i < HDMI_MAX_INSERT_CALLBACK)
+		return;
+
+	for (i = 0; i < HDMI_MAX_INSERT_CALLBACK; i++) {
+		if (hdmi_callback_table[i] == NULL)
+		break;
+	}
+	if (i == HDMI_MAX_INSERT_CALLBACK) {
+		HDMI_DRV_LOG("not enough mhl callback entries for module\n");
+		return;
+	}
+
+	hdmi_callback_table[i] = cb;
+	HDMI_DRV_LOG("callback: %p,i: %d\n", hdmi_callback_table[i], i);
+}
+
+void hdmi_unregister_cable_insert_callback(CABLE_INSERT_CALLBACK cb)
+{
+	int i;
+
+	for (i = 0; i < HDMI_MAX_INSERT_CALLBACK; i++) {
+		if (hdmi_callback_table[i] == cb) {
+			HDMI_DRV_LOG("unregister cable insert callback: %p, i: %d\n", hdmi_callback_table[i], i);
+			hdmi_callback_table[i] = NULL;
+			break;
+		}
+	}
+	if (i == HDMI_MAX_INSERT_CALLBACK) {
+		HDMI_DRV_LOG("Try to unregister callback function 0x%lx which was not registered\n",
+				(unsigned long int)cb);
+		return;
+	}
+}
+
+static void hdmi_invoke_cable_callbacks(enum HDMI_STATE state)
+{
+	int i = 0, j = 0;
+
+	for (i = 0; i < HDMI_MAX_INSERT_CALLBACK; i++) {
+		if (hdmi_callback_table[i])
+			j = i;
+	}
+
+	if (hdmi_callback_table[j]) {
+		HDMI_DRV_LOG("callback: %p, state: %d, j: %d\n", hdmi_callback_table[j], state, j);
+		hdmi_callback_table[j](state);
+	}
+}
+
 void cec_timer_wakeup(void)
 {
 	if (r_cec_timer.function)
@@ -1895,6 +1959,8 @@ const struct HDMI_DRIVER *HDMI_GetDriver(void)
 		.checkedidheader = hdmi_check_edid_header,
 		.resolution_setting = hdmi_resolution_debug_setting,
 		.get_external_device_capablity = hdmi_drv_get_external_device_capablity,
+		.register_callback   = hdmi_register_cable_insert_callback,
+		.unregister_callback = hdmi_unregister_cable_insert_callback,
 	};
 
 	return &HDMI_DRV;
