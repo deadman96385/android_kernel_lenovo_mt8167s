@@ -460,13 +460,8 @@
 		};
 
 		mcucfg: mcucfg@10200000 {
-			compatible = "mediatek,mt8173-mcucfg", "syscon";
-			reg = <0 0x10200000 0 0x1000>;
-		};
-
-		lastpc: lastpc@10200000 {
-			compatible = "mediatek,mt8167-mcucfg";
-			reg = <0 0x10200000 0 0x200>;
+			compatible = "mediatek,mt8167-mcucfg", "syscon";
+			reg = <0 0x10200000 0 0x2000>;
 		};
 
 		sysirq: intpol-controller@10200620 {
