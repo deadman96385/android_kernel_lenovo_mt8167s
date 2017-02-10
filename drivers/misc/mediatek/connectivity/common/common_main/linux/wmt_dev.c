@@ -148,19 +148,6 @@ UINT32 g_es_lr_flag_for_quick_sleep = 1;	/* for ctrl quick sleep flag */
 UINT32 g_es_lr_flag_for_lpbk_onoff;	/* for ctrl lpbk on off */
 OSAL_SLEEPABLE_LOCK g_es_lr_lock;
 
-INT32 __weak wmt_plat_set_dbg_mode(UINT32 flag)
-{
-	WMT_WARN_FUNC("wmt_plat_set_dbg_mode is not define!!!\n");
-
-	return 0;
-}
-
-VOID __weak wmt_plat_set_dynamic_dumpmem(UINT32 *buf)
-{
-	WMT_WARN_FUNC("wmt_plat_set_dynamic_dumpmem is not define!!!\n");
-
-}
-
 
 #ifndef CONFIG_MTK_COMBO_COMM_APO
 #ifdef CONFIG_EARLYSUSPEND
@@ -259,7 +246,7 @@ static VOID wmt_pwr_on_off_handler(struct work_struct *work)
 					retryCounter--;
 					osal_sleep_ms(1000);
 				} else {
-					WMT_INFO_FUNC("WMT turn on LPBK suceed\n");
+					WMT_DBG_FUNC("WMT turn on LPBK suceed\n");
 					break;
 				}
 			} while (retryCounter > 0);

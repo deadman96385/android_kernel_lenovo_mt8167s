@@ -30,6 +30,7 @@
 
 UINT32 gStpDbgLvl = STP_LOG_INFO;
 unsigned int chip_reset_only;
+INT32 wmt_dbg_sdio_retry_ctrl = 1;
 
 #define REMOVE_USELESS_LOG 1
 
@@ -133,7 +134,7 @@ static VOID stp_process_header_only_packet(VOID);
 static VOID stp_sdio_process_packet(VOID);
 static VOID stp_trace32_dump(VOID);
 static VOID stp_sdio_trace32_dump(VOID);
-static UINT32 stp_parser_dmp_num(PUINT8 str);
+static LONG stp_parser_dmp_num(PUINT8 str);
 static INT32 wmt_parser_data(PUINT8 buffer, UINT32 length, UINT8 type);
 
 static INT32 stp_ctx_lock_init(mtkstp_context_struct *pctx)
@@ -193,14 +194,6 @@ INT32 __weak mtk_wcn_consys_stp_btif_wakeup(VOID)
 
 	return 0;
 }
-#if 0
-ENUM_STP_TX_IF_TYPE __weak wmt_plat_get_comm_if_type(VOID)
-{
-	STP_INFO_FUNC("in combo flow, wmt_plat_get_comm_if_type is not define!!\n");
-
-	return STP_MAX_IF_TX;
-}
-#endif
 
 INT32 __weak mtk_wcn_consys_stp_btif_lpbk_ctrl(ENUM_BTIF_LPBK_MODE mode)
 {
@@ -315,7 +308,7 @@ static VOID stp_sdio_process_packet(VOID)
 
 static VOID stp_trace32_dump(VOID)
 {
-	UINT32 dmp_num = 0;
+	INT32 dmp_num = 0;
 
 	if (STP_IS_ENABLE_DBG(stp_core_ctx) && (stp_core_ctx.parser.type == STP_TASK_INDX)) {
 		if (stp_core_ctx.rx_counter != 0) {
@@ -362,7 +355,7 @@ static VOID stp_trace32_dump(VOID)
 	}
 }
 
-static UINT32 stp_parser_dmp_num(PUINT8 str)
+static LONG stp_parser_dmp_num(PUINT8 str)
 {
 	PUINT8 pParserDmpStr = "Dump=";
 	PUINT8 pStr = NULL;
@@ -371,7 +364,7 @@ static UINT32 stp_parser_dmp_num(PUINT8 str)
 	INT32 ret = -1;
 	UINT32 len = 0;
 	UINT8 tempBuf[64] = {0};
-	ULONG res;
+	LONG res;
 
 
 	if (!str) {
@@ -383,14 +376,12 @@ static UINT32 stp_parser_dmp_num(PUINT8 str)
 	pDtr = osal_strstr(pStr, pParserDmpStr);
 	if (pDtr != NULL) {
 		pDtr += osal_strlen(pParserDmpStr);
-		pTemp = osal_strchr(pDtr, ' ');
+		pTemp = pDtr;
+		while (*pTemp >= '0' && *pTemp <= '9')
+			pTemp++;
 	} else {
 		STP_DBG_WARN_FUNC("parser string 'Dump=' is not found\n");
 		return -2;
-	}
-	if (pTemp == NULL) {
-		STP_DBG_ERR_FUNC("space is not found\n");
-		return -3;
 	}
 	len = pTemp - pDtr;
 	osal_memcpy(&tempBuf[0], pDtr, len);
@@ -401,12 +392,12 @@ static UINT32 stp_parser_dmp_num(PUINT8 str)
 		return -4;
 	}
 
-	return (UINT32)res;
+	return res;
 }
 
 static VOID stp_sdio_trace32_dump(VOID)
 {
-	UINT32 dmp_num = 0;
+	INT32 dmp_num = 0;
 
 	if (STP_IS_ENABLE_DBG(stp_core_ctx) && (stp_core_ctx.parser.type == STP_TASK_INDX) &&
 			(mtk_wcn_stp_coredump_flag_get() != 0)) {
@@ -2454,7 +2445,7 @@ EXPORT_SYMBOL(mtk_wcn_stp_parser_data);
 *****************************************************************************/
 INT32 mtk_wcn_stp_enable(INT32 value)
 {
-	STP_INFO_FUNC("%s: set the current enable = (%d)\n", __func__, value);
+	STP_DBG_FUNC("%s: set the current enable = (%d)\n", __func__, value);
 
 	stp_rest_ctx_state();
 	STP_SET_ENABLE(stp_core_ctx, value);
@@ -2502,7 +2493,7 @@ INT32 mtk_wcn_stp_dbg_dump_package(VOID)
 *****************************************************************************/
 INT32 mtk_wcn_stp_ready(INT32 value)
 {
-	STP_INFO_FUNC("set ready (%d)\n", value);
+	STP_DBG_FUNC("set ready (%d)\n", value);
 
 	STP_SET_READY(stp_core_ctx, value);
 	/*if whole chip reset, reset the debuggine mode */
@@ -3475,7 +3466,7 @@ INT32 mtk_wcn_stp_notify_sleep_for_thermal(VOID)
 
 VOID mtk_wcn_stp_set_wmt_evt_err_trg_assert(UINT32 value)
 {
-	STP_INFO_FUNC("set evt err tigger assert flag to %d\n", value);
+	STP_DBG_FUNC("set evt err tigger assert flag to %d\n", value);
 	STP_SET_EVT_ERR_ASSERT(stp_core_ctx, value);
 }
 
@@ -3572,7 +3563,27 @@ INT32 mtk_wcn_stp_coredump_timeout_handle(VOID)
 		STP_INFO_FUNC("No to launch whole chip reset! for debugging purpose\n");
 	return 0;
 }
+
 VOID mtk_wcn_stp_dbg_pkt_log(INT32 type, INT32 dir)
 {
 	stp_dbg_pkt_log(type, 0, 0, 0, dir, NULL, 0);
+}
+
+VOID mtk_stp_sdio_retry_flag_ctrl(INT32 flag)
+{
+	if (flag) {
+		if (flag != wmt_dbg_sdio_retry_ctrl)
+			flag = wmt_dbg_sdio_retry_ctrl;
+	}
+	stp_sdio_retry_flag_ctrl(flag == 0 ? 0 : 1);
+}
+
+VOID mtk_stp_dbg_sdio_retry_flag_ctrl(INT32 flag)
+{
+	wmt_dbg_sdio_retry_ctrl = flag == 0 ? 0 : 1;
+}
+
+INT32 mtk_stp_sdio_retry_flag_get(VOID)
+{
+	return stp_sdio_retry_flag_get();
 }

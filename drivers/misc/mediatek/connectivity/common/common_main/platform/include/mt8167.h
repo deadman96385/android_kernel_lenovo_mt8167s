@@ -17,21 +17,35 @@
  *   Any definitions in this file will be shared among GLUE Layer and internal Driver Stack.
 */
 
-#ifndef _MTK_WCN_CONSYS_HW_H_
-#define _MTK_WCN_CONSYS_HW_H_
+#ifndef _MTK_MT8167_H_
+#define _MTK_MT8167_H_
 
-#include <sync_write.h>
-/* #include <mach/mt_reg_base.h> */
-#include "wmt_plat.h"
+/*******************************************************************************
+*                         C O M P I L E R   F L A G S
+********************************************************************************
+*/
+#define CONSYS_BT_WIFI_SHARE_V33 0
+
+#define CONSYS_PMIC_CTRL_ENABLE 1
+#define CONSYS_EMI_MPU_SETTING 0
+#define CONSYS_AHB_CLK_MAGEMENT 0
+#define CONSYS_USE_PLATFORM_WRITE 1
+#define CONSYS_PWR_ON_OFF_API_AVAILABLE 1
+#define CONSYS_CLOCK_BUF_CTRL           0
+#define CONSYS_AFE_REG_SETTING          0
+#define CONFIG_RESET_CONTROL            1
+
+/*******************************************************************************
+*                                 M A C R O S
+********************************************************************************
+*/
+
+/*tag start:new platform need to make sure these define */
+#define PLATFORM_SOC_CHIP 0x6757
+/*tag end*/
 
 /*device tree mode*/
 #if CONFIG_OF
-/* #if 1 */
-#include <linux/of.h>
-#include <linux/of_irq.h>
-#include <linux/irqreturn.h>
-#include <linux/of_address.h>
-
 struct CONSYS_BASE_ADDRESS {
 	SIZE_T mcu_base;
 	SIZE_T ap_rgu_base;
@@ -61,45 +75,6 @@ struct CONSYS_BASE_ADDRESS {
 /*AXI bus*/
 #define CONSYS_TOPAXI_PROT_EN_OFFSET    0x1220
 #define CONSYS_TOPAXI_PROT_STA1_OFFSET  0x1228
-/*******************************************************************************
-*                         C O M P I L E R   F L A G S
-********************************************************************************
-*/
-
-/*******************************************************************************
-*                                 M A C R O S
-********************************************************************************
-*/
-
-/*tag start:new platform need to make sure these define */
-#define PLATFORM_SOC_CHIP 0x8167
-
-#define CONSYS_BT_WIFI_SHARE_V33 0
-
-#define CONSYS_PMIC_CTRL_ENABLE 1
-#define CONSYS_EMI_MPU_SETTING 0
-#define CONSYS_AHB_CLK_MAGEMENT 0
-#define CONSYS_USE_PLATFORM_WRITE 1
-#define CONSYS_PWR_ON_OFF_API_AVAILABLE 1
-#define CONSYS_CLOCK_BUF_CTRL           0
-#define CONSYS_AFE_REG_SETTING          0
-#define CONFIG_RESET_CONTROL            1
-/*tag end*/
-
-#define CONSYS_SET_BIT(REG, BITVAL) (*((volatile UINT32 *)(REG)) |= ((UINT32)(BITVAL)))
-#define CONSYS_CLR_BIT(REG, BITVAL) ((*(volatile UINT32 *)(REG)) &= ~((UINT32)(BITVAL)))
-#define CONSYS_CLR_BIT_WITH_KEY(REG, BITVAL, KEY) {\
-	UINT32 val = (*(volatile UINT32 *)(REG)); \
-	val &= ~((UINT32)(BITVAL)); \
-	val |= ((UINT32)(KEY)); \
-	(*(volatile UINT32 *)(REG)) = val;\
-}
-#define CONSYS_REG_READ(addr) (*((volatile UINT32 *)(addr)))
-#if CONSYS_USE_PLATFORM_WRITE
-#define CONSYS_REG_WRITE(addr, data)  mt_reg_sync_writel(data, addr)
-#else
-#define CONSYS_REG_WRITE(addr, data)  (*((volatile UINT32 *)(addr)) = (UINT32)(data))
-#endif
 
 /*tag start: connsys register base address (hard code, no use) */
 #define AP_RGU_BASE			0xF0007000
@@ -241,26 +216,6 @@ struct CONSYS_BASE_ADDRESS {
 ********************************************************************************
 */
 
-typedef enum _ENUM_EMI_CTRL_STATE_OFFSET_ {
-	EXP_APMEM_CTRL_STATE = 0x0,
-	EXP_APMEM_CTRL_HOST_SYNC_STATE = 0x4,
-	EXP_APMEM_CTRL_HOST_SYNC_NUM = 0x8,
-	EXP_APMEM_CTRL_CHIP_SYNC_STATE = 0xc,
-	EXP_APMEM_CTRL_CHIP_SYNC_NUM = 0x10,
-	EXP_APMEM_CTRL_CHIP_SYNC_ADDR = 0x14,
-	EXP_APMEM_CTRL_CHIP_SYNC_LEN = 0x18,
-	EXP_APMEM_CTRL_CHIP_PRINT_BUFF_START = 0x1c,
-	EXP_APMEM_CTRL_CHIP_PRINT_BUFF_LEN = 0x20,
-	EXP_APMEM_CTRL_CHIP_PRINT_BUFF_IDX = 0x24,
-	EXP_APMEM_CTRL_CHIP_INT_STATUS = 0x28,
-	EXP_APMEM_CTRL_CHIP_PAGED_DUMP_END = 0x2c,
-	EXP_APMEM_CTRL_HOST_OUTBAND_ASSERT_W1 = 0x30,
-	EXP_APMEM_CTRL_CHIP_PAGE_DUMP_NUM = 0x44,
-	EXP_APMEM_CTRL_CHIP_FW_DBGLOG_MODE = 0x40,
-	EXP_APMEM_CTRL_CHIP_DYNAMIC_DUMP = 0x48,
-	EXP_APMEM_CTRL_MAX
-} ENUM_EMI_CTRL_STATE_OFFSET, *P_ENUM_EMI_CTRL_STATE_OFFSET;
-extern struct CONSYS_BASE_ADDRESS conn_reg;
 #ifdef CONSYS_BT_WIFI_SHARE_V33
 typedef struct _BT_WIFI_V33_STATUS_ {
 	UINT32 counter;
@@ -268,8 +223,6 @@ typedef struct _BT_WIFI_V33_STATUS_ {
 	spinlock_t lock;
 } BT_WIFI_V33_STATUS;
 
-#endif
-#if CONSYS_BT_WIFI_SHARE_V33
 extern BT_WIFI_V33_STATUS gBtWifiV33;
 #endif
 
@@ -289,22 +242,5 @@ extern BT_WIFI_V33_STATUS gBtWifiV33;
 *                              F U N C T I O N S
 ********************************************************************************
 */
-extern INT32 mtk_wcn_consys_hw_init(VOID);
-extern INT32 mtk_wcn_consys_hw_deinit(VOID);
-extern INT32 mtk_wcn_consys_hw_pwr_off(UINT32 co_clock_en);
-extern INT32 mtk_wcn_consys_hw_pwr_on(UINT32 co_clock_en);
-extern INT32 mtk_wcn_consys_hw_rst(UINT32 co_clock_en);
-extern INT32 mtk_wcn_consys_hw_bt_paldo_ctrl(UINT32 enable);
-extern INT32 mtk_wcn_consys_hw_wifi_paldo_ctrl(UINT32 enable);
-extern INT32 mtk_wcn_consys_hw_state_show(VOID);
-extern UINT8 *mtk_wcn_consys_emi_virt_addr_get(UINT32 ctrl_state_offset);
-#if CONSYS_ENALBE_SET_JTAG
-extern UINT32 mtk_wcn_consys_jtag_flag_ctrl(UINT32 en);
-#endif
-extern UINT32 mtk_wcn_consys_soc_chipid(VOID);
-#if !defined(CONFIG_MTK_LEGACY)
-extern struct pinctrl *mtk_wcn_consys_get_pinctrl(VOID);
-#endif
-extern INT32 mtk_wcn_consys_set_dbg_mode(UINT32 flag);
-extern INT32 mtk_wcn_consys_set_dynamic_dump(PUINT32 buf);
-#endif /* _MTK_WCN_CMB_HW_H_ */
+
+#endif /* _MTK_MT8167_H_ */

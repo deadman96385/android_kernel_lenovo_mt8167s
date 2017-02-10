@@ -10,6 +10,7 @@ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/$(MTK_PLATFORM)
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eemcs/
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/conn_md/include
+subdir-ccflags-y += -I$(srctree)/drivers/mmc/core
 
 subdir-ccflags-y += -D WMT_PLAT_ALPS=1
 subdir-ccflags-y += -D WMT_UART_RX_MODE_WORK=0 # 1. work thread 0. tasklet
@@ -53,10 +54,6 @@ endif
 ifeq ($(CONFIG_MTK_COMBO), y)
 obj-y += core/
 obj-y += linux/
-ifneq ($(filter "CONSYS_%",$(CONFIG_MTK_COMBO_CHIP)),)
-obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
-else
 obj-y += platform/
-endif
 
 endif
