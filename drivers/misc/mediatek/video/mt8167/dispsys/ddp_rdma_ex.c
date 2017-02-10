@@ -610,13 +610,9 @@ static int rdma_config(enum DISP_MODULE_ENUM module,
 	unsigned int idx = rdma_index(module);
 	unsigned int size_con_reg = 0;
 
-#if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) && defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
 	DDPMSG("RDMAConfig idx %d, mode %d, address 0x%lx, inputformat %s, pitch %u, width %u, height %u,sec%d\n",
 		idx, mode, address, rdma_intput_format_name(inputFormat, input_swap), pitch, width, height, sec);
-#else
-	DDPMSG("RDMAConfig idx %d, mode %d, address 0x%lx, inputformat %s, pitch %u, width %u, height %u,sec%d\n",
-		idx, mode, address, rdma_intput_format_name(inputFormat, input_swap), pitch, width, height, sec);
-#endif
+
 	if ((width > RDMA_MAX_WIDTH) || (height > RDMA_MAX_HEIGHT))
 		DDPERR("RDMA input overflow, w=%d, h=%d, max_w=%d, max_h=%d\n", width, height,
 		       RDMA_MAX_WIDTH, RDMA_MAX_HEIGHT);
