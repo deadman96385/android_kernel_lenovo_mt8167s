@@ -15,6 +15,7 @@
 
 #include <linux/clk.h>
 #include <linux/debugfs.h>
+#include <linux/delay.h>
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
@@ -598,18 +599,18 @@ static int mt8167_codec_ul_vref24_event(struct snd_soc_dapm_widget *w,
 static void mt8167_codec_hp_depop_setup(
 			struct mt8167_codec_priv *codec_data)
 {
-	/* Set audio DAC bias current to 50% */
+	/* Set audio DAC bias current */
 	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON01, (0x1F << 6), (0x14 << 6));
+			AUDIO_CODEC_CON01, (0x1F << 6), 0x0);
 	/* Set the charge option of depop VCM gen. to "charge type" */
 	snd_soc_update_bits(codec_data->codec,
 			AUDIO_CODEC_CON02, BIT(18), BIT(18));
-	/* Set the 33uA current step of depop VCM gen. to charge 33uF cap. */
+	/* Set the 22uA current step of depop VCM gen. to charge 22uF cap. */
 	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, (0x2 << 19), (0x2 << 19));
+			AUDIO_CODEC_CON02, GENMASK(20, 19), (0x1 << 19));
 	/* Set the depop VCM voltage of depop VCM gen. to 1.35V. */
 	snd_soc_update_bits(codec_data->codec,
-			AUDIO_CODEC_CON02, BIT(21), BIT(21));
+			AUDIO_CODEC_CON02, BIT(21), 0x0);
 	/* Enable the depop VCM generator. */
 	snd_soc_update_bits(codec_data->codec,
 			AUDIO_CODEC_CON02, BIT(22), BIT(22));
@@ -670,6 +671,7 @@ static void mt8167_codec_hp_depop_disable(
 			struct mt8167_codec_priv *codec_data)
 {
 	/* HP Pre-charge function release */
+	usleep_range(10000, 11000);
 	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
 			BIT(28), BIT(28));
 	/* Disable the depop mux of HP drivers */
@@ -1766,6 +1768,10 @@ static void mt8167_codec_init_regs(struct mt8167_codec_priv *codec_data)
 		AUDIO_CODEC_CON00, BIT(17), 0x0);
 	snd_soc_update_bits(codec_data->codec,
 		AUDIO_CODEC_CON01, BIT(31), 0x0);
+
+	/* Audio buffer quasi-current  */
+	snd_soc_update_bits(codec_data->codec,
+			AUDIO_CODEC_CON02, GENMASK(31, 30), 0x0);
 
 	/* setup default gain */
 	/* +4dB for voice buf gain */
