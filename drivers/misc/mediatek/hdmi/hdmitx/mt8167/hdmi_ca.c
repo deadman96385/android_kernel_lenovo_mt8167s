@@ -121,7 +121,7 @@ void vCaHDMIWriteReg(unsigned int u4addr, unsigned int u4data)
 		/**(volatile unsigned int *)(u4addr) = (u4data);*/
 	}
 
-	pr_err("[HDMI]W:%X=%X\n", param[0].value.a, param[1].value.a);
+	/*pr_err("[HDMI]W:%X=%X\n", param[0].value.a, param[1].value.a);*/
 
 	if (tz_ret != TZ_RESULT_SUCCESS)
 		pr_err("[HDMI]CA HDMI_TA_WRITE_REG err:%X\n", tz_ret);
@@ -349,5 +349,54 @@ bool fgCaHDMIAudioUnMute(bool fgen)
 	}
 	return TRUE;
 }
+
+void vCaHDCPFailState(unsigned int u4addr, unsigned int u4data)
+{
+	TZ_RESULT tz_ret = 0;
+	MTEEC_PARAM param[2];
+
+	if (ca_hdmi_handle == 0) {
+		pr_err("[HDMI_HDCP] vCaHDCPFailState=0\n");
+		return;
+	}
+
+	param[0].value.a = u4addr & 0x3FF;
+	param[0].value.b = 0;
+	param[1].value.a = u4data;
+	param[1].value.b = 0;
+	pr_err("hdcp fail para1=%d, para2=%d\n", u4addr, u4data);
+	tz_ret = KREE_TeeServiceCall(ca_hdmi_handle, HDMI_TA_HDCP_FAIL,
+				     TZ_ParamTypes2(TZPT_VALUE_INPUT, TZPT_VALUE_INPUT), param);
+
+
+	if (tz_ret != TZ_RESULT_SUCCESS)
+		pr_err("[HDMI_HDCP]CA vCaHDCPFailState err:%X\n", tz_ret);
+
+
+}
+
+void vCaHDCPOffState(unsigned int u4addr, unsigned int u4data)
+{
+	TZ_RESULT tz_ret = 0;
+	MTEEC_PARAM param[2];
+
+	if (ca_hdmi_handle == 0) {
+		pr_err("[HDMI_HDCP] vCaHDCPOffState=0\n");
+		return;
+	}
+
+	param[0].value.a = u4addr & 0x3FF;
+	param[0].value.b = 0;
+	param[1].value.a = u4data;
+	param[1].value.b = 0;
+	pr_err("hdcp off para1=%d, para2=%d\n", u4addr, u4data);
+	tz_ret = KREE_TeeServiceCall(ca_hdmi_handle, HDMI_TA_HDCP_OFF,
+				 TZ_ParamTypes2(TZPT_VALUE_INPUT, TZPT_VALUE_INPUT), param);
+
+
+	if (tz_ret != TZ_RESULT_SUCCESS)
+		pr_err("[HDMI_HDCP]CA vCaHDCPOffState err:%X\n", tz_ret);
+}
+
 
 #endif

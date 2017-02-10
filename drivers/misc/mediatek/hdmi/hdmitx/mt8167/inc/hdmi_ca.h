@@ -29,5 +29,7 @@ bool fgCaHDMIAudioUnMute(bool fgen);
 void vCaDPI1WriteReg(unsigned int u4addr, unsigned int u4data);
 bool fgCaHDMILoadROM(void);
 void vCaHDCPFailState(unsigned int u4addr, unsigned int u4data);
+void vCaHDCPOffState(unsigned int u4addr, unsigned int u4data);
+
 #endif
 #endif
