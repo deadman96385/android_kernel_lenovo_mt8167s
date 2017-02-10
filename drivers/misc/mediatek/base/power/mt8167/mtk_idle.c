@@ -941,7 +941,10 @@ static void backup_audintbus_26MHz(void)
 		return;
 
 	clk_mux_sel0 = idle_readl(CLK_MUX_SEL0);
-	idle_writel(CLK_MUX_SEL0, clk_mux_sel0 & ~GENMASK(29, 27));
+
+	/* select audiosys internal bus clock to 26MHz, CLK_MUX_SEL0[29:27] = 3'b001 */
+	/* select audio hopping clock to 26MHz, CLK_MUX_SEL0[26] = 0 */
+	idle_writel(CLK_MUX_SEL0, ((clk_mux_sel0 & ~GENMASK(29, 26)) | (1 << 27)));
 }
 
 static void restore_audintbus(void)
