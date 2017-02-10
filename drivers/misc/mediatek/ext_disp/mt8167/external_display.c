@@ -57,6 +57,7 @@
 #include "ddp_dpi.h"
 #include "ddp_irq.h"
 #include "ddp_reg.h"
+#include "mtk_disp_mgr.h"
 
 #include "tz_cross/trustzone.h"
 #include "tz_cross/ta_mem.h"
@@ -1176,6 +1177,9 @@ int ext_disp_suspend(unsigned int session)
 {
 	enum EXT_DISP_STATUS ret = EXT_DISP_STATUS_OK;
 
+	if (pgc->is_secure)
+		mutex_lock(&disp_trigger_lock);
+
 	_ext_disp_path_lock();
 	EXT_DISP_FUNC();
 
@@ -1212,6 +1216,9 @@ int ext_disp_suspend(unsigned int session)
 
 	EXT_DISP_ERR("ext_disp_suspend done\n");
 	_ext_disp_path_unlock();
+
+	if (pgc->is_secure)
+		mutex_unlock(&disp_trigger_lock);
 
 	return ret;
 }
@@ -1442,31 +1449,11 @@ static void ext_disp_path_blank(int enCmdq)
 
 static void ext_disp_path_blank_svp(int enCmdq)
 {
-	struct disp_ddp_path_config *data_config;
-	int i;
-
-	data_config = dpmgr_path_get_last_config(pgc->ovl2mem_path_handle);
-	for (i = 0; i < EXTD_OVERLAY_CNT; i++) {
-		data_config->ovl_config[i].layer = i;
-		data_config->ovl_config[i].layer_en = 0;
-		data_config->ovl_config[i].security = DISP_NORMAL_BUFFER;
-	}
-
-	data_config->wdma_config.dstAddress = pgc->dc_buf[pgc->dc_buf_id];
-	data_config->wdma_config.security = DISP_NORMAL_BUFFER;
-
-	data_config->dst_dirty = 1;
-	data_config->ovl_dirty = 1;
-	data_config->wdma_dirty = 1;
-	dpmgr_path_config(pgc->ovl2mem_path_handle, data_config,
-			enCmdq ? pgc->cmdq_handle_ovl2mem_config : NULL);
-	cmdqRecBackupUpdateSlot(pgc->cmdq_handle_ovl2mem_config, pgc->wdma_info,
-							0, DISP_NORMAL_BUFFER);
-	cmdqRecBackupUpdateSlot(pgc->cmdq_handle_ovl2mem_config, pgc->wdma_info,
-							1, data_config->wdma_config.dstAddress);
-	ext_disp_trigger_ovl_to_memory(pgc->ovl2mem_path_handle, pgc->cmdq_handle_ovl2mem_config,
-					(fence_release_callback)_ovl_fence_release_callback, 0, 1);
-	_ovl_fence_release_callback(1);
+	pgc->decouple_rdma_config.security = DISP_NORMAL_BUFFER;
+	pgc->decouple_rdma_config.address = pgc->dc_buf[pgc->dc_buf_id];
+	_config_rdma_input_data(&pgc->decouple_rdma_config, pgc->dpmgr_handle, pgc->cmdq_handle_config);
+	_ext_disp_trigger(1, NULL, 0);
+	ext_free_sec_buffer();
 
 	EXT_DISP_LOG("ext_disp_path_blank_svp\n");
 }

@@ -3438,7 +3438,7 @@ const LCM_UTIL_FUNCS PM_lcm_utils_dsi0 = {
 
 void *get_dsi_params_handle(uint32_t dsi_idx)
 {
-	if (dsi_idx != PM_DSI1)
+	if (dsi_idx != (uint32_t)(PM_DSI1))
 		return (void *)(&_dsi_context[0].dsi_params);
 	else
 		return (void *)(&_dsi_context[0].dsi_params);

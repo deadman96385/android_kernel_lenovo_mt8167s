@@ -963,7 +963,6 @@ static int ovl_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_confi
 				       __func__, ret);
 
 			cmdqRecReset(nonsec_switch_handle);
-			_cmdq_insert_wait_frame_done_token_mira(nonsec_switch_handle);
 			cmdqRecSetSecure(nonsec_switch_handle, 1);
 			cmdqRecSetSecureMode(nonsec_switch_handle, mode);
 
