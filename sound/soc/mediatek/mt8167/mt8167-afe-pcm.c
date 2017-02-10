@@ -2696,6 +2696,7 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 	unsigned int irq_id;
 	struct mtk_afe *afe;
 	struct resource *res;
+	struct device_node *np = pdev->dev.of_node;
 
 	afe = devm_kzalloc(&pdev->dev, sizeof(*afe), GFP_KERNEL);
 	if (!afe)
@@ -2716,7 +2717,7 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 
 	irq_id = platform_get_irq(pdev, 0);
 	if (!irq_id) {
-		dev_err(afe->dev, "np %s no irq\n", afe->dev->of_node->name);
+		dev_err(afe->dev, "np %s no irq\n", np->name);
 		return -ENXIO;
 	}
 
@@ -2769,8 +2770,8 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 
 	mt8167_afe_init_debugfs(afe);
 
-	/* TODO: parse tdm out mode from dts */
-	afe->tdm_out_mode = MT8167_AFE_TDM_OUT_HDMI;
+	if (of_property_read_u32(np, "mediatek,tdm-out-mode", &afe->tdm_out_mode))
+		afe->tdm_out_mode = MT8167_AFE_TDM_OUT_HDMI;
 
 	dev_info(&pdev->dev, "MTK AFE driver initialized.\n");
 	return 0;

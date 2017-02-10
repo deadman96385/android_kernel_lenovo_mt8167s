@@ -117,6 +117,11 @@
 	status = "okay";
 };
 
+&afe {
+	/* 0(HDMI) 1(I2S) 2(TDM) */
+	mediatek,tdm-out-mode = <0>;
+};
+
 &bat_comm {
 	interrupt-parent = <&pmic>;
 	interrupts = <10 IRQ_TYPE_LEVEL_HIGH>;
