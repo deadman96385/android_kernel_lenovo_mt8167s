@@ -1390,7 +1390,6 @@ static int mt8167_afe_tdm_in_startup(struct snd_pcm_substream *substream,
 	struct snd_pcm_runtime * const runtime = substream->runtime;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 
-	/* TODO: check whether channel constraint works */
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
 				   &constraints_channels_tdm_in);
 
@@ -1894,7 +1893,7 @@ static int mt8167_afe_dai_resume(struct snd_soc_dai *dai)
 static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 	/* FE DAIs: memory intefaces to CPU */
 	{
-		.name = "DL1", /* downlink 1 */
+		.name = "DL1",
 		.id = MT8167_AFE_MEMIF_DL1,
 		.suspend = mt8167_afe_dai_suspend,
 		.resume = mt8167_afe_dai_resume,
@@ -1904,11 +1903,12 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000_192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-				   SNDRV_PCM_FMTBIT_S24_LE,
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &mt8167_afe_dai_ops,
 	}, {
-		.name = "VUL", /* voice uplink */
+		.name = "VUL",
 		.id = MT8167_AFE_MEMIF_VUL,
 		.suspend = mt8167_afe_dai_suspend,
 		.resume = mt8167_afe_dai_resume,
@@ -1916,12 +1916,14 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 			.stream_name = "VUL",
 			.channels_min = 1,
 			.channels_max = 2,
-			.rates = SNDRV_PCM_RATE_8000_48000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.rates = SNDRV_PCM_RATE_8000_192000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &mt8167_afe_dai_ops,
 	}, {
-		.name = "DL2", /* downlink 2 */
+		.name = "DL2",
 		.id = MT8167_AFE_MEMIF_DL2,
 		.suspend = mt8167_afe_dai_suspend,
 		.resume = mt8167_afe_dai_resume,
@@ -1931,7 +1933,8 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000_192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-				   SNDRV_PCM_FMTBIT_S24_LE,
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &mt8167_afe_dai_ops,
 	}, {
@@ -1944,7 +1947,9 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 			.channels_min = 1,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000_192000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &mt8167_afe_dai_ops,
 	}, {
@@ -1971,15 +1976,10 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 			.stream_name = "HDMI",
 			.channels_min = 2,
 			.channels_max = 8,
-			.rates = SNDRV_PCM_RATE_32000 |
-				 SNDRV_PCM_RATE_44100 |
-				 SNDRV_PCM_RATE_48000 |
-				 SNDRV_PCM_RATE_88200 |
-				 SNDRV_PCM_RATE_96000 |
-				 SNDRV_PCM_RATE_176400 |
-				 SNDRV_PCM_RATE_192000,
+			.rates = SNDRV_PCM_RATE_8000_192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-				   SNDRV_PCM_FMTBIT_S24_LE,
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &mt8167_afe_dai_ops,
 	}, {
@@ -2007,7 +2007,8 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000_192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-				   SNDRV_PCM_FMTBIT_S24_LE,
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.capture = {
 			.stream_name = "I2S Capture",
@@ -2015,7 +2016,8 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000_192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-				   SNDRV_PCM_FMTBIT_S24_LE,
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &mt8167_afe_i2s_ops,
 	}, {
@@ -2027,7 +2029,8 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000_192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-				   SNDRV_PCM_FMTBIT_S24_LE,
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.capture = {
 			.stream_name = "2ND I2S Capture",
@@ -2035,7 +2038,8 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000_192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-				   SNDRV_PCM_FMTBIT_S24_LE,
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &mt8167_afe_2nd_i2s_ops,
 	}, {
@@ -2114,7 +2118,9 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 			.channels_min = 1,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000_192000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 	}, {
 	/* BE DAIs */
@@ -2124,15 +2130,10 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 			.stream_name = "HDMIO Playback",
 			.channels_min = 2,
 			.channels_max = 8,
-			.rates = SNDRV_PCM_RATE_32000 |
-				 SNDRV_PCM_RATE_44100 |
-				 SNDRV_PCM_RATE_48000 |
-				 SNDRV_PCM_RATE_88200 |
-				 SNDRV_PCM_RATE_96000 |
-				 SNDRV_PCM_RATE_176400 |
-				 SNDRV_PCM_RATE_192000,
+			.rates = SNDRV_PCM_RATE_8000_192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
-				   SNDRV_PCM_FMTBIT_S24_LE,
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &mt8167_afe_hdmi_ops,
 	},  {
