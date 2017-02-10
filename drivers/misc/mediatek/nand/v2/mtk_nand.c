@@ -677,6 +677,8 @@ static u32 mtk_nand_cs_on(struct nand_chip *nand_chip, u16 cs, u32 page);
 static bool mtk_nand_device_reset(void);
 static bool mtk_nand_set_command(u16 command);
 
+static bool ahb_read_sleep_enable(void);
+
 static bool ahb_read_can_sleep(u32 length);
 
 static void get_ahb_read_sleep_range(u32 length,
@@ -2998,21 +3000,22 @@ static bool mtk_nand_dma_read_data(struct mtd_info *mtd, u8 *buf, u32 length)
 			}
 		}
 	} else {
-		int sector_read_time;
-		unsigned long long s, e;
+		int sector_read_time = 0;
+		unsigned long long s = 0, e = 0;
 
 		g_running_dma = 0;
-		sector_read_time = get_sector_ahb_read_time();
-		if (!sector_read_time) {
-			s = sched_clock();
-		} else {
-			if (ahb_read_can_sleep(length)) {
+		if (ahb_read_sleep_enable()) {
+			sector_read_time = get_sector_ahb_read_time();
+			if (!sector_read_time) {
+				s = sched_clock();
+			} else if (ahb_read_can_sleep(length)) {
 				int min, max;
 
 				get_ahb_read_sleep_range(length, &min, &max);
 				usleep_range(min, max);
 			}
 		}
+
 		while ((length >> host->hw->nand_sec_shift) >
 			   ((DRV_Reg32(NFI_BYTELEN_REG16) & 0x1f000) >> 12)) {
 			timeout--;
@@ -3024,7 +3027,7 @@ static bool mtk_nand_dma_read_data(struct mtd_info *mtd, u8 *buf, u32 length)
 			}
 		}
 
-		if (!sector_read_time) {
+		if (ahb_read_sleep_enable() && !sector_read_time) {
 			e = sched_clock();
 			pr_err("s:(%llu) e:(%llu)\n", s, e);
 			cal_sector_ahb_read_time(s, e, length);
@@ -8607,6 +8610,12 @@ static int mtk_nand_verify_buf(struct mtd_info *mtd, const uint8_t *buf, int len
 #endif
 }
 #endif
+
+static bool ahb_read_sleep_enable(void)
+{
+	return (host->rd_para.sample_count > 0);
+}
+
 static bool ahb_read_can_sleep(u32 length)
 {
 	struct read_sleep_para *para = &host->rd_para;
