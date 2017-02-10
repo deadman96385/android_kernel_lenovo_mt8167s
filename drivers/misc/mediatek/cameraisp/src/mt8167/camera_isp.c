@@ -70,6 +70,7 @@
 #include <linux/of_platform.h>	/* for device tree */
 #include <linux/of_irq.h>	/* for device tree */
 #include <linux/of_address.h>	/* for device tree */
+#include <linux/irqchip/mtk-gic-extend.h> /* used to get actual IRQ #, which can be compared with dts */
 #endif
 
 /*******************************************************************************
@@ -104,8 +105,8 @@ typedef bool MBOOL;
 #define MyTag "[Camera-ISP]"
 
 #define	LOG_VRB(format,	args...)    pr_info(MyTag "[%s]" format "\n", __func__, ##args)
-#define LOG_DBG(format, args...)    pr_info(MyTag "[%s]" format "\n", __func__, ##args)
-#define LOG_INF(format, args...)    pr_info(MyTag "[%s]" format "\n", __func__, ##args)
+#define LOG_DBG(format, args...)    pr_err(MyTag "[%s]" format "\n", __func__, ##args)
+#define LOG_INF(format, args...)    pr_err(MyTag "[%s]" format "\n", __func__, ##args)
 #define LOG_NOTICE(format, args...) pr_notice(MyTag "[%s]" format "\n", __func__, ##args)
 #define LOG_WRN(format, args...)    pr_warn(MyTag "[%s, line%05d]Warning:" format "\n", __func__, __LINE__, ##args)
 #define LOG_ERR(format, args...)    pr_err(MyTag "[%s, line%05d]ERROR:" format "\n", __func__, __LINE__, ##args)
@@ -1743,6 +1744,12 @@ int MDPReset_Process(int params)
 static inline void Prepare_Enable_ccf_clock(void)
 {
 	int ret, i;
+
+#ifdef CONFIG_FPGA_EARLY_PORTING
+	LOG_WRN("[Houston]Clock driver is not ready, bypass Clock");
+	return;
+#endif
+
 	/* must keep this clk open order: CG_SCP_SYS_DIS-> CG_DISP0_SMI_COMMON -> CG_SCP_SYS_ISP -> ISP clk */
 #ifndef CONFIG_MTK_SMI_VARIANT
 	/*
@@ -1779,6 +1786,11 @@ static inline void Disable_Unprepare_ccf_clock(void)
 {
 	/* must keep this clk close order: ISP clk -> CG_SCP_SYS_ISP -> CG_DISP0_SMI_COMMON -> CG_SCP_SYS_DIS */
 	int i;
+
+#ifdef CONFIG_FPGA_EARLY_PORTING
+	LOG_WRN("[Houston]Clock driver is not ready, bypass Clock");
+	return;
+#endif
 
 	for (i = ARRAY_SIZE(ispclk) - 1 ; i >= 0 ; i--)
 		clk_disable_unprepare(ispclk[i].clock);
@@ -5472,8 +5484,6 @@ static MINT32 ISP_open(struct inode *pInode, struct file *pFile)
 
 	LOG_DBG("+,UserCount(%d)", g_IspInfo.UserCount);
 
-	spin_lock(&(g_IspInfo.SpinLockIspRef));
-
 	/* LOG_DBG("UserCount(%d)",g_IspInfo.UserCount); */
 
 	pFile->private_data = NULL;
@@ -5489,16 +5499,9 @@ static MINT32 ISP_open(struct inode *pInode, struct file *pFile)
 	}
 
 	if (g_IspInfo.UserCount > 0) {
-		g_IspInfo.UserCount++;
-		spin_unlock(&(g_IspInfo.SpinLockIspRef));
 		LOG_DBG("Curr UserCount(%d), (process, pid, tgid)=(%s, %d, %d), users exist",
 			g_IspInfo.UserCount, current->comm, current->pid, current->tgid);
 		goto EXIT;
-	} else {
-		g_IspInfo.UserCount++;
-		spin_unlock(&(g_IspInfo.SpinLockIspRef));
-		LOG_DBG("Curr UserCount(%d), (process, pid, tgid)=(%s, %d, %d),	first user",
-			g_IspInfo.UserCount, current->comm, current->pid, current->tgid);
 	}
 
 	#if (LOG_CONSTRAINT_ADJ == 1)
@@ -5544,11 +5547,6 @@ static MINT32 ISP_open(struct inode *pInode, struct file *pFile)
 		g_IspInfo.Callback[i].Func = NULL;
 	}
 
-	g_IspInfo.UserCount++;
-
-	LOG_DBG("Curr UserCount(%d), (process, pid, tgid)=(%s, %d, %d), first user",
-		g_IspInfo.UserCount, current->comm, current->pid, current->tgid);
-
 /* js_test */
 /* g_IspInfo.DebugMask = ISP_DBG_BUF_CTRL; */
 
@@ -5566,6 +5564,14 @@ EXIT:
 		 *  1. clkmgr: G_u4EnableClockCount=0, call clk_enable/disable
 		 *  2. CCF: call clk_enable/disable every time
 		 */
+		spin_lock(&(g_IspInfo.SpinLockIspRef));
+		g_IspInfo.UserCount++;
+		spin_unlock(&(g_IspInfo.SpinLockIspRef));
+
+		if (g_IspInfo.UserCount == 1)
+			LOG_DBG("Curr UserCount(%d), (process, pid, tgid)=(%s, %d, %d), first user",
+			g_IspInfo.UserCount, current->comm, current->pid, current->tgid);
+
 		ISP_EnableClock(MTRUE, 1);
 		LOG_DBG("isp open g_EnableClkCnt:	%d", g_EnableClkCnt);
 	}
@@ -5985,7 +5991,7 @@ static unsigned long of_get_nodeVA(const char *comp_str)
 static MINT32 ISP_probe(struct platform_device *pDev)
 {
 	MINT32 Ret = 0;
-	struct resource *pRes = NULL;
+	/*struct resource *pRes = NULL;*/ /* replaced by of_iomap */
 	MINT32 i;
 #ifdef CONFIG_OF
 	int new_count;
@@ -6044,8 +6050,8 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 				cam_isp_dev->irq[i]);
 			return Ret;
 		}
-		LOG_INF("DT, i=%d, name=%s, map_irq=%d\n", i, pDev->dev.of_node->name,
-			cam_isp_dev->irq[i]);
+		LOG_INF("DT, i=%d, name=%s, map_irq=%d , get_hardware_irq(%d)\n", i, pDev->dev.of_node->name,
+			cam_isp_dev->irq[i], get_hardware_irq(cam_isp_dev->irq[i]));
 
 	}
 	nr_camisp_devs = new_count;
@@ -6063,7 +6069,7 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 		dev_err(&pDev->dev, "register char failed");
 		return Ret;
 	}
-
+#if 0
 	/* Mapping CAM_REGISTERS */
 	for (i = 0; i < 1; i++) {	/* NEED_TUNING_BY_CHIP. 1: Only one IORESOURCE_MEM type resource in kernel\mt_devs.c\mt_resource_isp[]. */
 		LOG_DBG("Mapping CAM_REGISTERS. i: %d.", i);
@@ -6082,6 +6088,7 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 			goto EXIT;
 		}
 	}
+#endif
 
 #ifndef CONFIG_MTK_CLKMGR	/*CCF: Grab clock pointer (struct clk*) */
 
@@ -6098,8 +6105,11 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 	for (i = 0; i < ARRAY_SIZE(ispclk); i++) {
 		ispclk[i].clock = devm_clk_get(&pDev->dev, ispclk[i].clkname);
 		if (IS_ERR(ispclk[i].clock)) {
-			LOG_ERR("cannot get %s clock\n", ispclk[i].clkname);
+			LOG_ERR("cannot get %s clock, return errno(%ld, EPROBE_DEFER(-517))\n",
+				ispclk[i].clkname, PTR_ERR(ispclk[i].clock));
+#ifndef CONFIG_FPGA_EARLY_PORTING
 			return PTR_ERR(ispclk[i].clock);
+#endif
 		}
 	}
 
@@ -6168,12 +6178,11 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 		goto EXIT;
 	}
 	/* mt_irq_unmask(CAMERA_ISP_IRQ0_ID); */
+EXIT:
 #endif
 	/*  */
 
 /* #endif */
-
-EXIT:
 
 	if (Ret < 0) {
 		ISP_UnregCharDev();
@@ -6227,8 +6236,14 @@ static MINT32 ISP_remove(struct platform_device *pDev)
 ********************************************************************************/
 static MINT32 ISP_suspend(struct platform_device *pDev, pm_message_t Mesg)
 {
+	MUINT32 regTG1Val;
+
+	if (g_IspInfo.UserCount == 0) {
+		LOG_DBG("ISP UserCount=0");
+		return 0;
+	}
 	/* TG_VF_CON[0] (0x15004414[0]): VFDATA_EN. TG1 Take Picture Request. */
-	MUINT32 regTG1Val = ISP_RD32((void *)(ISP_ADDR + 0x414));
+	regTG1Val = ISP_RD32((void *)(ISP_ADDR + 0x414));
 
 	LOG_DBG("g_bPass1_On_In_Resume_TG1(%d),regTG1Val(0x%08x)", g_bPass1_On_In_Resume_TG1,
 		regTG1Val);
@@ -6248,8 +6263,15 @@ static MINT32 ISP_suspend(struct platform_device *pDev, pm_message_t Mesg)
 ********************************************************************************/
 static MINT32 ISP_resume(struct platform_device *pDev)
 {
+	MUINT32 regTG1Val;
+
+	if (g_IspInfo.UserCount == 0) {
+		LOG_DBG("ISP UserCount=0");
+		return 0;
+	}
+
 	/* TG_VF_CON[0] (0x15004414[0]): VFDATA_EN. TG1 Take Picture Request. */
-	MUINT32 regTG1Val = ISP_RD32((void *)(ISP_ADDR + 0x414));
+	regTG1Val = ISP_RD32((void *)(ISP_ADDR + 0x414));
 
 	LOG_DBG("g_bPass1_On_In_Resume_TG1(%d),regTG1Val(0x%x)", g_bPass1_On_In_Resume_TG1,
 		regTG1Val);
@@ -6352,99 +6374,92 @@ static struct platform_driver IspDriver = {
 /*******************************************************************************
 *
 ********************************************************************************/
-static ssize_t ISP_DumpRegToProc(struct file *pPage,
-				char __user *pBuffer, size_t Count, loff_t *off)
+static int ISP_DumpRegToProc(struct seq_file *s, void *v)
 {
-	char *p = (char *)pPage;
-	long Length = 0;
 	MUINT32 i = 0;
-	long ret = 0;
+	seq_puts(s, " MT8163 ISP Register\n");
+	seq_puts(s, "====== top ====\n");
+	for (i = 0x0; i <= 0x1AC; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
-	LOG_DBG("pPage(%p),off(0x%lx),Count(%ld)", pPage, (unsigned long)off, (long int)Count);
+	seq_puts(s, "====== dma ====\n");
+	for (i = 0x200; i <= 0x3D8; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n\r", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
-	p += sprintf(p, " MT ISP Register\n");
-	p += sprintf(p, "====== top ====\n");
+	seq_puts(s, "====== tg ====\n");
+	for (i = 0x400; i <= 0x4EC; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
-	for (i = 0x0; i <= 0x1AC; i += 4) {
-		p += sprintf(p, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			     ISP_RD32(ISP_ADDR + i));
+	seq_puts(s, "====== cdp (including EIS) ====\n");
+	for (i = 0xB00; i <= 0xDE0; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+
+	seq_puts(s, "====== seninf ====\n");
+	for (i = 0x4000; i <= 0x40C0; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+
+	for (i = 0x4100; i <= 0x41BC; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+
+	for (i = 0x4200; i <= 0x4208; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+
+	for (i = 0x4300; i <= 0x4310; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+
+	for (i = 0x43A0; i <= 0x43B0; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+
+	for (i = 0x4400; i <= 0x4424; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+
+	for (i = 0x4500; i <= 0x4520; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+
+	for (i = 0x4600; i <= 0x4608; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+
+	for (i = 0x4A00; i <= 0x4A08; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+
+
+	seq_puts(s, "====== 3DNR ====\n");
+	for (i = 0x4F00; i <= 0x4F38; i += 4)
+		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
+			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+
+	return 0;
 	}
 
-	p += sprintf(p, "====== dma ====\n");
-	for (i = 0x200; i <= 0x3D8; i += 4) {
-		p += sprintf(p, "+0x%08x 0x%08x\n\r", (unsigned int)(ISP_ADDR + i),
-			     ISP_RD32(ISP_ADDR + i));
-	}
-
-	p += sprintf(p, "====== tg ====\n");
-	for (i = 0x400; i <= 0x4EC; i += 4) {
-		p += sprintf(p, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			     ISP_RD32(ISP_ADDR + i));
-	}
-
-	p += sprintf(p, "====== cdp (including EIS) ====\n");
-	for (i = 0xB00; i <= 0xDE0; i += 4) {
-		p += sprintf(p, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			     ISP_RD32(ISP_ADDR + i));
-	}
-
-	p += sprintf(p, "====== seninf ====\n");
-	for (i = 0x4000; i <= 0x40C0; i += 4) {
-		p += sprintf(p, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			     ISP_RD32(ISP_ADDR + i));
-	}
-
-	for (i = 0x4100; i <= 0x41BC; i += 4) {
-		p += sprintf(p, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			     ISP_RD32(ISP_ADDR + i));
-	}
-
-	for (i = 0x4300; i <= 0x4310; i += 4) {
-		p += sprintf(p, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			     ISP_RD32(ISP_ADDR + i));
-	}
-
-	for (i = 0x43A0; i <= 0x43B0; i += 4) {
-		p += sprintf(p, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			     ISP_RD32(ISP_ADDR + i));
-	}
-
-	for (i = 0x4400; i <= 0x4424; i += 4) {
-		p += sprintf(p, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			     ISP_RD32((ISP_ADDR + i)));
-	}
-
-	for (i = 0x4500; i <= 0x4520; i += 4) {
-		p += sprintf(p, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			     ISP_RD32(ISP_ADDR + i));
-	}
-
-	p += sprintf(p, "====== 3DNR ====\n");
-	for (i = 0x4F00; i <= 0x4F38; i += 4) {
-		p += sprintf(p, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			     ISP_RD32(ISP_ADDR + i));
-	}
-
-	Length = (long)((unsigned long)p - (unsigned long)pPage);
-	if (Length > (long)off) {
-		Length -= (long)off;
-	} else {
-		Length = 0;
-	}
-
-	ret = Length < Count ? Length : Count;
-
-	LOG_DBG("ret(%ld)", ret);
-	return (ssize_t)(ret);
+static int ISP_DumpRegOpen(struct inode *inode, struct file *file)
+{
+	return single_open(file, ISP_DumpRegToProc, NULL);
 }
 
 /*******************************************************************************
 *
 ********************************************************************************/
-static ssize_t ISP_RegDebug(struct file *pFile,
-			   const char __user *pBuffer, size_t  Count, loff_t *p_off)
+static ssize_t ISP_RegDebug(
+	struct file *pFile,
+	const char *pBuffer,
+	size_t Count,
+	loff_t *pData)
+
 {
-	char RegBuf[64];
+	char RegBuf[64] = {'\0'};
 	MUINT32 CopyBufSize = (Count < (sizeof(RegBuf) - 1)) ? (Count) : (sizeof(RegBuf) - 1);
 	MUINT32 Addr = 0;
 	MUINT32 Data = 0;
@@ -6456,93 +6471,133 @@ static ssize_t ISP_RegDebug(struct file *pFile,
 		return -EFAULT;
 	}
 
-	if (sscanf(RegBuf, "%x %x", &Addr, &Data) == 2) {
-		ISP_WR32((ISP_ADDR_CAMINF + Addr), Data);
-		LOG_ERR("Write => Addr: 0x%08X, Write Data: 0x%08X. Read Data: 0x%08X.",
-			(unsigned int)(ISP_ADDR_CAMINF + Addr), Data,
-			ioread32((void *)(ISP_ADDR_CAMINF + Addr)));
+	if (sscanf(RegBuf, "debugmask=%x", &Addr) == 1) {
+		/*
+		* #define ISP_DBG_INT                 (0x00000001)
+		* #define ISP_DBG_HOLD_REG            (0x00000002)
+		* #define ISP_DBG_READ_REG            (0x00000004)
+		* #define ISP_DBG_WRITE_REG           (0x00000008)
+		* #define ISP_DBG_CLK                 (0x00000010)
+		* #define ISP_DBG_TASKLET             (0x00000020)
+		* #define ISP_DBG_SCHEDULE_WORK       (0x00000040)
+		* #define ISP_DBG_BUF_WRITE           (0x00000080)
+		* #define ISP_DBG_BUF_CTRL            (0x00000100)
+		* #define ISP_DBG_REF_CNT_CTRL        (0x00000200)
+		*/
+		if ((Addr >= 0) && (Addr <= 0xFFFF)) {
+			LOG_INF("Enable isp debug mask:%x", Addr);
+			g_IspInfo.DebugMask = Addr;
+		} else {
+			LOG_ERR("invalid isp debug mask:%x", Addr);
+		}
+	} else if (sscanf(RegBuf, "%x %x", &Addr, &Data) == 2) {
+		if ((ISP_ADDR_CAMINF + Addr >= ISP_ADDR) &&
+			(ISP_ADDR_CAMINF + Addr < (ISP_ADDR_CAMINF+ISP_REG_RANGE))) {
+			ISP_WR32(ISP_ADDR_CAMINF + Addr, Data);
+			LOG_INF("Write => Addr: 0x%08X, Write Data: 0x%08X. Read Data: 0x%08X.",
+			(unsigned int)(ISP_ADDR_CAMINF + Addr), Data, (unsigned int)ISP_RD32(ISP_ADDR_CAMINF + Addr));
+		} else {
+			LOG_ERR("Wrong address out of range (0x%x)", (unsigned int)(ISP_ADDR_CAMINF + Addr));
+		}
 	} else if (sscanf(RegBuf, "%x", &Addr) == 1) {
-		LOG_ERR("Read => Addr: 0x%08X, Read Data: 0x%08X.",
-			(unsigned int)(ISP_ADDR_CAMINF + Addr), ioread32((void *)(ISP_ADDR_CAMINF + Addr)));
+		if ((ISP_ADDR_CAMINF + Addr >= ISP_ADDR) &&
+			(ISP_ADDR_CAMINF + Addr < (ISP_ADDR_CAMINF+ISP_REG_RANGE))) {
+			LOG_INF("Read => Addr: 0x%08X, Read Data: 0x%08X.", (unsigned int)(ISP_ADDR_CAMINF + Addr),
+			(unsigned int)ISP_RD32(ISP_ADDR_CAMINF + Addr));
+		} else {
+			LOG_ERR("Wrong address out of range (0x%x)", (unsigned int)(ISP_ADDR_CAMINF + Addr));
 	}
-
-	LOG_DBG("Count(%d)", (MINT32) Count);
-	return (ssize_t)Count;
 }
 
+	LOG_DBG("- X. Count: %d.", (int)Count);
+	return Count;
+
+}
+#if 0
 static MUINT32 proc_regOfst;
-static ssize_t CAMIO_DumpRegToProc(struct file *pPage,
-				char __user *pBuffer, size_t Count, loff_t *off)
+#endif
+static int CAMIO_DumpRegToProc(struct seq_file *s, void *v)
 {
-	char *p = (char *)pPage;
-	long Length = 0;
-	long ret = 0;
-
-	LOG_DBG("pPage(%p),off(0x%lx),Count(%ld)", pPage, (unsigned long)off, (long int)Count);
-
-	p += sprintf(p, "reg_0x%08X = 0x%X\n", (unsigned int)(ISP_ADDR_CAMINF + proc_regOfst),
-		     ioread32((void *)(ISP_ADDR_CAMINF + proc_regOfst)));
-
-	Length = (long)((unsigned long)p - (unsigned long)pPage);
-	if (Length > (long)off) {
-		Length -= (long)off;
-	} else {
-		Length = 0;
+#if 0
+	seq_printf(s, "reg_0x%08X = 0x%X\n", (unsigned int)(ISP_GPIO_ADDR + proc_regOfst),
+			 ISP_RD32(ISP_GPIO_ADDR + proc_regOfst));
+#else
+	LOG_WRN("Not support");
+#endif
+	return 0;
 	}
 
-	/*  */
-	ret = Length < Count ? Length : Count;
-
-	LOG_DBG("ret(%ld)", ret);
-	return (ssize_t)ret;
+static int CAMIO_DumpRegOpen(struct inode *inode, struct file *file)
+{
+	return single_open(file, CAMIO_DumpRegToProc, NULL);
 }
 
 /*******************************************************************************
 *
 ********************************************************************************/
-static ssize_t CAMIO_RegDebug(struct file *pFile,
-			     const char __user *pBuffer, size_t Count, loff_t *p_off)
+static ssize_t CAMIO_RegDebug(struct file *pFile, const char __user *pBuffer, size_t Count,
+				  loff_t *ppos)
 {
+#if 0
 	char RegBuf[64];
 	MUINT32 CopyBufSize = (Count < (sizeof(RegBuf) - 1)) ? (Count) : (sizeof(RegBuf) - 1);
-#if 0
 	MUINT32 Addr = 0;
 	MUINT32 Data = 0;
-#endif
-	LOG_DBG("pFile(%p),pBuffer(%p),Count(%ld)", pFile, pBuffer, (long int)Count);
+	LOG_DBG("- E. pFile: 0x%08x. pBuffer: 0x%08x. Count: %d.", (unsigned int)pFile,
+		(unsigned int)pBuffer, (int)Count);
 
 	if (copy_from_user(RegBuf, pBuffer, CopyBufSize)) {
 		LOG_ERR("copy_from_user() fail.");
 		return -EFAULT;
 	}
-#if 0
+
 	if (sscanf(RegBuf, "%x %x", &Addr, &Data) == 2) {
 		proc_regOfst = Addr;
-		/* ISP_WR32((void *)(GPIO_BASE + Addr), Data); //TODO: Must fixed by Device tree */
-		LOG_ERR("Write => Addr: 0x%08X, Write Data: 0x%08X. Read Data: 0x%08X.",
-			GPIO_BASE + Addr, Data, ioread32((GPIO_BASE + Addr)));
+		if ((ISP_GPIO_ADDR + Addr >= ISP_GPIO_ADDR) &&
+			(ISP_GPIO_ADDR + Addr < (ISP_GPIO_ADDR + GPIO_RANGE))) {
+			ISP_WR32(ISP_GPIO_ADDR + Addr, Data);
+			LOG_INF("Write => Addr: 0x%08X, Write Data: 0x%08X. Read Data: 0x%08X.",
+				(unsigned int)(ISP_GPIO_ADDR + Addr), Data, ISP_RD32(ISP_GPIO_ADDR + Addr));
+		} else {
+			LOG_ERR("Wrong address out of range (0x%x)", (unsigned int)(ISP_GPIO_ADDR + Addr));
+		}
 	} else if (sscanf(RegBuf, "%x", &Addr) == 1) {
 		proc_regOfst = Addr;
-		LOG_ERR("Read => Addr: 0x%08X, Read Data: 0x%08X.", GPIO_BASE + Addr,
-			ioread32((GPIO_BASE + Addr)));
+		if ((ISP_GPIO_ADDR + Addr >= ISP_GPIO_ADDR) &&
+			(ISP_GPIO_ADDR + Addr < (ISP_GPIO_ADDR + GPIO_RANGE))) {
+			LOG_INF("Read => Addr: 0x%08X, Read Data: 0x%08X.", (unsigned int)(ISP_GPIO_ADDR + Addr),
+				ISP_RD32(ISP_GPIO_ADDR + Addr));
+		 } else {
+			LOG_ERR("Wrong address out of range (0x%x)", (unsigned int)(ISP_GPIO_ADDR + Addr));
+		}
 	}
+	LOG_DBG("- X. Count: %d.", (int)Count);
+#else
+	LOG_WRN("Not support");
 #endif
-
-	LOG_DBG("Count(%ld)", (long int) Count);
-	return (ssize_t)Count;
+	return Count;
 }
+
 
 /*******************************************************************************
 *
 ********************************************************************************/
-static const struct file_operations fcameraisp_proc_fops = {
-	.read = ISP_DumpRegToProc,
+static const struct file_operations g_isp_reg_fops = {
+	.owner = THIS_MODULE,
 	.write = ISP_RegDebug,
+	.open = ISP_DumpRegOpen,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
 };
 
-static const struct file_operations fcameraio_proc_fops = {
-	.read = CAMIO_DumpRegToProc,
+static const struct file_operations g_camio_reg_fops = {
+	.owner = THIS_MODULE,
 	.write = CAMIO_RegDebug,
+	.open = CAMIO_DumpRegOpen,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
 };
 
 /*******************************************************************************
@@ -6803,13 +6858,13 @@ static MINT32 __init ISP_Init(MVOID)
 	LOG_DBG("+");
 
 	Ret = platform_driver_register(&IspDriver);
-	if ((Ret) < 0) {
+	if (Ret) {
 		LOG_ERR("platform_driver_register fail");
 		return Ret;
 	}
 #if 1				/* linux-3.10 procfs API changed */
-	proc_create("driver/isp_reg", 0, NULL, &fcameraisp_proc_fops);
-	proc_create("driver/camio_reg", 0, NULL, &fcameraio_proc_fops);
+	proc_create("driver/isp_reg", 0, NULL, &g_isp_reg_fops);
+	proc_create("driver/camio_reg", 0, NULL, &g_camio_reg_fops);
 #else
 	pEntry = create_proc_entry("driver/isp_reg", 0, NULL);
 	if (pEntry) {
