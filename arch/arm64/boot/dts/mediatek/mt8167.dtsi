@@ -601,7 +601,7 @@
 			seninf_cam0_fifo_full = <73>;
 			apxgpt2_count = <0x10008028>;
 
-			clocks = <&infracfg CLK_TOP_GCE>,
+			clocks = <&topckgen CLK_TOP_GCE>,
 				 <&mmsys CLK_MM_SMI_COMMON>,
 				 <&mmsys CLK_MM_SMI_LARB0>,
 				 <&mmsys CLK_MM_CAM_MDP>,
@@ -1021,37 +1021,37 @@
 		mdp_rdma: mdp_rdma@14001000 {
 			compatible = "mediatek,mt8167-mdp_rdma";
 			reg = <0 0x14001000 0 0x1000>;
-			interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_LOW>;
+			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
 		};
 
 		mdp_rsz0: mdp_rsz0@14002000 {
 			compatible = "mediatek,mt8167-mdp_rsz0";
 			reg = <0 0x14002000 0 0x1000>;
-			interrupts = <GIC_SPI 179 IRQ_TYPE_LEVEL_LOW>;
+			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_LOW>;
 		};
 
 		mdp_rsz1: mdp_rsz1@14003000 {
 			compatible = "mediatek,mt8167-mdp_rsz1";
 			reg = <0 0x14003000 0 0x1000>;
-			interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_LOW>;
+			interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
 		};
 
 		mdp_wdma: mdp_wdma@14004000 {
 			compatible = "mediatek,mt8167-mdp_wdma";
 			reg = <0 0x14004000 0 0x1000>;
-			interrupts = <GIC_SPI 182 IRQ_TYPE_LEVEL_LOW>;
+			interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_LOW>;
 		};
 
 		mdp_wrot: mdp_wrot@14005000 {
 			compatible = "mediatek,mt8167-mdp_wrot";
 			reg = <0 0x14005000 0 0x1000>;
-			interrupts = <GIC_SPI 183 IRQ_TYPE_LEVEL_LOW>;
+			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_LOW>;
 		};
 
 		mdp_tdshp: mdp_tdshp@14006000 {
 			compatible = "mediatek,mt8167-mdp_tdshp0";
 			reg = <0 0x14006000 0 0x1000>;
-			interrupts = <GIC_SPI 181 IRQ_TYPE_LEVEL_LOW>;
+			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
 		};
 
 		dispsys: mt8167-dispsys {
