@@ -32,6 +32,8 @@ static unsigned int get_top_cg_mask(unsigned int cg_type)
 		return AUD_TCON0_PDN_22M;
 	case MT8167_AFE_CG_24M:
 		return AUD_TCON0_PDN_24M;
+	case MT8167_AFE_CG_INTDIR_CK:
+		return AUD_TCON0_PDN_INTDIR_CK;
 	case MT8167_AFE_CG_APLL_TUNER:
 		return AUD_TCON0_PDN_APLL_TUNER;
 	case MT8167_AFE_CG_APLL2_TUNER:
