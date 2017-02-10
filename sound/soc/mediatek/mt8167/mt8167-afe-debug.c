@@ -146,7 +146,7 @@ static ssize_t mt8167_afe_read_file(struct file *file, char __user *user_buf,
 	if (!buf)
 		return -ENOMEM;
 
-	clk_prepare_enable(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
+	mt8167_afe_enable_main_clk(afe);
 
 	for (i = 0; i < ARRAY_SIZE(afe_dump_regs); i++) {
 		if (regmap_read(afe->regmap, afe_dump_regs[i].offset, &reg_value))
@@ -157,7 +157,7 @@ static ssize_t mt8167_afe_read_file(struct file *file, char __user *user_buf,
 				       afe_dump_regs[i].name, reg_value);
 	}
 
-	clk_disable_unprepare(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
+	mt8167_afe_disable_main_clk(afe);
 
 	ret = simple_read_from_buffer(user_buf, count, pos, buf, n);
 
@@ -223,7 +223,7 @@ static ssize_t mt8167_afe_hdmi_read_file(struct file *file, char __user *user_bu
 	if (!buf)
 		return -ENOMEM;
 
-	clk_prepare_enable(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
+	mt8167_afe_enable_main_clk(afe);
 
 	for (i = 0; i < ARRAY_SIZE(hdmi_dump_regs); i++) {
 		if (regmap_read(afe->regmap, hdmi_dump_regs[i].offset, &reg_value))
@@ -234,7 +234,7 @@ static ssize_t mt8167_afe_hdmi_read_file(struct file *file, char __user *user_bu
 				       hdmi_dump_regs[i].name, reg_value);
 	}
 
-	clk_disable_unprepare(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
+	mt8167_afe_disable_main_clk(afe);
 
 	ret = simple_read_from_buffer(user_buf, count, pos, buf, n);
 
@@ -259,7 +259,7 @@ static ssize_t mt8167_afe_tdm_in_read_file(struct file *file, char __user *user_
 	if (!buf)
 		return -ENOMEM;
 
-	clk_prepare_enable(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
+	mt8167_afe_enable_main_clk(afe);
 
 	for (i = 0; i < ARRAY_SIZE(tdmi_in_dump_regs); i++) {
 		if (regmap_read(afe->regmap, tdmi_in_dump_regs[i].offset, &reg_value))
@@ -270,7 +270,7 @@ static ssize_t mt8167_afe_tdm_in_read_file(struct file *file, char __user *user_
 				       tdmi_in_dump_regs[i].name, reg_value);
 	}
 
-	clk_disable_unprepare(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
+	mt8167_afe_disable_main_clk(afe);
 
 	ret = simple_read_from_buffer(user_buf, count, pos, buf, n);
 
