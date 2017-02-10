@@ -3327,7 +3327,9 @@ int _trigger_ovl_to_memory(disp_path_handle disp_handle, struct cmdqRecStruct *c
 
 	DISPMSG("start trigger ovl to mem --- primary, data=%d blocking=%d\n", data, blocking);
 	dpmgr_wdma_path_force_power_on();
+	dprec_logger_trigger(DPREC_LOGGER_PRIMARY_TRIGGER, 5, 3);
 	dpmgr_path_trigger(disp_handle, cmdq_handle, CMDQ_ENABLE);
+	dprec_logger_trigger(DPREC_LOGGER_PRIMARY_TRIGGER, 5, 4);
 	cmdqRecWaitNoClear(cmdq_handle, CMDQ_EVENT_DISP_WDMA0_EOF);
 
 	cmdqRecBackupUpdateSlot(cmdq_handle, pgc->rdma_buff_info, 0, mem_config.addr);
@@ -3335,11 +3337,12 @@ int _trigger_ovl_to_memory(disp_path_handle disp_handle, struct cmdqRecStruct *c
 	rdma_pitch_sec = mem_config.pitch | (mem_config.security << 30);
 	cmdqRecBackupUpdateSlot(cmdq_handle, pgc->rdma_buff_info, 1, rdma_pitch_sec);
 	cmdqRecBackupUpdateSlot(cmdq_handle, pgc->rdma_buff_info, 2, mem_config.fmt);
-
+	dprec_logger_trigger(DPREC_LOGGER_PRIMARY_TRIGGER, 5, 5);
 	if (blocking)
 		cmdqRecFlush(cmdq_handle);
 	else
 		cmdqRecFlushAsyncCallback(cmdq_handle, (CmdqAsyncFlushCB) callback, data);
+	dprec_logger_trigger(DPREC_LOGGER_PRIMARY_TRIGGER, 5, 6);
 	cmdqRecReset(cmdq_handle);
 	cmdqRecWait(cmdq_handle, CMDQ_EVENT_DISP_WDMA0_EOF);
 	/* mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger, MMPROFILE_FLAG_PULSE, 0, data); */
@@ -3375,7 +3378,7 @@ int _trigger_ovl_to_memory_mirror(disp_path_handle disp_handle, struct cmdqRecSt
 	cmdqRecFlushAsyncCallback(cmdq_handle, (CmdqAsyncFlushCB) callback, data);
 	cmdqRecReset(cmdq_handle);
 	cmdqRecWait(cmdq_handle, CMDQ_EVENT_DISP_WDMA0_EOF);
-	mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger, MMPROFILE_FLAG_PULSE, 0, data);
+	/* mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger, MMPROFILE_FLAG_PULSE, 0, data); */
 
 	return 0;
 }
@@ -4692,6 +4695,7 @@ static int _ovl_ext_fence_release_callback(uint32_t userdata)
 #endif
 	}
 
+	mmprofile_log_ex(ddp_mmp_get_events()->session_release, MMPROFILE_FLAG_END, 0, 0);
 	return ret;
 }
 
@@ -4703,7 +4707,7 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 	unsigned int dsi_state[10];
 	unsigned int rdma_state[50];
 
-	mmprofile_log_ex(ddp_mmp_get_events()->session_release, MMPROFILE_FLAG_START, 1, userdata);
+	mmprofile_log_ex(ddp_mmp_get_events()->session_release, MMPROFILE_FLAG_START, 0, userdata);
 
 	DISPMSG("primary ovl->wdma frame done\n");
 
@@ -4822,6 +4826,8 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 		}
 	}
 #endif
+
+	mmprofile_log_ex(ddp_mmp_get_events()->session_release, MMPROFILE_FLAG_END, 0, 0);
 
 	return ret;
 }
@@ -6350,8 +6356,10 @@ static bool is_multipass_trigger;
 
 int primary_display_merge_session_cmd(struct disp_session_config *config)
 {
+#ifdef CONFIG_ALL_IN_TRIGGER_STAGE
 	struct disp_session_input_config *session_input;
 	struct disp_mem_output_config *primary_output;
+#endif
 	unsigned int output_type = config->dc_type;
 
 	if (output_type == DISP_OUTPUT_UNKNOWN)
@@ -6489,6 +6497,7 @@ int primary_display_trigger(int blocking, void *callback, unsigned int userdata)
 #endif
 	dprec_logger_start(DPREC_LOGGER_PRIMARY_TRIGGER, pgc->session_mode, pgc->dc_type);
 	primary_display_fps_update();
+	dprec_logger_trigger(DPREC_LOGGER_PRIMARY_TRIGGER, 5, 0);
 
 	if (pgc->session_mode == DISP_SESSION_DIRECT_LINK_MODE) {
 		_trigger_display_interface(blocking, _ovl_fence_release_callback,
@@ -6538,8 +6547,10 @@ int primary_display_trigger(int blocking, void *callback, unsigned int userdata)
 			decouple_wdma_config.dstAddress = writing_mva;
 			mem_config.addr = writing_mva;
 			mem_config.fmt = decouple_wdma_config.outputFormat;
+			dprec_logger_trigger(DPREC_LOGGER_PRIMARY_TRIGGER, 5, 1);
 			_config_wdma_output(&decouple_wdma_config, pgc->ovl2mem_path_handle,
 					    pgc->cmdq_handle_ovl1to2_config);
+			dprec_logger_trigger(DPREC_LOGGER_PRIMARY_TRIGGER, 5, 2);
 			mmprofile_log_ex(ddp_mmp_get_events()->primary_wdma_config,
 				       MMPROFILE_FLAG_PULSE, pgc->dc_buf_id, writing_mva);
 			/*

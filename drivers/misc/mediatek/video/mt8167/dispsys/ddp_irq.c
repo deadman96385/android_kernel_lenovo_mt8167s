@@ -295,6 +295,9 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 	unsigned int index = 0;
 	unsigned int mutexID = 0;
 	unsigned long reg_temp_val = 0;
+	unsigned int roi;
+	static bool ovl2wdma_status;
+	static bool rdma_status[2];
 
 	DDPDBG("disp_irq_handler, irq=%d, module=%s\n", irq, disp_irq_module(irq));
 	mmprofile_log_ex(ddp_mmp_get_events()->DDP_IRQ, MMPROFILE_FLAG_START, irq, 0);
@@ -316,6 +319,7 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 		index = (irq == dispsys_irq[DISP_REG_OVL0]) ? 0 : 1;
 		module = (irq == dispsys_irq[DISP_REG_OVL0]) ? DISP_MODULE_OVL0 : DISP_MODULE_OVL1;
 		reg_val = DISP_REG_GET(DISP_REG_OVL_INTSTA + index * DISP_OVL_INDEX_OFFSET);
+		roi = DISP_REG_GET(DISP_REG_OVL_ROI_SIZE);
 		if (reg_val & (1 << 1)) {
 			unsigned int i = 0;
 
@@ -339,8 +343,18 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 								DISP_OVL_INDEX_OFFSET + i * 0x20), 0);
 				}
 			}
+			if (ovl2wdma_status) {
+				mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger,
+							MMPROFILE_FLAG_END, 0, roi);
+				ovl2wdma_status = false;
+			}
 		}
 		if (reg_val & (1 << 2)) {
+			if (ovl2wdma_status) {
+				mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger,
+							MMPROFILE_FLAG_END, 0, roi);
+				ovl2wdma_status = false;
+			}
 			/* DDPERR("IRQ: OVL%d frame underrun! cnt=%d\n",index, cnt_ovl_underflow[index]++); */
 			/* disp_irq_log_module |= 1<<module; */
 		}
@@ -418,21 +432,34 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 		     dispsys_irq[DISP_REG_WDMA0]) ? DISP_MODULE_WDMA0 : DISP_MODULE_WDMA1;
 		reg_val =
 		    DISP_REG_GET(DISP_REG_WDMA_INTSTA + index * DISP_WDMA_INDEX_OFFSET);
+		roi = DISP_REG_GET(DISP_REG_WDMA_SRC_SIZE);
 		if (reg_val & (1 << 0)) {
 			DDPIRQ("IRQ: WDMA%d frame done! (cnt%d)\n", index, cnt_wdma_framedone[index]++);
 
-			mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger,
-							MMPROFILE_FLAG_END, 0, DISP_REG_GET(DISP_REG_WDMA_SRC_SIZE));
+			if (ovl2wdma_status) {
+				mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger,
+							MMPROFILE_FLAG_END, 0, roi);
+				ovl2wdma_status = false;
+			}
 		}
 
 		if (reg_val & (1 << 1)) {
 			DDPERR("IRQ: WDMA%d underrun! cnt=%d, src_size(0x%x)\n", index,
-			       cnt_wdma_underflow[index]++, DISP_REG_GET(DISP_REG_WDMA_SRC_SIZE));
+			       cnt_wdma_underflow[index]++, roi);
 			disp_irq_log_module |= 1 << module;
+			if (ovl2wdma_status) {
+				mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger,
+							MMPROFILE_FLAG_PULSE, 0, 0);
+				mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger,
+							MMPROFILE_FLAG_END, 1, roi);
+				ovl2wdma_status = false;
+			}
 		}
-		if (reg_val & (1 << 2))
-			DDPERR("IRQ: WDMA%d FIFO full!, src_size(0x%x)\n", index,
-					DISP_REG_GET(DISP_REG_WDMA_SRC_SIZE));
+		if (reg_val & (1 << 2)) {
+			DDPERR("IRQ: WDMA%d FIFO full!, src_size(0x%x)\n", index, roi);
+			mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger,
+							MMPROFILE_FLAG_PULSE, 0, roi);
+		}
 		/* clear intr */
 		DISP_CPU_REG_SET(DISP_REG_WDMA_INTSTA + index * DISP_WDMA_INDEX_OFFSET,
 				 ~reg_val);
@@ -455,10 +482,24 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 		if (reg_val & (1 << 0))
 			DDPIRQ("IRQ: RDMA%d reg update done!\n", index);
 
+		if (reg_val & (1 << 2)) {
+			if (rdma_status[index]) {
+				mmprofile_log_ex(ddp_mmp_get_events()->SCREEN_UPDATE[index],
+				       MMPROFILE_FLAG_END, reg_val, 0);
+				rdma_status[index] = false;
+			}
+			rdma_end_time[index] = sched_clock();
+			DDPIRQ("IRQ: RDMA%d frame done!\n", index);
+			/* rdma_done_irq_cnt[index] ++; */
+			rdma_done_irq_cnt[index] = rdma_start_irq_cnt[index];
+		}
 		if (reg_val & (1 << 1)) {
-			mmprofile_log_ex(ddp_mmp_get_events()->SCREEN_UPDATE[index],
+			if (!rdma_status[index]) {
+				mmprofile_log_ex(ddp_mmp_get_events()->SCREEN_UPDATE[index],
 				       MMPROFILE_FLAG_START, reg_val,
 				       DISP_REG_GET(DISP_REG_RDMA_MEM_START_ADDR));
+				rdma_status[index] = true;
+			}
 
 			rdma_start_time[index] = sched_clock();
 			DDPIRQ("IRQ: RDMA%d frame start!\n", index);
@@ -476,18 +517,15 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 				DDPERR("warning: reset ovl!\n");
 			}
 		}
-		if (reg_val & (1 << 2)) {
-			mmprofile_log_ex(ddp_mmp_get_events()->SCREEN_UPDATE[index],
-				       MMPROFILE_FLAG_END, reg_val, 0);
-			rdma_end_time[index] = sched_clock();
-			DDPIRQ("IRQ: RDMA%d frame done!\n", index);
-			/* rdma_done_irq_cnt[index] ++; */
-			rdma_done_irq_cnt[index] = rdma_start_irq_cnt[index];
-		}
 		if (reg_val & (1 << 3)) {
 			DDPERR("IRQ: RDMA%d abnormal! cnt=%d\n", index,
 			       cnt_rdma_abnormal[index]++);
 			disp_irq_log_module |= 1 << module;
+			if (rdma_status[index]) {
+				mmprofile_log_ex(ddp_mmp_get_events()->SCREEN_UPDATE[index],
+				       MMPROFILE_FLAG_END, reg_val, 0);
+				rdma_status[index] = false;
+			}
 
 		}
 		if (reg_val & (1 << 4)) {
@@ -509,6 +547,11 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 #endif
 			disp_irq_log_module |= 1 << module;
 			rdma_underflow_irq_cnt[index]++;
+			if (rdma_status[index]) {
+				mmprofile_log_ex(ddp_mmp_get_events()->SCREEN_UPDATE[index],
+				       MMPROFILE_FLAG_END, reg_val, 0);
+				rdma_status[index] = false;
+			}
 		}
 		if (reg_val & (1 << 5)) {
 			DDPIRQ("IRQ: RDMA%d target line!\n", index);
@@ -528,9 +571,9 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 	} else if (irq == dispsys_irq[DISP_REG_COLOR]) {
 		;
 	} else if (irq == dispsys_irq[DISP_REG_MUTEX]) {
-		/* mutex0: perimary disp */
-		/* mutex1: sub disp */
-		/* mutex2: aal */
+		/* mutex0: rdma0 */
+		/* mutex1: ovl->wdma */
+		/* mutex2: rdma1 */
 		module = DISP_MODULE_MUTEX;
 		reg_val = DISP_REG_GET(DISP_REG_CONFIG_MUTEX_INTSTA) & 0x7C1F;
 		for (mutexID = 0; mutexID < 5; mutexID++) {
@@ -539,9 +582,11 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 				mutex_start_irq_cnt[mutexID]++;
 				mmprofile_log_ex(ddp_mmp_get_events()->MUTEX_IRQ[mutexID],
 					       MMPROFILE_FLAG_PULSE, reg_val, 0);
-				if (mutexID == 1)
+				if (mutexID == 1 && !ovl2wdma_status) {
 					mmprofile_log_ex(ddp_mmp_get_events()->ovl_trigger,
 								MMPROFILE_FLAG_START, 0, 0);
+					ovl2wdma_status = true;
+				}
 			}
 			if (reg_val & (0x1 << (mutexID + DISP_MUTEX_TOTAL))) {
 				DDPIRQ("IRQ: mutex%d eof!\n", mutexID);

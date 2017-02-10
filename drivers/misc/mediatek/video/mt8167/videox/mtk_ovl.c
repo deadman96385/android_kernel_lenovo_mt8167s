@@ -48,7 +48,7 @@
 
 #include <linux/atomic.h>
 
-static int ovl2mem_layer_num;
+static int ovl2mem_layer_num = OVL_LAYER_NUM;
 int ovl2mem_use_m4u = 1;
 int ovl2mem_use_cmdq = CMDQ_ENABLE;
 
@@ -106,8 +106,7 @@ static void _ovl2mem_path_unlock(const char *caller)
 
 void ovl2mem_setlayernum(int layer_num)
 {
-	ovl2mem_layer_num = layer_num;
-	DISPMSG("ovl2mem_setlayernum: %d\n", ovl2mem_layer_num);
+	DISPMSG("ovl2mem_layer_num: %d\n", ovl2mem_layer_num);
 }
 
 int ovl2mem_get_info(void *info)
@@ -416,33 +415,5 @@ int ovl2mem_init(unsigned int session)
 
 int ovl2mem_deinit(void)
 {
-	int ret = -1;
-
-	DISPFUNC();
-
-	if (pgc->state == 0)
-		goto Exit;
-
-	_ovl2mem_path_lock(__func__);
-
-	ovl2mem_wait_done();
-	dpmgr_path_stop(pgc->dpmgr_handle, CMDQ_DISABLE);
-	dpmgr_path_reset(pgc->dpmgr_handle, CMDQ_DISABLE);
-	dpmgr_path_deinit(pgc->dpmgr_handle, CMDQ_DISABLE);
-	dpmgr_destroy_path(pgc->dpmgr_handle, NULL);
-	cmdqRecDestroy(pgc->cmdq_handle_config);
-
-	pgc->dpmgr_handle = NULL;
-	pgc->cmdq_handle_config = NULL;
-	pgc->state = 0;
-	pgc->need_trigger_path = 0;
-	atomic_set(&g_trigger_ticket, 1);
-	atomic_set(&g_release_ticket, 1);
-	ovl2mem_layer_num = 0;
-
-	_ovl2mem_path_unlock(__func__);
-
-Exit:
-	DISPMSG("ovl2mem_deinit done\n");
-	return ret;
+	return 0;
 }

@@ -496,27 +496,27 @@ static void mmsys_config_dump_analysis(void)
 	if (/*((DISP_REG_GET(DISP_REG_CONFIG_C09) >> 7) & 0x7) == 5 &&*/
 	    ((DISP_REG_GET(DISP_REG_RDMA_SIZE_CON_0) & 0xfff) > 1200 ||
 	     (DISP_REG_GET(DISP_REG_RDMA_SIZE_CON_1) & 0xfffff) > 1920)) {
-		DDPERR("check RDMA SIZE setting:(120,192),(%d, %d)\n",
+		DDPDUMP("check RDMA SIZE setting:(120,192),(%d, %d)\n",
 		       DISP_REG_GET(DISP_REG_RDMA_SIZE_CON_0) & 0xfff,
 		       DISP_REG_GET(DISP_REG_RDMA_SIZE_CON_1) & 0xfffff);
 	} else if (/*((DISP_REG_GET(DISP_REG_CONFIG_C09) >> 8) & 0x3) == 3 &&*/
 		   ((DISP_REG_GET(DISP_REG_RDMA_SIZE_CON_0) & 0xfff) > 800 ||
 		    (DISP_REG_GET(DISP_REG_RDMA_SIZE_CON_1) & 0xfffff) > 1280)) {
-		DDPERR("check RDMA SIZE setting:(80,128),(%d, %d)\n",
+		DDPDUMP("check RDMA SIZE setting:(80,128),(%d, %d)\n",
 		       DISP_REG_GET(DISP_REG_RDMA_SIZE_CON_0) & 0xfff,
 		       DISP_REG_GET(DISP_REG_RDMA_SIZE_CON_1) & 0xfffff);
 	}
 	if (/*((DISP_REG_GET(DISP_REG_CONFIG_C10) >> 7) & 0x7) == 5 &&*/
 	    ((DISP_REG_GET(DISP_REG_OVL_ROI_SIZE + DISP_OVL_INDEX_OFFSET * 1) & 0xfff) > 1200 ||
 	     ((DISP_REG_GET(DISP_REG_OVL_ROI_SIZE + DISP_OVL_INDEX_OFFSET * 1) >> 16) & 0xfff) > 1920)) {
-		DDPERR("check OVL ROI setting:(120,192),(%d, %d)\n",
+		DDPDUMP("check OVL ROI setting:(120,192),(%d, %d)\n",
 		       DISP_REG_GET(DISP_REG_OVL_ROI_SIZE + DISP_OVL_INDEX_OFFSET * 1) & 0xfff,
 		       (DISP_REG_GET(DISP_REG_OVL_ROI_SIZE + DISP_OVL_INDEX_OFFSET * 1) >> 16) &
 		       0xfff);
 	} else if (/*((DISP_REG_GET(DISP_REG_CONFIG_C10) >> 8) & 0x3) == 3 &&*/
 		   ((DISP_REG_GET(DISP_REG_OVL_ROI_SIZE + DISP_OVL_INDEX_OFFSET * 1) & 0xfff) > 800 ||
 		   ((DISP_REG_GET(DISP_REG_OVL_ROI_SIZE + DISP_OVL_INDEX_OFFSET * 1) >> 16) & 0xfff) > 1280)) {
-		DDPERR("check OVL ROI setting:(80,128),(%d, %d)\n",
+		DDPDUMP("check OVL ROI setting:(80,128),(%d, %d)\n",
 		       DISP_REG_GET(DISP_REG_OVL_ROI_SIZE + DISP_OVL_INDEX_OFFSET * 1) & 0xfff,
 		       (DISP_REG_GET(DISP_REG_OVL_ROI_SIZE + DISP_OVL_INDEX_OFFSET * 1) >> 16) & 0xfff);
 	}
