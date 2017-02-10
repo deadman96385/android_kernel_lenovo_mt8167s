@@ -9,3 +9,4 @@ snd-soc-mt8167-mt6392-mach-objs := \
 
 obj-$(CONFIG_SND_SOC_MT8167) += snd-soc-mt8167-pcm.o
 obj-$(CONFIG_SND_SOC_MT8167_MT6392_MACH) += snd-soc-mt8167-mt6392-mach.o
+obj-$(CONFIG_SND_SOC_MT8516_P1_MACH) += mt8516-p1.o
