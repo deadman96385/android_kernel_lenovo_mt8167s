@@ -514,8 +514,8 @@ static int mt8167_codec_voice_amp_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
-/* Audio LDO (2.2V/2.8V) */
-static int mt8167_codec_aldo_event(struct snd_soc_dapm_widget *w,
+/* CODEC_CLK */
+static int mt8167_codec_clk_event(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
 	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
@@ -524,8 +524,16 @@ static int mt8167_codec_aldo_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
+		/* CLKLDO power on */
+		snd_soc_update_bits(codec, AUDIO_CODEC_CON01, BIT(20), BIT(20));
+		/* Audio Codec CLK on */
+		snd_soc_update_bits(codec, AUDIO_CODEC_CON03, BIT(30), BIT(30));
 		break;
 	case SND_SOC_DAPM_POST_PMD:
+		/* Audio Codec CLK off */
+		snd_soc_update_bits(codec, AUDIO_CODEC_CON03, BIT(30), 0x0);
+		/* CLKLDO power off */
+		snd_soc_update_bits(codec, AUDIO_CODEC_CON01, BIT(20), 0x0);
 		break;
 	default:
 		break;
@@ -1304,25 +1312,26 @@ static const struct snd_soc_dapm_widget mt8167_codec_dapm_widgets[] = {
 			mt8167_codec_sdm_tone_gen_event,
 			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
 	/* generic widgets */
-	SND_SOC_DAPM_SUPPLY_S("AU_MICBIAS0", 4,
-			AUDIO_CODEC_CON03, 17, 0, NULL, 0),
-	SND_SOC_DAPM_SUPPLY_S("AU_MICBIAS1", 4,
-			AUDIO_CODEC_CON01, 21, 0, NULL, 0),
-	/* ALDO use SND_SOC_DAPM_REGULATOR_SUPPLY() instead ? */
-	SND_SOC_DAPM_SUPPLY_S("ALDO", 1, SND_SOC_NOPM, 0, 0,
-			mt8167_codec_aldo_event,
+	SND_SOC_DAPM_SUPPLY_S("CODEC_CLK", 1, SND_SOC_NOPM, 0, 0,
+			mt8167_codec_clk_event,
 			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_SUPPLY_S("Vcm14", 2, SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_SUPPLY_S("UL_CLK", 2, AUDIO_CODEC_CON03, 21, 0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY_S("DL_CLK", 2, AUDIO_CODEC_CON04, 15, 0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY_S("Vcm14", 3, SND_SOC_NOPM, 0, 0,
 			mt8167_codec_vcm14_event,
 			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_SUPPLY_S("UL_Vref24", 3, SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_SUPPLY_S("UL_Vref24", 4, SND_SOC_NOPM, 0, 0,
 			mt8167_codec_ul_vref24_event,
 			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_SUPPLY_S("DL_Vref24", 3,
+	SND_SOC_DAPM_SUPPLY_S("DL_Vref24", 4,
 			AUDIO_CODEC_CON02, 16, 0, NULL, 0),
-	SND_SOC_DAPM_SUPPLY_S("DAC_CLK", 3, AUDIO_CODEC_CON02, 27, 0, NULL, 0),
-	SND_SOC_DAPM_SUPPLY_S("DL_VCM1", 3, AUDIO_CODEC_CON01, 13, 0, NULL, 0),
-	SND_SOC_DAPM_SUPPLY_S("DL_VCM2", 3, AUDIO_CODEC_CON02, 17, 0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY_S("DAC_CLK", 4, AUDIO_CODEC_CON02, 27, 0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY_S("DL_VCM1", 4, AUDIO_CODEC_CON01, 13, 0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY_S("DL_VCM2", 4, AUDIO_CODEC_CON02, 17, 0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY_S("AU_MICBIAS0", 5,
+			AUDIO_CODEC_CON03, 17, 0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY_S("AU_MICBIAS1", 5,
+			AUDIO_CODEC_CON01, 21, 0, NULL, 0),
 
 	/* platform domain */
 	SND_SOC_DAPM_INPUT("AU_VIN0"),
@@ -1341,8 +1350,11 @@ static const struct snd_soc_dapm_widget mt8167_codec_dapm_widgets[] = {
 
 static const struct snd_soc_dapm_route mt8167_codec_dapm_routes[] = {
 	/* Power */
-	{"AIF TX", NULL, "ALDO"},
-	{"AIF RX", NULL, "ALDO"},
+	{"AIF TX", NULL, "CODEC_CLK"},
+	{"AIF RX", NULL, "CODEC_CLK"},
+
+	{"AIF TX", NULL, "UL_CLK"},
+	{"AIF RX", NULL, "DL_CLK"},
 
 	/* DL to UL loopback */
 	{"AIF DL_UL loopback", "Switch", "AIF RX"},
@@ -1823,7 +1835,7 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 /* TODO:
  * before access registers,
  * need to power on
- *  1) AVDD22_AUDIO/AVDD28_AUDIO (mt8167_codec_aldo_event)
+ *  1) AVDD22_AUDIO/AVDD28_AUDIO
  *  2) intbus clock (f_faud_intbus_aud_ck)
  */
 static int mt8167_codec_probe(struct snd_soc_codec *codec)
