@@ -294,7 +294,6 @@ static IMG_VOID mtk_mfg_disable_clock(IMG_BOOL bForce)
 	/* Disable(gated) mfg clock */
 	mtk_mfg_set_clock_gating(mfg_base->reg_base);
 
-
 	/* Disable and unprepare mfg top clock */
 	for (i = MAX_TOP_MFG_CLK - 1; i >= 0; i--)
 		MTKCLK_disable_unprepare(mfg_base->top_clk[i]);
@@ -1366,6 +1365,15 @@ int MTKRGXDeviceInit(void *pvOSDevice)
 	return 0;
 }
 
+void MTKDisablePowerDomain(void)
+{
+	if (sMFG2DDev)
+		pm_runtime_put_sync(&sMFG2DDev->dev);
+
+	if (sMFGASYNCDev)
+		pm_runtime_put_sync(&sMFGASYNCDev->dev);
+}
+
 bool mt_gpucore_ready(void)
 {
 	return (bCoreinitSucceeded == IMG_TRUE);
@@ -1440,6 +1448,11 @@ static int __init mtk_mfg_async_init(void)
 		return ret;
 	}
 
+	if (sMFGASYNCDev)
+		pm_runtime_get_sync(&sMFGASYNCDev->dev);
+	else
+		pr_err("mtk_mfg_async_init enable async power domain failed\n");
+
 	return ret;
 }
 subsys_initcall(mtk_mfg_async_init);
@@ -1487,6 +1500,11 @@ static int __init mtk_mfg_2d_init(void)
 		pr_err("Failed to register mfg async driver\n");
 		return ret;
 	}
+
+	if (sMFG2DDev)
+		pm_runtime_get_sync(&sMFG2DDev->dev);
+	else
+		pr_err("mtk_mfg_2d_init enable power domain failed\n");
 
 	return ret;
 }

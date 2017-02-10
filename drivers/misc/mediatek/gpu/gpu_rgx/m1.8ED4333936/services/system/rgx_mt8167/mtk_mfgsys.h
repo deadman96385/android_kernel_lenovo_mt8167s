@@ -44,6 +44,8 @@ struct mtk_mfg_base {
 PVRSRV_ERROR MTKMFGSystemInit(void);
 
 void MTKMFGSystemDeInit(void);
+void MTKDisablePowerDomain(void);
+
 
 void MTKMFGEnableDVFSTimer(bool bEnable);
 

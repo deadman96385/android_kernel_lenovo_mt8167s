@@ -207,6 +207,12 @@ struct file *LinuxFileFromConnection(CONNECTION_DATA *psConnection)
 	return psEnvConnection->psFile;
 }
 
+void MTKCommonDisablePowerDomain(void)
+{
+	MTKDisablePowerDomain();
+}
+
+
 /**************************************************************************/ /*!
 @Function     PVRSRVCommonDriverInit
 @Description  Common one time driver initialisation

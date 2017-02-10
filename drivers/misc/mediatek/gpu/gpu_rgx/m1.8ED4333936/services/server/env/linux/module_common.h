@@ -51,6 +51,8 @@ struct drm_file;
 
 int PVRSRVCommonDriverInit(void);
 void PVRSRVCommonDriverDeinit(void);
+void MTKCommonDisablePowerDomain(void);
+
 
 int PVRSRVCommonDeviceInit(struct _PVRSRV_DEVICE_NODE_ *psDeviceNode);
 void PVRSRVCommonDeviceDeinit(struct _PVRSRV_DEVICE_NODE_ *psDeviceNode);
