@@ -1063,7 +1063,7 @@
 			compatible = "mediatek,mt8167-ispsys";
 			reg = <0 0x15004000 0 0x9000>,	/* ISP_ADDR */
 			      <0 0x15000000 0 0x10000>,	/* IMGSYS_CONFIG_ADDR */
-			      <0 0x10011800 0 0x3000>;	/* MIPI_ANA_ADDR */
+			      <0 0x10011000 0 0x3000>;	/* MIPI_ANA_ADDR:0x10011800 for PAGE aligned */
 
 			interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_LOW>, /* CAM0 */
 				     <GIC_SPI 183 IRQ_TYPE_LEVEL_LOW>; /* SENINF */
