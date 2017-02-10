@@ -139,8 +139,33 @@ static DEVICE_ATTR(pmic_access, 0664, show_pmic_access, store_pmic_access);	/* 6
 
 void PMIC_INIT_SETTING_V1(void)
 {
-	/* to be do */
-	/* put init setting from DE/SA */
+	/* do in preloader */
+}
+
+static void pmic_low_power_setting(void)
+{
+	unsigned int ret = 0;
+
+	ret = pmic_config_interface(0x4E, 0x1, 0x1, 5); /* [5:5]: STRUP_AUXADC_RSTB_SW; */
+	ret = pmic_config_interface(0x4E, 0x1, 0x1, 7); /* [7:7]: STRUP_AUXADC_RSTB_SEL; */
+	ret = pmic_config_interface(0x404, 0x1, 0x1, 0); /* [0:0]: VAUD22_LP_SEL; */
+	ret = pmic_config_interface(0x424, 0x1, 0x1, 0); /* [0:0]: VAUD28_LP_SEL; */
+	ret = pmic_config_interface(0x428, 0x1, 0x1, 0); /* [0:0]: VADC18_LP_SEL; */
+	ret = pmic_config_interface(0x500, 0x1, 0x1, 0); /* [0:0]: VIO28_LP_SEL; */
+	ret = pmic_config_interface(0x502, 0x1, 0x1, 0); /* [0:0]: VUSB_LP_SEL; */
+	ret = pmic_config_interface(0x552, 0x1, 0x1, 0); /* [0:0]: VM_LP_SEL; */
+	ret = pmic_config_interface(0x556, 0x1, 0x1, 0); /* [0:0]: VIO18_LP_SEL; */
+	ret = pmic_config_interface(0x562, 0x1, 0x1, 0); /* [0:0]: VM25_LP_SEL; */
+	ret = pmic_config_interface(0x738, 0x0, 0x1, 15); /* [15:15]: AUXADC_CK_AON; */
+	ret = pmic_config_interface(0x75C, 0x0, 0x1, 14); /* [14:14]: AUXADC_START_SHADE_EN */
+	ret = pmic_config_interface(0x102, 0x0, 0x1, 1); /* [1:1]: RG_CLKSQ_EN; */
+
+#ifndef CONFIG_USB_C_SWITCH_MT6392
+	ret = pmic_config_interface(0x10E, 0x1, 0x1, 8); /* [8:8]: RG_TYPE_C_CSR_CK_PDN; */
+	ret = pmic_config_interface(0x10E, 0x1, 0x1, 9); /* [9:9]: RG_TYPE_C_CC_CK_PDN; */
+#endif
+
+	pr_notice("[Power/PMIC] low power setting done...\n");
 }
 
 void upmu_set_vcn35_on_ctrl_bt(unsigned int val)
@@ -234,6 +259,9 @@ static int mt6392_pmic_probe(struct platform_device *dev)
 
 	/* pmic initial setting */
 	PMIC_INIT_SETTING_V1();
+
+	/* pmic low power setting */
+	pmic_low_power_setting();
 
 	device_create_file(&(dev->dev), &dev_attr_pmic_access);
 	return 0;
