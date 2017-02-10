@@ -186,6 +186,9 @@
 #define INVALID_SLEW_RATE	(0)
 /* #define GPU_DVFS_PMIC_SETTLE_TIME (40) // us */
 
+/* register val -> mV */
+#define GPU_VOLT_TO_MV(volt)            (((volt)*625)/100+700)
+
 #define PMIC_BUCK_VGPU_VOSEL_ON		MT6351_PMIC_BUCK_VGPU_VOSEL_ON
 #define PMIC_ADDR_VGPU_VOSEL_ON		MT6351_PMIC_BUCK_VGPU_VOSEL_ON_ADDR
 #define PMIC_ADDR_VGPU_VOSEL_ON_MASK	MT6351_PMIC_BUCK_VGPU_VOSEL_ON_MASK
@@ -884,11 +887,10 @@ EXPORT_SYMBOL(mt_gpufreq_restore_default_volt);
 /* Set voltage because PTP-OD modified voltage table by PMIC wrapper */
 unsigned int mt_gpufreq_update_volt(unsigned int pmic_volt[], unsigned int array_size)
 {
-#if 0
 	int i;			/* , idx; */
 	/* unsigned long flags; */
 	unsigned volt = 0;
-#endif
+
 	if (mt_gpufreq_ready == false) {
 		gpufreq_warn("@%s: GPU DVFS not ready!\n", __func__);
 		return DRIVER_NOT_READY;
@@ -900,18 +902,17 @@ unsigned int mt_gpufreq_update_volt(unsigned int pmic_volt[], unsigned int array
 	}
 
 	mutex_lock(&mt_gpufreq_lock);
-#if 0
 	for (i = 0; i < array_size; i++) {
-	/*  mt6799: FIX-ME
-	 *  mt_gpufreq_pmic_wrap_to_volt for ISL91302a
-	 */
-	/* CJ Fix me, need to ask the wrap function*/
-		volt = mt_gpufreq_pmic_wrap_to_volt(pmic_volt[i]);
-		mt_gpufreqs[i].gpufreq_volt = volt;
-		gpufreq_dbg("@%s: mt_gpufreqs[%d].gpufreq_volt = %x\n", __func__, i,
-				mt_gpufreqs[i].gpufreq_volt);
+		volt = GPU_VOLT_TO_MV(pmic_volt[i]);
+		if ((volt > 95000) && (volt < 130000)) {	/* between 950mv~1300mv */
+			mt_gpufreqs[i].gpufreq_volt = volt;
+			gpufreq_dbg("@%s: mt_gpufreqs[%d].gpufreq_volt = %x\n", __func__, i,
+					mt_gpufreqs[i].gpufreq_volt);
+		} else {
+			gpufreq_err("@%s: index[%d]._volt = %x Over-Boundary\n", __func__, i, volt);
+		}
 	}
-#endif
+
 
 #ifndef MTK_GPU_SPM
 	mt_gpufreq_volt_switch(g_cur_gpu_volt, mt_gpufreqs[g_cur_gpu_OPPidx].gpufreq_volt);
