@@ -283,6 +283,8 @@ static IMG_VOID mtk_mfg_enable_clock(void)
 
 	/* Enable(un-gated) mfg clock */
 	mtk_mfg_clr_clock_gating(mfg_base->reg_base);
+	/* enlarge the sync fifo, to avoid that CPU accesses GPU register fail problem */
+	writel((readl(mfg_base->reg_base + 0x1c) | 0xf0), mfg_base->reg_base + 0x1c);
 }
 
 
