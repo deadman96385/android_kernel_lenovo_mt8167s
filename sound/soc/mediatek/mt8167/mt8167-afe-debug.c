@@ -27,7 +27,7 @@
 
 #ifdef CONFIG_DEBUG_FS
 
-struct mtk_afe_debug_fs {
+struct mt8167_afe_debug_fs {
 	char *fs_name;
 	const struct file_operations *fops;
 };
@@ -123,7 +123,7 @@ static const struct afe_dump_reg_attr tdmi_in_dump_regs[] = {
 	DUMP_REG_ENTRY(AFE_MEMIF_PBUF2_SIZE),
 };
 
-static ssize_t mtk_afe_read_file(struct file *file, char __user *user_buf,
+static ssize_t mt8167_afe_read_file(struct file *file, char __user *user_buf,
 	size_t count, loff_t *pos)
 {
 	struct mtk_afe *afe = file->private_data;
@@ -141,7 +141,7 @@ static ssize_t mtk_afe_read_file(struct file *file, char __user *user_buf,
 
 	pm_runtime_get_sync(afe->dev);
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	for (i = 0; i < ARRAY_SIZE(afe_dump_regs); i++) {
 		if (regmap_read(afe->regmap, afe_dump_regs[i].offset, &reg_value))
@@ -155,7 +155,7 @@ static ssize_t mtk_afe_read_file(struct file *file, char __user *user_buf,
 	n += scnprintf(buf + n, count - n, "adda_afe_on_ref_cnt = %d\n",
 		       afe->adda_afe_on_ref_cnt);
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 
 	pm_runtime_put(afe->dev);
 
@@ -166,7 +166,7 @@ static ssize_t mtk_afe_read_file(struct file *file, char __user *user_buf,
 	return ret;
 }
 
-static ssize_t mtk_afe_write_file(struct file *file, const char __user *user_buf,
+static ssize_t mt8167_afe_write_file(struct file *file, const char __user *user_buf,
 	size_t count, loff_t *pos)
 {
 	char buf[64];
@@ -200,18 +200,18 @@ static ssize_t mtk_afe_write_file(struct file *file, const char __user *user_buf
 
 	pm_runtime_get_sync(afe->dev);
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	regmap_write(afe->regmap, reg, value);
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 
 	pm_runtime_put(afe->dev);
 
 	return buf_size;
 }
 
-static ssize_t mtk_afe_hdmi_read_file(struct file *file, char __user *user_buf,
+static ssize_t mt8167_afe_hdmi_read_file(struct file *file, char __user *user_buf,
 				size_t count, loff_t *pos)
 {
 	struct mtk_afe *afe = file->private_data;
@@ -229,7 +229,7 @@ static ssize_t mtk_afe_hdmi_read_file(struct file *file, char __user *user_buf,
 
 	pm_runtime_get_sync(afe->dev);
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	for (i = 0; i < ARRAY_SIZE(hdmi_dump_regs); i++) {
 		if (regmap_read(afe->regmap, hdmi_dump_regs[i].offset, &reg_value))
@@ -240,7 +240,7 @@ static ssize_t mtk_afe_hdmi_read_file(struct file *file, char __user *user_buf,
 				       hdmi_dump_regs[i].name, reg_value);
 	}
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 
 	pm_runtime_put(afe->dev);
 
@@ -251,7 +251,7 @@ static ssize_t mtk_afe_hdmi_read_file(struct file *file, char __user *user_buf,
 	return ret;
 }
 
-static ssize_t mtk_afe_tdm_in_read_file(struct file *file, char __user *user_buf,
+static ssize_t mt8167_afe_tdm_in_read_file(struct file *file, char __user *user_buf,
 				size_t count, loff_t *pos)
 {
 	struct mtk_afe *afe = file->private_data;
@@ -269,7 +269,7 @@ static ssize_t mtk_afe_tdm_in_read_file(struct file *file, char __user *user_buf
 
 	pm_runtime_get_sync(afe->dev);
 
-	mtk_afe_enable_main_clk(afe);
+	mt8167_afe_enable_main_clk(afe);
 
 	for (i = 0; i < ARRAY_SIZE(tdmi_in_dump_regs); i++) {
 		if (regmap_read(afe->regmap, tdmi_in_dump_regs[i].offset, &reg_value))
@@ -280,7 +280,7 @@ static ssize_t mtk_afe_tdm_in_read_file(struct file *file, char __user *user_buf
 				       tdmi_in_dump_regs[i].name, reg_value);
 	}
 
-	mtk_afe_disable_main_clk(afe);
+	mt8167_afe_disable_main_clk(afe);
 
 	pm_runtime_put(afe->dev);
 
@@ -291,34 +291,34 @@ static ssize_t mtk_afe_tdm_in_read_file(struct file *file, char __user *user_buf
 	return ret;
 }
 
-static const struct file_operations mtk_afe_fops = {
+static const struct file_operations mt8167_afe_fops = {
 	.open = simple_open,
-	.read = mtk_afe_read_file,
-	.write = mtk_afe_write_file,
+	.read = mt8167_afe_read_file,
+	.write = mt8167_afe_write_file,
 	.llseek = default_llseek,
 };
 
-static const struct file_operations mtk_afe_hdmi_fops = {
+static const struct file_operations mt8167_afe_hdmi_fops = {
 	.open = simple_open,
-	.read = mtk_afe_hdmi_read_file,
+	.read = mt8167_afe_hdmi_read_file,
 	.llseek = default_llseek,
 };
 
-static const struct file_operations mtk_afe_tdm_in_fops = {
+static const struct file_operations mt8167_afe_tdm_in_fops = {
 	.open = simple_open,
-	.read = mtk_afe_tdm_in_read_file,
+	.read = mt8167_afe_tdm_in_read_file,
 	.llseek = default_llseek,
 };
 
-static const struct mtk_afe_debug_fs afe_debug_fs[] = {
-	{"mtksocaudio", &mtk_afe_fops},
-	{"mtksochdmiaudio", &mtk_afe_hdmi_fops},
-	{"mtksoctdminaudio", &mtk_afe_tdm_in_fops},
+static const struct mt8167_afe_debug_fs afe_debug_fs[] = {
+	{"mtksocaudio", &mt8167_afe_fops},
+	{"mtksochdmiaudio", &mt8167_afe_hdmi_fops},
+	{"mtksoctdminaudio", &mt8167_afe_tdm_in_fops},
 };
 
 #endif
 
-void mtk_afe_init_debugfs(struct mtk_afe *afe)
+void mt8167_afe_init_debugfs(struct mtk_afe *afe)
 {
 #ifdef CONFIG_DEBUG_FS
 	int i;
@@ -334,12 +334,12 @@ void mtk_afe_init_debugfs(struct mtk_afe *afe)
 #endif
 }
 
-void mtk_afe_cleanup_debugfs(struct mtk_afe *afe)
+void mt8167_afe_cleanup_debugfs(struct mtk_afe *afe)
 {
 #ifdef CONFIG_DEBUG_FS
 	int i;
 
-	for (i = 0; i < MTK_AFE_DEBUGFS_NUM; i++)
+	for (i = 0; i < MT8167_AFE_DEBUGFS_NUM; i++)
 		debugfs_remove(afe->debugfs_dentry[i]);
 #endif
 }

@@ -1,5 +1,5 @@
 /*
- * mtk_afe_regs.h  --  Mediatek audio register definitions
+ * mt8167_afe_regs.h  --  Mediatek audio register definitions
  *
  * Copyright (c) 2016 MediaTek Inc.
  *
@@ -13,8 +13,8 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _MTK_AFE_REGS_H_
-#define _MTK_AFE_REGS_H_
+#ifndef _MT8167_AFE_REGS_H_
+#define _MT8167_AFE_REGS_H_
 
 #include <linux/bitops.h>
 

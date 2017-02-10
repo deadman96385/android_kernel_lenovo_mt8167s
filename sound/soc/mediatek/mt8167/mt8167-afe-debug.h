@@ -20,8 +20,8 @@
 struct mtk_afe;
 
 
-void mtk_afe_init_debugfs(struct mtk_afe *afe);
+void mt8167_afe_init_debugfs(struct mtk_afe *afe);
 
-void mtk_afe_cleanup_debugfs(struct mtk_afe *afe);
+void mt8167_afe_cleanup_debugfs(struct mtk_afe *afe);
 
 #endif

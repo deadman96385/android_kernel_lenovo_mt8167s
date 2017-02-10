@@ -24,27 +24,27 @@
 static unsigned int get_top_cg_mask(unsigned int cg_type)
 {
 	switch (cg_type) {
-	case MTK_AFE_CG_AFE:
+	case MT8167_AFE_CG_AFE:
 		return AUD_TCON0_PDN_AFE;
-	case MTK_AFE_CG_I2S:
+	case MT8167_AFE_CG_I2S:
 		return AUD_TCON0_PDN_I2S;
-	case MTK_AFE_CG_22M:
+	case MT8167_AFE_CG_22M:
 		return AUD_TCON0_PDN_22M;
-	case MTK_AFE_CG_24M:
+	case MT8167_AFE_CG_24M:
 		return AUD_TCON0_PDN_24M;
-	case MTK_AFE_CG_APLL_TUNER:
+	case MT8167_AFE_CG_APLL_TUNER:
 		return AUD_TCON0_PDN_APLL_TUNER;
-	case MTK_AFE_CG_APLL2_TUNER:
+	case MT8167_AFE_CG_APLL2_TUNER:
 		return AUD_TCON0_PDN_APLL2_TUNER;
-	case MTK_AFE_CG_HDMI:
+	case MT8167_AFE_CG_HDMI:
 		return AUD_TCON0_PDN_HDMI;
-	case MTK_AFE_CG_SPDIF:
+	case MT8167_AFE_CG_SPDIF:
 		return AUD_TCON0_PDN_SPDF;
-	case MTK_AFE_CG_ADC:
+	case MT8167_AFE_CG_ADC:
 		return AUD_TCON0_PDN_ADC;
-	case MTK_AFE_CG_DAC:
+	case MT8167_AFE_CG_DAC:
 		return AUD_TCON0_PDN_DAC;
-	case MTK_AFE_CG_DAC_PREDIS:
+	case MT8167_AFE_CG_DAC_PREDIS:
 		return AUD_TCON0_PDN_DAC_PREDIS;
 	default:
 		return 0;
@@ -52,7 +52,7 @@ static unsigned int get_top_cg_mask(unsigned int cg_type)
 }
 
 
-int mtk_afe_enable_top_cg(struct mtk_afe *afe, unsigned int cg_type)
+int mt8167_afe_enable_top_cg(struct mtk_afe *afe, unsigned int cg_type)
 {
 	unsigned int mask = get_top_cg_mask(cg_type);
 	unsigned long flags;
@@ -68,7 +68,7 @@ int mtk_afe_enable_top_cg(struct mtk_afe *afe, unsigned int cg_type)
 	return 0;
 }
 
-int mtk_afe_disable_top_cg(struct mtk_afe *afe, unsigned cg_type)
+int mt8167_afe_disable_top_cg(struct mtk_afe *afe, unsigned cg_type)
 {
 	unsigned int mask = get_top_cg_mask(cg_type);
 	unsigned long flags;
@@ -86,7 +86,7 @@ int mtk_afe_disable_top_cg(struct mtk_afe *afe, unsigned cg_type)
 	return 0;
 }
 
-int mtk_afe_enable_main_clk(struct mtk_afe *afe)
+int mt8167_afe_enable_main_clk(struct mtk_afe *afe)
 {
 #if defined(COMMON_CLOCK_FRAMEWORK_API)
 	int ret;
@@ -107,7 +107,7 @@ int mtk_afe_enable_main_clk(struct mtk_afe *afe)
 	/* clk_prepare_enable(afe->clocks[MTK_CLK_BCK1]); */
 #endif
 
-	mtk_afe_enable_top_cg(afe, MTK_AFE_CG_AFE);
+	mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_AFE);
 
 	return 0;
 
@@ -123,9 +123,9 @@ err_infra:
 #endif
 }
 
-int mtk_afe_disable_main_clk(struct mtk_afe *afe)
+int mt8167_afe_disable_main_clk(struct mtk_afe *afe)
 {
-	mtk_afe_disable_top_cg(afe, MTK_AFE_CG_AFE);
+	mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_AFE);
 #if defined(COMMON_CLOCK_FRAMEWORK_API)
 	/* clk_disable_unprepare(afe->clocks[MTK_CLK_BCK0]); */
 	/* clk_disable_unprepare(afe->clocks[MTK_CLK_BCK1]); */
@@ -136,7 +136,7 @@ int mtk_afe_disable_main_clk(struct mtk_afe *afe)
 	return 0;
 }
 
-int mtk_afe_emi_clk_on(struct mtk_afe *afe)
+int mt8167_afe_emi_clk_on(struct mtk_afe *afe)
 {
 #ifdef IDLE_TASK_DRIVER_API
 	mutex_lock(&afe->emi_clk_mutex);
@@ -150,7 +150,7 @@ int mtk_afe_emi_clk_on(struct mtk_afe *afe)
 	return 0;
 }
 
-int mtk_afe_emi_clk_off(struct mtk_afe *afe)
+int mt8167_afe_emi_clk_off(struct mtk_afe *afe)
 {
 #ifdef IDLE_TASK_DRIVER_API
 	mutex_lock(&afe->emi_clk_mutex);
@@ -166,7 +166,7 @@ int mtk_afe_emi_clk_off(struct mtk_afe *afe)
 	return 0;
 }
 
-int mtk_afe_enable_afe_on(struct mtk_afe *afe)
+int mt8167_afe_enable_afe_on(struct mtk_afe *afe)
 {
 	unsigned long flags;
 
@@ -181,7 +181,7 @@ int mtk_afe_enable_afe_on(struct mtk_afe *afe)
 	return 0;
 }
 
-int mtk_afe_disable_afe_on(struct mtk_afe *afe)
+int mt8167_afe_disable_afe_on(struct mtk_afe *afe)
 {
 	unsigned long flags;
 
