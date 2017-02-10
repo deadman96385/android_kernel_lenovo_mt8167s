@@ -908,7 +908,7 @@ static int setup_rdma_sec(enum DISP_MODULE_ENUM module, struct disp_ddp_path_con
 					       __func__, ret);
 
 				cmdqRecReset(nonsec_switch_handle);
-				_cmdq_insert_wait_frame_done_token_mira(nonsec_switch_handle);
+				cmdqRecWait(nonsec_switch_handle, pConfig->hw_mutex_id + CMDQ_EVENT_MUTEX0_STREAM_EOF);
 				cmdqRecSetSecure(nonsec_switch_handle, 1);
 
 				/*ugly work around by kzhang !!. will remove when cmdq delete disable scenario.*/
