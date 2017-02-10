@@ -21,7 +21,7 @@
 #include <sound/asound.h>
 
 #define COMMON_CLOCK_FRAMEWORK_API
-/* #define IDLE_TASK_DRIVER_API */
+#define IDLE_TASK_DRIVER_API
 #define ENABLE_AFE_APLL_TUNER
 
 

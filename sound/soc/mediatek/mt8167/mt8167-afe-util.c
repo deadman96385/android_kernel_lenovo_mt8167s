@@ -17,7 +17,8 @@
 #include "mt8167-afe-regs.h"
 #include "mt8167-afe-common.h"
 #ifdef IDLE_TASK_DRIVER_API
-#include <mt_idle.h>
+#include "mtk_idle.h"
+#define MT_CG_AUDIO_AFE (CGID(CG_AUDIO, 2))
 #endif
 #include <linux/device.h>
 
