@@ -63,7 +63,7 @@ static imgsensor_info_struct imgsensor_info = {
 	.sensor_id = GC2355_SENSOR_ID,	/* record sensor id defined in Kd_imgsensor.h */
 
 	/* .checksum_value = 0x9d1c9dad,        //checksum value for Camera Auto Test */
-	.checksum_value = 0xffd8e112,	/* checksum value for Camera Auto Test */
+	.checksum_value = 0x31fb1318,	/* checksum value for Camera Auto Test */
 
 	.pre = {
 		.pclk = 42000000,	/* record different mode's pclk */

@@ -67,7 +67,7 @@ static DEFINE_SPINLOCK(imgsensor_drv_lock);
 static imgsensor_info_struct imgsensor_info = {
 	.sensor_id = IMX219_SENSOR_ID,	/* record sensor id defined in Kd_imgsensor.h */
 
-	.checksum_value = 0x9e08861c,	/* checksum value for Camera Auto Test */
+	.checksum_value = 0x9488500d,	/* checksum value for Camera Auto Test */
 
 	.pre = {
 		.pclk = 137600000,	/* record different mode's pclk */
