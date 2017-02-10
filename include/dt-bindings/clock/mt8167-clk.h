@@ -316,7 +316,7 @@
 #define CLK_IMG_CAM_CAM			2
 #define CLK_IMG_SEN_TG			3
 #define CLK_IMG_SEN_CAM			4
-#define CLK_IMG_CG			5
+#define CLK_IMG_VENC			5
 #define CLK_IMG_NR_CLK			6
 
 /* VDECSYS */
