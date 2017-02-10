@@ -84,6 +84,8 @@
 
 	mt8167_audio_codec: mt8167_audio_codec {
 		compatible = "mediatek,mt8167-codec";
+		clocks = <&topckgen CLK_TOP_AUDIO>;
+		clock-names = "bus";
 		mediatek,afe-regmap = <&afe>;
 		mediatek,apmixedsys-regmap = <&apmixedsys>;
 		mediatek,pwrap-regmap = <&pwrap>;
