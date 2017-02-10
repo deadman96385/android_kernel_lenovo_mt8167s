@@ -17,8 +17,8 @@
 #include <linux/sysfs.h>
 #include <linux/string.h>
 
-#include "mt_spm_internal.h"
-#include "mt_sleep.h"
+#include "mtk_spm_internal.h"
+#include "mtk_sleep.h"
 
 /*
  * Macro and Inline

@@ -15,9 +15,8 @@
 #define _MT_SPM_IDLE_
 
 #include <linux/kernel.h>
-#include "mt_spm.h"
-#include "mt_spm_sleep.h"
-/* #include <mach/mt_gpt.h> */
+#include "mtk_spm.h"
+#include "mtk_spm_sleep.h"
 
 #define TAG     "SPM-Idle"
 

@@ -15,8 +15,8 @@
 #define _MT_SLEEP_
 
 #include <linux/kernel.h>
-#include "mt_spm.h"
-#include "mt_spm_sleep.h"
+#include "mtk_spm.h"
+#include "mtk_spm_sleep.h"
 
 #define WAKE_SRC_CFG_KEY            (1U << 31)
 
@@ -30,7 +30,5 @@ extern void slp_dpd_en(bool en);
 extern void slp_set_auto_suspend_wakelock(bool lock);
 extern void slp_start_auto_suspend_resume_timer(u32 sec);
 extern void slp_create_auto_suspend_resume_thread(void);
-
-extern void slp_module_init(void);
 
 #endif

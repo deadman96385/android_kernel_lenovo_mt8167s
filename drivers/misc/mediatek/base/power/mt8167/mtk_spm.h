@@ -325,12 +325,6 @@ struct twam_sig {
 
 typedef void (*twam_handler_t) (struct twam_sig *twamsig);
 
-/* check if spm firmware ready */
-extern int spm_load_firmware_status(void);
-
-/* for power management init */
-extern int spm_module_init(void);
-
 /* for ANC in talking */
 extern void spm_mainpll_on_request(const char *drv_name);
 extern void spm_mainpll_on_unrequest(const char *drv_name);

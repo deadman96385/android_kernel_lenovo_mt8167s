@@ -91,7 +91,6 @@
  * MT_CPU_DORMANT_BYPASS: (for debug only) to bypass all dormant flow.
  */
 
-int mt_cpu_dormant_init(void);
 int mt_cpu_dormant(unsigned long data);
 
 void write_cntpctl(int cntpctl);

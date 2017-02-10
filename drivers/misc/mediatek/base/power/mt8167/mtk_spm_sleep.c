@@ -22,22 +22,12 @@
 #include <linux/of_fdt.h>
 #include <asm/setup.h>
 #include <linux/lockdep.h>
-/* #include <mach/mt_cirq.h> */
-#include "mt_spm_sleep.h"
-#include "mt_cpuidle.h"
+#include <mt-plat/mtk_cirq.h>
+#include "mtk_spm_sleep.h"
+#include "mtk_cpuidle.h"
 /* #include <mach/wd_api.h> */
-/* #include <mach/eint.h> */
-/* #include "mt_cpufreq.h" */
-/* #include "mt_power_gs-v1.h" */
-/* #include <mt-plat/upmu_common.h> */
-/* #include <mt-plat/upmu_sw.h> */
-/* #include <mt-plat/upmu_hw.h> */
 
-/* #include "mach/mt_pmic_wrap.h" */
-
-/* #include <mt_i2c.h> */
-
-#include "mt_spm_internal.h"
+#include "mtk_spm_internal.h"
 
 /* for MP0,1 AXI_CONFIG */
 #include <linux/of.h>
@@ -544,7 +534,6 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	/* spm_suspend_pre_process(pwrctrl); */
 	lockdep_off();
 	spin_lock_irqsave(&__spm_lock, flags);
-
 	mt_irq_mask_all(&mask);
 	if (desc)
 		unmask_irq(desc);
