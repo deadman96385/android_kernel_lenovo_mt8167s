@@ -185,6 +185,10 @@ static int tpd_calmat_local[8]     = TPD_CALIBRATION_MATRIX;
 static int tpd_def_calmat_local[8] = TPD_CALIBRATION_MATRIX;
 #endif
 
+static struct task_struct *probe_thread;
+DECLARE_WAIT_QUEUE_HEAD(init_waiter);
+bool check_flag;
+
 #ifdef CONFIG_MTK_I2C_EXTENSION
 #ifdef GSLTP_ENABLE_I2C_DMA
 static int msg_dma_alloc(void)
@@ -917,6 +921,12 @@ static int init_chip(struct i2c_client *client)
 		GSL_LOGE("------gslX680 test_i2c error------\n");
 		return -1;
 	}
+	if (tpd_load_status == 0 && check_flag == false) {
+		GSL_LOGD("tpd_load_status = 1");
+		tpd_load_status = 1;
+		check_flag = true;
+		wake_up_interruptible(&init_waiter);
+	}
 	clr_reg(client);
 	reset_chip(client);
 	clr_reg(client);
@@ -1413,13 +1423,12 @@ static void green_mode(struct i2c_client *client, int mode)
 	}
 }
 #endif
-static int tpd_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int tpd_registration(void *client)
 {
 	int ret = 0;
 	struct device_node *node = NULL;
 
 	GSL_LOGF();
-
 	tpd_gpio_output(GTP_RST_PORT, 0);
 	msleep(100);
 
@@ -1466,51 +1475,43 @@ static int tpd_i2c_probe(struct i2c_client *client, const struct i2c_device_id *
 	}
 	disable_irq(touch_irq);
 
-	tpd_load_status = 1;
-	GSL_LOGD("tpd_load_status = 1");
-
 	thread = kthread_run(touch_event_handler, 0, TPD_DEVICE);
 	if (IS_ERR(thread)) {
 		ret = PTR_ERR(thread);
 		GSL_LOGE(TPD_DEVICE " failed to create kernel thread: %d\n", ret);
 		return ret;
 	}
-#if 0/* def SUPPORT_TP_KERNEL_CHECK */
-	tp_check_flag = ctp_factory_test();
-	GSL_LOGD("\ntp_check_flag = %x\n", tp_check_flag);
-	if (tp_check_flag == 0)
-		tp_check_flag = 1;
-	else
-		tp_check_flag = 0;
-	/* mdelay(500); */
-	/* eboda_support_tp_check_put(tp_check_flag); */
-	tpd_load_status = tp_check_flag;
-#endif
 
 #ifdef GSL_MONITOR
 	GSL_LOGD("tpd_i2c_probe () : queue gsl_monitor_workqueue\n");
-
 	INIT_DELAYED_WORK(&gsl_monitor_work, gsl_monitor_worker);
 	gsl_monitor_workqueue = create_singlethread_workqueue("gsl_monitor_workqueue");
 	queue_delayed_work(gsl_monitor_workqueue, &gsl_monitor_work, MONITOR_CYCLE_BY_REG_CHECK);
 #endif
 
 #ifdef TPD_PROC_DEBUG
-	#if 0
-		gsl_config_proc = create_proc_entry(GSL_CONFIG_PROC_FILE, 0666, NULL);
-		if (gsl_config_proc == NULL) {
-			GSL_LOGD("create_proc_entry %s failed\n", GSL_CONFIG_PROC_FILE);
-		} else {
-			gsl_config_proc->read_proc = gsl_config_read_proc;
-			gsl_config_proc->write_proc = gsl_config_write_proc;
-		}
-	#else
 	proc_create(GSL_CONFIG_PROC_FILE, 0660, NULL, &gsl_seq_fops);
-	#endif
 	gsl_proc_flag = 0;
 #endif
-	/* enable_irq(touch_irq); */
 	GSL_LOGD("tpd_i2c_probe is ok -----------------");
+
+	return 0;
+}
+static int tpd_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
+{
+	int ret = 0;
+
+	GSL_LOGF();
+
+	probe_thread = kthread_run(tpd_registration, (void *)client, "tpd_i2c_probe");
+	if (IS_ERR(probe_thread)) {
+		ret = PTR_ERR(probe_thread);
+		GSL_LOGD(TPD_DEVICE " failed to create probe thread: %d\n", ret);
+		return ret;
+	}
+	GSL_LOGD("tpd_i2c_probe start.wait_event_interruptible");
+	wait_event_interruptible_timeout(init_waiter, check_flag == true, 5 * HZ);
+	GSL_LOGD("tpd_i2c_probe end.wait_event_interruptible");
 
 	return 0;
 }
