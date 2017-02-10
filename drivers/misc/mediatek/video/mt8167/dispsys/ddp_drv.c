@@ -327,8 +327,6 @@ static const struct file_operations disp_fops = {
  * the enum disp_clk_id in case get the wrong clock.
  */
 const char *disp_clk_name[MAX_DISP_CLK_CNT] = {
-	"MMSYS_CLK_SMI_COMMON",
-	"MMSYS_CLK_SMI_LARB0",
 	"MMSYS_CLK_FAKE_ENG",
 	"MMSYS_CLK_DISP_OVL0",
 	"MMSYS_CLK_DISP_RDMA0",
@@ -602,11 +600,6 @@ static int disp_probe(struct platform_device *pdev)
 			       __FILE__, __LINE__, i, disp_clk_name[i]);
 		else {
 			switch (i) {
-			/*case DISP_MTCMOS_CLK:*/
-			case DISP0_SMI_COMMON:
-			case DISP0_SMI_LARB0:
-				ddp_clk_prepare_enable(i);
-				break;
 			default:
 				ddp_clk_prepare(i);
 				break;
