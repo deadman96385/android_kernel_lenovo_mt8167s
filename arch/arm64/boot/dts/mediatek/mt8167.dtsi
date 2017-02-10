@@ -407,8 +407,9 @@
 		hacc@1000a000 {
 			compatible = "mediatek,hacc";
 			reg = <0 0x1000a000 0 0x1000>;
-			clocks = <&infracfg CLK_INFRA_SEJ>;
-			clock-names = "main";
+			clocks = <&topckgen CLK_TOP_SEJ>,
+				 <&topckgen CLK_TOP_SEJ_13M>;
+			clock-names = "main", "second";
 		};
 
 		pwrap: pwrap@1000f000 {
