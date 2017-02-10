@@ -446,6 +446,83 @@ static int mt8167_afe_hdmi_force_clk_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int mt8167_afe_tdm_out_sgen_get(struct snd_kcontrol *kcontrol,
+				     struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
+	unsigned int val = 0;
+
+	mt8167_afe_enable_main_clk(afe);
+
+	regmap_read(afe->regmap, AFE_SINEGEN_CON_TDM, &val);
+
+	mt8167_afe_disable_main_clk(afe);
+
+	ucontrol->value.integer.value[0] = (val & AFE_SINEGEN_CON_TDM_OUT_EN);
+
+	return 0;
+}
+
+static int mt8167_afe_tdm_out_sgen_put(struct snd_kcontrol *kcontrol,
+				     struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
+
+	mt8167_afe_enable_main_clk(afe);
+
+	if (ucontrol->value.integer.value[0])
+		regmap_update_bits(afe->regmap, AFE_SINEGEN_CON_TDM,
+				   GENMASK(31, 0), 0x11071071);
+	else
+		regmap_update_bits(afe->regmap, AFE_SINEGEN_CON_TDM,
+				   GENMASK(31, 0), 0x100100);
+
+	mt8167_afe_disable_main_clk(afe);
+
+	return 0;
+}
+
+static int mt8167_afe_tdm_in_sgen_get(struct snd_kcontrol *kcontrol,
+				     struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
+	unsigned int val = 0;
+
+	mt8167_afe_enable_main_clk(afe);
+
+	regmap_read(afe->regmap, AFE_SINEGEN_CON_TDM_IN, &val);
+
+	mt8167_afe_disable_main_clk(afe);
+
+	ucontrol->value.integer.value[0] = (val & AFE_SINEGEN_CON_TDM_IN_EN);
+
+	return 0;
+}
+
+static int mt8167_afe_tdm_in_sgen_put(struct snd_kcontrol *kcontrol,
+				     struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
+
+	mt8167_afe_enable_main_clk(afe);
+
+	if (ucontrol->value.integer.value[0])
+		regmap_update_bits(afe->regmap, AFE_SINEGEN_CON_TDM_IN,
+				   GENMASK(31, 0), 0x11071071);
+	else
+		regmap_update_bits(afe->regmap, AFE_SINEGEN_CON_TDM_IN,
+				   GENMASK(31, 0), 0x100100);
+
+	mt8167_afe_disable_main_clk(afe);
+
+	return 0;
+}
+
+
 static const struct soc_enum mt8167_afe_soc_enums[] = {
 	[CTRL_SGEN_EN] = SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(sgen_func),
 				sgen_func),
@@ -472,6 +549,14 @@ static const struct snd_kcontrol_new mt8167_afe_controls[] = {
 			    0,
 			    mt8167_afe_hdmi_force_clk_get,
 			    mt8167_afe_hdmi_force_clk_put),
+	SOC_SINGLE_BOOL_EXT("TDM_Out_Sgen_Switch",
+			    0,
+			    mt8167_afe_tdm_out_sgen_get,
+			    mt8167_afe_tdm_out_sgen_put),
+	SOC_SINGLE_BOOL_EXT("TDM_In_Sgen_Switch",
+			    0,
+			    mt8167_afe_tdm_in_sgen_get,
+			    mt8167_afe_tdm_in_sgen_put),
 };
 
 
