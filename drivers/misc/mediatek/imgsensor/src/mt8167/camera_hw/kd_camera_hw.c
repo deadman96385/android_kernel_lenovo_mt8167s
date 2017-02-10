@@ -60,6 +60,29 @@ struct pinctrl_state *cam1_rst_l = NULL;
 struct pinctrl_state *cam_ldo0_h = NULL;
 struct pinctrl_state *cam_ldo0_l = NULL;
 
+static int check_pdn_rst_pin(void)
+{
+	if (camctrl == NULL
+	 || cam0_pnd_h == NULL
+	 || cam0_pnd_l == NULL
+	 || cam0_rst_h == NULL
+	 || cam0_rst_l == NULL
+	 || cam1_pnd_h == NULL
+	 || cam1_pnd_l == NULL
+	 || cam1_rst_h == NULL
+	 || cam1_rst_l == NULL
+	 /*
+	 *  not used now
+	 || cam_ldo0_h == NULL
+	 || cam_ldo0_l == NULL
+	 */
+	 ) {
+		pr_debug("%s : check pinctrl returns ERROR: NULL pin ctrl\n", __func__);
+		return 0;
+	}
+	return 1;
+}
+
 int mtkcam_gpio_init(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -140,6 +163,9 @@ int mtkcam_gpio_init(struct platform_device *pdev)
 int mtkcam_gpio_set(int PinIdx, int PwrType, int Val)
 {
 	int ret = 0;
+
+	if (!check_pdn_rst_pin())
+		return 0;
 
 	switch (PwrType) {
 	case CAMRST:

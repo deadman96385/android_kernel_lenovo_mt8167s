@@ -59,7 +59,7 @@
 #include <linux/compat.h>
 #endif
 
-#include <mt_chip.h>
+/* #include <mt_chip.h> */
 /*K.S. kernel standard*/
 #if !defined(CONFIG_MTK_LEGACY)
 #include <linux/regulator/consumer.h>
