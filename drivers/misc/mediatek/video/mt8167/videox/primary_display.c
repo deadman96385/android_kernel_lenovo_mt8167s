@@ -893,6 +893,7 @@ int primary_display_switch_mmsys_clk(int mmsys_clk_old, int mmsys_clk_new)
 #endif
 int primary_display_set_secondary_display(int add, enum DISP_SESSION_TYPE type)
 {
+	DISPMSG("primary_display_set_secondary_display, add=%d, type=%d\n", add, type);
 	if (add) {
 		if (type == DISP_SESSION_MEMORY)
 			pgc->force_on_wdma_path = 1;
@@ -1888,7 +1889,7 @@ static void _cmdq_start_trigger_loop(void)
 #ifndef MTK_FB_CMDQ_DISABLE
 	int ret = 0;
 
-	cmdqRecDumpCommand(pgc->cmdq_handle_trigger);
+	/* cmdqRecDumpCommand(pgc->cmdq_handle_trigger); */
 	/* this should be called only once because trigger loop will nevet stop */
 	ret = cmdqRecStartLoop(pgc->cmdq_handle_trigger);
 	if (!primary_display_is_video_mode()) {
@@ -1911,7 +1912,7 @@ static void _cmdq_start_trigger_loop(void)
 	if (_is_decouple_mode(pgc->session_mode))
 		cmdqCoreSetEvent(CMDQ_EVENT_DISP_WDMA0_EOF);
 
-	DISPPRINT("primary display START cmdq trigger loop finished\n");
+	DISPMSG("primary display START cmdq trigger loop finished\n");
 #endif
 }
 
@@ -1924,6 +1925,9 @@ static void _cmdq_stop_trigger_loop(void)
 	ret = cmdqRecStopLoop(pgc->cmdq_handle_trigger);
 
 	DISPCHECK("primary display STOP cmdq trigger loop finished\n");
+
+	cmdqCoreSetEvent(CMDQ_EVENT_DISP_RDMA0_EOF);
+	cmdqCoreSetEvent(CMDQ_EVENT_MUTEX0_STREAM_EOF);
 #endif
 }
 
@@ -4328,9 +4332,8 @@ unsigned int cmdqDdpClockOff(uint64_t engineFlag)
 
 unsigned int cmdqDdpDumpInfo(uint64_t engineFlag, char *pOutBuf, unsigned int bufSize)
 {
-	DISPERR("cmdq timeout:%llu\n", engineFlag);
+	DISPERR("cmdqDdpDumpInfo: engineFlag=0x%016llx\n", engineFlag);
 	primary_display_diagnose();
-	/* DISP_LOG_I("cmdqDdpDumpInfo\n"); */
 
 	if (primary_display_is_decouple_mode()) {
 		ddp_dump_analysis(DISP_MODULE_OVL0);
@@ -4339,6 +4342,7 @@ unsigned int cmdqDdpDumpInfo(uint64_t engineFlag, char *pOutBuf, unsigned int bu
 #endif
 	}
 	ddp_dump_analysis(DISP_MODULE_WDMA0);
+	ddp_dump_analysis(DISP_MODULE_RDMA0);
 
 	/* try to set event by CPU to avoid blocking auto test such as Monkey/MTBF */
 	cmdqCoreSetEvent(CMDQ_SYNC_TOKEN_STREAM_EOF);

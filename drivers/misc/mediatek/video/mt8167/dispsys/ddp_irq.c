@@ -136,7 +136,7 @@ int disp_unregister_module_irq_callback(enum DISP_MODULE_ENUM module, DDP_IRQ_CA
 		}
 	}
 	if (i == DISP_MAX_IRQ_CALLBACK) {
-		DDPERR("Try to unregister callback function with was not registered. module=%d cb=%p\n", module, cb);
+		DDPDBG("Try to unregister callback function with was not registered. module=%d cb=%p\n", module, cb);
 		return -1;
 	}
 	return 0;

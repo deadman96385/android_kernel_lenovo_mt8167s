@@ -116,6 +116,7 @@ struct disp_session_input_config *captured_session_input = _session_input[0];
 struct disp_session_input_config *cached_session_input = _session_input[1];
 struct disp_mem_output_config *captured_session_output = _session_output[0];
 struct disp_mem_output_config *cached_session_output = _session_output[1];
+static char fence_msg_buf[512];
 
 static int mtk_disp_mgr_open(struct inode *inode, struct file *file)
 {
@@ -1359,7 +1360,6 @@ static int set_primary_buffer(struct disp_session_input_config *input)
 	unsigned long dst_mva = 0;
 	unsigned int session_id = 0;
 	unsigned int mva_offset = 0;
-	char fence_msg_buf[512];
 	unsigned int fence_msg_len = 0;
 	struct disp_session_sync_info *session_info;
 
