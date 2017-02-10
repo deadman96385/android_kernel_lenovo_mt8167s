@@ -127,6 +127,7 @@ disp_path_handle ovl2mem_path_handle;
 struct task_struct *rdma_update_task;
 wait_queue_head_t rdma_update_wq;
 atomic_t rdma_update_event = ATOMIC_INIT(0);
+static DEFINE_SEMAPHORE(external_disp_mutex);
 
 static struct ext_disp_path_context *_get_context(void)
 {
@@ -167,12 +168,12 @@ void ext_disp_path_set_mode(enum EXT_DISP_PATH_MODE mode, unsigned int session)
 
 static void _ext_disp_path_lock(void)
 {
-	extd_sw_mutex_lock(NULL);	/* /(&(pgc->lock)); */
+	down(&external_disp_mutex);
 }
 
 static void _ext_disp_path_unlock(void)
 {
-	extd_sw_mutex_unlock(NULL);	/* (&(pgc->lock)); */
+	up(&external_disp_mutex);
 }
 
 static void _ext_disp_vsync_lock(unsigned int session)
@@ -1120,9 +1121,8 @@ int ext_disp_init(char *lcm_name, unsigned int session)
 
 int ext_disp_deinit(unsigned int session)
 {
-	EXT_DISP_FUNC();
-
 	_ext_disp_path_lock();
+	EXT_DISP_FUNC();
 
 	if (pgc->state == EXTD_DEINIT)
 		goto deinit_exit;
@@ -1151,9 +1151,8 @@ int ext_disp_wait_for_vsync(void *config, unsigned int session)
 	int ret = 0;
 	struct disp_session_vsync_config *c = (struct disp_session_vsync_config *) config;
 
-	EXT_DISP_FUNC();
-
 	_ext_disp_path_lock();
+	EXT_DISP_FUNC();
 	if (pgc->state == EXTD_DEINIT) {
 		_ext_disp_path_unlock();
 		msleep(20);
@@ -1181,9 +1180,8 @@ int ext_disp_suspend(unsigned int session)
 {
 	enum EXT_DISP_STATUS ret = EXT_DISP_STATUS_OK;
 
-	EXT_DISP_FUNC();
-
 	_ext_disp_path_lock();
+	EXT_DISP_FUNC();
 
 	if (pgc->state == EXTD_DEINIT || pgc->state == EXTD_SUSPEND || session != pgc->session) {
 		EXT_DISP_LOG("no need suspend, pgc->state = %d\n", pgc->state);
@@ -1223,9 +1221,8 @@ int ext_disp_resume(unsigned int session)
 {
 	enum EXT_DISP_STATUS ret = EXT_DISP_STATUS_OK;
 
-	EXT_DISP_FUNC();
-
 	_ext_disp_path_lock();
+	EXT_DISP_FUNC();
 
 	if (pgc->state != EXTD_SUSPEND) {
 		EXT_DISP_LOG("no need resume, pgc->state = %d\n", pgc->state);
@@ -1276,18 +1273,19 @@ static int ext_disp_trigger_ovl_to_memory(disp_path_handle disp_handle, struct c
 
 
 unsigned int ovl_curr_addr[EXTD_OVERLAY_CNT];
-static int _ovl_fence_release_callback(uint32_t userdata)
+static int _ovl_fence_release_callback(uint32_t block)
 {
 	int secure = 0;
 	unsigned int addr = 0;
 
-	_ext_disp_path_lock();
-	EXT_DISP_LOG("extd ovl->wdma frame done\n");
-	if (pgc->state == EXTD_DEINIT || pgc->state == EXTD_SUSPEND) {
+	if (!block)
+		_ext_disp_path_lock();
+	if (!block && (pgc->state == EXTD_DEINIT || pgc->state == EXTD_SUSPEND)) {
 		EXT_DISP_LOG("%s ext display is already slept\n", __func__);
 		_ext_disp_path_unlock();
 		return -1;
 	}
+	EXT_DISP_LOG("extd ovl->wdma frame done\n");
 	cmdqBackupReadSlot(pgc->wdma_info, 0, &(secure));
 	cmdqBackupReadSlot(pgc->wdma_info, 1, &(addr));
 	pgc->decouple_rdma_config.security = secure;
@@ -1308,7 +1306,8 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 	pgc->dc_buf_id %= DISP_INTERNAL_BUFFER_COUNT;
 
 	mtkfb_release_session_fence(pgc->session);
-	_ext_disp_path_unlock();
+	if (!block)
+		_ext_disp_path_unlock();
 
 	return 0;
 }
@@ -1332,10 +1331,8 @@ int ext_disp_trigger(int blocking, void *callback, unsigned int userdata, unsign
 {
 	int ret = 0;
 
-	EXT_DISP_FUNC();
-
 	_ext_disp_path_lock();
-
+	EXT_DISP_FUNC();
 	if (pgc->state == EXTD_DEINIT || pgc->state == EXTD_SUSPEND || pgc->need_trigger_overlay < 1) {
 		EXT_DISP_LOG("%s ext display is already slept\n", __func__);
 		mmprofile_log_ex(ddp_mmp_get_events()->Extd_ErrorInfo, MMPROFILE_FLAG_PULSE, Trigger, 0);
@@ -1346,7 +1343,7 @@ int ext_disp_trigger(int blocking, void *callback, unsigned int userdata, unsign
 	if (pgc->mode == EXTD_DECOUPLE_MODE) {
 		ext_disp_trigger_ovl_to_memory(pgc->ovl2mem_path_handle, pgc->cmdq_handle_ovl2mem_config,
 					(fence_release_callback)_ovl_fence_release_callback, 0, 1);
-		_ovl_fence_release_callback(0);
+		_ovl_fence_release_callback(1);
 	} else {
 		if (DISP_SESSION_TYPE(session) == DISP_SESSION_EXTERNAL && DISP_SESSION_DEV(session) == DEV_MHL + 1)
 			_ext_disp_trigger(blocking, _rdma_fence_release_callback, userdata);
@@ -1366,9 +1363,8 @@ int ext_disp_suspend_trigger(void *callback, unsigned int userdata, unsigned int
 {
 	enum EXT_DISP_STATUS ret = EXT_DISP_STATUS_OK;
 
-	EXT_DISP_FUNC();
-
 	_ext_disp_path_lock();
+	EXT_DISP_FUNC();
 
 	if (pgc->state != EXTD_RESUME) {
 		EXT_DISP_LOG("%s ext display is already slept\n", __func__);
