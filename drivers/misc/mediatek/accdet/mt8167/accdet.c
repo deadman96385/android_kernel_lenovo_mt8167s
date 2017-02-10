@@ -22,6 +22,7 @@
 #include <linux/of_gpio.h>
 #include <linux/gpio.h>
 #include "mtk_auxadc.h"
+#include "mtk_devinfo.h"
 
 #define DEBUG_THREAD 1
 #define ACCDET_MULTI_KEY_FEATURE
@@ -73,7 +74,10 @@ static inline int accdet_irq_handler(void);
 static void send_key_event(int keycode, int flag);
 #define KEYDOWN_FLAG 1
 #define KEYUP_FLAG 0
-static int long_press_time = 2000;
+int mid_key_four;
+int voice_key_four;
+int up_key_four;
+int down_key_four;
 
 #if defined CONFIG_ACCDET_EINT || defined CONFIG_ACCDET_EINT_IRQ
 static struct work_struct accdet_eint_work;
@@ -357,19 +361,11 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 #define KEY_SAMPLE_PERIOD        60	/* ms */
 #define MULTIKEY_ADC_CHANNEL	 15
 
-#define NO_KEY			 (0x0)
-#define UP_KEY			 (0x01)
-#define MD_KEY			 (0x02)
-#define DW_KEY			 (0x04)
-
-#define SHORT_PRESS		 (0x0)
-#define LONG_PRESS		 (0x10)
-#define SHORT_UP         ((UP_KEY) | SHORT_PRESS)
-#define SHORT_MD		 ((MD_KEY) | SHORT_PRESS)
-#define SHORT_DW         ((DW_KEY) | SHORT_PRESS)
-#define LONG_UP          ((UP_KEY) | LONG_PRESS)
-#define LONG_MD          ((MD_KEY) | LONG_PRESS)
-#define LONG_DW           ((DW_KEY) | LONG_PRESS)
+#define NO_KEY			(0x0)
+#define UP_KEY			(0x01)
+#define MD_KEY			(0x02)
+#define DW_KEY			(0x04)
+#define AS_KEY			(0x08)
 
 #define KEYDOWN_FLAG 1
 #define KEYUP_FLAG 0
@@ -377,117 +373,74 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 
 static DEFINE_MUTEX(accdet_multikey_mutex);
 
-/*
- *		MD          UP         DW
- *	|---------|-----------|----------|
- *	0V<=MD< 0.09V<= UP<0.24V<=DW <0.5V
- */
-
-#define DW_KEY_HIGH_THR	 (500)	/* 0.50v=500000uv */
-#define DW_KEY_THR		 (240)	/* 0.24v=240000uv */
-#define UP_KEY_THR       (90)	/* 0.09v=90000uv */
-#define MD_KEY_THR		 (0)
-
 static int key_check(int b)
 {
-	if ((b < DW_KEY_HIGH_THR) && (b >= DW_KEY_THR)) {
-		ACCDET_DEBUG("[Accdet]DW_KEY->adc_data: %d mv\n", b);
+	ACCDET_DEBUG("[accdet] come in key_check!!\n");
+	if ((b < down_key_four) && (b >= up_key_four))
 		return DW_KEY;
-	} else if ((b < DW_KEY_THR) && (b >= UP_KEY_THR)) {
-		ACCDET_DEBUG("[Accdet]UP_KEY->adc_data: %d mv\n", b);
+	else if ((b < up_key_four) && (b >= voice_key_four))
 		return UP_KEY;
-	} else if ((b < UP_KEY_THR) && (b >= MD_KEY_THR)) {
-		ACCDET_DEBUG("[Accdet]MD_KEY->adc_data: %d mv\n", b);
+	else if ((b < voice_key_four) && (b >= mid_key_four))
+		return AS_KEY;
+	else if ((b < mid_key_four) && (b >= 0))
 		return MD_KEY;
-	}
-	ACCDET_DEBUG("[Accdet]NO_KEY->adc_data: %d mv\n", b);
+	ACCDET_DEBUG("[accdet] leave key_check!!\n");
 	return NO_KEY;
 }
 
 static void send_key_event(int keycode, int flag)
 {
-	if (call_status == 0) {
-		switch (keycode) {
-		case DW_KEY:
-			input_report_key(kpd_accdet_dev, KEY_NEXTSONG, flag);
-			input_sync(kpd_accdet_dev);
-			ACCDET_DEBUG("[Accdet] report KEY_NEXTSONG %d\n", flag);
-			break;
-		case UP_KEY:
-			input_report_key(kpd_accdet_dev, KEY_PREVIOUSSONG, flag);
-			input_sync(kpd_accdet_dev);
-			ACCDET_DEBUG("[Accdet] report KEY_PREVIOUSSONG %d\n", flag);
-			break;
-		}
-	} else {
-		switch (keycode) {
-		case DW_KEY:
-			input_report_key(kpd_accdet_dev, KEY_VOLUMEDOWN, flag);
-			input_sync(kpd_accdet_dev);
-			ACCDET_DEBUG("[Accdet] report KEY_VOLUMEDOWN %d\n", flag);
-			break;
-		case UP_KEY:
-			input_report_key(kpd_accdet_dev, KEY_VOLUMEUP, flag);
-			input_sync(kpd_accdet_dev);
-			ACCDET_DEBUG("[Accdet] report KEY_VOLUMEUP %d\n", flag);
-			break;
-		}
+	switch (keycode) {
+	case DW_KEY:
+		input_report_key(kpd_accdet_dev, KEY_VOLUMEDOWN, flag);
+		input_sync(kpd_accdet_dev);
+		ACCDET_DEBUG("[accdet]KEY_VOLUMEDOWN %d\n", flag);
+		break;
+	case UP_KEY:
+		input_report_key(kpd_accdet_dev, KEY_VOLUMEUP, flag);
+		input_sync(kpd_accdet_dev);
+		ACCDET_DEBUG("[accdet]KEY_VOLUMEUP %d\n", flag);
+		break;
+	case MD_KEY:
+		input_report_key(kpd_accdet_dev, KEY_PLAYPAUSE, flag);
+		input_sync(kpd_accdet_dev);
+		ACCDET_DEBUG("[accdet]KEY_PLAYPAUSE %d\n", flag);
+		break;
+	case AS_KEY:
+		input_report_key(kpd_accdet_dev, KEY_VOICECOMMAND, flag);
+		input_sync(kpd_accdet_dev);
+		ACCDET_DEBUG("[accdet]KEY_VOICECOMMAND %d\n", flag);
+		break;
 	}
-
 }
 
-static int multi_key_detection(void)
+static void multi_key_detection(int current_status)
 {
-	int current_status = 0;
-	int index = 0;
-	int count = long_press_time / (KEY_SAMPLE_PERIOD + 40);	/* ADC delay */
 	int m_key = 0;
-	int cur_key = 0;
 	int cali_voltage = 0;
 	int ret;
 
-	ret = IMM_GetOneChannelValue_Cali(MULTIKEY_ADC_CHANNEL, &cali_voltage);
-	if (ret)
-		ACCDET_ERROR("[Accdet]get auxadc value fail, ret = %d\n", ret);
+	if (current_status == 0) {
+		ret = IMM_GetOneChannelValue_Cali(MULTIKEY_ADC_CHANNEL, &cali_voltage);
+		if (ret)
+			ACCDET_ERROR("[Accdet]get auxadc value fail, ret = %d\n", ret);
 
-	cali_voltage = cali_voltage / 1000; /* uV->mV */
-	cali_voltage = cali_voltage / 2; /* ACCDET 2 times gain */
+		cali_voltage = cali_voltage / 1000;  /* uV->mV */
 
-	ACCDET_INFO("[Accdet]adc cali_voltage1 = %d mv\n", cali_voltage);
-	ACCDET_INFO("[Accdet]*********detect key.\n");
+		ACCDET_INFO("[Accdet]adc cali_voltage1 = %d mV\n", cali_voltage);
+		ACCDET_INFO("[Accdet]*********detect key.\n");
 
-	m_key = cur_key = key_check(cali_voltage);
-
-	send_key_event(m_key, KEYDOWN_FLAG);
-
-	while (index++ < count) {
-		/* Check if the current state has been changed */
-		current_status = ((accdet_read(ACCDET_STATE_RG) & 0xc0) >> 6);
-		ACCDET_DEBUG("[Accdet]accdet current_status = %d\n", current_status);
-
-		if (current_status != 0) {
-			send_key_event(m_key, KEYUP_FLAG);
-			return (m_key | SHORT_PRESS);
-		}
-
-		/* Check if the voltage has been changed (press one key and another) */
-
-		/* To be do: change to use AP AUXADC */
-		/* cali_voltage = PMIC_IMM_GetOneChannelValue(MULTIKEY_ADC_CHANNEL, 1, 1); */
-		ACCDET_DEBUG("[Accdet]adc in while loop [%d]= %d mv\n", index, cali_voltage);
-		cur_key = key_check(cali_voltage);
-
-		if (m_key != cur_key) {
-			send_key_event(m_key, KEYUP_FLAG);
-			ACCDET_DEBUG("[Accdet]accdet press one key and another happen!!\n");
-			return (m_key | SHORT_PRESS);
-		}
-
-		m_key = cur_key;
-		msleep(KEY_SAMPLE_PERIOD);
+		m_key = cur_key = key_check(cali_voltage);
 	}
-
-	return (m_key | LONG_PRESS);
+	mdelay(30);
+	if (((accdet_read(ACCDET_IRQ_STS) & IRQ_STATUS_BIT) != IRQ_STATUS_BIT) || eint_accdet_sync_flag) {
+		send_key_event(cur_key, !current_status);
+	} else {
+		ACCDET_DEBUG("[Accdet]plug out side effect key press, do not report key = %d\n", cur_key);
+		cur_key = NO_KEY;
+	}
+	if (current_status)
+		cur_key = NO_KEY;
 }
 
 #endif
@@ -611,15 +564,6 @@ static int sendKeyEvent(void *unuse)
 	return 0;
 }
 
-static ssize_t notify_sendKeyEvent(int event)
-{
-
-	accdet_key_event = event;
-	atomic_set(&send_event_flag, 1);
-	wake_up(&send_event_wq);
-	ACCDET_DEBUG(" accdet:notify_sendKeyEvent !\n");
-	return 0;
-}
 #endif
 
 static inline void check_cable_type(void)
@@ -710,12 +654,11 @@ static inline void check_cable_type(void)
 			button_status = 1;
 			if (button_status) {
 				#ifdef ACCDET_MULTI_KEY_FEATURE
-				int multi_key = NO_KEY;
 				/* mdelay(10); */
 				/* if plug out don't send key */
 				mutex_lock(&accdet_eint_irq_sync_mutex);
 				if (eint_accdet_sync_flag == 1)
-					multi_key = multi_key_detection();
+					multi_key_detection(current_status);
 				else
 					ACCDET_DEBUG("[Accdet] multi_key_detection: Headset has plugged out\n");
 				mutex_unlock(&accdet_eint_irq_sync_mutex);
@@ -724,55 +667,6 @@ static inline void check_cable_type(void)
 					REGISTER_VALUE(cust_headset_settings->pwm_width));
 					accdet_write(ACCDET_PWM_THRESH,
 					REGISTER_VALUE(cust_headset_settings->pwm_thresh));
-
-				switch (multi_key) {
-				case SHORT_UP:
-					ACCDET_DEBUG("[Accdet] Short press up (0x%x)\n", multi_key);
-					if (call_status == 0)
-						notify_sendKeyEvent(ACC_MEDIA_PREVIOUS);
-					else
-						notify_sendKeyEvent(ACC_VOLUMEUP);
-					break;
-				case SHORT_MD:
-					ACCDET_DEBUG("[Accdet] Short press middle (0x%x)\n", multi_key);
-					notify_sendKeyEvent(ACC_MEDIA_PLAYPAUSE);
-					break;
-				case SHORT_DW:
-					ACCDET_DEBUG("[Accdet] Short press down (0x%x)\n", multi_key);
-					if (call_status == 0)
-						notify_sendKeyEvent(ACC_MEDIA_NEXT);
-					else
-						notify_sendKeyEvent(ACC_VOLUMEDOWN);
-					break;
-				case LONG_UP:
-					ACCDET_DEBUG("[Accdet] Long press up (0x%x)\n", multi_key);
-					send_key_event(UP_KEY, KEYUP_FLAG);
-					break;
-				case LONG_MD:
-					ACCDET_DEBUG("[Accdet] Long press middle (0x%x)\n", multi_key);
-					/* notify_sendKeyEvent(ACC_END_CALL); */
-					notify_sendKeyEvent(ACC_END_CALL);
-					break;
-				case LONG_DW:
-					ACCDET_DEBUG("[Accdet] Long press down (0x%x)\n", multi_key);
-					send_key_event(DW_KEY, KEYUP_FLAG);
-					break;
-				default:
-					ACCDET_DEBUG("[Accdet] unknown key (0x%x)\n", multi_key);
-					break;
-				}
-				#else
-				if (call_status != 0) {
-					if (is_long_press()) {
-						ACCDET_DEBUG("[Accdet]send long press remote button event %d\n",
-							ACC_END_CALL);
-						notify_sendKeyEvent(ACC_END_CALL);
-					} else {
-						ACCDET_DEBUG("[Accdet]send short press remote button event %d\n",
-							ACC_ANSWER_CALL);
-						notify_sendKeyEvent(ACC_MEDIA_PLAYPAUSE);
-					}
-				}
 				#endif/* //end  ifdef ACCDET_MULTI_KEY_FEATURE else */
 			}
 		} else if (current_status == 1) {
@@ -827,6 +721,7 @@ static inline void check_cable_type(void)
 		} else if (current_status == 1) {
 			mutex_lock(&accdet_eint_irq_sync_mutex);
 			if (eint_accdet_sync_flag == 1) {
+				multi_key_detection(current_status);
 				accdet_status = MIC_BIAS;
 				cable_type = HEADSET_MIC;
 			} else {
@@ -941,11 +836,6 @@ void accdet_get_dts_data(void)
 {
 	struct device_node *node = NULL;
 	int debounce[7];
-	#ifdef CONFIG_FOUR_KEY_HEADSET
-	int four_key[5];
-	#else
-	int three_key[4];
-	#endif
 	int ret;
 	unsigned int val;
 
@@ -957,19 +847,6 @@ void accdet_get_dts_data(void)
 		of_property_read_u32(node, "accdet-plugout-debounce", &accdet_dts_data.accdet_plugout_debounce);
 		of_property_read_u32(node, "accdet-mic-mode", &accdet_dts_data.accdet_mic_mode);
 		of_property_read_u32(node, "eint-debounce", &accdet_dts_data.eint_debounce);
-		#ifdef CONFIG_FOUR_KEY_HEADSET
-		of_property_read_u32_array(node, "headset-four-key-threshold", four_key, ARRAY_SIZE(four_key));
-		memcpy(&accdet_dts_data.four_key, four_key+1, sizeof(four_key));
-		ACCDET_INFO("[Accdet]mid-Key = %d, voice = %d, up_key = %d, down_key = %d\n",
-		     accdet_dts_data.four_key.mid_key_four, accdet_dts_data.four_key.voice_key_four,
-		     accdet_dts_data.four_key.up_key_four, accdet_dts_data.four_key.down_key_four);
-		#else
-		of_property_read_u32_array(node, "headset-three-key-threshold", three_key, ARRAY_SIZE(three_key));
-		memcpy(&accdet_dts_data.three_key, three_key+1, sizeof(three_key));
-		ACCDET_INFO("[Accdet]mid-Key = %d, up_key = %d, down_key = %d\n",
-		     accdet_dts_data.three_key.mid_key, accdet_dts_data.three_key.up_key,
-		     accdet_dts_data.three_key.down_key);
-		#endif
 
 		memcpy(&accdet_dts_data.headset_debounce, debounce, sizeof(debounce));
 		cust_headset_settings = &accdet_dts_data.headset_debounce;
@@ -982,7 +859,7 @@ void accdet_get_dts_data(void)
 	}
 
 	/* Adjust micbias1 voltage depends on dts data */
-	ACCDET_INFO("accdet_dts_data.mic_mode_vol = %d\n", accdet_dts_data.mic_mode_vol);
+	ACCDET_INFO("[Accdet] accdet_dts_data.mic_mode_vol = %d\n", accdet_dts_data.mic_mode_vol);
 	ret = regmap_update_bits(apmix_regmap, AUDIO_CODEC_CON01, 0x7 << 22, (accdet_dts_data.mic_mode_vol) << 22);
 	if (ret) {
 		ACCDET_ERROR("Failed to update register AUDIO_CODEC_CON01: %d\n", ret);
@@ -990,10 +867,112 @@ void accdet_get_dts_data(void)
 	}
 	ret = regmap_read(apmix_regmap, AUDIO_CODEC_CON01, &val);
 	if (ret) {
-		ACCDET_ERROR("Failed to read AUDIO_CODEC_CON01 value: %d\n", ret);
+		ACCDET_ERROR("[Accdet] Failed to read AUDIO_CODEC_CON01 value: %d\n", ret);
 		return;
 	}
-	ACCDET_INFO("AUDIO_CODEC_CON01  = 0x%x\n", val);
+	ACCDET_INFO("[Accdet] AUDIO_CODEC_CON01  = 0x%x\n", val);
+}
+
+void accdet_set_four_key_threshold(void)
+{
+	int GE, OE, Code7, Code6;
+	int mid_key_four_code, voice_key_four_code, up_key_four_code, down_key_four_code;
+	double R1, ratio_mid, ratio_voice, ratio_up, ratio_down;
+
+	ACCDET_DEBUG("[ACCDET] 0x10009188 = 0x%x\n", get_devinfo_with_index(62));
+	GE = (get_devinfo_with_index(62) >> 11) & 0xFFF;
+	ACCDET_DEBUG("[ACCDET] GE 0x%x = %d\n", GE, GE);
+
+	ACCDET_DEBUG("[ACCDET] 0x10009184 = 0x%x\n", get_devinfo_with_index(61));
+	ACCDET_DEBUG("[ACCDET] 0x10009188 = 0x%x\n", get_devinfo_with_index(62));
+	ACCDET_DEBUG("[ACCDET] 0x10009198 = 0x%x\n", get_devinfo_with_index(66));
+	OE = ((get_devinfo_with_index(61) & 0x3) << 8) |
+		((get_devinfo_with_index(62) & (0x3 << 9)) >> 3) |
+		((get_devinfo_with_index(66) & (0x3F << 5)) >> 5);
+	ACCDET_DEBUG("[ACCDET] OE 0x%x = %d\n", OE, OE);
+
+	ACCDET_DEBUG("[ACCDET] 0x10009194 = 0x%x\n", get_devinfo_with_index(65));
+	Code7 = (get_devinfo_with_index(65) >> 12) & 0xFFF;
+	Code6 = get_devinfo_with_index(65) & 0xFFF;
+	ACCDET_DEBUG("[ACCDET] Code7 0x%x = %d\n", Code7, Code7);
+	ACCDET_DEBUG("[ACCDET] Code6 0x%x = %d\n", Code6, Code6);
+
+	R1 = (double)((Code7 - (OE - 512)) / (Code6 - (OE - 512)));
+
+	/*
+	 *	Calculate four-key threshold for different MICBIAS1 voltage
+	 *	0 : 2.5V
+	 *	1 : 2.2V
+	 *	2 : 2.1V
+	 *	3 : 2.0V
+	 *	4 : 1.9V
+	 */
+	switch (accdet_dts_data.mic_mode_vol) {
+	case 0:
+		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 2.5V!\n");
+		ratio_mid = 2.5 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
+		ratio_voice = 2.5 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
+		ratio_up = 2.5 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
+		ratio_down = 2.5 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
+		break;
+	case 1:
+		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 2.2V!\n");
+		ratio_mid = 2.2 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
+		ratio_voice = 2.2 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
+		ratio_up = 2.2 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
+		ratio_down = 2.2 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
+		break;
+	case 2:
+		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 2.1V!\n");
+		ratio_mid = 2.1 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
+		ratio_voice = 2.1 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
+		ratio_up = 2.1 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
+		ratio_down = 2.1 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
+		break;
+	case 3:
+		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 2.0V!\n");
+		ratio_mid = 2.0 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
+		ratio_voice = 2.0 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
+		ratio_up = 2.0 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
+		ratio_down = 2.0 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
+		break;
+	case 4:
+		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 1.9V!\n");
+		ratio_mid = 1.9 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
+		ratio_voice = 1.9 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
+		ratio_up = 1.9 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
+		ratio_down = 1.9 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
+		break;
+	default:
+		ACCDET_ERROR("[ACCDET] Unsupported MICBIAS1 voltage!!!\n");
+		return;
+	}
+
+	if (GE == 0 || OE == 0) {
+		ACCDET_ERROR("[ACCDET] No Calibration Efuse IC!!!\n");
+		GE = 2048;
+		OE = 512;
+	}
+
+	mid_key_four_code = ratio_mid * (4096 + GE - 2048) + (OE - 512);
+	mid_key_four = mid_key_four_code * 1500 / 4096;
+	ACCDET_INFO("[ACCDET] mid_key_four_code = %d\n", mid_key_four_code);
+	ACCDET_INFO("[ACCDET] mid_key_four = %d mV\n", mid_key_four);
+
+	voice_key_four_code = (ratio_voice * (4096 + GE - 2048) + (OE - 512));
+	voice_key_four  = voice_key_four_code * 1500 / 4096;
+	ACCDET_INFO("[ACCDET] voice_key_four_code = %d\n", voice_key_four_code);
+	ACCDET_INFO("[ACCDET] voice_key_four = %d mV\n", voice_key_four);
+
+	up_key_four_code = (ratio_up * (4096 + GE - 2048) + (OE - 512));
+	up_key_four  = up_key_four_code * 1500 / 4096;
+	ACCDET_INFO("[ACCDET] up_key_four_code = %d\n", up_key_four_code);
+	ACCDET_INFO("[ACCDET] up_key_four = %d mV\n", up_key_four);
+
+	down_key_four_code = (ratio_down * (4096 + GE - 2048) + (OE - 512));
+	down_key_four  = down_key_four_code * 1500 / 4096;
+	ACCDET_INFO("[ACCDET] down_key_four_code = %d\n", down_key_four_code);
+	ACCDET_INFO("[ACCDET] down_key_four = %d mV\n", down_key_four);
 }
 
 static inline void accdet_init(void)
@@ -1306,6 +1285,8 @@ int mt_accdet_probe(struct platform_device *dev)
 		eint_accdet_sync_flag = 1;
 		/*Accdet Hardware Init*/
 		accdet_get_dts_data();
+
+		accdet_set_four_key_threshold();
 
 		accdet_init();
 		/*schedule a work for the first detection*/
