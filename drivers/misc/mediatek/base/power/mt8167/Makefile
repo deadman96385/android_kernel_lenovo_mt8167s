@@ -24,7 +24,7 @@ obj-$(CONFIG_MACH_MT8167) += mtk_spm_sleep.o
 obj-$(CONFIG_MACH_MT8167) += mtk_spm_dpidle.o
 obj-$(CONFIG_MACH_MT8167) += mtk_spm_sodi.o
 obj-$(CONFIG_MACH_MT8167) += mtk_spm_fs.o
-
+obj-$(CONFIG_MACH_MT8167) += mtk_udi.o
 obj-y += mtk_cpuidle.o
 
 obj-y += cpu_dormant.o
