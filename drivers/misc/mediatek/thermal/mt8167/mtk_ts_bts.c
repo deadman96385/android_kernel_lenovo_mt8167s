@@ -27,7 +27,7 @@
 #include <linux/writeback.h>
 #include <linux/uaccess.h>
 #include "mt-plat/mtk_thermal_monitor.h"
-#include "inc/mtk_thermal.h"
+#include "mach/mtk_thermal.h"
 #include "inc/mtk_thermal_timer.h"
 #include "mt-plat/mtk_thermal_platform.h"
 #include <linux/uidgid.h>

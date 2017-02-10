@@ -17,7 +17,7 @@
 #include <linux/cpufreq.h>
 #include "mtk_power_throttle.h"
 #include "mt_hotplug_strategy.h"
-#include "inc/mtk_thermal.h"
+#include "mach/mtk_thermal.h"
 
 static unsigned long clipped_freq;
 static unsigned int limited_max_ncpu;

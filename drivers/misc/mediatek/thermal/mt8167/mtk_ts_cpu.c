@@ -30,7 +30,7 @@
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include "mtk_thermal_typedefs.h"
-#include "inc/mtk_thermal.h"
+#include "mach/mtk_thermal.h"
 #include "mtk_power_throttle.h"
 #include "mtk_gpufreq.h"
 

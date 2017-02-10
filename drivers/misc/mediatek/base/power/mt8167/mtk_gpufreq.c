@@ -55,7 +55,7 @@
 
 /* TODO: check this! */
 /* #include "mach/mt_static_power.h" */
-#include "inc/mtk_thermal.h"
+#include "mach/mtk_thermal.h"
 #include "mt8167/include/mach/upmu_sw.h"
 
 #include <linux/regulator/consumer.h>

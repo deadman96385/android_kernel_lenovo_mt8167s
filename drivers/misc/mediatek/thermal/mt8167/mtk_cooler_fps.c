@@ -30,7 +30,7 @@
 #endif
 /* switch device to sent the (fps limit)uevent */
 #include <linux/switch.h>
-#include "inc/mtk_thermal.h"
+#include "mach/mtk_thermal.h"
 #include <linux/uidgid.h>
 #ifdef CONFIG_MTK_GPU_SUPPORT
 #include "ged_dvfs.h"
