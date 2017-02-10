@@ -184,7 +184,7 @@ int disp_get_session_number(void)
 }
 
 #ifdef OVL_CASCADE_SUPPORT
-struct OVL_CONFIG_STRUCT ovl2mem_in_cached_config[DDP_OVL_LAYER_MUN] = {
+struct OVL_CONFIG_STRUCT ovl2mem_in_cached_config[2*DDP_OVL_LAYER_MUN] = {
 	{.layer = 0, .isDirty = 1}
 	,
 	{.layer = 1, .isDirty = 1}
@@ -233,9 +233,6 @@ int _session_inited(struct disp_session_config config)
 	return 0;
 }
 
-#ifdef OVL_CASCADE_SUPPORT
-static int g_enable_clock;
-#endif
 int disp_create_session(struct disp_session_config *config)
 {
 	int ret = 0;
