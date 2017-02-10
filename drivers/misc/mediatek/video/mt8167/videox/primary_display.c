@@ -2121,7 +2121,7 @@ static int _DL_switch_to_DC_fast(void)
 		wdma_config.security = DISP_NORMAL_BUFFER;
 
 	/* disable SODI by CPU to prevent underflow */
-#if defined(MTK_FB_SODI_SUPPORT) || !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(MTK_FB_SODI_SUPPORT)
 	spm_enable_sodi(0);
 #endif
 
@@ -2226,7 +2226,7 @@ static int _DL_switch_to_DC_fast(void)
 	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_START);
 
 	/* enable SODI after switch */
-#if defined(MTK_FB_SODI_SUPPORT) || !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(MTK_FB_SODI_SUPPORT)
 	spm_enable_sodi(1);
 #endif
 
@@ -2244,7 +2244,7 @@ static int _DC_switch_to_DL_fast(void)
 	struct OVL_CONFIG_STRUCT ovl_config[OVL_LAYER_NUM];
 
 	/* 1. disable SODI */
-#if defined(MTK_FB_SODI_SUPPORT) || !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(MTK_FB_SODI_SUPPORT)
 	spm_enable_sodi(0);
 #endif
 
@@ -2324,7 +2324,7 @@ static int _DC_switch_to_DL_fast(void)
 	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_START);
 
 	/* 1. enable SODI */
-#if defined(MTK_FB_SODI_SUPPORT) || !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(MTK_FB_SODI_SUPPORT)
 	spm_enable_sodi(1);
 #endif
 	return ret;
@@ -3374,7 +3374,7 @@ int _esd_check_config_handle_vdo(void)
 
 	_primary_path_lock(__func__);
 
-#if defined(MTK_FB_SODI_SUPPORT) || !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(MTK_FB_SODI_SUPPORT)
 	spm_enable_sodi(0);
 #endif
 
@@ -3423,7 +3423,7 @@ int _esd_check_config_handle_vdo(void)
 
 	ret = cmdqRecFlush(pgc->cmdq_handle_config_esd);
 
-#if defined(MTK_FB_SODI_SUPPORT) || !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(MTK_FB_SODI_SUPPORT)
 	spm_enable_sodi(1);
 #endif
 	_primary_path_unlock(__func__);
@@ -4031,7 +4031,7 @@ static int primary_display_vdo_pullclk_worker_kthread(void *data)
 
 		_primary_path_lock(__func__);
 
-#if defined(MTK_FB_SODI_SUPPORT) || !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(MTK_FB_SODI_SUPPORT)
 		spm_enable_sodi(0);
 #endif
 
@@ -4070,7 +4070,7 @@ static int primary_display_vdo_pullclk_worker_kthread(void *data)
 
 		ret = cmdqRecFlush(pgc->cmdq_handle_config_esd);
 
-#if defined(MTK_FB_SODI_SUPPORT) || !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(MTK_FB_SODI_SUPPORT)
 		spm_enable_sodi(1);
 #endif
 		_primary_path_unlock(__func__);
@@ -5477,7 +5477,7 @@ done:
 #endif
 
 #ifndef WDMA_PATH_CLOCK_DYNAMIC_SWITCH
-#ifndef CONFIG_FPGA_EARLY_PORTING
+#if defined(MTK_FB_SODI_SUPPORT)
 	enable_soidle_by_bit(MT_CG_DISP0_DISP_WDMA0);
 #endif
 #endif
