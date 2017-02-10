@@ -55,7 +55,6 @@ struct mt8167_codec_priv {
 	struct snd_soc_codec *codec;
 	struct regmap *regmap;
 	struct regmap *regmap_modules[REGMAP_NUMS];
-	struct mutex regmap_mutex;
 	uint32_t lch_dccomp_val; /* L-ch DC compensation value */
 	uint32_t rch_dccomp_val; /* R-ch DC compensation value */
 	uint32_t lch_dc_offset; /* L-ch DC offset value */
@@ -270,6 +269,32 @@ static int mt8167_codec_prepare(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int mt8167_codec_dl_ul_enable(struct snd_pcm_substream *substream,
+		struct snd_soc_dai *codec_dai)
+{
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+		snd_soc_update_bits(codec_dai->codec,
+			ABB_AFE_CON0, BIT(1), BIT(1));
+	else if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		snd_soc_update_bits(codec_dai->codec,
+			ABB_AFE_CON0, BIT(0), BIT(0));
+
+	return 0;
+}
+
+static int mt8167_codec_dl_ul_disable(struct snd_pcm_substream *substream,
+		struct snd_soc_dai *codec_dai)
+{
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+		snd_soc_update_bits(codec_dai->codec,
+			ABB_AFE_CON0, BIT(1), 0x0);
+	else if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		snd_soc_update_bits(codec_dai->codec,
+			ABB_AFE_CON0, BIT(0), 0x0);
+
+	return 0;
+}
+
 static int mt8167_codec_trigger(struct snd_pcm_substream *substream,
 			int command,
 			struct snd_soc_dai *codec_dai)
@@ -277,8 +302,11 @@ static int mt8167_codec_trigger(struct snd_pcm_substream *substream,
 	switch (command) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
+		mt8167_codec_dl_ul_enable(substream, codec_dai);
+		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
+		mt8167_codec_dl_ul_disable(substream, codec_dai);
 		break;
 	}
 	dev_dbg(codec_dai->codec->dev, "%s command = %d\n ",
@@ -317,50 +345,6 @@ static struct snd_soc_dai_driver mt8167_codec_dai = {
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
 	},
 };
-
-static int mt8167_codec_aif_tx_event(struct snd_soc_dapm_widget *w,
-	struct snd_kcontrol *kcontrol, int event)
-{
-	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
-
-	dev_dbg(codec->dev, "%s, event %d\n", __func__, event);
-
-	switch (event) {
-	case SND_SOC_DAPM_POST_PMU:
-		snd_soc_update_bits(codec,
-			ABB_AFE_CON0, BIT(1), BIT(1));
-		break;
-	case SND_SOC_DAPM_PRE_PMD:
-		snd_soc_update_bits(codec,
-			ABB_AFE_CON0, BIT(1), 0x0);
-		break;
-	default:
-		break;
-	}
-
-	return 0;
-}
-
-static int mt8167_codec_aif_rx_event(struct snd_soc_dapm_widget *w,
-	struct snd_kcontrol *kcontrol, int event)
-{
-	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
-
-	dev_dbg(codec->dev, "%s, event %d\n", __func__, event);
-
-	switch (event) {
-	case SND_SOC_DAPM_POST_PMU:
-		snd_soc_update_bits(codec, ABB_AFE_CON0, 0x1, 0x1);
-		break;
-	case SND_SOC_DAPM_PRE_PMD:
-		snd_soc_update_bits(codec, ABB_AFE_CON0, 0x1, 0x0);
-		break;
-	default:
-		break;
-	}
-
-	return 0;
-}
 
 static int mt8167_codec_dmic_event(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
@@ -528,12 +512,16 @@ static int mt8167_codec_clk_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_PRE_PMU:
 		/* CLKLDO power on */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON01, BIT(20), BIT(20));
+		/* Select CLK from PLL */
+		snd_soc_update_bits(codec, AUDIO_CODEC_CON03, BIT(19), BIT(19));
 		/* Audio Codec CLK on */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON03, BIT(30), BIT(30));
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		/* Audio Codec CLK off */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON03, BIT(30), 0x0);
+		/* Select CLK from DCXO */
+		snd_soc_update_bits(codec, AUDIO_CODEC_CON03, BIT(19), 0x0);
 		/* CLKLDO power off */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON01, BIT(20), 0x0);
 		break;
@@ -1259,12 +1247,8 @@ static const struct snd_kcontrol_new mt8167_codec_sdm_tone_gen_ctrl =
 
 static const struct snd_soc_dapm_widget mt8167_codec_dapm_widgets[] = {
 	/* stream domain */
-	SND_SOC_DAPM_AIF_OUT_E("AIF TX", "Capture", 0, SND_SOC_NOPM, 0, 0,
-			mt8167_codec_aif_tx_event,
-			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
-	SND_SOC_DAPM_AIF_IN_E("AIF RX", "Playback", 0, SND_SOC_NOPM, 0, 0,
-			mt8167_codec_aif_rx_event,
-			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+	SND_SOC_DAPM_AIF_OUT("AIF TX", "Capture", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_IN("AIF RX", "Playback", 0, SND_SOC_NOPM, 0, 0),
 	SND_SOC_DAPM_ADC("Left ADC", NULL, AUDIO_CODEC_CON00, 23, 0),
 	SND_SOC_DAPM_ADC("Right ADC", NULL, AUDIO_CODEC_CON00, 5, 0),
 	SND_SOC_DAPM_DAC("Left DAC", NULL, AUDIO_CODEC_CON01, 15, 0),
@@ -1628,18 +1612,10 @@ static int codec_reg_write(void *context,
 
 static void codec_regmap_lock(void *lock_arg)
 {
-	struct mt8167_codec_priv *codec_data =
-			(struct mt8167_codec_priv *) lock_arg;
-
-	mutex_lock(&codec_data->regmap_mutex);
 }
 
 static void codec_regmap_unlock(void *lock_arg)
 {
-	struct mt8167_codec_priv *codec_data =
-			(struct mt8167_codec_priv *) lock_arg;
-
-	mutex_unlock(&codec_data->regmap_mutex);
 }
 
 static struct regmap_config mt8167_codec_regmap_config = {
@@ -1953,10 +1929,6 @@ static int mt8167_codec_dev_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	dev_set_drvdata(dev, codec_data);
-
-	/* setup for regmap config */
-	mutex_init(&codec_data->regmap_mutex);
-	mt8167_codec_regmap_config.lock_arg = codec_data;
 
 	/* get regmap of codec */
 	codec_data->regmap = devm_regmap_init(dev, NULL, codec_data,
