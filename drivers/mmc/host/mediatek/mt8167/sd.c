@@ -1850,7 +1850,6 @@ unsigned int msdc_do_command(struct msdc_host *host,
 		goto end;
 
  end:
-	pr_debug("        return<%d> resp<0x%.8x>", cmd->error, cmd->resp[0]);
 	return cmd->error;
 }
 
