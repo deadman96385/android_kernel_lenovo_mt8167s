@@ -1481,7 +1481,7 @@ static int hdmi_internal_init(void)
 
 static void vNotifyAppHdmiState(unsigned char u1hdmistate)
 {
-	struct HDMI_EDID_INFO_T get_info;
+	HDMI_EDID_T get_info;
 
 	HDMI_PLUG_LOG("u1hdmistate = %d,%s\n", u1hdmistate, szHdmiPordStatusStr[u1hdmistate]);
 

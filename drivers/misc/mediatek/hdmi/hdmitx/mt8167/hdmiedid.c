@@ -1704,7 +1704,7 @@ void vShowEdidInformation(void)
 
 }
 
-void hdmi_AppGetEdidInfo(struct HDMI_EDID_INFO_T *pv_get_info)
+void hdmi_AppGetEdidInfo(HDMI_EDID_T *pv_get_info)
 {
 	HDMI_EDID_FUNC();
 
