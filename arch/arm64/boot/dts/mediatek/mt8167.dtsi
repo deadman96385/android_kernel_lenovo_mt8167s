@@ -313,11 +313,6 @@
 			clock-names = "main";
 		};
 
-		fhctl@1000cf00 {
-			compatible = "mediatek,mt8167-fhctl";
-			reg = <0 0x1000cf00 0 0x100>;
-		};
-
 		pwrap: pwrap@1000f000 {
 			compatible = "mediatek,mt8167-pwrap";
 			reg = <0 0x1000f000 0 0x1000>;
@@ -345,6 +340,11 @@
 			compatible = "mediatek,mt8167-apmixedsys", "syscon";
 			reg = <0 10018000 0 0x710>;
 			#clock-cells = <1>;
+		};
+
+		fhctl@10018f00 {
+			compatible = "mediatek,mt8167-fhctl";
+			reg = <0 0x10018f00 0 0x100>;
 		};
 
 		mcucfg: mcucfg@10200000 {
