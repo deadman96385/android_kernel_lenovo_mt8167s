@@ -1824,7 +1824,6 @@ static struct regmap *mt8167_codec_get_regmap_from_dt(const char *phandle_name,
 		dev_dbg(dev, "%s found regmap of %s\n", __func__, phandle_name);
 		return regmap;
 	}
-	dev_err(dev, "%s failed to get regmap of %s\n", __func__, phandle_name);
 
 	regmap = syscon_regmap_lookup_by_phandle(dev->of_node, phandle_name);
 	if (!IS_ERR(regmap)) {
