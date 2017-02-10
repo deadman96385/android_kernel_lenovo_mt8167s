@@ -2851,7 +2851,7 @@ int fts_ctpm_fw_upgrade_with_app_file(struct i2c_client *client, char *firmware_
 {
 	u8 *pbt_buf = NULL;
 	int i_ret = 0;
-	int fwsize = fts_GetFirmwareSize(firmware_name);
+	int fwsize = 0;
 
 	printk("**********fts_ctpm_fw_upgrade_with_app_file start****************\n");
 
