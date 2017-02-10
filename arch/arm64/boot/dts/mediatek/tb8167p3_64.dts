@@ -287,7 +287,7 @@
 	mediatek,kpd-key-debounce = <1024>;
 	mediatek,kpd-sw-pwrkey = <116>;
 	mediatek,kpd-hw-pwrkey = <8>;
-	mediatek,kpd-sw-rstkey  = <114>;
+	mediatek,kpd-sw-rstkey  = <0>;
 	mediatek,kpd-hw-rstkey = <17>;
 	mediatek,kpd-use-extend-type = <0>;
 	/*HW Keycode [0~71] -> Linux Keycode*/
