@@ -1043,17 +1043,17 @@
 		/* We need add another node to contrl DISP power in ISP driver */
 		isp_display: isp_display {
 			compatible = "mediatek,mt8167-isp_display";
-			/*power-domains = <&scpsys MT8167_POWER_DOMAIN_DISP>;*/
+			power-domains = <&scpsys MT8167_POWER_DOMAIN_DISP>;
 		};
 
 		ispsys: ispsys@15000000 {
 			compatible = "mediatek,mt8167-ispsys";
 			reg = <0 0x15004000 0 0x9000>,	/* ISP_ADDR */
 			      <0 0x15000000 0 0x10000>,	/* IMGSYS_CONFIG_ADDR */
-			      <0 0x10217000 0 0x3000>;	/* MIPI_ANA_ADDR */
+			      <0 0x10011800 0 0x3000>;	/* MIPI_ANA_ADDR */
 
-			interrupts = <GIC_SPI 218 IRQ_TYPE_LEVEL_LOW>, /* SENINF */
-				     <GIC_SPI 219 IRQ_TYPE_LEVEL_LOW>; /* CAM0 */
+			interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_LOW>, /* CAM0 */
+				     <GIC_SPI 183 IRQ_TYPE_LEVEL_LOW>; /* SENINF */
 
 			clocks = <&imgsys CLK_IMG_LARB2_SMI>,
 				 <&imgsys CLK_IMG_CAM_SMI>,
@@ -1072,7 +1072,7 @@
 				      "MM_SMI_COMMON";
 
 			/* Power domains */
-			/*power-domains = <&scpsys MT8167_POWER_DOMAIN_ISP>;*/
+			power-domains = <&scpsys MT8167_POWER_DOMAIN_ISP>;
 		};
 
 		larb1: larb@15001000 {
