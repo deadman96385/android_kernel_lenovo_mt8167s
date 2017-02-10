@@ -43,6 +43,7 @@
 #define REG_DDRPHY_ADDR(x)          (DDRPHY_BASE  + (x))
 #endif
 
+#define REG_AP_PLL_CON0     REG_APMIX_ADDR(0x0000) /* mt8167 apmixedsys, bit#24 is FHCTL clock */
 #define REG_FHCTL_HP_EN     REG_APMIX_ADDR(0x0014) /* mt8167 apmixedsys */
 #define REG_FHCTL_CLK_CON   REG_ADDR(0x0004)
 #define REG_FHCTL_RST_CON   REG_ADDR(0x0008)

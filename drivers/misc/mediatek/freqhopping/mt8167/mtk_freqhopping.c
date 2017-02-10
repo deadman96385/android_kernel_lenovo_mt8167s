@@ -1060,7 +1060,7 @@ static void mt_fh_hal_init(void)
 	int i = 0;
 	int	ret = 0;
 	unsigned long flags = 0;
-
+	unsigned int fhctl_clock_mask = 0x01000000;
 
 	FH_MSG_DEBUG("EN: %s", __func__);
 
@@ -1075,6 +1075,7 @@ static void mt_fh_hal_init(void)
 		return;
 #endif
 
+	fh_set_field(REG_AP_PLL_CON0, fhctl_clock_mask, 1);
 
 	for (i = 0; i < FH_PLL_NUM; ++i) {
 		unsigned int mask = 1<<i;
