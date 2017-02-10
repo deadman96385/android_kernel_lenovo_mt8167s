@@ -677,6 +677,16 @@ static u32 mtk_nand_cs_on(struct nand_chip *nand_chip, u16 cs, u32 page);
 static bool mtk_nand_device_reset(void);
 static bool mtk_nand_set_command(u16 command);
 
+static bool ahb_read_can_sleep(u32 length);
+
+static void get_ahb_read_sleep_range(u32 length,
+	int *min, int *max);
+
+static int get_sector_ahb_read_time(void);
+
+static void cal_sector_ahb_read_time(unsigned long long s,
+	unsigned long long e, u32 length);
+
 static bmt_struct *g_bmt;
 struct mtk_nand_host *host;
 static u8 g_running_dma;
@@ -1052,7 +1062,6 @@ static unsigned short SS_RANDOM_SEED[SS_SEED_NUM] = {
 	0x3A5A, 0x2BAC, 0x743A, 0x5E74, 0x3B2E, 0x7EC7, 0x4FD2, 0x5D28,
 	0x751F, 0x3EF8, 0x39B1, 0x4E49, 0x746B, 0x6EF6, 0x44BE, 0x6DB7
 };
-
 
 #if CFG_PERFLOG_DEBUG
 static suseconds_t Cal_timediff(struct timeval *end_time, struct timeval *start_time)
@@ -2989,19 +2998,21 @@ static bool mtk_nand_dma_read_data(struct mtd_info *mtd, u8 *buf, u32 length)
 			}
 		}
 	} else {
-		/* Remove AHB Done check for IRQ driver */
-#if 0
-		while (!DRV_Reg16(NFI_INTR_REG16)) {
-			timeout--;
-			if (timeout == 0) {
-				pr_err("[%s] poll nfi_intr error\n", __func__);
-				dump_nfi();
-				g_running_dma = 0;
-				return false;	/* 4  // AHB Mode Time Out! */
+		int sector_read_time;
+		unsigned long long s, e;
+
+		g_running_dma = 0;
+		sector_read_time = get_sector_ahb_read_time();
+		if (!sector_read_time) {
+			s = sched_clock();
+		} else {
+			if (ahb_read_can_sleep(length)) {
+				int min, max;
+
+				get_ahb_read_sleep_range(length, &min, &max);
+				usleep_range(min, max);
 			}
 		}
-#endif
-		g_running_dma = 0;
 		while ((length >> host->hw->nand_sec_shift) >
 			   ((DRV_Reg32(NFI_BYTELEN_REG16) & 0x1f000) >> 12)) {
 			timeout--;
@@ -3009,8 +3020,14 @@ static bool mtk_nand_dma_read_data(struct mtd_info *mtd, u8 *buf, u32 length)
 				pr_err("[%s] poll BYTELEN error\n", __func__);
 				dump_nfi();
 				g_running_dma = 0;
-				return false;	/* 4  // AHB Mode Time Out! */
+				return false;
 			}
+		}
+
+		if (!sector_read_time) {
+			e = sched_clock();
+			pr_err("s:(%llu) e:(%llu)\n", s, e);
+			cal_sector_ahb_read_time(s, e, length);
 		}
 	}
 
@@ -8590,6 +8607,72 @@ static int mtk_nand_verify_buf(struct mtd_info *mtd, const uint8_t *buf, int len
 #endif
 }
 #endif
+static bool ahb_read_can_sleep(u32 length)
+{
+	struct read_sleep_para *para = &host->rd_para;
+	int sectors = length >> host->hw->nand_sec_shift;
+
+	return (sectors * para->t_sector_ahb) > para->t_threshold;
+}
+
+static void get_ahb_read_sleep_range(u32 length,
+	int *min, int *max)
+{
+	struct read_sleep_para *para = &host->rd_para;
+	int sectors = length >> host->hw->nand_sec_shift;
+	int t_base = sectors * para->t_sector_ahb - para->t_schedule;
+
+	*min = t_base - para->t_sleep_range;
+	*max = t_base + para->t_sleep_range;
+}
+
+static int get_sector_ahb_read_time(void)
+{
+	return host->rd_para.t_sector_ahb;
+}
+
+static void cal_sector_ahb_read_time(unsigned long long s,
+	unsigned long long e, u32 length)
+{
+	struct read_sleep_para *para = &host->rd_para;
+	static int sample_index;
+	static int total_time;
+	static int total_length;
+
+	if (!para->sample_count || para->t_sector_ahb)
+		return;
+
+	if (sample_index < para->sample_count) {
+		total_time += (e - s);
+		total_length += length;
+		sample_index++;
+		pr_err("In cal total_time:%d, total_length:%d\n", total_time, total_length);
+	} else {
+		total_time /= 1000;/* ns to us*/
+		para->t_sector_ahb =
+			total_time/(total_length >> host->hw->nand_sec_shift);
+		if (para->t_sector_ahb) {
+			pr_err("t_sector_ahb:%d, nand_sec_shift:%d, time:%d, total_length:%d\n",
+				para->t_sector_ahb, host->hw->nand_sec_shift, total_time, total_length);
+		} else {
+			pr_err("total_time:%d, total_length:%d\n", total_time, total_length);
+		}
+		total_time = 0;
+		total_length = 0;
+		sample_index = 0;
+	}
+}
+
+static void mtk_nand_init_read_sleep_para(void)
+{
+	struct read_sleep_para *para = &host->rd_para;
+
+	para->sample_count = 3;
+	para->t_sector_ahb = 0;
+	para->t_schedule = 40;
+	para->t_sleep_range = 10;
+	para->t_threshold = 100;
+}
 
 /******************************************************************************
  * mtk_nand_init_hw
@@ -9739,7 +9822,7 @@ static int mtk_nand_probe(struct platform_device *pdev)
 		/* pr_err("failed to allocate device structure.\n"); */
 		return -ENOMEM;
 	}
-
+	mtk_nand_init_read_sleep_para();
 #if __INTERNAL_USE_AHB_MODE__
 	g_bHwEcc = true;
 #else
@@ -10995,8 +11078,65 @@ static const struct file_operations mtk_nand_fops = {
 	.release = single_release,
 };
 
+ssize_t mtk_nand_rd_para_proc_write(struct file *file, const char __user *buffer, size_t count,
+				loff_t *data)
+{
+	char buf[32];
+	char para_name[16];
+	int value;
+	int len = count;
+
+	if (len >= sizeof(buf))
+		len = sizeof(buf) - 1;
+
+	if (copy_from_user(buf, buffer, len))
+		return -EFAULT;
+	nand_err("buf:%s\n", buf);
+	if (sscanf(buf, "%s%x", para_name, &value) != 2)
+		return -EINVAL;
+	nand_err("para_name:%s, value:%d\n", para_name, value);
+
+	if (!strcmp(para_name, "sample_count"))
+		host->rd_para.sample_count = value;
+	else if (!strcmp(para_name, "t_sector_ahb"))
+		host->rd_para.t_sector_ahb = value;
+	else if (!strcmp(para_name, "t_schedule"))
+		host->rd_para.t_schedule = value;
+	else if (!strcmp(para_name, "t_sleep_range"))
+		host->rd_para.t_sleep_range = value;
+	else if (!strcmp(para_name, "t_threshold"))
+		host->rd_para.t_threshold = value;
+
+	return len;
+}
+
+int mtk_nand_rd_para_proc_show(struct seq_file *m, void *v)
+{
+	SEQ_printf(m, "sample_count:%d\n", host->rd_para.sample_count);
+	SEQ_printf(m, "t_sector_ahb:%d\n", host->rd_para.t_sector_ahb);
+	SEQ_printf(m, "t_schedule:%d\n", host->rd_para.t_schedule);
+	SEQ_printf(m, "t_sleep_range:%d\n", host->rd_para.t_sleep_range);
+	SEQ_printf(m, "t_threshold:%d\n", host->rd_para.t_threshold);
+
+	return 0;
+}
+
+static int mt_nand_rd_para_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, mtk_nand_rd_para_proc_show, inode->i_private);
+}
+
+static const struct file_operations mtk_nand_rd_para_fops = {
+	.open = mt_nand_rd_para_open,
+	.write = mtk_nand_rd_para_proc_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
 static int __init mtk_nand_init(void)
 {
+	struct proc_dir_entry *nand_dir;
 	struct proc_dir_entry *entry;
 
 	g_i4Interrupt = 1;
@@ -11021,18 +11161,18 @@ static int __init mtk_nand_init(void)
 	g_mtk_otp_fuc.OTPWrite = samsung_OTPWrite;
 #endif
 
-	entry = proc_create(PROCNAME, 0664, NULL, &mtk_nand_fops);
-#if 0				/* removed in kernel 3.10 */
-	entry = create_proc_entry(PROCNAME, 0664, NULL);
-	if (entry == NULL) {
-		MSG(INIT, "MTK Nand : unable to create /proc entry\n");
-		return -ENOMEM;
+	nand_dir = proc_mkdir(PROCNAME, NULL);
+	if (!nand_dir) {
+		pr_err("create nand folder fail!!!\n");
+	} else {
+		entry = proc_create("basic_info", 0664, nand_dir, &mtk_nand_fops);
+		if (!entry)
+			pr_err("create nand\basic file fail!!!\n");
+		entry = proc_create("rd_para", 0664, nand_dir,
+			&mtk_nand_rd_para_fops);
+		if (!entry)
+			pr_err("create nand\rd_para file fail!!!\n");
 	}
-	entry->read_proc = mtk_nand_proc_read;
-	entry->write_proc = mtk_nand_proc_write;
-#endif
-
-	/* pr_debug("MediaTek Nand driver init, version %s\n", VERSION); */
 
 	return platform_driver_register(&mtk_nand_driver);
 }

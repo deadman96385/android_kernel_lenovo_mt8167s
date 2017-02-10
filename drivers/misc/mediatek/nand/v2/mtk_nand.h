@@ -574,10 +574,20 @@ struct mtk_nand_host_hw {
 };
 #endif
 
+/*time unit is us*/
+struct read_sleep_para {
+	int sample_count;
+	int t_sector_ahb;
+	int t_schedule;
+	int t_sleep_range;
+	int t_threshold;
+};
+
 struct mtk_nand_host {
 	struct nand_chip nand_chip;
 	struct mtd_info mtd;
 	struct mtk_nand_host_hw *hw;
+	struct read_sleep_para rd_para;
 #ifdef CONFIG_PM
 	struct nfi_saved_para saved_para;
 #endif
