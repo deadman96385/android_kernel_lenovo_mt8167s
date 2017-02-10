@@ -39,10 +39,7 @@
 #include "nand_device_define.h"
 #include "mtk_nand_chip.h"
 
-/* #define MTK_FORCE_SYNC_OPS */
 /* #define MTK_FORCE_READ_FULL_PAGE */
-
-#define MTK_NAND_OPS_BG_CTRL
 
 /* UNIT TEST RELATED */
 /* #define MTK_NAND_CHIP_TEST */
@@ -56,10 +53,6 @@ extern bool tlc_snd_phyplane;
 extern enum NFI_TLC_PG_CYCLE tlc_program_cycle;
 extern bool tlc_lg_left_plane;
 extern struct mtk_nand_host *host;
-#if 0
-extern u32 Nand_ErrBitLoc[][96];
-extern u32 Nand_ErrNUM[];
-#endif
 extern void dump_nfi(void);
 
 #define NAND_DEBUG_DISABLE	1
@@ -193,9 +186,7 @@ struct mtk_nand_data_info {
 
 	struct worklist_ctrl elist_ctrl;
 	struct worklist_ctrl wlist_ctrl;
-#ifdef MTK_NAND_OPS_BG_CTRL
 	struct completion ops_ctrl;
-#endif
 	struct task_struct *nand_bgt;
 
 	struct mtd_info *mtd;

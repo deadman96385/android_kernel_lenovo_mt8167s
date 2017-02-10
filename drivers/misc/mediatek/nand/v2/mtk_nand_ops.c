@@ -1222,14 +1222,9 @@ static int mtk_nand_process_list(
 
 	count = get_list_work_cnt(list_ctrl);
 
-	if (((sync_num > 0) &&
-			(count < sync_num))
-		|| (count == 0))
+	if (((sync_num > 0) && (count < sync_num))
+			|| (count == 0))
 		goto OUT;
-
-	if (sync_num && count)
-		nand_debug("sync_num:%d, count:%d",
-			sync_num, count);
 
 	lock_list(list_ctrl);
 	head = &list_ctrl->head;
@@ -1239,7 +1234,7 @@ static int mtk_nand_process_list(
 	while (item != NULL) {
 		start_node = list_ctrl->is_ready_func(info, head, item, &count);
 		if (count) {
-			nand_debug("get write count:%d, start_node:%p, sync:%d",
+			nand_debug("get count:%d, start_node:%p, sync:%d\n",
 				count, start_node, sync_num);
 			next = list_ctrl->process_data_func(info,
 					list_ctrl, start_node, count);
@@ -1283,36 +1278,18 @@ static int mtk_nand_work_thread(void *u)
 	struct mtk_nand_chip_info *info = &data_info->chip_info;
 	struct worklist_ctrl *elist_ctrl = &data_info->elist_ctrl;
 	struct worklist_ctrl *wlist_ctrl = &data_info->wlist_ctrl;
-	unsigned int ret = 0;
 
-	nand_debug("mtk_nand_async_thread thread started, PID %d",
-		task_pid_nr(current));
-
+	pr_err("%s started, PID %d\n", __func__, task_pid_nr(current));
 	set_freezable();
-
 	for (;;) {
-		if (kthread_should_stop())
-			break;
-		if (try_to_freeze())
-			continue;
-
-#ifdef MTK_NAND_OPS_BG_CTRL
 		wait_for_completion(&data_info->ops_ctrl);
-#endif
-		ret = mtk_nand_process_list(info, elist_ctrl, 0);
-		ret  |= mtk_nand_process_list(info, wlist_ctrl, 0);
 
-		if (ret == 0) {
-			schedule();
-			continue;
-		} else {
-			cond_resched();
-		}
+		mtk_nand_process_list(info, elist_ctrl, 0);
+		mtk_nand_process_list(info, wlist_ctrl, 0);
 
 	}
 
-	nand_debug("mtk_nand_async_thread thread killed, PID %d",
-		task_pid_nr(current));
+	pr_err("%s exit, PID %d\n", __func__, task_pid_nr(current));
 
 	return 0;
 }
@@ -1571,8 +1548,8 @@ int mtk_nand_chip_write_page(struct mtk_nand_chip_info *info,
 	struct mtk_nand_chip_operation *ops;
 	int total_num;
 
-	nand_debug("%s, block:0x%x page:0x%x more_page:0x%x",
-		__func__, block, page, more_page);
+	nand_debug("write block:0x%x page:0x%x more_page:0x%x\n",
+		block, page, more_page);
 
 	if (oob_buffer == NULL) {
 		nand_err("data_buffer is null");
@@ -1625,11 +1602,7 @@ int mtk_nand_chip_write_page(struct mtk_nand_chip_info *info,
 
 	add_list_node(list_ctrl, &work->list);
 
-#ifdef MTK_NAND_OPS_BG_CTRL
 	complete(&data_info->ops_ctrl);
-#else
-	wake_up_process(data_info->nand_bgt);
-#endif
 
 	return 0;
 }
@@ -1654,8 +1627,8 @@ int mtk_nand_chip_erase_block(struct mtk_nand_chip_info *info,
 	struct mtk_nand_chip_operation *ops;
 	int total_num;
 
-	nand_debug("%s, block:0x%x more_page:0x%x",
-		__func__, block, more_block);
+	nand_debug("erase block:0x%x more_page:0x%x\n",
+		block, more_block);
 
 	if (!block_num_is_valid(info, block)) {
 		nand_err("block num is invalid:block:%d", block);
@@ -1696,12 +1669,7 @@ int mtk_nand_chip_erase_block(struct mtk_nand_chip_info *info,
 		block, &work->list);
 
 	add_list_node(list_ctrl, &work->list);
-
-#ifdef MTK_NAND_OPS_BG_CTRL
 	complete(&data_info->ops_ctrl);
-#else
-	wake_up_process(data_info->nand_bgt);
-#endif
 
 	return 0;
 }
@@ -2363,12 +2331,10 @@ int mtk_nand_ops_init(struct mtd_info *mtd, struct nand_chip *chip)
 		complete_write_count,
 		mtk_nand_do_write);
 
-#ifdef MTK_NAND_OPS_BG_CTRL
 	init_completion(&data_info->ops_ctrl);
-#endif
-
-	data_info->nand_bgt = kthread_create(mtk_nand_work_thread,
+	data_info->nand_bgt = kthread_run(mtk_nand_work_thread,
 				data_info, "nand_bgt");
+
 	if (IS_ERR(data_info->nand_bgt)) {
 		ret = PTR_ERR(data_info->nand_bgt);
 		data_info->nand_bgt = NULL;
