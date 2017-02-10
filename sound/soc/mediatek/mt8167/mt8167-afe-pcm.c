@@ -1214,6 +1214,11 @@ static void mt8167_afe_hdmi_shutdown(struct snd_pcm_substream *substream,
 	const unsigned int stream = substream->stream;
 
 	if (be->prepared[stream]) {
+		/* disable tdm */
+		regmap_update_bits(afe->regmap, AFE_TDM_CON1, 0x1, 0);
+
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_HDMI);
+
 		if (rate % 8000)
 			mt8167_afe_disable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
 		else
@@ -1355,6 +1360,11 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 		regmap_update_bits(afe->regmap, AFE_I2S_CON1,
 			   AFE_I2S_CON1_TDMOUT_MUX_MASK, AFE_I2S_CON1_TDMOUT_TO_PAD);
 
+	mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_HDMI);
+
+	/* enable tdm */
+	regmap_update_bits(afe->regmap, AFE_TDM_CON1, 0x1, 0x1);
+
 	be->prepared[stream] = true;
 
 	return 0;
@@ -1371,8 +1381,6 @@ static int mt8167_afe_hdmi_trigger(struct snd_pcm_substream *substream, int cmd,
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
-		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_HDMI);
-
 		/* align the connection logic with HDMI Tx */
 		/* set connections:  O28~O35: L/R/LFE/C/LS/RS/CH7/CH8 */
 		if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI)
@@ -1390,21 +1398,11 @@ static int mt8167_afe_hdmi_trigger(struct snd_pcm_substream *substream, int cmd,
 
 		/* enable Out control */
 		regmap_update_bits(afe->regmap, AFE_HDMI_OUT_CON0, 0x1, 0x1);
-
-		/* enable tdm */
-		regmap_update_bits(afe->regmap, AFE_TDM_CON1, 0x1, 0x1);
-
 		return 0;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
-		/* disable tdm */
-		regmap_update_bits(afe->regmap, AFE_TDM_CON1, 0x1, 0);
-
 		/* disable Out control */
 		regmap_update_bits(afe->regmap, AFE_HDMI_OUT_CON0, 0x1, 0);
-
-		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_HDMI);
-
 		return 0;
 	default:
 		return -EINVAL;
