@@ -27,7 +27,13 @@
 
 #include <mt-plat/upmu_common.h>
 
+#define PMIC6392_E1_CID_CODE 0x1092
+
 struct regmap *pwrap_regmap;
+
+static DEFINE_SPINLOCK(vcn35_on_ctrl_spinlock);
+static int vcn35_on_ctrl_bt;
+static int vcn35_on_ctrl_wifi;
 
 unsigned int pmic_read_interface(unsigned int RegNum, unsigned int *val, unsigned int MASK, unsigned int SHIFT)
 {
@@ -135,6 +141,82 @@ void PMIC_INIT_SETTING_V1(void)
 {
 	/* to be do */
 	/* put init setting from DE/SA */
+}
+
+void upmu_set_vcn35_on_ctrl_bt(unsigned int val)
+{
+	unsigned int ret, cid;
+	u32 vcn35_on_ctrl;
+
+	cid = upmu_get_cid();
+	if (cid == PMIC6392_E1_CID_CODE) {
+		pr_debug("%s: MT6392 PMIC CID=0x%x\n", __func__, cid);
+
+		spin_lock(&vcn35_on_ctrl_spinlock);
+
+		if (val)
+			vcn35_on_ctrl_bt = 1;
+		else
+			vcn35_on_ctrl_bt = 0;
+
+		if (vcn35_on_ctrl_bt || vcn35_on_ctrl_wifi)
+			vcn35_on_ctrl = 0x1;
+		else
+			vcn35_on_ctrl = 0x0;
+
+		ret = pmic_config_interface((unsigned int)(MT6392_DIGLDO_CON61),
+				    (unsigned int)(vcn35_on_ctrl),
+				    (unsigned int)(MT6392_PMIC_VCN35_ON_CTRL_MASK),
+				    (unsigned int)(MT6392_PMIC_VCN35_ON_CTRL_SHIFT)
+			);
+
+		spin_unlock(&vcn35_on_ctrl_spinlock);
+	} else {
+		pr_debug("%s: MT6392 PMIC CID=0x%x\n",  __func__, cid);
+		ret = pmic_config_interface((unsigned int)(MT6392_ANALDO_CON16),
+				    (unsigned int)(val),
+				    (unsigned int)(MT6392_PMIC_VCN35_ON_CTRL_BT_MASK),
+				    (unsigned int)(MT6392_PMIC_VCN35_ON_CTRL_BT_SHIFT)
+			);
+	}
+}
+
+void upmu_set_vcn35_on_ctrl_wifi(unsigned int val)
+{
+	unsigned int ret, cid;
+	u32 vcn35_on_ctrl;
+
+	cid = upmu_get_cid();
+	if (cid == PMIC6392_E1_CID_CODE) {
+		pr_debug("%s: MT6392 PMIC CID=0x%x\n", __func__, cid);
+
+		spin_lock(&vcn35_on_ctrl_spinlock);
+
+		if (val)
+			vcn35_on_ctrl_wifi = 1;
+		else
+			vcn35_on_ctrl_wifi = 0;
+
+		if (vcn35_on_ctrl_bt || vcn35_on_ctrl_wifi)
+			vcn35_on_ctrl = 0x1;
+		else
+			vcn35_on_ctrl = 0x0;
+
+		ret = pmic_config_interface((unsigned int)(MT6392_DIGLDO_CON61),
+				    (unsigned int)(vcn35_on_ctrl),
+				    (unsigned int)(MT6392_PMIC_VCN35_ON_CTRL_MASK),
+				    (unsigned int)(MT6392_PMIC_VCN35_ON_CTRL_SHIFT)
+			);
+
+		spin_unlock(&vcn35_on_ctrl_spinlock);
+	} else {
+		pr_debug("%s: MT6392 PMIC CID=0x%x\n", __func__, cid);
+		ret = pmic_config_interface((unsigned int)(MT6392_ANALDO_CON17),
+					    (unsigned int)(val),
+					    (unsigned int)(MT6392_PMIC_VCN35_ON_CTRL_WIFI_MASK),
+					    (unsigned int)(MT6392_PMIC_VCN35_ON_CTRL_WIFI_SHIFT)
+		    );
+	}
 }
 
 static int mt6392_pmic_probe(struct platform_device *dev)
