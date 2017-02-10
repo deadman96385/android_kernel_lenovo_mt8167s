@@ -19,6 +19,8 @@
 #include <linux/string.h>
 #include <linux/of_address.h>
 #include <linux/of_fdt.h>
+#include <linux/regmap.h>
+#include <linux/soc/mediatek/pmic_wrap.h>
 #include <uapi/asm/setup.h>
 
 #include "mtk_spm_internal.h"
@@ -417,7 +419,7 @@ static void __iomem *pwrap_base;
 
 #define NR_PMIC_WRAP_CMD 8
 
-#define PMIC_ADDR_VPROC_CA53_VOSEL_ON	0x0220	/* [6:0] */
+#define PMIC_ADDR_VPROC_VOSEL_ON		0x0220	/* [6:0] */
 #define PMIC_ADDR_VCORE_VOSEL_ON		0x0314	/* [6:0] */
 
 struct pmic_wrap_cmd {
@@ -446,17 +448,17 @@ static struct pmic_wrap_setting pw = {
 
 	/* Vproc only, power off: index 1, power on: 0 */
 	.set[PMIC_WRAP_PHASE_DEEPIDLE] = {
-		._[IDX_DI_VPROC_CA7_NORMAL] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+		._[IDX_DI_VPROC_CA7_NORMAL] = {PMIC_ADDR_VPROC_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(1150),},
-		._[IDX_DI_VPROC_CA7_SLEEP] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+		._[IDX_DI_VPROC_CA7_SLEEP] = {PMIC_ADDR_VPROC_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(850),},
 		._[IDX_DI_VSRAM_CA7_FAST_TRSN_EN] = {PMIC_ADDR_VCORE_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(1125),},
 		._[IDX_DI_VSRAM_CA7_FAST_TRSN_DIS] = {PMIC_ADDR_VCORE_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(900),},
-		._[IDX_DI_VCORE_NORMAL] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+		._[IDX_DI_VCORE_NORMAL] = {PMIC_ADDR_VPROC_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(1000),},
-		._[IDX_DI_VCORE_SLEEP] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+		._[IDX_DI_VCORE_SLEEP] = {PMIC_ADDR_VPROC_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(800),},
 		._[IDX_DI_VCORE_PDN_NORMAL] = {PMIC_ADDR_VCORE_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(1125),},
@@ -465,19 +467,19 @@ static struct pmic_wrap_setting pw = {
 		.nr_idx = NR_IDX_DI,
 	},
 
-	/* power off: index 7,3. power on: index 2,6 */
+	/* Vproc only, power off: 1, power on: 0 */
 	.set[PMIC_WRAP_PHASE_SODI] = {
-		._[IDX_SO_VSRAM_CA15L_NORMAL] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
-			VOLT_TO_PMIC_VAL(1000),},
-		._[IDX_SO_VSRAM_CA15L_SLEEP] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
-			VOLT_TO_PMIC_VAL(800),},
-		._[IDX_SO_VPROC_CA7_NORMAL] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+		._[IDX_SO_VSRAM_CA15L_NORMAL] = {PMIC_ADDR_VPROC_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(1150),},
+		._[IDX_SO_VSRAM_CA15L_SLEEP] = {PMIC_ADDR_VPROC_VOSEL_ON,
+			VOLT_TO_PMIC_VAL(850),},
+		._[IDX_SO_VPROC_CA7_NORMAL] = {PMIC_ADDR_VPROC_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(1125),},
-		._[IDX_SO_VPROC_CA7_SLEEP] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+		._[IDX_SO_VPROC_CA7_SLEEP] = {PMIC_ADDR_VPROC_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(700),},
-		._[IDX_SO_VCORE_NORMAL] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+		._[IDX_SO_VCORE_NORMAL] = {PMIC_ADDR_VPROC_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(1000),},
-		._[IDX_SO_VCORE_SLEEP] = {PMIC_ADDR_VPROC_CA53_VOSEL_ON,
+		._[IDX_SO_VCORE_SLEEP] = {PMIC_ADDR_VPROC_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(800),},
 		._[IDX_SO_VSRAM_CA7_FAST_TRSN_EN] = {PMIC_ADDR_VCORE_VOSEL_ON,
 			VOLT_TO_PMIC_VAL(1125),},
@@ -487,9 +489,10 @@ static struct pmic_wrap_setting pw = {
 	},
 };
 
+static struct regmap *pmic_regmap;
 static void spm_get_pwrap_base(void)
 {
-	struct device_node *node;
+	struct device_node *node, *pwrap_node;
 
 	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-pwrap");
 	if (!node)
@@ -497,6 +500,19 @@ static void spm_get_pwrap_base(void)
 	pwrap_base = of_iomap(node, 0);
 	if (!pwrap_base)
 		spm_warn("get pwrap_base failed\n");
+
+	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-scpsys");
+	if (!node)
+		spm_err("find mt8167-scpsys node failed\n");
+	BUG_ON(!node);
+	pwrap_node = of_parse_phandle(node, "mediatek,pwrap-regmap", 0);
+	if (pwrap_node) {
+		pmic_regmap = pwrap_node_to_regmap(pwrap_node);
+		if (IS_ERR(pmic_regmap))
+			spm_err("cannot get pmic_regmap\n");
+	} else {
+		spm_err("pwrap node has not register regmap\n");
+	}
 }
 
 static void spm_pmic_table_init(void)
@@ -517,7 +533,8 @@ static void spm_pmic_table_init(void)
 
 void __spm_set_pmic_phase(enum pmic_wrap_phase_id phase)
 {
-	int i;
+	int i, ret;
+	u32 rdata = 0;
 
 	WARN_ON(phase >= NR_PMIC_WRAP_PHASE);
 
@@ -528,6 +545,16 @@ void __spm_set_pmic_phase(enum pmic_wrap_phase_id phase)
 	}
 
 	pw.phase = phase;
+
+	/* backup the voltage setting of Vproc */
+	ret = regmap_read(pmic_regmap, PMIC_ADDR_VPROC_VOSEL_ON, &rdata);
+	BUG_ON(ret);
+
+	if (phase == PMIC_WRAP_PHASE_SODI) {
+		pw.set[phase]._[IDX_SO_VSRAM_CA15L_NORMAL].cmd_wdata = rdata;
+	} else if (phase == PMIC_WRAP_PHASE_DEEPIDLE) {
+		pw.set[phase]._[IDX_DI_VPROC_CA7_NORMAL].cmd_wdata = rdata;
+	}
 
 	for (i = 0; i < pw.set[phase].nr_idx; i++) {
 		spm_write(pw.addr[i].cmd_addr, pw.set[phase]._[i].cmd_addr);
