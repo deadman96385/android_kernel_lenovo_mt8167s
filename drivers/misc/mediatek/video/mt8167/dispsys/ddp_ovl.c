@@ -539,10 +539,10 @@ int ovl_layer_config(enum DISP_MODULE_ENUM module,
 		ASSERT(0);
 	}
 
-	DDPMSG("ovl%d, layer=%d source=%s off(x=%d, y=%d), dst(%d, %d, %d, %d) ",
+	DDPMSG("ovl%d, layer=%d source=%s off(x=%d, y=%d), dst(%d, %d, %d, %d)\n",
 			idx, layer, (source == 0) ? "memory" : "dim",
 			src_x, src_y, dst_x, dst_y, dst_w, dst_h);
-	DDPMSG("pitch=%d, fmt=%s, addr=0x%lx, sec = %d\n",
+	DDPMSG("                pitch=%d, fmt=%s, addr=0x%lx, sec = %d\n",
 			src_pitch, ovl_intput_format_name(fmt, input_swap), addr, sec);
 
 	/*
