@@ -20,7 +20,7 @@
 
 #include <linux/of.h>
 #include <linux/of_address.h>
-#include "mt_smi.h"
+#include "mtk_smi.h"
 
 static m4u_domain_t gM4uDomain;
 
