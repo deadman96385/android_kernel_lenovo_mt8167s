@@ -2538,7 +2538,7 @@ int mt_gpufreq_fan53555_init(void)
 }
 #ifdef CONFIG_OF
 static const struct of_device_id mt_gpufreq_of_match[] = {
-	{.compatible = "mediatek,mt6799-gpufreq",},
+	{.compatible = "mediatek,mt8167-gpufreq",},
 	{ /* sentinel */ },
 };
 #endif

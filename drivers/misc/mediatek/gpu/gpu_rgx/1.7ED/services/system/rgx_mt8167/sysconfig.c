@@ -158,6 +158,7 @@ static PHYS_HEAP_REGION gsHeapRegionsLocal[] = {
 
 PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 {
+	PVRSRV_ERROR err = PVRSRV_OK;
 
 	gsPhysHeapFuncs.pfnCpuPAddrToDevPAddr = UMAPhysHeapCpuPAddrToDevPAddr;
 	gsPhysHeapFuncs.pfnDevPAddrToCpuPAddr = UMAPhysHeapDevPAddrToCpuPAddr;
@@ -304,10 +305,9 @@ dump_stack();
 	gsDevices[0].pvOSDevice = pvOSDevice;
 	*ppsDevConfig = &gsDevices[0];
 
-	/*MTKRGXDeviceInit(gsDevices[0].pvOSDevice);*/
-	/*CJ removei it first, because, the Power and Clk should be ready*/
+	err = (PVRSRV_ERROR)(MTKRGXDeviceInit(gsDevices[0].pvOSDevice));
 
-	return PVRSRV_OK;
+	return err;
 }
 
 void SysDevDeInit(PVRSRV_DEVICE_CONFIG *psDevConfig)
