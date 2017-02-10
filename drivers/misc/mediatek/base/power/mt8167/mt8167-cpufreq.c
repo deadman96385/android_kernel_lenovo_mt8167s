@@ -536,8 +536,9 @@ static int mtk_cpufreq_init(struct cpufreq_policy *policy)
 		dev_pm_opp_add(info->cpu_dev, 598000000, 1150000);
 		dev_pm_opp_add(info->cpu_dev, 747500000, 1150000);
 		dev_pm_opp_add(info->cpu_dev, 1040000000, 1200000);
+		dev_pm_opp_add(info->cpu_dev, 1196000000, 1250000);
 		dev_pm_opp_add(info->cpu_dev, 1300000000, 1300000);
-		dev_pm_opp_add(info->cpu_dev, 1481000000, 1300000);
+		dev_pm_opp_add(info->cpu_dev, 1500000000, 1300000);
 
 		dev_pm_opp_free_cpufreq_table(info->cpu_dev, &freq_table);
 		dev_pm_opp_init_cpufreq_table(info->cpu_dev, &freq_table);
