@@ -1119,6 +1119,7 @@ extern bool mtk_block_istlc(u64 addr);
 extern bool mtk_is_normal_tlc_nand(void);
 extern u64 mtk_nand_device_size(void);
 extern int mtk_nand_init_size(struct mtd_info *mtd, struct nand_chip *this, u8 *id_data);
+extern int mtk_nand_interface_async(void);
 #endif
 
 #define PMT_POOL_SIZE (2)

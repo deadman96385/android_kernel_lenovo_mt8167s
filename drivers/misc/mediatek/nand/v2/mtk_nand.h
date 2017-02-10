@@ -107,12 +107,15 @@
 #define NFI_FIFODATA2_REG32 ((volatile unsigned int *)(NFI_BASE+0x0198))
 #define NFI_FIFODATA3_REG32 ((volatile unsigned int *)(NFI_BASE+0x019C))
 #define NFI_DEBUG_CON1_REG16 ((volatile unsigned short *)(NFI_BASE+0x0220))
+
+#define NFI_DEBUG_ECCPLL_SHIFT     (11)
+
 #define NFI_MASTERSTA_REG16 ((volatile unsigned short *)(NFI_BASE+0x0224))
 #define NFI_MASTERRST_REG32 ((volatile unsigned short *)(NFI_BASE+0x0228))
 #define NFI_RANDOM_CNFG_REG32 ((volatile unsigned int *)(NFI_BASE+0x0238))
 #define NFI_ENMPTY_THRESH_REG32 ((volatile unsigned int *)(NFI_BASE+0x023C))
 #define NFI_NAND_TYPE_CNFG_REG32 ((volatile unsigned int *)(NFI_BASE+0x0240))
-#define NFI_ACCCON1_REG3    ((volatile unsigned int *)(NFI_BASE+0x0244))
+#define NFI_ACCCON1_REG32    ((unsigned int *)(NFI_BASE+0x0244))
 #define NFI_DLYCTRL_REG32    ((volatile unsigned int *)(NFI_BASE+0x0248))
 
 #define NFI_RANDOM_ENSEED01_TS_REG32 ((volatile unsigned int *)(NFI_BASE+0x024C))

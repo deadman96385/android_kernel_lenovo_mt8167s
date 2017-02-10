@@ -132,14 +132,14 @@
 
 
 static const flashdev_info_t gen_FlashTable_p[] = {
-	{{0x45, 0x4C, 0x98, 0xA3, 0x76, 0x00}, 5, 5, IO_8BIT, 0x10F2000, 6144, 16384, 1952, 0x10401011,
-	 0xC03222, 0x101, 80, VEND_SANDISK, 1024, "SDTNSIAMA016G ", MULTI_PLANE,
+	{{0x45, 0x4C, 0x98, 0xA3, 0x76, 0x00}, 5, 5, IO_8BIT/*IO_TOGGLESDR*/, 0x10F2000, 6144, 16384, 1952, 0x10401011,
+	 0x33418010, 0x01010400, 80, VEND_SANDISK, 1024, "SDTNSIAMA016G ", MULTI_PLANE,
 	 {PPTBL_NONE,
 	  {0xEF, 0xEE, 0x5D, 46, 0x11, 0, 0, RTYPE_SANDISK_TLC_1ZNM, {0x80, 0x00}, {0x80, 0x01} },
 	  {RAND_TYPE_SAMSUNG, {0x2D2D, 1, 1, 1, 1, 1} } },
 	  NAND_FLASH_TLC, {FALSE, FALSE, TRUE, TRUE, 0xA2, 0xFF, TRUE, 68, 8, 0}, false },
-	{{0x45, 0xDE, 0x94, 0x93, 0x76, 0x51}, 6, 5, IO_8BIT, 0x800000, 4096, 16384, 1280, 0x10401011/* 0x10804222 */,
-	 0xC03222, 0x101, 80, VEND_SANDISK, 1024, "SDTNSGAMA008G ", MULTI_PLANE,
+	{{0x45, 0xDE, 0x94, 0x93, 0x76, 0x51}, 6, 5, IO_8BIT/* IO_TOGGLESDR*/, 0x800000, 4096, 16384, 1280, 0x10401011,
+	 0x33418010, 0x01010400, 80, VEND_SANDISK, 1024, "SDTNSGAMA008G ", MULTI_PLANE,
 	 {SANDISK_16K,
 	  {0xEF, 0xEE, 0x5D, 33, 0x11, 0, 0xFFFFFFFE, RTYPE_SANDISK, {0x80, 0x00}, {0x80, 0x01} },
 	  {RAND_TYPE_SAMSUNG, {0x2D2D, 1, 1, 1, 1, 1} } },
@@ -238,10 +238,27 @@ static struct clk *onfi_mode5;
 static struct clk *onfi_mode4;
 static struct clk *nfi_bclk_sel;
 static struct clk *nfi_ahb_clk;
-static struct clk *nfi_1xpad_clk;
 static struct clk *nfi_ecc_pclk;
 static struct clk *nfi_pclk;
 static struct clk *onfi_pad_clk;
+/* for MT8167 */
+
+static struct clk *nfi_2xclk;
+static struct clk *nfi_rgecc;
+
+static struct clk *nfi_1xclk_sel;
+static struct clk *nfi_2xclk_sel;
+static struct clk *nfiecc_sel;
+static struct clk *nfiecc_csw_sel;
+static struct clk *nfi_1xpad_clk;
+
+static struct clk *main_d4;	/* main_d10 */
+static struct clk *main_d5;	/* main_d12 */
+static struct clk *main_d6;	/* main_d10 */
+static struct clk *main_d7;	/* main_d12 */
+static struct clk *main_d8;	/* main_d12 */
+static struct clk *main_d10;	/* main_d10 */
+static struct clk *main_d12;	/* main_d12 */
 
 static struct regulator *mtk_nand_regulator;
 #endif
@@ -612,7 +629,8 @@ static int g_page_size;
 static int g_block_size;
 static u32 PAGES_PER_BLOCK = 255;
 static bool g_bSyncOrToggle;
-#ifndef CONFIG_MTK_FPGA
+/* #ifndef CONFIG_MTK_FPGA */
+#if 0
 #ifdef CONFIG_MTK_LEGACY
 static int g_iNFI2X_CLKSRC = ARMPLL;
 #else
@@ -650,6 +668,8 @@ static int mtk_nand_cs_check(struct mtd_info *mtd, u8 *id, u16 cs);
 static u32 mtk_nand_cs_on(struct nand_chip *nand_chip, u16 cs, u32 page);
 #endif
 
+static bool mtk_nand_device_reset(void);
+static bool mtk_nand_set_command(u16 command);
 
 static bmt_struct *g_bmt;
 struct mtk_nand_host *host;
@@ -848,6 +868,16 @@ void nand_prepare_clock(void)
 		clk_prepare(nfi_pclk);
 		clk_prepare(nfi_ecc_pclk);
 	}
+	if (mtk_nfi_dev_comp->chip_ver == 3) {
+		pr_debug("%s %d\n", __func__, __LINE__);
+		clk_prepare(nfi_rgecc);
+
+		if (g_bSyncOrToggle == true)
+			clk_prepare(nfi_2xclk);
+	}
+	clk_prepare(nfi_hclk);
+	clk_prepare(nfiecc_bclk);
+	clk_prepare(nfi_bclk);
 	#endif
 	#endif
 }
@@ -862,6 +892,13 @@ void nand_unprepare_clock(void)
 	if (mtk_nfi_dev_comp->chip_ver == 2) {
 		clk_unprepare(nfi_pclk);
 		clk_unprepare(nfi_ecc_pclk);
+	}
+	if (mtk_nfi_dev_comp->chip_ver == 3) {
+		pr_debug("%s %d\n", __func__, __LINE__);
+		clk_unprepare(nfi_rgecc);
+
+		if (g_bSyncOrToggle == true)
+			clk_unprepare(nfi_2xclk);
 	}
 	#endif
 	#endif
@@ -890,6 +927,13 @@ void nand_enable_clock(void)
 	}
 #else
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
+	if (mtk_nfi_dev_comp->chip_ver == 3) {
+		/* pr_debug("%s %d\n", __func__, __LINE__); */
+		clk_enable(nfi_rgecc);
+
+		if (g_bSyncOrToggle == true)
+			clk_enable(nfi_2xclk);
+	}
 	clk_enable(nfi_hclk);
 	clk_enable(nfiecc_bclk);
 	clk_enable(nfi_bclk);
@@ -924,6 +968,13 @@ void nand_disable_clock(void)
 	}
 #else
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
+	/* pr_debug("%s %d\n", __func__, __LINE__); */
+	if (mtk_nfi_dev_comp->chip_ver == 3) {
+		clk_disable(nfi_rgecc);
+
+		if (g_bSyncOrToggle == true)
+			clk_disable(nfi_2xclk);
+	}
 	clk_disable(nfi_hclk);
 	clk_disable(nfiecc_bclk);
 	clk_disable(nfi_bclk);
@@ -1480,143 +1531,228 @@ bool mtk_nand_IsRawPartition(loff_t logical_address)
 		return false;
 }
 
+int mtk_nand_interface_async(void)
+{
+	int retry = 10;
+	u32 val = 0;
+	struct gFeatureSet *feature_set = &(devinfo.feature_set.FeatureSet);
+
+	pr_debug("[%s] Start to change ASYNC interface\n", __func__);
+
+	if (g_bSyncOrToggle == TRUE) {
+
+		mtk_nand_GetFeature(NULL, feature_set->gfeatureCmd,
+				feature_set->Interface.address, (u8 *) &val, 4);
+
+		if (val != feature_set->Interface.feature) {
+			pr_info("[%s] %d check device interface value %d (0x%x)\n",
+			    __func__, __LINE__, val, DRV_Reg16(NFI_NAND_TYPE_CNFG_REG32));
+		}
+
+		mtk_nand_SetFeature(NULL, (u16) feature_set->sfeatureCmd,
+				feature_set->Interface.address,
+				(u8 *) &feature_set->Async_timing.feature,
+				sizeof(feature_set->Interface.feature));
+
+		while ((DRV_Reg16(NFI_NAND_TYPE_CNFG_REG32) != 4) && retry--)
+			DRV_WriteReg16(NFI_NAND_TYPE_CNFG_REG32, 0);
+
+		nand_disable_clock();
+
+		clk_prepare_enable(nfi_2xclk_sel);
+		clk_set_parent(nfi_2xclk_sel, onfi_26m_clk);
+		clk_disable_unprepare(nfi_2xclk_sel);
+
+		clk_prepare_enable(nfi_1xclk_sel);
+		clk_set_parent(nfi_1xclk_sel, nfi_ahb_clk);
+		clk_disable_unprepare(nfi_1xclk_sel);
+		nand_enable_clock();
+
+		NFI_SET_REG32(NFI_DEBUG_CON1_REG16, NFI_BYPASS);
+
+		NFI_SET_REG32(ECC_BYPASS_REG32, ECC_BYPASS);
+		DRV_WriteReg32(NFI_ACCCON_REG32, devinfo.timmingsetting);
+
+		g_bSyncOrToggle = FALSE;
+		pr_debug("Disable DDR mode\n");
+	} else
+		pr_debug("Already legacy mode\n");
+
+	return 0;
+}
+
 static int mtk_nand_interface_config(struct mtd_info *mtd)
 {
 	u32 timeout;
 	u32 val;
-	u32 acccon1;
+	int retry = 10;
+	int sretry = 10;
 	struct gFeatureSet *feature_set = &(devinfo.feature_set.FeatureSet);
-	/* int clksrc = ARMPLL; */
+
+	pr_debug("[%s] Start to change DDR interface\n", __func__);
+	mtk_nand_GetFeature(mtd, feature_set->gfeatureCmd,
+						feature_set->Interface.address, (u8 *) &val, 4);
+
+	if ((val != feature_set->Interface.feature) &&
+		(val != feature_set->Async_timing.feature)) {
+		pr_info("[%s] Change mode to toggle first\n", __func__);
+		pr_info("value %d, regs 0x%x, 0x%x, 0x%x\n", val,
+			DRV_Reg16(NFI_NAND_TYPE_CNFG_REG32),
+			DRV_Reg32(NFI_ACCCON1_REG32),
+			DRV_Reg32(NFI_ACCCON_REG32));
+		DRV_WriteReg32(NFI_DLYCTRL_REG32, 0xA001);
+
+		DRV_WriteReg16((unsigned short *)(GPIO_BASE + 0xF00), 0x3);
+		DRV_WriteReg16((unsigned short *)(GPIO_BASE + 0xF10), 0x10);
+
+		DRV_WriteReg16(NFI_NAND_TYPE_CNFG_REG32, 1);
+		DRV_WriteReg32(NFI_ACCCON1_REG32, devinfo.s_acccon1);
+		DRV_WriteReg32(NFI_ACCCON_REG32, devinfo.s_acccon);
+	}
+
+	mtk_nand_GetFeature(mtd, feature_set->gfeatureCmd,
+						feature_set->Interface.address, (u8 *) &val, 4);
+	if ((val != feature_set->Interface.feature) &&
+		(val != feature_set->Async_timing.feature)) {
+		pr_info("[%s] LINE %d - value %d (0x%x)\n", __func__, __LINE__,
+			val, DRV_Reg16(NFI_NAND_TYPE_CNFG_REG32));
+	}
+
 	if (devinfo.iowidth == IO_ONFI || devinfo.iowidth == IO_TOGGLEDDR
 		|| devinfo.iowidth == IO_TOGGLESDR) {
-		nand_enable_clock();
-#ifndef CONFIG_MTK_FPGA
-		/* 0:26M   1:182M  2:156M  3:124.8M  4:91M	5:62.4M   6:39M   7:26M */
-		if (devinfo.freq == 80) {	/* mode 4 */
-#ifdef CONFIG_MTK_LEGACY
-			g_iNFI2X_CLKSRC = MSDCPLL; /* 156M */
-#else
-			g_iNFI2X_CLKSRC = 2;	/* 156M */
-#endif
+		do {
+/*reset*/
+			mtk_nand_device_reset();
 
-		} else if (devinfo.freq == 100) {	/* mode 5 */
-#ifdef CONFIG_MTK_LEGACY
-			g_iNFI2X_CLKSRC = MAINPLL; /* 182M */
-#else
-			g_iNFI2X_CLKSRC = 1;	/* 182M */
-#endif
-		}
-#endif
-		/* reset */
-		/* pr_debug("[Bean]mode:%d\n", g_iNFI2X_CLKSRC); */
-		NFI_ISSUE_COMMAND(NAND_CMD_RESET, 0, 0, 0, 0);
-		timeout = TIMEOUT_4;
-		while (timeout)
-			timeout--;
-		mtk_nand_reset();
-		/* set feature */
-		/* pr_debug("[Interface Config]cmd:0x%X addr:0x%x feature:0x%x\n", */
-		/* feature_set->sfeatureCmd, feature_set->Interface.address, feature_set->Interface.feature); */
+			mtk_nand_GetFeature(mtd, feature_set->gfeatureCmd,
+								feature_set->Interface.address, (u8 *) &val, 4);
+			if ((val != feature_set->Interface.feature) &&
+				(val != feature_set->Async_timing.feature)) {
+				pr_info("[%s] LINE %d - value %d (0x%x)\n", __func__, __LINE__,
+					val, DRV_Reg16(NFI_NAND_TYPE_CNFG_REG32));
+			}
+/*set feature*/
+			mtk_nand_SetFeature(mtd, (u16) feature_set->sfeatureCmd,
+						feature_set->Interface.address,
+						(u8 *) &feature_set->Interface.feature,
+						sizeof(feature_set->Interface.feature));
+			/* Set DDR flag here for clk */
+			g_bSyncOrToggle = TRUE;
 
-		/* mtk_nand_GetFeature(mtd, feature_set->gfeatureCmd, \ */
-		/* feature_set->Interface.address, &val,4); */
-		/* pr_debug("[Interface]0x%X\n", val); */
-		mtk_nand_SetFeature(mtd, (u16) feature_set->sfeatureCmd,
-					feature_set->Interface.address,
-					(u8 *) &feature_set->Interface.feature,
-					sizeof(feature_set->Interface.feature));
-		mb();
-		NFI_CLN_REG32(NFI_DEBUG_CON1_REG16, HWDCM_SWCON_ON);
+			NFI_CLN_REG32(NFI_DEBUG_CON1_REG16, HWDCM_SWCON_ON);
+/*setup register*/
+			NFI_CLN_REG32(NFI_DEBUG_CON1_REG16, NFI_BYPASS);
 
-		/* setup register */
-		mb();
-		NFI_CLN_REG32(NFI_DEBUG_CON1_REG16, NFI_BYPASS);
-		/* clear bypass of ecc */
-		mb();
-		NFI_CLN_REG32(ECC_BYPASS_REG32, ECC_BYPASS);
-		mb();
-#ifndef CONFIG_MTK_FPGA
-		/* DRV_WriteReg32(PERICFG_BASE+0x5C, 0x0); // setting default AHB clock */
-		/* MSG(INIT, "AHB Clock(0x%x)\n",DRV_Reg32(PERICFG_BASE+0x5C)); */
-		mb();
-#if defined(CONFIG_MTK_LEGACY)
-		NFI_SET_REG32(PERI_NFI_CLK_SOURCE_SEL, NFI_PAD_1X_CLOCK);
-#else
-		clk_set_parent(nfi_bclk_sel, nfi_1xpad_clk);
-#endif
-		mb();
+			/*clear bypass of ecc */
+			NFI_CLN_REG32(ECC_BYPASS_REG32, ECC_BYPASS);
 
-#if defined(CONFIG_MTK_LEGACY)
-		clkmux_sel(MT_MUX_ONFI, g_iNFI2X_CLKSRC, "NFI");
-#else
-		if (g_iNFI2X_CLKSRC == 1)
-			clk_set_parent(onfi_sel_clk, onfi_mode5);
-		else if (g_iNFI2X_CLKSRC == 2)
-			clk_set_parent(onfi_sel_clk, onfi_mode4);
+			nand_disable_clock();
+			nand_unprepare_clock();
+			g_bSyncOrToggle = TRUE;
+
+			/* Keep Switch 2xCLK to MAINPLL_D12 or MAINPLL_D10 */
+			/* Disable AHB clk and enable 2x clk */
+			/* clk_set_parent(onfi_sel_clk, onfi_mode4); */
+			clk_prepare_enable(nfi_2xclk_sel);
+			clk_set_parent(nfi_2xclk_sel, main_d10);
+			/* clk_set_parent(nfi_2xclk_sel, onfi_26m_clk); */
+			clk_disable_unprepare(nfi_2xclk_sel);
+
+			/* Disable AHB clk and enable 2x clk */
+			clk_prepare_enable(nfi_1xclk_sel);
+			clk_set_parent(nfi_1xclk_sel, nfi_1xpad_clk);
+			clk_disable_unprepare(nfi_1xclk_sel);
+
+			nand_prepare_clock();
+			nand_enable_clock();
+
+			while (0 == (DRV_Reg32(NFI_STA_REG32) && STA_FLASH_MACRO_IDLE))
+				;
+
+			if (devinfo.iowidth == IO_ONFI) {
+				while ((DRV_Reg16(NFI_NAND_TYPE_CNFG_REG32) != 2) && retry--)
+					DRV_WriteReg16(NFI_NAND_TYPE_CNFG_REG32, 2);
+			} else {
+				while ((DRV_Reg16(NFI_NAND_TYPE_CNFG_REG32) != 1) && retry--)
+					DRV_WriteReg16(NFI_NAND_TYPE_CNFG_REG32, 1);
+			}
+
+			/* For DQSCTRL setting */
+			DRV_WriteReg32(NFI_DLYCTRL_REG32, 0xA001);
+#if 0
+			/* For 26MHz DQS delay */
+			DRV_WriteReg16((unsigned short *)(GPIO_BASE + 0xF00),
+					0x3 | (0x1D << 4) | (0x6<<9));
+			DRV_WriteReg16((unsigned short *)(GPIO_BASE + 0xF10), 0x10);
 #endif
-		mb();
-#endif
-		DRV_WriteReg32(NFI_DLYCTRL_REG32, 0x64011);
-#ifndef CONFIG_MTK_FPGA
-		/* DRV_WriteReg32(PERI_NFI_MAC_CTRL, 0x10006); */
-#endif
-		while (0 == (DRV_Reg32(NFI_STA_REG32) && STA_FLASH_MACRO_IDLE))
-			;
-		if (devinfo.iowidth == IO_ONFI)
-			DRV_WriteReg16(NFI_NAND_TYPE_CNFG_REG32, 2);	/* ONFI */
-		else
-			DRV_WriteReg16(NFI_NAND_TYPE_CNFG_REG32, 1);	/* Toggle */
-		/* pr_debug("[Timing]0x%x 0x%x\n", devinfo.s_acccon, devinfo.s_acccon1); */
-		acccon1 = DRV_Reg32(NFI_ACCCON1_REG3);
-		DRV_WriteReg32(NFI_ACCCON1_REG3, devinfo.s_acccon1);
-		DRV_WriteReg32(NFI_ACCCON_REG32, devinfo.s_acccon);
-		/* read back confirm */
-		mtk_nand_GetFeature(mtd, feature_set->gfeatureCmd,
-					feature_set->Interface.address, (u8 *) &val, 4);
-		/* pr_debug("[Bean]feature is %x\n", val); */
+			/* For 150MHz DQS delay */
+			DRV_WriteReg16((unsigned short *)(GPIO_BASE + 0xF00), 0x3);
+			DRV_WriteReg16((unsigned short *)(GPIO_BASE + 0xF10), 0x10);
+
+			pr_debug("[Timing] main_d10 0x%x 0x%x\n", devinfo.s_acccon, devinfo.s_acccon1);
+			DRV_WriteReg32(NFI_ACCCON_REG32, devinfo.s_acccon);
+			DRV_WriteReg32(NFI_ACCCON1_REG32, devinfo.s_acccon1);
+
+			mtk_nand_reset();
+
+			mtk_nand_GetFeature(mtd, feature_set->gfeatureCmd,
+						feature_set->Interface.address, (u8 *) &val, 4);
+
+
+		} while (((val & 0xFF) != (feature_set->Interface.feature & 0xFF)) && sretry--);
+
 		if ((val & 0xFF) != (feature_set->Interface.feature & 0xFF)) {
-			pr_err("[%s] fail 0x%X\n", __func__, val);
-			NFI_ISSUE_COMMAND(NAND_CMD_RESET, 0, 0, 0, 0);	/* ASYNC */
+			pr_info("[%s] fail %d\n", __func__, val);
+			mtk_nand_reset();
+			DRV_WriteReg16(NFI_CNFG_REG16, CNFG_OP_RESET);
+			mtk_nand_set_command(NAND_CMD_RESET);
 			timeout = TIMEOUT_4;
 			while (timeout)
 				timeout--;
 			mtk_nand_reset();
-#ifndef CONFIG_MTK_FPGA
-#if defined(CONFIG_MTK_LEGACY)
-			clkmux_sel(MT_MUX_ONFI, MAINPLL, "NFI");	/* 182M */
-#else
-			clk_set_parent(onfi_sel_clk, onfi_mode5);
-#endif
-#endif
+			DRV_WriteReg16(NFI_NAND_TYPE_CNFG_REG32, 0);
+
+			nand_disable_clock();
+
+			/* Disable 2x clk and enable AHB clk */
+			clk_prepare_enable(nfi_1xclk_sel);
+			clk_set_parent(nfi_1xclk_sel, nfi_ahb_clk);
+			clk_disable_unprepare(nfi_1xclk_sel);
+
+			nand_enable_clock();
+
 			NFI_SET_REG32(NFI_DEBUG_CON1_REG16, NFI_BYPASS);
 			NFI_SET_REG32(ECC_BYPASS_REG32, ECC_BYPASS);
-#ifndef CONFIG_MTK_FPGA
-#if defined(CONFIG_MTK_LEGACY)
-			NFI_CLN_REG32(PERI_NFI_CLK_SOURCE_SEL, NFI_PAD_1X_CLOCK);
-#else
-			clk_set_parent(nfi_bclk_sel, nfi_ahb_clk);
-#endif
-			/* DRV_WriteReg32(PERICFG_BASE+0x5C, 0x1); // setting AHB clock */
-			/* MSG(INIT, "AHB Clock(0x%x)\n",DRV_Reg32(PERICFG_BASE+0x5C)); */
-#endif
-			DRV_WriteReg32(NFI_ACCCON1_REG3, acccon1);
 			DRV_WriteReg32(NFI_ACCCON_REG32, devinfo.timmingsetting);
-			DRV_WriteReg16(NFI_NAND_TYPE_CNFG_REG32, 0);	/* Legacy */
-			g_bSyncOrToggle = false;
+
+			g_bSyncOrToggle = FALSE;
+
 			return 0;
 		}
-		g_bSyncOrToggle = true;
+		pr_debug("[%s] DDR interface\n", __func__);
 
-		pr_notice("[%s] success 0x%X\n", __func__, devinfo.iowidth);
-		/* extern void log_boot(char *str); */
-		/* log_boot("[Bean]sync mode success!"); */
 	} else {
-		g_bSyncOrToggle = false;
-		pr_notice("[%s] legacy interface\n", __func__);
-		return 0;
+		pr_debug("[%s] legacy interface\n", __func__);
+		g_bSyncOrToggle = FALSE;
 	}
 
 	return 1;
+}
+
+void mtk_nand_interface_switch(struct mtd_info *mtd)
+{
+	if (devinfo.iowidth == IO_ONFI || devinfo.iowidth == IO_TOGGLEDDR
+		|| devinfo.iowidth == IO_TOGGLESDR) {
+		if (g_bSyncOrToggle == FALSE) {
+			if (mtk_nand_interface_config(mtd)) {
+				pr_debug("[NFI] interface switch sync!!!!\n");
+				g_bSyncOrToggle = TRUE;
+			} else {
+				pr_debug("[NFI] interface switch fail!!!!\n");
+				g_bSyncOrToggle = FALSE;
+			}
+		}
+	}
 }
 
 #if CFG_RANDOMIZER
@@ -8469,7 +8605,6 @@ static void mtk_nand_init_hw(struct mtk_nand_host *host)
 {
 	struct mtk_nand_host_hw *hw = host->hw;
 
-
 	g_bInitDone = false;
 	g_kCMD.u4OOBRowAddr = (u32) -1;
 
@@ -8509,6 +8644,12 @@ static void mtk_nand_init_hw(struct mtk_nand_host *host)
 	if (mtk_nfi_dev_comp->chip_ver != 3)
 		DRV_WriteReg16(NFI_DEBUG_CON1_REG16, (NFI_BYPASS | WBUF_EN | HWDCM_SWCON_ON));
 
+	/* Enable ECC PLL for MT8167*/
+	if (mtk_nfi_dev_comp->chip_ver == 3) {
+		NFI_SET_REG16(NFI_DEBUG_CON1_REG16, (1<<NFI_DEBUG_ECCPLL_SHIFT));
+		pr_info("NFI_DEBUG_CON1_REG16:%x\n", DRV_Reg16(NFI_DEBUG_CON1_REG16));
+
+	}
 #ifdef CONFIG_PM
 	host->saved_para.suspend_flag = 0;
 #endif
@@ -9499,6 +9640,38 @@ static int mtk_nand_probe(struct platform_device *pdev)
 		WARN_ON(IS_ERR(nfiecc_bclk));
 		nfi_bclk = devm_clk_get(&pdev->dev, "nfi_bclk");
 		WARN_ON(IS_ERR(nfi_bclk));
+		nfi_2xclk = devm_clk_get(&pdev->dev, "nfi_2xclk");
+		WARN_ON(IS_ERR(nfi_2xclk));
+		nfi_1xpad_clk  = devm_clk_get(&pdev->dev, "nfi_1xclk");
+		WARN_ON(IS_ERR(nfi_1xpad_clk));
+		nfi_rgecc  = devm_clk_get(&pdev->dev, "nfi_rgecc");
+		WARN_ON(IS_ERR(nfi_rgecc));
+		nfi_1xclk_sel = devm_clk_get(&pdev->dev, "nfi_1xpad_sel");
+		WARN_ON(IS_ERR(nfi_1xclk_sel));
+		nfi_2xclk_sel = devm_clk_get(&pdev->dev, "nfi_2xpad_sel");
+		WARN_ON(IS_ERR(nfi_2xclk_sel));
+		nfiecc_sel = devm_clk_get(&pdev->dev, "nfiecc_sel");
+		WARN_ON(IS_ERR(nfiecc_sel));
+		nfiecc_csw_sel = devm_clk_get(&pdev->dev, "nfiecc_csw_sel");
+		WARN_ON(IS_ERR(nfiecc_csw_sel));
+		nfi_ahb_clk = devm_clk_get(&pdev->dev, "infra_ahb");
+		WARN_ON(IS_ERR(nfi_ahb_clk));
+		onfi_26m_clk = devm_clk_get(&pdev->dev, "clk_26m");
+		WARN_ON(IS_ERR(onfi_26m_clk));
+		main_d4 = devm_clk_get(&pdev->dev, "main_d4");
+		WARN_ON(IS_ERR(main_d4));
+		main_d5 = devm_clk_get(&pdev->dev, "main_d5");
+		WARN_ON(IS_ERR(main_d5));
+		main_d6 = devm_clk_get(&pdev->dev, "main_d6");
+		WARN_ON(IS_ERR(main_d6));
+		main_d7 = devm_clk_get(&pdev->dev, "main_d7");
+		WARN_ON(IS_ERR(main_d7));
+		main_d8 = devm_clk_get(&pdev->dev, "main_d7");
+		WARN_ON(IS_ERR(main_d8));
+		main_d10 = devm_clk_get(&pdev->dev, "main_d10");
+		WARN_ON(IS_ERR(main_d10));
+		main_d12 = devm_clk_get(&pdev->dev, "main_d12");
+		WARN_ON(IS_ERR(main_d12));
 		mtk_nand_regulator = devm_regulator_get(&pdev->dev, "vmch");
 		WARN_ON(IS_ERR(mtk_nand_regulator));
 #endif
@@ -9628,6 +9801,19 @@ static int mtk_nand_probe(struct platform_device *pdev)
 	pr_debug("[FPGA Dummy]Enable NFI and NFIECC Clock\n");
 #else
 	/* MSG(INIT, "[NAND]Enable NFI and NFIECC Clock\n"); */
+
+	clk_prepare_enable(nfi_2xclk_sel);
+	clk_set_parent(nfi_2xclk_sel, onfi_26m_clk);
+	clk_disable_unprepare(nfi_2xclk_sel);
+
+	clk_prepare_enable(nfiecc_sel);
+	clk_set_parent(nfiecc_sel, main_d4);
+	clk_disable_unprepare(nfiecc_sel);
+
+	clk_prepare_enable(nfi_1xclk_sel);
+	clk_set_parent(nfi_1xclk_sel, nfi_ahb_clk);
+	clk_disable_unprepare(nfi_1xclk_sel);
+
 	nand_prepare_clock();
 	nand_enable_clock();
 
@@ -9957,11 +10143,11 @@ static int mtk_nand_probe(struct platform_device *pdev)
 #endif
 
 	if (devinfo.vendor != VEND_NONE) {
-		err = mtk_nand_interface_config(mtd);
+		mtk_nand_interface_switch(mtd);
 #if CFG_2CS_NAND
 		if (g_bTricky_CS) {
 			DRV_WriteReg16(NFI_CSEL_REG16, NFI_TRICKY_CS);
-			err = mtk_nand_interface_config(mtd);
+			mtk_nand_interface_switch(mtd);
 			DRV_WriteReg16(NFI_CSEL_REG16, NFI_DEFAULT_CS);
 		}
 #endif
@@ -10132,15 +10318,7 @@ static int mtk_nand_suspend(struct platform_device *pdev, pm_message_t state)
 		/* host->saved_para.sECC_FDMADDR_REG32 = DRV_Reg32(ECC_FDMADDR_REG32); */
 		host->saved_para.sECC_DECCNFG_REG32 = DRV_Reg32(ECC_DECCNFG_REG32);
 		/* for sync mode */
-		if (g_bSyncOrToggle) {
-			host->saved_para.sNFI_DLYCTRL_REG32 = DRV_Reg32(NFI_DLYCTRL_REG32);
-#ifndef CONFIG_MTK_FPGA
-			/* host->saved_para.sPERI_NFI_MAC_CTRL = DRV_Reg32(PERI_NFI_MAC_CTRL); */
-#endif
-			host->saved_para.sNFI_NAND_TYPE_CNFG_REG32 =
-				DRV_Reg32(NFI_NAND_TYPE_CNFG_REG32);
-			host->saved_para.sNFI_ACCCON1_REG32 = DRV_Reg32(NFI_ACCCON1_REG3);
-		}
+		mtk_nand_interface_async();
 #ifdef CONFIG_MTK_PMIC_MT6397
 		hwPowerDown(MT65XX_POWER_LDO_VMCH, "NFI");
 #else
@@ -10259,44 +10437,23 @@ static int mtk_nand_resume(struct platform_device *pdev)
 		DRV_WriteReg16(NFI_INTR_EN_REG16, host->saved_para.sNFI_INTR_EN_REG16);
 
 		/* mtk_nand_interface_config(&host->mtd); */
-		if (g_bSyncOrToggle) {
-			NFI_CLN_REG32(NFI_DEBUG_CON1_REG16, HWDCM_SWCON_ON);
-			NFI_CLN_REG32(NFI_DEBUG_CON1_REG16, NFI_BYPASS);
-			NFI_CLN_REG32(ECC_BYPASS_REG32, ECC_BYPASS);
-#ifndef CONFIG_MTK_FPGA
-#if defined(CONFIG_MTK_LEGACY)
-			/* DRV_WriteReg32(PERICFG_BASE+0x5C, 0x0); */
-			NFI_SET_REG32(PERI_NFI_CLK_SOURCE_SEL, NFI_PAD_1X_CLOCK);
-#else
-			clk_set_parent(nfi_bclk_sel, nfi_1xpad_clk);
-#endif
-#if defined(CONFIG_MTK_LEGACY)
-			clkmux_sel(MT_MUX_ONFI, g_iNFI2X_CLKSRC, "NFI");
-#else
-			if (g_iNFI2X_CLKSRC == 0)
-				clk_set_parent(onfi_sel_clk, onfi_26m_clk);
-			else if (g_iNFI2X_CLKSRC == 1)
-				clk_set_parent(onfi_sel_clk, onfi_mode5);
-			else if (g_iNFI2X_CLKSRC == 2)
-				clk_set_parent(onfi_sel_clk, onfi_mode4);
-#endif
-#endif
-			DRV_WriteReg32(NFI_DLYCTRL_REG32, host->saved_para.sNFI_DLYCTRL_REG32);
-#ifndef CONFIG_MTK_FPGA
-			/* DRV_WriteReg32(PERI_NFI_MAC_CTRL, host->saved_para.sPERI_NFI_MAC_CTRL); */
-#endif
-			while (0 == (DRV_Reg32(NFI_STA_REG32) && STA_FLASH_MACRO_IDLE))
-				;
-			DRV_WriteReg16(NFI_NAND_TYPE_CNFG_REG32,
-					   host->saved_para.sNFI_NAND_TYPE_CNFG_REG32);
-			DRV_WriteReg32(NFI_ACCCON1_REG3, host->saved_para.sNFI_ACCCON1_REG32);
-		}
-		/* mtk_nand_GetFeature(mtd, feature_set->gfeatureCmd, \ */
-		/* feature_set->Interface.address, (u8 *)&val,4); */
-		/* MSG(POWERCTL, "[NFI] Resume feature %d!\n", val); */
-
 		mtk_nand_device_reset();
+		mtk_nand_interface_switch(&host->mtd);
 
+#if 0
+		mtk_nand_interface_async();
+		(void)mtk_nand_reset();
+		DRV_WriteReg16(NFI_NAND_TYPE_CNFG_REG32, 0);
+
+		clk_disable_unprepare(nfi_2xclk);
+		clk_prepare_enable(nfi_1xclk_sel);
+		clk_set_parent(nfi_1xclk_sel, nfi_ahb_clk);
+		clk_disable_unprepare(nfi_1xclk_sel);
+
+		NFI_SET_REG32(NFI_DEBUG_CON1_REG16, NFI_BYPASS);
+		NFI_SET_REG32(ECC_BYPASS_REG32, ECC_BYPASS);
+		DRV_WriteReg32(NFI_ACCCON_REG32, devinfo.timmingsetting);
+#endif
 		nand_disable_clock();
 		host->saved_para.suspend_flag = 0;
 	} else {

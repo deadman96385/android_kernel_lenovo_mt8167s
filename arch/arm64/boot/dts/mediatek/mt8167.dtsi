@@ -678,8 +678,29 @@
 			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_LOW>;
 			clocks = <&topckgen CLK_TOP_NFI_BUS>,
 				 <&topckgen CLK_TOP_NFIECC>,
-				 <&topckgen CLK_TOP_NFI>;
-			clock-names = "nfi_hclk", "nfiecc_bclk", "nfi_bclk";
+				 <&topckgen CLK_TOP_NFI>,
+				 <&topckgen CLK_TOP_RG_NFIECC>,
+				 <&topckgen CLK_TOP_NFI2X>,
+				 <&topckgen CLK_TOP_NFI1X>,
+				 <&topckgen CLK_TOP_NFI1X_PAD_SEL>,
+				 <&topckgen CLK_TOP_NFI2X_PAD_SEL>,
+				 <&topckgen CLK_TOP_NFIECC_SEL>,
+				 <&topckgen CLK_TOP_CSW_NFIECC_SEL>,
+				 <&topckgen CLK_TOP_AHB_INFRA_SEL>,
+				 <&topckgen CLK_TOP_CLK26M>,
+				 <&topckgen CLK_TOP_MAINPLL_D4>,
+				 <&topckgen CLK_TOP_MAINPLL_D5>,
+				 <&topckgen CLK_TOP_MAINPLL_D6>,
+				 <&topckgen CLK_TOP_MAINPLL_D7>,
+				 <&topckgen CLK_TOP_MAINPLL_D8>,
+				 <&topckgen CLK_TOP_MAINPLL_D10>,
+				 <&topckgen CLK_TOP_MAINPLL_D12>;
+			clock-names = "nfi_hclk", "nfiecc_bclk", "nfi_bclk",
+				      "nfi_rgecc", "nfi_2xclk",
+				      "nfi_1xclk", "nfi_1xpad_sel", "nfi_2xpad_sel",
+				      "nfiecc_sel", "nfiecc_csw_sel", "infra_ahb",
+				      "clk_26m", "main_d4", "main_d5", "main_d6",
+				      "main_d7", "main_d8", "main_d10", "main_d12";
 			status = "disabled";
 		};
 
