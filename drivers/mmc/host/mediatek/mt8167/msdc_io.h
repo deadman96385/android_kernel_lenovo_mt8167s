@@ -44,7 +44,8 @@ void msdc_fpga_pwr_init(void);
 #define DT_COMPATIBLE_NAME      "mediatek,mt2701-sdio"
 #define MSDC0_CLK_NAME          "MSDC0-CLOCK"
 #define MSDC1_CLK_NAME          "MSDC1-CLOCK"
-#define MSDC2_CLK_NAME          "sdio-clock"
+#define MSDC2_CLK_NAME          "sdio-bus"
+#define MSDC2_SRC_CLK_NAME      "sdio-src"
 #define MSDC3_CLK_NAME          "MSDC3-CLOCK"
 #define MSDC0_IOCFG_NAME        "mediatek,iocfg_5"
 #define MSDC1_IOCFG_NAME        "mediatek,iocfg_0"
@@ -169,8 +170,6 @@ extern u32 g_msdc3_flash;
 #define msdc_dump_clock_sts()
 extern u32 hclks_msdc[];
 #define msdc_get_hclks(host)            hclks_msdc
-#define msdc_clk_enable(host)
-#define msdc_clk_disable(host)
 #endif
 
 #if !defined(FPGA_PLATFORM)
@@ -193,9 +192,6 @@ extern u32 *hclks_msdc_all[];
 
 int msdc_get_ccf_clk_pointer(struct platform_device *pdev,
 	struct msdc_host *host);
-#define msdc_clk_enable(host) clk_enable(host->clock_control)
-#define msdc_clk_disable(host) clk_disable(host->clock_control)
-
 #endif
 
 #define MSDC0_SRC_0             260000

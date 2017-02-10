@@ -615,7 +615,8 @@ void msdc_set_smpl_all(struct msdc_host *host, u32 clock_mode)
 /*host doesn't need the clock on*/
 void msdc_gate_clock(struct msdc_host *host)
 {
-	clk_disable(host->clock_control);
+	clk_disable(host->bus_clk_ctrl);
+	clk_disable(host->src_clk_ctrl);
 }
 
 /* host does need the clock on */
@@ -623,7 +624,8 @@ void msdc_ungate_clock(struct msdc_host *host)
 {
 	void __iomem *base = host->base;
 
-	clk_enable(host->clock_control);
+	clk_enable(host->src_clk_ctrl);
+	clk_enable(host->bus_clk_ctrl);
 	while (!(MSDC_READ32(MSDC_CFG) & MSDC_CFG_CKSTB))
 		cpu_relax();
 }
@@ -5048,7 +5050,7 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
 		spin_lock(&host->sdio_irq_lock);
 
 	if (host->core_clkon == 0) {
-		msdc_clk_enable(host);
+		msdc_gate_clock(host);
 		host->core_clkon = 1;
 		MSDC_SET_FIELD(MSDC_CFG, MSDC_CFG_MODE, MSDC_SDMMC);
 	}
@@ -5751,9 +5753,10 @@ static int msdc_drv_remove(struct platform_device *pdev)
 	ERR_MSG("msdc_drv_remove");
 #ifndef FPGA_PLATFORM
 	/* clock unprepare */
-	if (host->clock_control)
-		clk_unprepare(host->clock_control);
-
+	if (host->bus_clk_ctrl)
+		clk_unprepare(host->bus_clk_ctrl);
+	if (host->src_clk_ctrl)
+		clk_unprepare(host->src_clk_ctrl);
 #endif
 	platform_set_drvdata(pdev, NULL);
 	mmc_remove_host(host->mmc);
