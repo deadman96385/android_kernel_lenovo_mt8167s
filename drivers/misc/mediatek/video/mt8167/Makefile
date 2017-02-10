@@ -12,23 +12,10 @@
 #
 
 ################################################################################
-# FrameBuffer Driver for Display
+# Platform Dependent
 #
 #
 ################################################################################
-ifneq ($(filter y,$(CONFIG_ARCH_MT8127) $(CONFIG_ARCH_MT7623) $(CONFIG_ARCH_MT8590)),)
-CONFIG_MTK_PLATFORM := mt8127
-endif
 
-ifneq ($(CONFIG_MTK_LCM), y)
-	obj-y += mtdummy/
-else
-	######################################
-	obj-$(CONFIG_MTK_FB) += $(subst ",,$(CONFIG_MTK_PLATFORM))/
-	obj-$(CONFIG_ARCH_MT6755) += common/
-	obj-$(CONFIG_ARCH_MT6797) += common/
-	obj-$(CONFIG_MACH_MT6757) += common/
-	obj-$(CONFIG_ARCH_ELBRUS) += common/
-	obj-$(CONFIG_MACH_MT8167) += common/
-endif
-
+obj-$(CONFIG_MTK_FB) += dispsys/
+obj-$(CONFIG_MTK_FB) += videox/
