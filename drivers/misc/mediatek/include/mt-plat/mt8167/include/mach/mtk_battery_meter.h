@@ -26,22 +26,22 @@
 /*#define CONFIG_DIS_CHECK_BATTERY*/
 /*#define FIXED_TBAT_25*/
 
-#if defined(CONFIG_BQ24296_SUPPORT) || defined(CONFIG_BQ24196_SUPPORT)
+#if defined(CONFIG_MTK_BQ24296_SUPPORT) || defined(CONFIG_MTK_BQ24196_SUPPORT)
 #define BAT_VOL_USE_ISENSE
 #define SWCHR_POWER_PATH
 #endif
 
-#if defined(CONFIG_FAN5402_SUPPORT) \
-	 || defined(CONFIG_FAN5405_SUPPORT) \
-	  || defined(CONFIG_BQ24158_SUPPORT) \
-	   || defined(CONFIG_BQ24196_SUPPORT) \
-	    || defined(CONFIG_BQ24296_SUPPORT) \
-	     || defined(CONFIG_NCP1851_SUPPORT) \
-	      || defined(CONFIG_NCP1854_SUPPORT) \
-	       || defined(CONFIG_BQ24160_SUPPORT) \
-			|| defined(CONFIG_BQ24157_SUPPORT) \
-			|| defined(CONFIG_BQ24250_SUPPORT) \
-			|| defined(CONFIG_BQ24261_SUPPORT)
+#if defined(CONFIG_MTK_FAN5402_SUPPORT) \
+	 || defined(CONFIG_MTK_FAN5405_SUPPORT) \
+	  || defined(CONFIG_MTK_BQ24158_SUPPORT) \
+	   || defined(CONFIG_MTK_BQ24196_SUPPORT) \
+	    || defined(CONFIG_MTK_BQ24296_SUPPORT) \
+	     || defined(CONFIG_MTK_NCP1851_SUPPORT) \
+	      || defined(CONFIG_MTK_NCP1854_SUPPORT) \
+	       || defined(CONFIG_MTK_BQ24160_SUPPORT) \
+			|| defined(CONFIG_MTK_BQ24157_SUPPORT) \
+			|| defined(CONFIG_MTK_BQ24250_SUPPORT) \
+			|| defined(CONFIG_MTK_BQ24261_SUPPORT)
 #define EXTERNAL_SWCHR_SUPPORT
 #endif
 
