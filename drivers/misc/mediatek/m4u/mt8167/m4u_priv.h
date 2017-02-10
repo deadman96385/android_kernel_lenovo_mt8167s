@@ -51,9 +51,9 @@
 #ifdef MMProfileStart
 #undef MMProfileStart
 #endif
-#define MMProfileLogEx(...)
-#define MMProfileEnable(...)
-#define MMProfileStart(...)
+#define mmprofile_log_ex(...)
+#define mmprofile_enable(...)
+#define mmprofile_start(...)
 #endif
 
 
@@ -280,7 +280,7 @@ typedef enum {
 	M4U_MMP_TOGGLE_CG,
 	M4U_MMP_MAX,
 } M4U_MMP_TYPE;
-extern MMP_Event M4U_MMP_Events[M4U_MMP_MAX];
+extern mmp_event M4U_MMP_Events[M4U_MMP_MAX];
 
 
 typedef struct {
