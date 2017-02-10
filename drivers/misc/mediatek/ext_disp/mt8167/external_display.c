@@ -55,6 +55,8 @@
 #include "ion_drv.h"
 #include "mtk_ion.h"
 #include "ddp_dpi.h"
+#include "ddp_irq.h"
+#include "ddp_reg.h"
 
 #include "tz_cross/trustzone.h"
 #include "tz_cross/ta_mem.h"
@@ -103,6 +105,10 @@ struct ext_disp_path_context {
 LCM_PARAMS extd_lcm_params;
 int enable_ut;
 disp_path_handle ovl2mem_path_handle;
+
+struct task_struct *rdma_update_task;
+wait_queue_head_t rdma_update_wq;
+atomic_t rdma_update_event = ATOMIC_INIT(0);
 
 static struct ext_disp_path_context *_get_context(void)
 {
@@ -793,6 +799,8 @@ static int _convert_disp_input_to_rdma(struct RDMA_CONFIG_STRUCT *dst, struct di
 	if (pgc->is_interlace) {
 		dst->is_interlace = true;
 		dst->is_top_filed = ddp_dpi_is_top_filed(DISP_MODULE_DPI1);
+	} else {
+		dst->is_interlace = false;
 	}
 
 	return ret;
@@ -957,6 +965,33 @@ static int _ext_disp_trigger_EPD(int blocking, void *callback, unsigned int user
 	return 0;
 }
 
+/* For support interlace */
+static int ext_disp_rdma_update_kthread(void *data)
+{
+	struct sched_param param = {.sched_priority = 94 };
+	struct disp_ddp_path_config *data_config;
+
+	sched_setscheduler(current, SCHED_RR, &param);
+	for (;;) {
+		wait_event_interruptible(rdma_update_wq,
+					 atomic_read(&rdma_update_event));
+		atomic_set(&rdma_update_event, 0);
+		if (kthread_should_stop())
+			break;
+
+		_ext_disp_path_lock();
+		data_config = dpmgr_path_get_last_config(pgc->dpmgr_handle);
+		data_config->rdma_config.is_interlace = true;
+		data_config->rdma_config.is_top_filed = ddp_dpi_is_top_filed(DISP_MODULE_DPI1);
+		data_config->rdma_dirty = 1;
+		dpmgr_path_config(pgc->dpmgr_handle, data_config, pgc->cmdq_handle_config);
+		_ext_disp_trigger(0, NULL, 0);
+		_ext_disp_path_unlock();
+	}
+
+	return 0;
+}
+
 void ext_disp_probe(void)
 {
 	EXT_DISP_FUNC();
@@ -1051,15 +1086,14 @@ int ext_disp_init(char *lcm_name, unsigned int session)
 	} else
 		EXT_DISP_LOG("allocate buffer failed!!!\n");
 
-	/* this will be set to always enable cmdq later */
-/*
-*
-	if (ext_disp_is_video_mode())
-		dpmgr_map_event_to_irq(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC, DDP_IRQ_DPI_VSYNC);
-*/
-
 	if (ext_disp_use_cmdq == CMDQ_ENABLE)
 		_cmdq_reset_config_handle();
+
+	rdma_update_task = kthread_create(ext_disp_rdma_update_kthread,
+							 NULL, "ext_disp_rdma_update");
+	wake_up_process(rdma_update_task);
+
+	init_waitqueue_head(&rdma_update_wq);
 
 	mutex_init(&(pgc->vsync_lock));
 	pgc->state = EXTD_INIT;
@@ -1248,6 +1282,8 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 	if (pgc->is_interlace) {
 		pgc->decouple_rdma_config.is_interlace = true;
 		pgc->decouple_rdma_config.is_top_filed = ddp_dpi_is_top_filed(DISP_MODULE_DPI1);
+	} else {
+		pgc->decouple_rdma_config.is_interlace = false;
 	}
 	_config_rdma_input_data(&pgc->decouple_rdma_config, pgc->dpmgr_handle, pgc->cmdq_handle_config);
 	_ext_disp_trigger(0, NULL, 0);
@@ -1357,19 +1393,39 @@ int ext_disp_suspend_trigger(void *callback, unsigned int userdata, unsigned int
 	return ret;
 }
 
+#if defined(CONFIG_MTK_HDMI_SUPPORT)
+static void ext_disp_update_rdma(enum DISP_MODULE_ENUM module, unsigned int param)
+{
+	if (param & 0x2) {
+		if (pgc->is_interlace) {
+			atomic_set(&rdma_update_event, 1);
+			wake_up_interruptible(&rdma_update_wq);
+		}
+	}
+}
+
 static void ext_check_is_interlace_output(struct disp_ddp_path_config *config)
 {
-#if defined(CONFIG_MTK_HDMI_SUPPORT)
+	static bool is_exist_callback;
 	/* should make sure HDMI_VIDEO_RESOLUTION and DPI_VIDEO_RESOLUTION is sync */
 	if ((config->dispif_config.dpi.dpi_clock == HDMI_VIDEO_1920x1080i_60Hz) ||
 		(config->dispif_config.dpi.dpi_clock == HDMI_VIDEO_1920x1080i_50Hz) ||
 		(config->dispif_config.dpi.dpi_clock == HDMI_VIDEO_1920x1080i3d_60Hz) ||
-		(config->dispif_config.dpi.dpi_clock == HDMI_VIDEO_1920x1080i3d_60Hz))
+		(config->dispif_config.dpi.dpi_clock == HDMI_VIDEO_1920x1080i3d_60Hz)) {
+		if (!is_exist_callback) {
+			disp_register_module_irq_callback(DISP_MODULE_RDMA1, ext_disp_update_rdma);
+			is_exist_callback = true;
+		}
 		pgc->is_interlace = true;
-	else
+	} else {
+		if (is_exist_callback) {
+			disp_unregister_module_irq_callback(DISP_MODULE_RDMA1, ext_disp_update_rdma);
+			is_exist_callback = false;
+		}
 		pgc->is_interlace = false;
-#endif
+	}
 }
+#endif
 
 int ext_disp_config_input_multiple(struct disp_session_input_config *input, int idx, unsigned int session)
 {
@@ -1409,7 +1465,9 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 	/* all dirty should be cleared in dpmgr_path_get_last_config() */
 	data_config = dpmgr_path_get_last_config(disp_handle);
 	memcpy(&(data_config->dispif_config), &extd_lcm_params, sizeof(LCM_PARAMS));
+#if defined(CONFIG_MTK_HDMI_SUPPORT)
 	ext_check_is_interlace_output(data_config);
+#endif
 
 	/* hope we can use only 1 input struct for input config, just set layer number */
 	if (_should_config_ovl_input()) {
