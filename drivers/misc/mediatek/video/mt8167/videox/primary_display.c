@@ -2592,10 +2592,10 @@ static int __build_path_direct_link(void)
 #ifdef CONFIG_MTK_M4U
 #ifndef MTKFB_NO_M4U
 	config_display_m4u_port();
+#endif
+#endif
 #if !defined(CONFIG_MTK_GMO_RAM_OPTIMIZE)
 	init_decouple_buffers();
-#endif
-#endif
 #endif
 
 	dpmgr_set_lcm_utils(pgc->dpmgr_handle, pgc->plcm->drv);
