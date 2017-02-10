@@ -981,23 +981,22 @@
 			compatible = "mediatek,mt8167-hdmitx";
 			power-domains = <&scpsys MT8167_POWER_DOMAIN_DISP>;
 			reg  =	<0 0x1401b000 0 0x1000>, /* HDMI Shell */
-				<0 0x1100f000 0 0x10>, /* HDMI DDC  */
-				<0 0x10013000 0 0xbc>; /* HDMI CEC  */
-			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_LOW>;
-
+				<0 0x11011000 0 0x10>, /* HDMI DDC  */
+				<0 0x1001a000 0 0xbc>; /* HDMI CEC  */
+			interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_LOW>;
 			clocks = <&infracfg CLK_INFRA_CEC>,
 				 <&infracfg CLK_INFRA_CEC_26M>,
 				 <&mmsys CLK_MM_HDMI_PIXEL>,
 				 <&mmsys CLK_MM_HDMI_PLLCK>,
-				 <&mmsys CLK_MM_HDMI_ADSP>,
+				 <&mmsys CLK_MM_HDMI_ADSP_BCK>,
 				 <&mmsys CLK_MM_HDMI_SPDIF>;
-
 			clock-names = "cec_pdn",
 				      "clk_cec_26m",
 				      "mmsys_hdmi_pll",
 				      "mmsys_hdmi_pixel",
 				      "mmsys_hdmi_audio",
 				      "mmsys_hdmi_spidif";
+			status = "disabled";
 		};
 
 		g3d_iommu@13005000 {
