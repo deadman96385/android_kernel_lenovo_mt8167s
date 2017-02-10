@@ -1472,13 +1472,6 @@
 			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_LOW>;
 		};
 
-		jpgenc@17003000 {
-			compatible = "mediatek,mt8167-jpgenc","mediatek,jpgenc";
-			reg = <0 0x17003000 0 0x1000>;
-			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&vencsys CLK_VENC_CKE2>; /* jpeg enc */
-			clock-names = "venc-jpgenc";
-		};
 
 		consys: consys@18070000 {
 			compatible = "mediatek,mt8167-consys";
