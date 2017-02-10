@@ -190,7 +190,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 
 	if (ops0 == NULL) {
 		nand_err("ops0 is NULL");
-		return -EIO;
+		return -EINVAL;
 	}
 
 	if (ops1 != NULL) {
@@ -201,7 +201,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 				&& (ops1->block < info->data_block_num))) {
 			nand_err("do not in same area ops0->block:0x%x ops1->block:0x%x ",
 				ops0->block, ops1->block);
-			return -EIO;
+			return -EINVAL;
 		}
 		if (mtk_isbad_block(ops1->block)) {
 			page_addr1 = 0;
@@ -266,6 +266,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 						page_size, temp_page_buf, fdm_buf);
 			if (ret != 0) {
 				nand_err("write failed for page_addr0:0x%x", page_addr0);
+				ret = -ENANDWRITE;
 				goto exit;
 			}
 
@@ -277,6 +278,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 						page_size, temp_page_buf, fdm_buf);
 			if (ret != 0) {
 				nand_err("write failed for page_addr0:0x%x", page_addr0);
+				ret = -ENANDWRITE;
 				goto exit;
 			}
 
@@ -294,6 +296,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 						temp_page_buf, temp_fdm_buf);
 				if (ret != 0) {
 					nand_err("write failed for page_addr1:0x%x", page_addr1);
+					ret = -ENANDWRITE;
 					goto exit;
 				}
 
@@ -305,6 +308,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 						temp_page_buf, temp_fdm_buf);
 				if (ret != 0) {
 					nand_err("write failed for page_addr1:0x%x", page_addr1);
+					ret = -ENANDWRITE;
 					goto exit;
 				}
 				tlc_snd_phyplane = FALSE;
@@ -318,6 +322,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 					page_size, temp_page_buf, fdm_buf);
 			if (ret != 0) {
 				nand_err("write failed for page_addr0:0x%x", page_addr0);
+				ret = -ENANDWRITE;
 				goto exit;
 			}
 
@@ -338,6 +343,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 						temp_page_buf, temp_fdm_buf);
 				if (ret != 0) {
 					nand_err("write failed for page_addr1:0x%x", page_addr1);
+					ret = -ENANDWRITE;
 					goto exit;
 				}
 			}
@@ -352,6 +358,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 				page_size, ops0->data_buffer, fdm_buf);
 		if (ret != 0) {
 			nand_err("write failed for page_addr0:0x%x", page_addr0);
+			ret = -ENANDWRITE;
 			goto exit;
 		}
 
@@ -364,6 +371,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 						page_size, ops1->data_buffer, fdm_buf);
 			if (ret != 0) {
 				nand_err("write failed for page_addr1:0x%x", page_addr1);
+				ret = -ENANDWRITE;
 				goto exit;
 			}
 		}
@@ -398,7 +406,7 @@ static int mtk_nand_erase_blocks(struct mtk_nand_chip_operation *ops0,
 
 	if (ops0 == NULL) {
 		nand_err("ops0 is NULL");
-		return -EIO;
+		return -EINVAL;
 	}
 
 	if (ops1 != NULL) {
@@ -409,7 +417,7 @@ static int mtk_nand_erase_blocks(struct mtk_nand_chip_operation *ops0,
 				&& (ops1->block < info->data_block_num))) {
 			nand_err("do not in same area ops0->block:0x%x ops1->block:0x%x ",
 				ops0->block, ops1->block);
-			return -EIO;
+			return -EINVAL;
 		}
 		if (mtk_isbad_block(ops1->block))
 			page_addr1 = 0;
@@ -439,7 +447,7 @@ static int mtk_nand_erase_blocks(struct mtk_nand_chip_operation *ops0,
 	if (status & NAND_STATUS_FAIL) {
 		nand_debug("%s: failed erase, page_addr0 0x%x\n",
 			__func__, page_addr0);
-		ret = MTD_ERASE_FAILED;
+		ret = -ENANDERASE;
 	}
 
 	nand_debug("%s: done start page_addr0= 0x%x page_addr1= 0x%x",
@@ -744,7 +752,7 @@ static int do_multi_work_erase(
 	for (i = 0; i < count; i++)  {
 		if (item == NULL) {
 			nand_err("i:%d, NULL item\n", i);
-			return -ENANDWRITE;
+			return -ENANDERASE;
 		}
 		work = get_list_work(item);
 		if (i == 0)
