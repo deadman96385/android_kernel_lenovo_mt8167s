@@ -369,6 +369,7 @@ void spm_suspend_aee_init(void)
 wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 {
 	u32 sec = 2;
+	u32 capcode;
 /*	int wd_ret; */
 	unsigned long flags;
 	struct mtk_irq_mask mask;
@@ -391,6 +392,10 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 
 	if (!mt_xo_has_ext_crystal())
 		pwrctrl->pcm_flags |= SPM_32K_LESS;
+
+	/* Read XO cap code */
+	capcode = mt_xo_get_current_capid();
+	spm_write(SPM_PCM_RESERVE8, capcode);
 
 #if SPM_PWAKE_EN
 	sec = spm_get_wake_period(-1 /* FIXME */, last_wr);

@@ -340,8 +340,7 @@ extern void spm_twam_enable_monitor(const struct twam_sig *twamsig, bool speed_m
 				    unsigned int window_len);
 extern void spm_twam_disable_monitor(void);
 
-/*for AP BSI Generator*/
-void spm_ap_bsi_gen(unsigned int *clk_buf_cfg);
+extern uint32_t mt_xo_get_current_capid(void);
 
 extern void unmask_irq(struct irq_desc *desc); /* to replace mt_irq_unmask_for_sleep */
 
