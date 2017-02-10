@@ -13,6 +13,10 @@
 
 #ifndef __USB20_H__
 #define __USB20_H__
+#ifdef CONFIG_MTK_UART_USB_SWITCH
+#include <linux/regmap.h>
+#include <linux/mfd/syscon.h>
+#endif
 
 #define ID_PIN_USE_EX_EINT 1
 extern bool mtk_usb_power;
@@ -28,6 +32,10 @@ extern void musb_id_pin_sw_work(bool host_mode);
 #ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
 extern void mt_usb_clock_prepare(void);
 extern void mt_usb_clock_unprepare(void);
+#endif
+
+#ifdef CONFIG_MTK_UART_USB_SWITCH
+extern struct regmap *mt_regmap;
 #endif
 
 #ifdef CONFIG_USB_MTK_OTG
@@ -84,12 +92,12 @@ enum CABLE_MODE {
 };
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH
-enum {
+typedef enum {
 	PORT_MODE_USB = 0,
 	PORT_MODE_UART,
 
 	PORT_MODE_MAX
-} PORT_MODE;
+} USB_PORT_MODE;
 
 extern u32 usb_port_mode_temp;
 extern void mtk_uart_usb_rx_sel(unsigned int uart_port, unsigned int enable);

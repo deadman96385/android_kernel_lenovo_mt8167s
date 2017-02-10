@@ -54,6 +54,10 @@ struct clk *icusb_clk;
 
 /* default value 0 */
 static int usb_rdy;
+#ifdef CONFIG_MTK_UART_USB_SWITCH
+struct regmap *mt_regmap;
+#endif
+
 void set_usb_rdy(void)
 {
 	DBG(0, "set usb_rdy, wake up bat\n");
@@ -869,14 +873,14 @@ static ssize_t mt_usb_show_portmode(struct device *dev, struct device_attribute 
 static ssize_t mt_usb_store_portmode(struct device *dev, struct device_attribute *attr,
 	const char *buf, size_t count)
 {
-	unsigned int portmode;
+	long int portmode;
 
 	if (!dev) {
 		DBG(0, "dev is null!!\n");
 		return count;
 	/* } else if (1 == sscanf(buf, "%d", &portmode)) { */
-	} else if (kstrtol(buf, 10, &portmode) == 0) {
-		DBG(0, "\nUSB Port mode: current => %d (port_mode), change to => %d (portmode)\n",
+	} else if (kstrtol(buf, 10, (long int *)&portmode) == 0) {
+		DBG(0, "\nUSB Port mode: current => %d (port_mode), change to => %ld (portmode)\n",
 				port_mode, portmode);
 		if (portmode >= PORT_MODE_MAX)
 			portmode = PORT_MODE_USB;
@@ -925,7 +929,7 @@ static ssize_t mt_usb_show_tx(struct device *dev, struct device_attribute *attr,
 static ssize_t mt_usb_store_tx(struct device *dev, struct device_attribute *attr,
 	const char *buf, size_t count)
 {
-	unsigned int val;
+	long int val;
 	UINT8 var;
 	UINT8 var2;
 
@@ -933,8 +937,8 @@ static ssize_t mt_usb_store_tx(struct device *dev, struct device_attribute *attr
 		DBG(0, "dev is null!!\n");
 		return count;
 	/* } else if (1 == sscanf(buf, "%d", &val)) { */
-	} else if (kstrtol(buf, 10, &val) == 0) {
-		DBG(0, "\n Write TX : %d\n", val);
+	} else if (kstrtol(buf, 10, (long int *)&val) == 0) {
+		DBG(0, "\n Write TX : %ld\n", val);
 
 #ifdef FPGA_PLATFORM
 		var = USB_PHY_Read_Register8(0x6E);
@@ -1505,6 +1509,10 @@ static int mt_usb_dts_probe(struct platform_device *pdev)
 #endif
 	/*int				ret = -ENOMEM;*/
 	int retval = 0;
+	#ifdef CONFIG_MTK_UART_USB_SWITCH
+	struct device_node *np, *node_pctl;
+	#endif
+
 
 	DBG(0, "[U2]usb20 dts probe\n");
 
@@ -1577,6 +1585,16 @@ static int mt_usb_dts_probe(struct platform_device *pdev)
 		return retval;
 	}
 	#endif
+#endif
+#ifdef CONFIG_MTK_UART_USB_SWITCH
+	np = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-pinctrl");
+	node_pctl = of_parse_phandle(np, "mediatek,pctl-regmap", 0);
+	if (node_pctl) {
+		mt_regmap = syscon_node_to_regmap(node_pctl);
+		if (IS_ERR(mt_regmap))
+			return PTR_ERR(mt_regmap);
+		DBG(0, KERN_WARNING "Get PINCTRL SUCCESS!!\n");
+	}
 #endif
 	DBG(0, "[U2]usb20 dts probe\n");
 	mt_usb_device.dev.of_node = pdev->dev.of_node;
