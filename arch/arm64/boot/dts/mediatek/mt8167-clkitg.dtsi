@@ -91,7 +91,7 @@
 			<&clk26m>,
 			<&clk26m>,
 			<&topckgen CLK_TOP_RG_BSI>,
-			<&topckgen CLK_TOP_RG_DBG_ATCLK>,
+			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
