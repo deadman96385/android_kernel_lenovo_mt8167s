@@ -134,7 +134,7 @@ enum {
 
 /* Idle handler on/off */
 static int idle_switch[NR_TYPES] = {
-	0,			/* dpidle switch */
+	1,			/* dpidle switch */
 	0,			/* soidle switch */
 	0,			/* mcidle switch */
 	0,			/* slidle switch */
@@ -1426,7 +1426,7 @@ static inline int soidle_handler(int cpu)
 }
 
 static u32 slp_spm_deepidle_flags = {
-	SPM_INFRA_PDN_DIS | SPM_26M_OFF_DIS | SPM_DDRPHY_S1_DIS
+	SPM_INFRA_PDN_DIS | SPM_26M_OFF_DIS | SPM_DDRPHY_S1_DIS | SPM_MCU_PDN_DIS
 };
 
 void set_slp_spm_deepidle_flags(bool en)
