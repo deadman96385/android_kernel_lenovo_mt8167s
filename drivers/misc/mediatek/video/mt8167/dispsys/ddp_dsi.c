@@ -1641,7 +1641,7 @@ enum DSI_STATUS DSI_EnableVM_CMD(enum DISP_MODULE_ENUM module, struct cmdqRecStr
 	return DSI_STATUS_OK;
 }
 
-/* / return value: the data length we got */
+/* return value: the data length we got */
 uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8_t cmd,
 	uint8_t *buffer, uint8_t buffer_size)
 {
@@ -1654,11 +1654,10 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 	struct DSI_RX_DATA_REG read_data2;
 	struct DSI_RX_DATA_REG read_data3;
 	int i = 0;
-#if 1
 	struct DSI_T0_INS t0;
 
 #if ENABLE_DSI_INTERRUPT
-	static const long WAIT_TIMEOUT = HZ / 2;	/* 2 sec//Yifan Modified for ESD Check with out LCM */
+	static const long WAIT_TIMEOUT = HZ / 2;
 	long ret;
 #endif
 	if (DSI_REG[i]->DSI_MODE_CTRL.MODE)
@@ -1676,7 +1675,7 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 
 		DSI_WaitForNotBusy(module, cmdq);
 
-		t0.CONFG = 0x04;	/* /BTA */
+		t0.CONFG = 0x04;	/* BTA */
 		t0.Data0 = cmd;
 		if (buffer_size < 0x3)
 			t0.Data_ID = DSI_DCS_READ_PACKET_ID;
@@ -1687,28 +1686,14 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 		DSI_OUTREG32(cmdq, &DSI_CMDQ_REG[i]->data[0], AS_UINT32(&t0));
 		DSI_OUTREG32(cmdq, &DSI_REG[i]->DSI_CMDQ_SIZE, 1);
 
-		/* /clear read ACK */
-		/* DSI_REG->DSI_RACK.DSI_RACK = 1; */
-		/* DSI_REG->DSI_INTSTA.RD_RDY = 1; */
-		/* DSI_REG->DSI_INTSTA.CMD_DONE = 1; */
-		/* DSI_REG->DSI_INTEN.RD_RDY =  1; */
-		/* DSI_REG->DSI_INTEN.CMD_DONE=  1; */
 		DSI_OUTREGBIT(cmdq, struct DSI_RACK_REG, DSI_REG[i]->DSI_RACK, DSI_RACK, 1);
 		DSI_OUTREGBIT(cmdq, struct DSI_INT_STATUS_REG, DSI_REG[i]->DSI_INTSTA, RD_RDY, 1);
 		DSI_OUTREGBIT(cmdq, struct DSI_INT_STATUS_REG, DSI_REG[i]->DSI_INTSTA, CMD_DONE, 1);
 		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[i]->DSI_INTEN, RD_RDY, 1);
 		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[i]->DSI_INTEN, CMD_DONE, 1);
 
-
-
 		DSI_OUTREG32(cmdq, &DSI_REG[i]->DSI_START, 0);
 		DSI_OUTREG32(cmdq, &DSI_REG[i]->DSI_START, 1);
-
-		/* / the following code is to */
-		/* / 1: wait read ready */
-		/* / 2: ack read ready */
-		/* / 3: wait for CMDQ_DONE */
-		/* / 3: read data */
 #if ENABLE_DSI_INTERRUPT
 		ret = wait_event_interruptible_timeout(_dsi_dcs_read_wait_queue[i],
 						       waitRDDone, WAIT_TIMEOUT);
@@ -1718,27 +1703,20 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 
 			DSI_DumpRegisters(module, 1);
 
-			/* /do necessary reset here */
-			/* DSI_REG->DSI_RACK.DSI_RACK = 1; */
 			DSI_OUTREGBIT(cmdq, struct DSI_RACK_REG, DSI_REG[i]->DSI_RACK, DSI_RACK, 1);
 			DSI_Reset(module, NULL);
 
 			return 0;
 		}
 #else
-
 		DDPMSG(" Start polling DSI read ready!!!\n");
 		while (DSI_REG[i]->DSI_INTSTA.RD_RDY == 0) {
-			/* /keep polling */
 			msleep(20);
 			read_timeout_ms--;
 
 			if (read_timeout_ms == 0) {
 				DDPMSG(" Polling DSI read ready timeout!!!\n");
 				DSI_DumpRegisters(module, 1);
-
-				/* /do necessary reset here */
-				/* DSI_REG->DSI_RACK.DSI_RACK = 1; */
 				DSI_OUTREGBIT(cmdq, struct DSI_RACK_REG, DSI_REG[i]->DSI_RACK, DSI_RACK, 1);
 				DSI_Reset(module, NULL);
 				return 0;
@@ -1749,18 +1727,13 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 			DDPMSG(" End polling DSI read ready!!!\n");
 #endif
 
-		/* DSI_REG->DSI_RACK.DSI_RACK = 1; */
 		DSI_OUTREGBIT(cmdq, struct DSI_RACK_REG, DSI_REG[i]->DSI_RACK, DSI_RACK, 1);
 
-		/* /clear interrupt status */
-		/* DSI_REG->DSI_INTSTA.RD_RDY = 1; */
 		DSI_OUTREGBIT(cmdq, struct DSI_INT_STATUS_REG, DSI_REG[i]->DSI_INTSTA, RD_RDY, 1);
-		/* /STOP DSI */
 		DSI_OUTREG32(cmdq, &DSI_REG[i]->DSI_START, 0);
 
 #endif
 
-		/* DSI_REG->DSI_INTEN.RD_RDY =  0; */
 		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[i]->DSI_INTEN, RD_RDY, 1);
 
 		DSI_OUTREG32(cmdq, &read_data0, AS_UINT32(&DSI_REG[i]->DSI_RX_DATA0));
@@ -1768,7 +1741,6 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 		DSI_OUTREG32(cmdq, &read_data2, AS_UINT32(&DSI_REG[i]->DSI_RX_DATA2));
 		DSI_OUTREG32(cmdq, &read_data3, AS_UINT32(&DSI_REG[i]->DSI_RX_DATA3));
 #ifdef DDI_DRV_DEBUG_LOG_ENABLE
-/* DISP_LOG_PRINT(ANDROID_LOG_INFO, "DSI", " DSI_RX_STA : 0x%x\n", DSI_REG->DSI_RX_STA); */
 		DDPMSG(" DSI_CMDQ_SIZE : 0x%x\n",
 			       DSI_REG[i]->DSI_CMDQ_SIZE.CMDQ_SIZE);
 		DDPMSG(" DSI_CMDQ_DATA0 : 0x%x\n",
@@ -1780,13 +1752,13 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 		DDPMSG(" DSI_CMDQ_DATA3 : 0x%x\n",
 			       DSI_CMDQ_REG[i]->data[0].byte3);
 		DDPMSG(" DSI_RX_DATA0 : 0x%x\n",
-			       DSI_REG[i]->DSI_RX_DATA0);
+			       *((uint32_t *)(&DSI_REG[i]->DSI_RX_DATA0)));
 		DDPMSG(" DSI_RX_DATA1 : 0x%x\n",
-			       DSI_REG[i]->DSI_RX_DATA1);
+			       *((uint32_t *)(&DSI_REG[i]->DSI_RX_DATA1)));
 		DDPMSG(" DSI_RX_DATA2 : 0x%x\n",
-			       DSI_REG[i]->DSI_RX_DATA2);
+			       *((uint32_t *)(&DSI_REG[i]->DSI_RX_DATA2)));
 		DDPMSG(" DSI_RX_DATA3 : 0x%x\n",
-			       DSI_REG[i]->DSI_RX_DATA3);
+			       *((uint32_t *)(&DSI_REG[i]->DSI_RX_DATA3)));
 
 		DDPMSG("read_data0, %x,%x,%x,%x\n", read_data0.byte0, read_data0.byte1,
 			read_data0.byte2, read_data0.byte3);
@@ -1798,15 +1770,12 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 			read_data3.byte2, read_data3.byte3);
 #endif
 
-#if 1
 		packet_type = read_data0.byte0;
 
 #ifdef DDI_DRV_DEBUG_LOG_ENABLE
 		if (dsi_log_on)
 			DDPMSG(" DSI read packet_type is 0x%x\n", packet_type);
 #endif
-
-
 
 		if (packet_type == 0x1A || packet_type == 0x1C) {
 			recv_data_cnt = read_data0.byte1 + read_data0.byte2 * 16;
@@ -1832,23 +1801,17 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 #endif
 			memcpy((void *)buffer, (void *)&read_data1, recv_data_cnt);
 		} else {
-			if (recv_data_cnt > buffer_size) {
 #ifdef DDI_DRV_DEBUG_LOG_ENABLE
-				if (dsi_log_on)
-					DDPMSG(" DSI read short packet data  exceeds buffer size: %d\n",
-						       buffer_size);
+			if (dsi_log_on)
+				DDPMSG(" DSI read short packet data  exceeds buffer size: %d\n",
+					       buffer_size);
 #endif
-				recv_data_cnt = buffer_size;
-			}
+			recv_data_cnt = buffer_size;
 			memcpy((void *)buffer, (void *)&read_data0.byte1, 2);
 		}
-#endif
 	} while (packet_type != 0x1C && packet_type != 0x21 && packet_type != 0x22
 		 && packet_type != 0x1A);
-	/* / here: we may receive a ACK packet which packet type is 0x02 (incdicates some error happened) */
-	/* / therefore we try re-read again until no ACK packet */
-	/* / But: if it is a good way to keep re-trying ??? */
-#endif
+
 	return recv_data_cnt;
 }
 
