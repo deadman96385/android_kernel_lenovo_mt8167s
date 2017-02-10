@@ -365,8 +365,8 @@ void usb_phy_poweron(void)
 	USBPHY_CLR8(0x22, 0x03);
 
 	/*OTG enable*/
-	USBPHY_SET8(0x20, 0x10);
-	/* force_suspendm, 1'b0 */
+	USBPHY_SET8(0x1a, 0x10);
+	/* 6 s6: release force suspendm. */
 	USBPHY_CLR8(0x6a, 0x04);
 
 	/*6-1. PASS RX sensitivity HQA requirement*/

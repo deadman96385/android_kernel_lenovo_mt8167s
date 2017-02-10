@@ -828,10 +828,10 @@
 			dma = <1>;
 			num_eps = <16>;
 			dma_channels = <8>;
-			clocks = <&apmixedsys CLK_APMIXED_UNIVPLL>,
-				 <&infracfg CLK_INFRA_USB_MCU>,
-				 <&infracfg CLK_INFRA_USB>,
-				 <&infracfg CLK_INFRA_ICUSB>;
+			clocks = <&topckgen CLK_TOP_USB_PHY48M>,
+				 <&topckgen CLK_TOP_USBIF>,
+				 <&topckgen CLK_TOP_USB>,
+				 <&topckgen CLK_TOP_USB_1P>;
 			clock-names = "usbpll", "usbmcu", "usb", "icusb";
 		};
 

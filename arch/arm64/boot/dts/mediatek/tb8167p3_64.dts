@@ -524,11 +524,6 @@
 	flashlight_pins_hwen_low: hwen_low {
 	};
 
-/* USB GPIO start */
-	gpio38_mode0_iddig: iddig_irq_init {
-	};
-/* USB GPIO end */
-
 	/* CONSYS GPIO Settings - Start */
 	gpslna_pins_init: gpslna@0 {
 	};
@@ -699,6 +694,40 @@
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
 		};
 	};
+
+/* USB GPIO start */
+	usb0_drvvbus: drvvbus_init {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_43_KPCOL1__FUNC_USB_DRVVBUS>;
+			slew-rate = <1>;
+			bias-pull-up = <00>;
+		};
+	};
+
+	usb0_drvvbus_high: drvvbus_high {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_43_KPCOL1__FUNC_USB_DRVVBUS>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+
+	usb0_drvvbus_low: drvvbus_low {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_43_KPCOL1__FUNC_USB_DRVVBUS>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+
+	usb0_iddig: iddig_irq_init {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_41_KPROW1__FUNC_GPIO41>;
+			slew-rate = <0>;
+			bias-pull-up = <00>;
+		};
+	};
+/* USB GPIO end */
 };
 
 &pmic {
@@ -746,8 +775,11 @@
 };
 
 &usb0 {
-	pinctrl-names = "iddig_irq_init";
-	pinctrl-0 = <&gpio38_mode0_iddig>;
-	iddig_gpio = <&pio 38 0>;
+	pinctrl-names = "iddig_irq_init", "drvvbus_init", "drvvbus_low", "drvvbus_high";
+	pinctrl-0 = <&usb0_iddig>;
+	pinctrl-1 = <&usb0_drvvbus>;
+	pinctrl-2 = <&usb0_drvvbus_low>;
+	pinctrl-3 = <&usb0_drvvbus_high>;
+	usb-power-supply = <&mt6392_vusb_reg>;
 	status = "okay";
 };

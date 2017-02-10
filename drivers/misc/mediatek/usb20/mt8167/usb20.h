@@ -40,17 +40,16 @@ extern struct musb *mtk_musb;
 #endif
 #endif
 
-/*	#if (defined(CONFIG_MTK_FAN5405_SUPPORT) \
-	*		|| defined(CONFIG_MTK_BQ24158_SUPPORT) \
-	*		|| defined(CONFIG_MTK_NCP1851_SUPPORT) \
-	*		|| defined(CONFIG_MTK_BQ24196_SUPPORT) \
-	*		|| defined(CONFIG_MTK_NCP1854_SUPPORT) \
-	*		|| defined(CONFIG_MTK_BQ24297_SUPPORT) \
-	*		|| defined(CONFIG_MTK_BQ24296_SUPPORT)) \
-	*	&& !defined(CONFIG_MTK_DUAL_INPUT_CHARGER_SUPPORT)
-	*#define OTG_BOOST_BY_SWITCH_CHARGER 1
-	*#endif
-*/
+#if (defined(CONFIG_MTK_FAN5405_SUPPORT) \
+	|| defined(CONFIG_MTK_BQ24158_SUPPORT) \
+	|| defined(CONFIG_MTK_NCP1851_SUPPORT) \
+	|| defined(CONFIG_MTK_BQ24196_SUPPORT) \
+	|| defined(CONFIG_MTK_NCP1854_SUPPORT) \
+	|| defined(CONFIG_MTK_BQ24297_SUPPORT) \
+	|| defined(CONFIG_MTK_BQ24296_SUPPORT)) \
+	&& !defined(CONFIG_MTK_DUAL_INPUT_CHARGER_SUPPORT)
+#define OTG_BOOST_BY_SWITCH_CHARGER 1
+#endif
 
 #if defined(CONFIG_FPGA_EARLY_PORTING)
 #define FPGA_PLATFORM 1
