@@ -187,7 +187,7 @@
 /* #define GPU_DVFS_PMIC_SETTLE_TIME (40) // us */
 
 /* register val -> mV */
-#define GPU_VOLT_TO_MV(volt)            (((volt)*625)/100+700)
+#define GPU_VOLT_TO_MV(volt)            ((((volt)*625)/100+700)*100)
 
 #define PMIC_BUCK_VGPU_VOSEL_ON		MT6351_PMIC_BUCK_VGPU_VOSEL_ON
 #define PMIC_ADDR_VGPU_VOSEL_ON		MT6351_PMIC_BUCK_VGPU_VOSEL_ON_ADDR
