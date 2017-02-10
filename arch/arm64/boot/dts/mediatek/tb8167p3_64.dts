@@ -93,6 +93,16 @@
 		mediatek,dmic-wire-mode = <1>; /* 0(ONE_WIRE) 1(TWO_WIRE) */
 	};
 
+	panel: panel@0 {
+		compatible = "kd,kd070d5450nha6";
+		pinctrl-names = "default";
+		pinctrl-0 = <&dpi_pins_default>;
+		gpio_lcd_pwr = <&pio 50 0>;
+		gpio_lcd_rst = <&pio 70 0>;
+		reg-lcm-supply = <&mt6392_vgp2_reg>;
+		status = "okay";
+	};
+
 	sound: sound {
 		compatible = "mediatek,mt8167-mt6392";
 		mediatek,platform = <&afe>;
@@ -333,13 +343,6 @@
 	power-domains = <>;
 };
 
-&lcm {
-	pinctrl-names = "default";
-	pinctrl-0 = <&dpi_pins_default>;
-	gpio_lcd_pwr = <&pio 50 0>;
-	reg-lcm-supply = <&mt6392_vgp2_reg>;
-	status = "okay";
-};
 
 &mmc0 {
 	pinctrl-names = "default", "state_uhs";
@@ -588,13 +591,8 @@
 			<MT8167_PIN_3_EINT3__FUNC_DPI_D14>,
 			<MT8167_PIN_4_EINT4__FUNC_DPI_D15>,
 			<MT8167_PIN_5_EINT5__FUNC_DPI_D16>,
-			<MT8167_PIN_6_EINT6__FUNC_DPI_D17>,
-			<MT8167_PIN_35_UTXD2__FUNC_DPI_D18>,
-			<MT8167_PIN_25_EINT25__FUNC_DPI_D19>,
-			<MT8167_PIN_24_EINT24__FUNC_DPI_D20>,
-			<MT8167_PIN_69_MSDC2_CLK__FUNC_DPI_D21>,
-			<MT8167_PIN_70_MSDC2_DAT0__FUNC_DPI_D22>,
-			<MT8167_PIN_72_MSDC2_DAT2__FUNC_DPI_D23>;
+			<MT8167_PIN_6_EINT6__FUNC_DPI_D17>;
+			drive-strength = <MTK_DRIVE_8mA>;
 		};
 	};
 
