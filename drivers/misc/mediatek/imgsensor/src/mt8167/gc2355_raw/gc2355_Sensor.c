@@ -54,7 +54,12 @@
 #define LOG_1 LOG_INF("GC2355, DVP\n")
 /****************************   Modify end    *******************************************/
 
+#define GC2355_DEBUG  1
+#if GC2355_DEBUG
+#define LOG_INF(format, args...)    pr_info(PFX "[%s] " format, __func__, ##args)
+#else
 #define LOG_INF(format, args...)    pr_debug(PFX "[%s] " format, __func__, ##args)
+#endif
 
 static DEFINE_SPINLOCK(imgsensor_drv_lock);
 
@@ -220,7 +225,7 @@ static void write_cmos_sensor(kal_uint32 addr, kal_uint32 para)
 
 }
 
-#if 0
+#if 1
 static void set_dummy(void)
 {
 	kal_uint32 hb = 0;
@@ -228,8 +233,8 @@ static void set_dummy(void)
 
 	LOG_INF("dummyline = %d, dummypixels = %d\n", imgsensor.dummy_line, imgsensor.dummy_pixel);
 
-	hb = imgsensor.dummy_pixel;
-	vb = imgsensor.dummy_line;
+	hb = imgsensor.dummy_pixel + GC2355_DEFAULT_DUMMY_PIXEL_NUMS;
+	vb = imgsensor.dummy_line + GC2355_DEFAULT_DUMMY_LINE_NUMS;
 
 
 	/* Set HB */
@@ -275,7 +280,7 @@ static void set_max_framerate(UINT16 framerate, kal_bool min_framelength_en)
 	if (min_framelength_en)
 		imgsensor.min_frame_length = imgsensor.frame_length;
 	spin_unlock(&imgsensor_drv_lock);
-	/* set_dummy(); */
+	set_dummy();
 }				/*    set_max_framerate  */
 
 
@@ -1169,7 +1174,7 @@ static kal_uint32 set_max_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenario_i
 		imgsensor.frame_length = imgsensor_info.pre.framelength + imgsensor.dummy_line;
 		imgsensor.min_frame_length = imgsensor.frame_length;
 		spin_unlock(&imgsensor_drv_lock);
-		/* set_dummy(); */
+		set_dummy();
 		break;
 	case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
 		if (framerate == 0)
@@ -1187,7 +1192,7 @@ static kal_uint32 set_max_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenario_i
 		    imgsensor_info.normal_video.framelength + imgsensor.dummy_line;
 		imgsensor.min_frame_length = imgsensor.frame_length;
 		spin_unlock(&imgsensor_drv_lock);
-		/* set_dummy(); */
+		set_dummy();
 		break;
 	case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
 		if (imgsensor.current_fps == imgsensor_info.cap1.max_framerate) {
@@ -1222,7 +1227,7 @@ static kal_uint32 set_max_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenario_i
 			imgsensor.min_frame_length = imgsensor.frame_length;
 			spin_unlock(&imgsensor_drv_lock);
 		}
-		/* set_dummy(); */
+		set_dummy();
 		break;
 	case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
 		frame_length =
@@ -1237,7 +1242,7 @@ static kal_uint32 set_max_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenario_i
 		imgsensor.frame_length = imgsensor_info.hs_video.framelength + imgsensor.dummy_line;
 		imgsensor.min_frame_length = imgsensor.frame_length;
 		spin_unlock(&imgsensor_drv_lock);
-		/* set_dummy(); */
+		set_dummy();
 		break;
 	case MSDK_SCENARIO_ID_SLIM_VIDEO:
 		frame_length =
@@ -1253,7 +1258,7 @@ static kal_uint32 set_max_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenario_i
 		    imgsensor_info.slim_video.framelength + imgsensor.dummy_line;
 		imgsensor.min_frame_length = imgsensor.frame_length;
 		spin_unlock(&imgsensor_drv_lock);
-		/* set_dummy(); */
+		set_dummy();
 		break;
 	default:		/* coding with  preview scenario by default */
 		frame_length =
@@ -1266,7 +1271,7 @@ static kal_uint32 set_max_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenario_i
 		imgsensor.frame_length = imgsensor_info.pre.framelength + imgsensor.dummy_line;
 		imgsensor.min_frame_length = imgsensor.frame_length;
 		spin_unlock(&imgsensor_drv_lock);
-		/* set_dummy(); */
+		set_dummy();
 		LOG_INF("error scenario_id = %d, we use preview scenario\n", scenario_id);
 		break;
 	}
