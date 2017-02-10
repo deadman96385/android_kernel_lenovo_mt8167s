@@ -512,7 +512,7 @@
 
 		xo: xo@10210000 {
 			compatible = "mediatek,mt8167-xo";
-			reg = <0 10210000 0 0x1000>;
+			reg = <0 0x10210000 0 0x1000>;
 			clocks = <&topckgen CLK_TOP_BSI>,
 				 <&topckgen CLK_TOP_RG_BSI>;
 			clock-names = "bsi",
