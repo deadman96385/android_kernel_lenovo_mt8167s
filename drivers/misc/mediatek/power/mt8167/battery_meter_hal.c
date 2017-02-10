@@ -193,7 +193,7 @@ int get_hw_ocv(void)
 #else
 	signed int adc_result_reg = 0;
 	signed int adc_result = 0;
-	signed int r_val_temp = 4;
+	signed int r_val_temp = 3;
 
 	#if defined(SWCHR_POWER_PATH)
 	adc_result_reg = upmu_get_auxadc_adc_out_wakeup_swchr();
