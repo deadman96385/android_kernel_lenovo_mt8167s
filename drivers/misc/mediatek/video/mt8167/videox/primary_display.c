@@ -36,6 +36,10 @@
 /*#include "mt_idle.h"*/
 /*#include "mt_spm_idle.h"*/
 /*#include "mt_spm.h" *//* for sodi reg addr define */
+#ifdef MTK_FB_SODI_SUPPORT
+#include "mtk_spm_idle.h"
+#endif
+
 #define mt_eint_set_hw_debounce(eint_num, ms) (void)0
 
 /* #include <linux/rtpm_prio.h> */
