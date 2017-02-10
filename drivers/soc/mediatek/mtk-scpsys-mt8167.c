@@ -23,9 +23,6 @@
 
 #include <dt-bindings/power/mt8167-power.h>
 
-#include <linux/regmap.h>
-#define INFRA_TOPAXI_SI1_CTL		0x0204
-
 #define SPM_VDE_PWR_CON			0x0210
 #define SPM_MFG_PWR_CON			0x0214
 #define SPM_VEN_PWR_CON			0x0230
