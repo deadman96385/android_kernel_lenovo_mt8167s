@@ -298,7 +298,6 @@ void vAnalyzeDTD(unsigned short ui2Active, unsigned short ui2HBlanking, unsigned
 	unsigned int ui41stNTSC = _HdmiSinkAvCap.ui4_sink_1st_dtd_ntsc_resolution;
 	unsigned int ui41stPAL = _HdmiSinkAvCap.ui4_sink_1st_dtd_pal_resolution;
 
-	HDMI_EDID_FUNC();
 
 	switch (ui2Active) {
 	case 0x5a0:		/* 480i */

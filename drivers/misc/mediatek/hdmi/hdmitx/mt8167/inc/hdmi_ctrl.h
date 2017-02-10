@@ -75,7 +75,7 @@ extern size_t hdmidrv_log_on;
 #define hdmiedidlog        (0x100)
 #define hdmidrvlog         (0x200)
 
-#define hdmialllog   (hdmitxhotpluglog | hdmiedidlog | hdmiplllog)
+#define hdmialllog   (hdmitxhotpluglog | hdmiedidlog)
 
 /* ////////////////////////////////////////////PLL////////////////////////////////////////////////////// */
 #define HDMI_PLL_LOG(fmt, arg...) \
