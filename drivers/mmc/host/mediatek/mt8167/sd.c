@@ -3187,6 +3187,8 @@ done:
 				 *		count, host->id);
 				 * }
 				 */
+				dir = data->flags & MMC_DATA_READ ?
+					DMA_FROM_DEVICE : DMA_TO_DEVICE;
 				dma_unmap_sg(mmc_dev(mmc), data->sg,
 					data->sg_len, dir);
 			}
