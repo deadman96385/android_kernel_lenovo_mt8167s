@@ -1046,6 +1046,8 @@
 			clocks = <&topckgen CLK_TOP_MSDC0>,
 					<&topckgen CLK_TOP_AHB_INFRA_SEL>;
 			clock-names = "source", "hclk";
+			assigned-clocks = <&topckgen CLK_TOP_MSDC0_SEL>;
+			assigned-clock-parents = <&topckgen CLK_TOP_MAINPLL_D8>;
 			status = "disabled";
 		};
 
@@ -1056,6 +1058,8 @@
 			clocks = <&topckgen CLK_TOP_MSDC1>,
 					<&topckgen CLK_TOP_AHB_INFRA_SEL>;
 			clock-names = "source", "hclk";
+			assigned-clocks = <&topckgen CLK_TOP_MSDC1_SEL>;
+			assigned-clock-parents = <&topckgen CLK_TOP_MAINPLL_D8>;
 			status = "disabled";
 		};
 
