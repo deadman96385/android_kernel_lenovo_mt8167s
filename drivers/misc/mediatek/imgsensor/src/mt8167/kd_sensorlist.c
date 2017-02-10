@@ -89,12 +89,18 @@ static DEFINE_SPINLOCK(kdsensor_drv_lock);
 #define SUPPORT_I2C_BUS_NUM2        1
 #endif
 
-/* for PMIC may return fail, just ignore it */
-#define WORKAROUND_FOR_PMIC	1
+/* If need workaround for fpga, then modify them=== START*/
+#define WORKAROUND_FOR_PMIC	0
 
-#define BYPASS_GPIO		1
+#define BYPASS_GPIO		0
 
-#define FORCE_IGNORE_CCF	1
+#define FORCE_IGNORE_CCF	0
+/* If need workaround for fpga, then modify them=== END*/
+
+/* for build test */
+#if defined(CONFIG_FPGA_EARLY_PORTING) && 0
+#warning "defined CONFIG_FPGA_EARLY_PORTING"
+#endif
 
 #define CAMERA_HW_DRVNAME1  "kd_camera_hw"
 #define CAMERA_HW_DRVNAME2  "kd_camera_hw_bus2"
@@ -134,13 +140,9 @@ struct cam_power g_cam[2];
 
 #endif
 
-
-/* Common Clock Framework (CCF) */
-#ifdef MTKCAM_USING_CCF
 struct clk *g_camclk_camtg_sel;
-struct clk *g_camclk_univpll_d26;
-struct clk *g_camclk_univpll2_d2;
-#endif
+struct clk *g_camclk_48m;
+struct clk *g_camclk_208m;
 
 struct device *sensor_device;
 
@@ -1128,7 +1130,9 @@ kdModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM socketIdx[KDIMGSENSOR_MAX_INVOKE_
 
 	for (i = KDIMGSENSOR_INVOKE_DRIVER_0; i < KDIMGSENSOR_MAX_INVOKE_DRIVERS; i++) {
 		if (g_bEnableDriver[i]) {
-			/* PK_XLOG_INFO("[%s][%d][%d][%s][%s]\r\n",__FUNCTION__,g_bEnableDriver[i],socketIdx[i],sensorNameStr[i],mode_name); */
+			/* PK_XLOG_INFO("[%s][%d][%d][%s][%s]\r",__FUNCTION__,
+			 * g_bEnableDriver[i],socketIdx[i],sensorNameStr[i],mode_name);
+			 */
 #ifndef CONFIG_FPGA_EARLY_PORTING
 			ret = kdCISModulePowerOn(socketIdx[i], sensorNameStr[i], On, mode_name);
 #endif
@@ -1293,14 +1297,19 @@ int kdCheckSensorPowerOn(void)
 int kdSensorSyncFunctionPtr(void)
 {
 	unsigned int FeatureParaLen = 0;
-	/* PK_DBG("[Sensor] kdSensorSyncFunctionPtr1:%d %d %d\n", g_NewSensorExpGain.uSensorExpDelayFrame, g_NewSensorExpGain.uSensorGainDelayFrame, g_NewSensorExpGain.uISPGainDelayFrame); */
+	/* PK_DBG("[Sensor] kdSensorSyncFunctionPtr1:%d %d %d",
+	* g_NewSensorExpGain.uSensorExpDelayFrame, g_NewSensorExpGain.uSensorGainDelayFrame,
+	*	g_NewSensorExpGain.uISPGainDelayFrame);
+	*/
 	mutex_lock(&kdCam_Mutex);
 	if (g_pSensorFunc == NULL) {
 		PK_ERR("ERROR:NULL g_pSensorFunc\n");
 		mutex_unlock(&kdCam_Mutex);
 		return -EIO;
 	}
-	/* PK_DBG("[Sensor] Exposure time:%d, Gain = %d\n", g_NewSensorExpGain.u2SensorNewExpTime,g_NewSensorExpGain.u2SensorNewGain ); */
+	/* PK_DBG("[Sensor] Exposure time:%d, Gain = %d",
+	 *	g_NewSensorExpGain.u2SensorNewExpTime,g_NewSensorExpGain.u2SensorNewGain );
+	*/
 	/* exposure time */
 	if (g_NewSensorExpGain.uSensorExpDelayFrame == 0) {
 		FeatureParaLen = 2;
@@ -1351,7 +1360,9 @@ int kdGetRawGainInfoPtr(UINT16 *pRAWGain)
 		*(pRAWGain + 1) = g_NewSensorExpGain.u2ISPNewGrGain;
 		*(pRAWGain + 2) = g_NewSensorExpGain.u2ISPNewGbGain;
 		*(pRAWGain + 3) = g_NewSensorExpGain.u2ISPNewBGain;
-		/* PK_DBG("[Sensor] ISP Gain:%d\n", g_NewSensorExpGain.u2ISPNewRGain, g_NewSensorExpGain.u2ISPNewGrGain, */
+		/* PK_DBG("[Sensor] ISP Gain:%d", g_NewSensorExpGain.u2ISPNewRGain,
+		 *	g_NewSensorExpGain.u2ISPNewGrGain,
+		 */
 		/* g_NewSensorExpGain.u2ISPNewGbGain, g_NewSensorExpGain.u2ISPNewBGain); */
 		spin_lock(&kdsensor_drv_lock);
 		g_NewSensorExpGain.uISPGainDelayFrame = 0xFF;	/* disable */
@@ -2280,53 +2291,53 @@ static inline int adopt_CAMERA_HW_Close(void)
 /*******************************************************************************
 * Common Clock Framework (CCF)
 ********************************************************************************/
-
-#ifdef MTKCAM_USING_CCF
-
 static inline void Get_ccf_clk(struct platform_device *pdev)
 {
-#if defined(CONFIG_FPGA_EARLY_PORTING) || FORCE_IGNORE_CCF
+#if FORCE_IGNORE_CCF
 	return;
 #endif
 
-#if FORCE_IGNORE_CCF
-	/* force ignore ccf */
-	return;
-#endif
 	if (pdev == NULL) {
 		pr_err("[%s] pdev is null\n", __func__);
 		return;
 	}
 	/* get all possible using clocks */
 	g_camclk_camtg_sel = devm_clk_get(&pdev->dev, "TOP_CAMTG_SEL");
-	BUG_ON(IS_ERR(g_camclk_camtg_sel));
-	g_camclk_univpll_d26 = devm_clk_get(&pdev->dev, "TOP_UNIVPLL_D26");
-	BUG_ON(IS_ERR(g_camclk_univpll_d26));
-	g_camclk_univpll2_d2 = devm_clk_get(&pdev->dev, "TOP_UNIVPLL2_D2");
-	BUG_ON(IS_ERR(g_camclk_univpll2_d2));
+	if (IS_ERR(g_camclk_camtg_sel))
+		PK_ERR("get g_camclk_camtg_sel : invalid...\n");
+	g_camclk_48m = devm_clk_get(&pdev->dev, "TOP_CAM_TG_48M");
+	if (IS_ERR(g_camclk_48m))
+		PK_ERR("get g_camclk_48m : invalid...\n");
+	g_camclk_208m = devm_clk_get(&pdev->dev, "TOP_CAM_TG_208M");
+	if (IS_ERR(g_camclk_208m))
+		PK_ERR("get g_camclk_208m : invalid...\n");
 
 	return;
 }
 
-static inline void Check_ccf_clk(void)
+static inline int Check_ccf_clk(void)
 {
-#if defined(CONFIG_FPGA_EARLY_PORTING) || FORCE_IGNORE_CCF
-	return;
-#endif
-
 #if FORCE_IGNORE_CCF
-	/* force ignore ccf */
-	return;
+	return 1;
 #endif
 
-	BUG_ON(IS_ERR(g_camclk_camtg_sel));
-	BUG_ON(IS_ERR(g_camclk_univpll_d26));
-	BUG_ON(IS_ERR(g_camclk_univpll2_d2));
+	if (IS_ERR(g_camclk_camtg_sel)) {
+		PK_ERR("g_camclk_camtg_sel invalid...\n");
+		return 0;
+	}
 
-	return;
+	if (IS_ERR(g_camclk_48m)) {
+		PK_ERR("g_camclk_48m invalid...\n");
+		return 0;
+	}
+
+	if (IS_ERR(g_camclk_208m)) {
+		PK_ERR("g_camclk_208m invalid...\n");
+		return 0;
+	}
+
+	return 1;
 }
-
-#endif
 
 static inline int kdSetSensorMclk(int *pBuf)
 {
@@ -2334,42 +2345,28 @@ static inline int kdSetSensorMclk(int *pBuf)
 	int ret = 0;
 	ACDK_SENSOR_MCLK_STRUCT *pSensorCtrl = (ACDK_SENSOR_MCLK_STRUCT *) pBuf;
 
-#if defined(CONFIG_FPGA_EARLY_PORTING) || FORCE_IGNORE_CCF
-	return 0;
-#endif
-
 #if FORCE_IGNORE_CCF
-	/* force ignore ccf */
 	return 0;
 #endif
 
 	PK_INFO("[CAMERA SENSOR] kdSetSensorMclk on=%d, freq= %d\n", pSensorCtrl->on,
 		pSensorCtrl->freq);
-#ifdef MTKCAM_USING_CCF
+
 	PK_DBG("========= MTKCAM_USING_CCF =======\n");
-	Check_ccf_clk();
+	if (!Check_ccf_clk()) {
+		PK_ERR("Check Camera CCF error!\n");
+		return 0;
+	}
 	if (pSensorCtrl->on == 1) {
 		clk_prepare_enable(g_camclk_camtg_sel);
 		if (pSensorCtrl->freq == 1 /*CAM_PLL_48_GROUP */)
-			clk_set_parent(g_camclk_camtg_sel, g_camclk_univpll_d26);
+			clk_set_parent(g_camclk_camtg_sel, g_camclk_48m);
 		else if (pSensorCtrl->freq == 2 /*CAM_PLL_52_GROUP */)
-			clk_set_parent(g_camclk_camtg_sel, g_camclk_univpll2_d2);
+			clk_set_parent(g_camclk_camtg_sel, g_camclk_208m);
 	} else {
 		clk_disable_unprepare(g_camclk_camtg_sel);
 	}
 	return ret;
-
-#else
-	PK_DBG("========= Old Clock =======\n");
-	if (pSensorCtrl->on == 1) {
-		enable_mux(MT_MUX_CAMTG, "CAMERA_SENSOR");
-		clkmux_sel(MT_MUX_CAMTG, pSensorCtrl->freq, "CAMERA_SENSOR");
-	} else {
-
-		disable_mux(MT_MUX_CAMTG, "CAMERA_SENSOR");
-	}
-	return ret;
-#endif
 /* #endif */
 }
 
@@ -2601,7 +2598,7 @@ int cam_power_init(struct platform_device *pdev, int PinIdx)
 	PK_DBG(" == MTKCAM_USING_PWRREG : cam_power_init(%d) ==", PinIdx);
 
 #if defined(CONFIG_FPGA_EARLY_PORTING) || WORKAROUND_FOR_PMIC
-	PK_DBG("Just bypass power");
+	PK_DBG("Just bypass power\n");
 	return 1;
 #else
 	g_cam[PinIdx].vcama = devm_regulator_get(&pdev->dev, "reg-vcama");
@@ -2727,6 +2724,9 @@ bool _hwPowerOn(int PinIdx, KD_REGULATOR_TYPE_T PwrType, int Voltage)
 
 	PK_DBG("PinIndex=%d , PowerType = %d , Voltage = %d", PinIdx, PwrType, Voltage);
 
+#if defined(CONFIG_FPGA_EARLY_PORTING) || WORKAROUND_FOR_PMIC
+	return TRUE;
+#endif
 	if ((PinIdx != 0) && (PinIdx != 1)) {
 		PK_ERR("PinIndex=%d is invalid\n", PinIdx);
 		return FALSE;
@@ -2753,11 +2753,7 @@ bool _hwPowerOn(int PinIdx, KD_REGULATOR_TYPE_T PwrType, int Voltage)
 	if (pwr != NULL)
 		return CAMERA_Regulator_PowerOnOFF(pwr, 1, Voltage);
 	else {
-#if defined(CONFIG_FPGA_EARLY_PORTING) || WORKAROUND_FOR_PMIC
-		return TRUE;
-#else
 		return FALSE;
-#endif
 	}
 }
 EXPORT_SYMBOL(_hwPowerOn);
@@ -2768,6 +2764,10 @@ bool _hwPowerDown(int PinIdx, KD_REGULATOR_TYPE_T PwrType)
 	struct regulator *pwr;
 
 	PK_DBG("PinIndex=%d , PowerType = %d", PinIdx, PwrType);
+
+#if defined(CONFIG_FPGA_EARLY_PORTING) || WORKAROUND_FOR_PMIC
+		return TRUE;
+#endif
 
 	if ((PinIdx != 0) && (PinIdx != 1)) {
 		PK_ERR("PinIndex=%d is invalid\n", PinIdx);
@@ -2795,11 +2795,7 @@ bool _hwPowerDown(int PinIdx, KD_REGULATOR_TYPE_T PwrType)
 	if (pwr != NULL)
 		return CAMERA_Regulator_PowerOnOFF(pwr, 0, 0);
 	else {
-#if defined(CONFIG_FPGA_EARLY_PORTING) || WORKAROUND_FOR_PMIC
-		return TRUE;
-#else
 		return FALSE;
-#endif
 	}
 }
 EXPORT_SYMBOL(_hwPowerDown);
@@ -3703,7 +3699,7 @@ struct i2c_driver CAMERA_HW_i2c_driver2 = {
 ********************************************************************************/
 static int CAMERA_HW_probe(struct platform_device *pdev)
 {
-#if !BYPASS_GPIO && (!defined(CONFIG_FPGA_EARLY_PORTING) && !defined(CONFIG_MTK_LEGACY))
+#if !BYPASS_GPIO && !defined(CONFIG_MTK_LEGACY)
 	struct device *dev = &pdev->dev;
 #endif
 
@@ -3728,12 +3724,10 @@ static int CAMERA_HW_probe(struct platform_device *pdev)
 	}
 #endif
 
-#ifdef MTKCAM_USING_CCF
 	PK_DBG(" == MTKCAM_USING_CCF ==\n");
 	Get_ccf_clk(pdev);
-#endif
 
-#if !BYPASS_GPIO && (!defined(CONFIG_FPGA_EARLY_PORTING) && !defined(CONFIG_MTK_LEGACY))
+#if !BYPASS_GPIO && !defined(CONFIG_MTK_LEGACY)
 	/* request GPIO RST/PDN */
 	GPIO_CAM0_RST = of_get_named_gpio(dev->of_node, "cam0_rst", 0);
 	GPIO_CAM0_PDN = of_get_named_gpio(dev->of_node, "cam0_pdn", 0);
@@ -3765,7 +3759,7 @@ static int CAMERA_HW_probe(struct platform_device *pdev)
 ********************************************************************************/
 static int CAMERA_HW_remove(struct platform_device *pdev)
 {
-#if !BYPASS_GPIO && (!defined(CONFIG_FPGA_EARLY_PORTING) && !defined(CONFIG_MTK_LEGACY))
+#if !BYPASS_GPIO && !defined(CONFIG_MTK_LEGACY)
 
 	if (gpio_is_valid(GPIO_CAM0_RST))
 		gpio_free(GPIO_CAM0_RST);
@@ -3810,13 +3804,13 @@ static int CAMERA_HW_probe2(struct platform_device *pdev)
 
 	if (ret < 0) {
 #if WORKAROUND_FOR_PMIC
-		PK_INFO("Workaround for Camera Probe because of PMIC error, just continue...");
+		PK_INFO("Workaround for Camera Probe because of PMIC error, just continue...\n");
 		if (ret == (-EPROBE_DEFER))
-			PK_INFO("Reason: Camera HW driver is probed earlier than PMIC");
+			PK_INFO("Reason: Camera HW driver is probed earlier than PMIC\n");
 #else
 		if (ret == (-EPROBE_DEFER))
 			PK_ERR
-			    ("Camera HW driver is probed earlier than PMIC, let's deferring probe");
+			    ("Camera HW driver is probed earlier than PMIC, let's deferring probe\n");
 		return ret;
 #endif
 	}

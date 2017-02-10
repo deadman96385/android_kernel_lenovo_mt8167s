@@ -259,23 +259,44 @@
 
 /* Main Cam */
 &kd_camera_hw1 {
-	pinctrl-names = "default", "cam0_rst0", "cam0_rst1", "cam0_pnd0", "cam0_pnd1",
-			"cam1_rst0", "cam1_rst1", "cam1_pnd0", "cam1_pnd1","cam_ldo0_0", "cam_ldo0_1";
+	reg-vcama-supply = <&mt6392_vcama_reg>;		/* AVDD */
+	reg-vcamd-supply = <&mt6392_vcamd_reg>;		/* DVDD */
+	reg-vcamio-supply = <&mt6392_vcamio_reg>;	/* DOVDD */
+	reg-vcamaf-supply = <&mt6392_vcamaf_reg>;	/* AFVDD */
+
+	pinctrl-names = "default",
+		"cam_mclk", "cam_pclk",
+		"cam_gpio90",  "cam_gpio91", "cam_gpio92", "cam_gpio93",  "cam_gpio94",
+		"cam_gpio95",  "cam_gpio96", "cam_gpio97", "cam_gpio98",  "cam_gpio99";
+
 	pinctrl-0 = <&camera_pins_default>;
-	pinctrl-1 = <&camera_pins_cam0_rst0>;
-	pinctrl-2 = <&camera_pins_cam0_rst1>;
-	pinctrl-3 = <&camera_pins_cam0_pnd0>;
-	pinctrl-4 = <&camera_pins_cam0_pnd1>;
-	pinctrl-5 = <&camera_pins_cam1_rst0>;
-	pinctrl-6 = <&camera_pins_cam1_rst1>;
-	pinctrl-7 = <&camera_pins_cam1_pnd0>;
-	pinctrl-8 = <&camera_pins_cam1_pnd1>;
+	pinctrl-1 = <&camera_pins_cam_mclk>;
+	pinctrl-2 = <&camera_pins_cam_pclk>;
+	pinctrl-3 = <&camera_pins_gpio90>;
+	pinctrl-4 = <&camera_pins_gpio91>;
+	pinctrl-5 = <&camera_pins_gpio92>;
+	pinctrl-6 = <&camera_pins_gpio93>;
+	pinctrl-7 = <&camera_pins_gpio94>;
+	pinctrl-8 = <&camera_pins_gpio95>;
+	pinctrl-9 = <&camera_pins_gpio96>;
+	pinctrl-10 = <&camera_pins_gpio97>;
+	pinctrl-11 = <&camera_pins_gpio98>;
+	pinctrl-12 = <&camera_pins_gpio99>;
+
+	cam0_rst = <&pio 49 0>;
+	cam0_pdn = <&pio 48 0>;
+	cam1_rst = <&pio 49 0>;
+	cam1_pdn = <&pio 51 0>;
 	status = "okay";
 };
 
 /* Sub Cam */
-/* FIX ME: same power pins as Main ? */
+/* Same power pins as Main, actually, it can be commented */
 &kd_camera_hw2{
+	reg-vcama-supply = <&mt6392_vcama_reg>;		/* AVDD */
+	reg-vcamd-supply = <&mt6392_vcamd_reg>;		/* DVDD */
+	reg-vcamio-supply = <&mt6392_vcamio_reg>;	/* DOVDD */
+	reg-vcamaf-supply = <&mt6392_vcamaf_reg>;	/* AFVDD */
 };
 
 &keypad {
@@ -395,26 +416,80 @@
 	};
 
 	/* CAMERA GPIO standardization */
-	/* Project Dependency : tb8163m1 */
-	camera_pins_cam0_rst0: cam0@0 {
-	};
-	camera_pins_cam0_rst1: cam0@1 {
-	};
-	camera_pins_cam0_pnd0: cam0@2 {
-	};
-	camera_pins_cam0_pnd1: cam0@3 {
-	};
-	camera_pins_cam1_rst0: cam1@0 {
-	};
-	camera_pins_cam1_rst1: cam1@1 {
-	};
-	camera_pins_cam1_pnd0: cam1@2 {
-	};
-	camera_pins_cam1_pnd1: cam1@3 {
+	/* default mode */
+	camera_pins_default: camdefault {
 	};
 
-	/* Set MCLK Pin default mode */
-	camera_pins_default: camdefault {
+	camera_pins_cam_mclk: cam_pin_mclk {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_102_CMMCLK__FUNC_CMMCLK>;
+		};
+	};
+
+	camera_pins_cam_pclk: cam_pin_pclk {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_103_CMPCLK__FUNC_CMPCLK>;
+		};
+	};
+
+	camera_pins_gpio90: cam_pin_gpio90 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_90_RDN2__FUNC_CMDAT8>;
+		};
+	};
+
+	camera_pins_gpio91: cam_pin_gpio91 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_91_RDP2__FUNC_CMDAT9>;
+		};
+	};
+
+	camera_pins_gpio92: cam_pin_gpio92 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_92_RDN3__FUNC_CMDAT4>;
+		};
+	};
+
+	camera_pins_gpio93: cam_pin_gpio93 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_93_RDP3__FUNC_CMDAT5>;
+		};
+	};
+
+	camera_pins_gpio94: cam_pin_gpio94 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_94_RCN_A__FUNC_CMDAT6>;
+		};
+	};
+
+	camera_pins_gpio95: cam_pin_gpio95 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_95_RCP_A__FUNC_CMDAT7>;
+		};
+	};
+
+	camera_pins_gpio96: cam_pin_gpio96 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_96_RDN1_A__FUNC_CMDAT2>;
+		};
+	};
+
+	camera_pins_gpio97: cam_pin_gpio97 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_97_RDP1_A__FUNC_CMDAT3>;
+		};
+	};
+
+	camera_pins_gpio98: cam_pin_gpio98 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_98_RDN0_A__FUNC_CMHSYNC>;
+		};
+	};
+
+	camera_pins_gpio99: cam_pin_gpio99 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_99_RDP0_A__FUNC_CMVSYNC>;
+		};
 	};
 
 	/* CONSYS GPIO Settings - Start */
