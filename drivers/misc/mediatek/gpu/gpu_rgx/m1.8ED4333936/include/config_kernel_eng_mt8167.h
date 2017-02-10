@@ -7,8 +7,8 @@
 #define SUPPORT_RGX 1
 #define DMABUF_IMPORT_PHYSHEAP_ID  0
 #define RELEASE
-#define RGX_BVNC_CORE_KM_HEADER "cores/rgxcore_km_22.30.54.25.h"
-#define RGX_BNC_CONFIG_KM_HEADER "configs/rgxconfig_km_22.V.54.25.h"
+#define RGX_BVNC_CORE_KM_HEADER "cores/rgxcore_km_22.40.54.30.h"
+#define RGX_BNC_CONFIG_KM_HEADER "configs/rgxconfig_km_22.V.54.30.h"
 #define SUPPORT_DBGDRV_EVENT_OBJECTS
 #define PDUMP_STREAMBUF_MAX_SIZE_MB 16
 #define PVRSRV_NEED_PVR_DPF

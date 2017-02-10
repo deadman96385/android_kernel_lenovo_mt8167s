@@ -50,6 +50,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgxfwload.h"
 #include "pvr_debug.h"
 #include "srvkm.h"
+#include "mtk_mfgsys.h"
 
 struct RGXFW
 {
@@ -218,7 +219,7 @@ static bool VerifyFirmware(const struct firmware *psFW)
 	}
 
 	PVR_LOG(("Digital signature for '%s' verified successfully.",
-			 RGX_FW_FILENAME));
+			 rgx_fw_name));
 	bVerified = true;
 err_put_key:
 	key_put(key_ref_to_ptr(hKey));
@@ -263,19 +264,19 @@ RGXLoadFirmware(SHARED_DEV_CONNECTION psDeviceNode, const IMG_CHAR *pszBVNCStrin
 			if (res != 0)
 			{
 				PVR_DPF((PVR_DBG_WARNING, "%s: request_firmware('%s') failed (%d), trying '%s'",
-										__func__, pszBVpNCString, res, RGX_FW_FILENAME));
-				res = request_firmware(&psFW, RGX_FW_FILENAME, psDeviceNode->psDevConfig->pvOSDevice);
+							__func__, pszBVpNCString, res, rgx_fw_name));
+				res = request_firmware(&psFW, rgx_fw_name, psDeviceNode->psDevConfig->pvOSDevice);
 			}
 		}
 	}
 	else
 	{
-		res = request_firmware(&psFW, RGX_FW_FILENAME, psDeviceNode->psDevConfig->pvOSDevice);
+		res = request_firmware(&psFW, rgx_fw_name, psDeviceNode->psDevConfig->pvOSDevice);
 	}
 	if (res != 0)
 	{
 		PVR_DPF((PVR_DBG_ERROR, "%s: request_firmware('%s') failed (%d)",
-								__func__, RGX_FW_FILENAME, res));
+								__func__, rgx_fw_name, res));
 		return NULL;
 	}
 

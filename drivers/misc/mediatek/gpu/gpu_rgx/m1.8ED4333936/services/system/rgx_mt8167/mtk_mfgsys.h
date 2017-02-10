@@ -63,7 +63,7 @@ PVRSRV_ERROR MTKSystemPrePowerState(PVRSRV_SYS_POWER_STATE eNewPowerState);
 PVRSRV_ERROR MTKSystemPostPowerState(PVRSRV_SYS_POWER_STATE eNewPowerState);
 
 int MTKRGXDeviceInit(void *pvOSDevice);
-
+void MTKSetICVerion(void);
 
 #ifdef CONFIG_MTK_HIBERNATION
 extern void mt_irq_set_sens(unsigned int irq, unsigned int sens);
@@ -99,7 +99,7 @@ extern void (*ged_dvfs_gpu_freq_commit_fp)(unsigned long ui32NewFreqID,
 extern int (*ged_dvfs_vsync_trigger_fp)(int idx);
 extern unsigned int mt_gpufreq_get_volt_by_idx(unsigned int idx);
 #endif
-
+extern char rgx_fw_name[20];
 
 #endif
 

@@ -59,6 +59,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "rgx_compat_bvnc.h"
 
 #include "srvinit_osfunc.h"
+#include "mtk_mfgsys.h"
 
 #if !defined(SUPPORT_KERNEL_SRVINIT)
 #include "rgxdefs.h"
@@ -1358,17 +1359,17 @@ static PVRSRV_ERROR InitFirmware(SHARED_DEV_CONNECTION hServices,
 	IMG_CHAR *pszFWFilename = NULL;
 	IMG_CHAR *pszFWpFilename = NULL;
 #if defined(SUPPORT_KERNEL_SRVINIT)
-	IMG_CHAR aszFWFilenameStr[OSStringLength(RGX_FW_FILENAME)+MAX_BVNC_STRING_LEN+2];
-	IMG_CHAR aszFWpFilenameStr[OSStringLength(RGX_FW_FILENAME)+MAX_BVNC_STRING_LEN+3];
+	IMG_CHAR aszFWFilenameStr[OSStringLength(rgx_fw_name)+MAX_BVNC_STRING_LEN+2];
+	IMG_CHAR aszFWpFilenameStr[OSStringLength(rgx_fw_name)+MAX_BVNC_STRING_LEN+3];
 	PVRSRV_DEVICE_NODE *psDeviceNode = (PVRSRV_DEVICE_NODE *)hServices;
 	PVRSRV_RGXDEV_INFO *psDevInfo = (PVRSRV_RGXDEV_INFO *)psDeviceNode->pvDevice;
 
 	pszFWFilename = &aszFWFilenameStr[0];
-	OSSNPrintf(pszFWFilename, OSStringLength(RGX_FW_FILENAME)+MAX_BVNC_STRING_LEN+2, "%s.%d.%d.%d.%d", RGX_FW_FILENAME,
+	OSSNPrintf(pszFWFilename, OSStringLength(rgx_fw_name)+MAX_BVNC_STRING_LEN+2, "%s.%d.%d.%d.%d", rgx_fw_name,
 	           psDevInfo->sDevFeatureCfg.ui32B, psDevInfo->sDevFeatureCfg.ui32V,
 	           psDevInfo->sDevFeatureCfg.ui32N, psDevInfo->sDevFeatureCfg.ui32C);
 	pszFWpFilename = &aszFWpFilenameStr[0];
-	OSSNPrintf(pszFWpFilename, OSStringLength(RGX_FW_FILENAME)+MAX_BVNC_STRING_LEN+3, "%s.%d.%dp.%d.%d", RGX_FW_FILENAME,
+	OSSNPrintf(pszFWpFilename, OSStringLength(rgx_fw_name)+MAX_BVNC_STRING_LEN+3, "%s.%d.%dp.%d.%d", rgx_fw_name,
 	           psDevInfo->sDevFeatureCfg.ui32B, psDevInfo->sDevFeatureCfg.ui32V,
 	           psDevInfo->sDevFeatureCfg.ui32N, psDevInfo->sDevFeatureCfg.ui32C);
 #endif /* defined(SUPPORT_KERNEL_SRVINIT) */

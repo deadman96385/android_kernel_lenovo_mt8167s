@@ -26,6 +26,7 @@
 #include "device.h"
 #include "rgxinit.h"
 #include "pvr_dvfs.h"
+#include "mtk_chip.h"
 
 #include <linux/of.h>
 #include <linux/of_irq.h>
@@ -147,6 +148,8 @@ static const char * const top_mfg_clk_name[] = {
 #ifdef CONFIG_MTK_SEGMENT_TEST
 static IMG_UINT32 efuse_mfg_enable;
 #endif
+
+char rgx_fw_name[20] = "rgx.fw.signed";
 
 #ifdef CONFIG_MTK_HIBERNATION
 int gpu_pm_restore_noirq(struct device *device)
@@ -838,6 +841,13 @@ static bool MTKCheckDeviceInit(void)
 	return ret;
 }
 
+void MTKSetICVerion(void)
+{
+	if (mt_get_chip_sw_ver() == 0) /* E1 */
+		strcat(rgx_fw_name, ".e1");
+
+	PVR_DPF((PVR_DBG_ERROR, "rgx_fw_name: %s", rgx_fw_name));
+}
 
 PVRSRV_ERROR MTKDevPrePowerState(IMG_HANDLE hSysData, PVRSRV_DEV_POWER_STATE eNewPowerState,
 				 PVRSRV_DEV_POWER_STATE eCurrentPowerState,

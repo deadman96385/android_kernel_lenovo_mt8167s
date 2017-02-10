@@ -1813,6 +1813,7 @@ static PVRSRV_ERROR RGXDevInitCompatCheck_BVNC_FWAgainstDriver(PVRSRV_RGXDEV_INF
 		return PVRSRV_ERROR_INVALID_PARAMS;
 
 	RGX_BVNC_EQUAL(sBVNC, psRGXFWInit->sRGXCompChecks.sFWBVNC, bCompatibleAll, bCompatibleVersion, bCompatibleLenMax, bCompatibleBNC, bCompatibleV);
+	bCompatibleAll = IMG_TRUE;
 	
 	if (!bCompatibleAll)
 	{
@@ -2066,6 +2067,7 @@ static PVRSRV_ERROR RGXDevInitCompatCheck_BVNC_HWAgainstDriver(PVRSRV_RGXDEV_INF
 	}
 
 	RGX_BVNC_EQUAL(sSWBVNC, sHWBVNC, bCompatibleAll, bCompatibleVersion, bCompatibleLenMax, bCompatibleBNC, bCompatibleV);
+	bCompatibleAll = IMG_TRUE;
 
 	if(psDevInfo->sDevFeatureCfg.ui64ErnsBrns & FIX_HW_BRN_42480_BIT_MASK)
 	{
@@ -2090,6 +2092,7 @@ static PVRSRV_ERROR RGXDevInitCompatCheck_BVNC_HWAgainstDriver(PVRSRV_RGXDEV_INF
 		}
 	}
 
+	bCompatibleAll = IMG_TRUE;
 	if (!bCompatibleAll)
 	{
 		if (!bCompatibleVersion)
@@ -2959,6 +2962,7 @@ PVRSRVRGXInitFirmwareKM(CONNECTION_DATA          *psConnection,
 	rgx_bvnc_packed(&sBVNC.ui64BNC, sBVNC.aszV, sBVNC.ui32VLenMax,  ui32B, szV, ui32N, ui32C);
 
 	RGX_BVNC_EQUAL(sBVNC, *psClientBVNC, bCompatibleAll, bCompatibleVersion, bCompatibleLenMax, bCompatibleBNC, bCompatibleV);
+	bCompatibleAll = IMG_TRUE;
 
 	if (!bCompatibleAll)
 	{
@@ -3145,6 +3149,7 @@ PVRSRVRGXInitFirmwareExtendedKM(CONNECTION_DATA        *psConnection,
 
 	/* Check if BVNC numbers of firmware and driver are compatible */
 	RGX_BVNC_EQUAL(sBVNC, *psFirmwareBVNC, bCompatibleAll, bCompatibleVersion, bCompatibleLenMax, bCompatibleBNC, bCompatibleV);
+	bCompatibleAll = IMG_TRUE;
 
 	if (!bCompatibleAll)
 	{

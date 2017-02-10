@@ -52,6 +52,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "pvr_drv.h"
 #include "pvrmodule.h"
 #include "sysinfo.h"
+#include "mtk_mfgsys.h"
 
 static struct drm_driver pvr_drm_platform_driver;
 
@@ -227,7 +228,7 @@ static int __init pvr_init(void)
 	(LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0))
 	pvr_drm_platform_driver.set_busid = drm_platform_set_busid;
 #endif
-
+	MTKSetICVerion();
 	err = PVRSRVCommonDriverInit();
 	if (err)
 		return err;
