@@ -85,7 +85,7 @@ static unsigned int	g_initialize;
 #define MEMPLL_DEF_FREQ          160000   /* /< It is 160Mbps provided from DRAM expert. */
 #define MMPLL_DEF_FREQ          1092000
 #define TVDPLL_DEF_FREQ         1782000
-#define LVDSPLL_DEF_FREQ      1632000	/* 1040000 */
+#define LVDSPLL_DEF_FREQ      1976000
 
 /* keep track the status of each PLL */
 static  fh_pll_t g_fh_pll[FH_PLL_NUM] = {
@@ -94,7 +94,7 @@ static  fh_pll_t g_fh_pll[FH_PLL_NUM] = {
 	{FH_FH_DISABLE,     FH_PLL_ENABLE, 0, MEMPLL_DEF_FREQ,       0},
 	{FH_FH_DISABLE,	    FH_PLL_ENABLE, 0, MMPLL_DEF_FREQ,        0},
 	{FH_FH_DISABLE,	    FH_PLL_ENABLE, 0, TVDPLL_DEF_FREQ,       0},
-	{FH_FH_ENABLE_SSC,	    FH_PLL_ENABLE, 0, LVDSPLL_DEF_FREQ,    0}
+	{FH_FH_DISABLE,	    FH_PLL_ENABLE, 0, LVDSPLL_DEF_FREQ,    0}
 };
 
 static const struct freqhopping_ssc ssc_armca7pll_setting[] = {
@@ -136,7 +136,7 @@ static const struct freqhopping_ssc ssc_tvdpll_setting[] = {
 static const struct freqhopping_ssc ssc_lvdspll_setting[] = {
 	{0, 0, 0, 0, 0, 0},
 	{0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
-	{LVDSPLL_DEF_FREQ, 0, 9, 0, 8, 0xfb13b}, /* 0~-8% */
+	{LVDSPLL_DEF_FREQ, 0, 9, 0, 8, 0x130000}, /* 0~-8% */
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -233,8 +233,6 @@ static void mt_fh_hal_default_conf(void)
 	/* freqhopping_config(FH_MSDC_PLLID, g_default_freq[FH_MSDC_PLLID], true); */
 	/* freqhopping_config(FH_MM_PLLID, g_default_freq[FH_MM_PLLID], true); */
 	#endif
-
-	freqhopping_config(FH_LVDS_PLLID, g_default_freq[FH_LVDS_PLLID], true);
 
 	#ifdef ENABLE_DVT_LTE_SIDEBAND_SIGNAL_TESTCASE
 	fh_set_field(REG_FHCTL1_DDS, (0x1FFFFFU<<0), 0X100000);   /* /< Set default MPLL DDS */
