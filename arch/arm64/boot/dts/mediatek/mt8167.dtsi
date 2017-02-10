@@ -1126,7 +1126,7 @@
 		};
 
 		mdp_tdshp: mdp_tdshp@14006000 {
-			compatible = "mediatek,mt8167-mdp_tdshp0";
+			compatible = "mediatek,mdp_tdshp";
 			reg = <0 0x14006000 0 0x1000>;
 			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
 		};
