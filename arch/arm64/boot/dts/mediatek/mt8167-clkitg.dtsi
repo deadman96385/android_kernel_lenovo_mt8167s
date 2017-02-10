@@ -28,7 +28,7 @@
 			<&topckgen CLK_TOP_PWM>,
 			<&clk26m>,
 			<&clk26m>,
-			<&topckgen CLK_TOP_BTIF>,
+			<&clk26m>,
 			<&topckgen CLK_TOP_USB>,
 			<&topckgen CLK_TOP_FLASHIF_26M>,
 			<&topckgen CLK_TOP_AUXADC2>,
@@ -221,10 +221,5 @@
 	bring-up-pd-mfg {
 		compatible = "mediatek,scpsys-bring-up";
 		power-domains = <&scpsys MT8167_POWER_DOMAIN_MFG>;
-	};
-
-	bring-up-pd-conn {
-		compatible = "mediatek,scpsys-bring-up";
-		power-domains = <&scpsys MT8167_POWER_DOMAIN_CONN>;
 	};
 };
