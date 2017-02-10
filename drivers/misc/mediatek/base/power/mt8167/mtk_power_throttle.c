@@ -267,7 +267,7 @@ static int mtk_cpufreq_thermal_notifier(struct notifier_block *nb,
 	 * need to do anything.
 	 */
 
-	if (mtktscpu_debug_log)
+	if (mtktscpu_debug_log  & 0x1)
 		pr_err("%s clipped_freq = %ld, policy->max=%d, policy->min=%d\n",
 				__func__, clipped_freq, policy->max, policy->min);
 
@@ -351,10 +351,10 @@ void mt_cpufreq_thermal_protect(unsigned int limited_power)
 
 	clipped_freq = limited_max_freq;
 
-	if (mtktscpu_debug_log) {
+	if (mtktscpu_debug_log & 0x1) {
 		pr_err("%s found = %d, limited_power = %u\n",
 			__func__, found, limited_power);
-		pr_err("%s possible_cpu = %d, power_tbl[0].cpufreq_khz =%u\n",
+		pr_err("%s possible_cpu = %d, cpu_dvfs.power_tbl[0].cpufreq_khz =%u\n",
 			__func__, possible_cpu, cpu_dvfs.power_tbl[0].cpufreq_khz);
 		pr_err("%s limited_max_ncpu = %u, limited_max_freq = %u\n",
 			__func__, limited_max_ncpu, limited_max_freq);
