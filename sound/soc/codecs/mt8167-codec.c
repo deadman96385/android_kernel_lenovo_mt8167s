@@ -1789,16 +1789,6 @@ static void mt8167_codec_init_regs(struct mt8167_codec_priv *codec_data)
 	snd_soc_update_bits(codec_data->codec,
 		AUDIO_CODEC_CON01, BIT(31), 0x0);
 
-	/* Audio global bias current  */
-	snd_soc_update_bits(codec_data->codec,
-		AUDIO_CODEC_CON01, GENMASK(27, 26), 0x3 << 26);
-
-	/* Uplink bias current */
-	snd_soc_update_bits(codec_data->codec,
-		AUDIO_CODEC_CON00, GENMASK(16, 14), 0x4 << 14);
-	snd_soc_update_bits(codec_data->codec,
-		AUDIO_CODEC_CON01, GENMASK(30, 28), 0x4 << 28);
-
 	/* Audio buffer quasi-current  */
 	snd_soc_update_bits(codec_data->codec,
 			AUDIO_CODEC_CON02, GENMASK(31, 30), 0x0);
