@@ -238,6 +238,9 @@ struct display_primary_path_context {
 
 	enum DISP_DC_TYPE dc_type;
 	unsigned int force_on_wdma_path;
+
+	long long last_trigger;
+	unsigned int avg_fps;
 };
 
 struct sec_session_node {
