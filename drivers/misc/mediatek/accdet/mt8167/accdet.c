@@ -113,7 +113,7 @@ char *accdet_report_string[4] = {
 	/* "Double_check"*/
 };
 /****************************************************************/
-/***        export function                                                                        **/
+/***        export function                                    **/
 /****************************************************************/
 
 void accdet_detect(void)
@@ -185,8 +185,8 @@ static inline void disable_accdet(void)
 {
 	int irq_temp = 0;
 
-	/* sync with accdet_irq_handler set clear accdet irq bit to avoid  set clear accdet irq bit after disable accdet
-	 * disable accdet irq
+	/* sync with accdet_irq_handler set clear accdet irq bit to avoid  set clear accdet irq bit
+	 * after disable accdet disable accdet irq
 	 */
 	clear_accdet_interrupt();
 	udelay(200);
@@ -252,6 +252,7 @@ static void accdet_eint_work_callback(struct work_struct *work)
 		mutex_lock(&accdet_eint_irq_sync_mutex);
 		eint_accdet_sync_flag = 1;
 		mutex_unlock(&accdet_eint_irq_sync_mutex);
+		mod_timer(&micbias_timer, jiffies + MICBIAS_DISABLE_TIMER);
 		wake_lock_timeout(&accdet_timer_lock, 7 * HZ);
 
 		accdet_init();	/* do set pwm_idle on in accdet_init*/
