@@ -118,7 +118,7 @@ void ddp_set_mipi26m(int en)
 	} while (0)
 
 
-#ifdef CONFIG_MTK_FPGA
+#ifdef CONFIG_FPGA_EARLY_PORTING
 #define MIPITX_Write60384(slave_addr, write_addr, write_data)			\
 {	\
 	DDPMSG("MIPITX_Write60384:0x%x,0x%x,0x%x\n", slave_addr, write_addr, write_data);		\
@@ -1052,7 +1052,7 @@ unsigned int dsi_phy_get_clk(enum DISP_MODULE_ENUM module)
 
 void DSI_PHY_clk_setting(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, LCM_DSI_PARAMS *dsi_params)
 {
-#ifdef CONFIG_MTK_FPGA
+#ifdef CONFIG_FPGA_EARLY_PORTING
 #ifdef FPGA_SET_CLK
 	MIPITX_Write60384(0x18, 0x00, 0x10);
 	MIPITX_Write60384(0x20, 0x42, 0x01);
@@ -2305,7 +2305,7 @@ end:
 
 int ddp_dsi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 {
-#ifndef CONFIG_MTK_FPGA
+#ifndef CONFIG_FPGA_EARLY_PORTING
 	enum DSI_STATUS ret = DSI_STATUS_OK;
 #endif
 	int i = 0;
@@ -2351,7 +2351,7 @@ int ddp_dsi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 
 	disp_register_module_irq_callback(DISP_MODULE_DSI0, _DSI_INTERNAL_IRQ_Handler);
 
-#ifndef CONFIG_MTK_FPGA
+#ifndef CONFIG_FPGA_EARLY_PORTING
 	if (MIPITX_IsEnabled(module, cmdq)) {
 		s_isDsiPowerOn = true;
 #ifdef ENABLE_CLK_MGR
@@ -2584,7 +2584,7 @@ int ddp_dsi_config(enum DISP_MODULE_ENUM module, struct disp_ddp_path_config *co
 	if (dsi_config->mode != CMD_MODE)
 		dsi_currect_mode = 1;
 
-#ifdef CONFIG_MTK_FPGA
+#ifdef CONFIG_FPGA_EARLY_PORTING
 	return 0;	/* DONOT config again when LK has already done it*/
 #endif
 
