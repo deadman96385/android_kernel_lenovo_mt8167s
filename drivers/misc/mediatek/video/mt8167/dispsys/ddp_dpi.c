@@ -653,11 +653,6 @@ int ddp_dpi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 
 	pr_warn("DISP/DPI,ddp_dpi_init- %p\n", cmdq);
 
-/* #ifdef CONFIG_FPGA_EARLY_PORTING */
-	/* DPI_OUTREG32(0, DISPSYS_DPI0_BASE, 0x1); */
-	/* DPI_OUTREG32(0, DISPSYS_DPI0_BASE + 0xE0, 0x404); */
-/* #endif */
-
 	DPI_REG[0] = (struct DPI_REGS *) (DISPSYS_DPI0_BASE);
 	DPI_REG[1] = (struct DPI_REGS *) (DISPSYS_DPI1_BASE);
 	LVDS_TX_REG = (struct LVDS_TX_REGS *) (DISPSYS_LVDS_TX_BASE);
@@ -670,7 +665,6 @@ int ddp_dpi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 		DPI_OUTREGBIT(cmdq, struct DPI_REG_INTERRUPT, DPI_REG[i]->INT_ENABLE, VSYNC, 1);
 
 	disp_register_module_irq_callback(module, _DPI_InterruptHandler);
-
 #endif
 	for (i = 0; i < DPI_INTERFACE_NUM; i++)
 		DISPCHECK("dpi%d init finished\n", i);
@@ -1009,6 +1003,7 @@ int ddp_dpi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 		ret += enable_clock(MT_CG_DISP1_HDMI_ADSP, "DPI");
 		ret += enable_clock(MT_CG_DISP1_HDMI_SPDIF, "DPI");
 #else
+		ret += ddp_clk_enable(TOP_RG_FDPI1);
 		ret += ddp_clk_enable(DISP1_DPI1_PIXEL);
 		ret += ddp_clk_enable(DISP1_DPI1_ENGINE);
 		if (ret > 0)
@@ -1036,13 +1031,11 @@ int ddp_dpi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 		disable_mux(MT_MUX_DPI0, "dpi0");
 		ret += disable_pll(LVDSPLL, "DPI0");
 #else
-		ret += ddp_clk_disable(TOP_RG_FDPI0);
+		ret += ddp_clk_disable(DISP1_LVDS_PIXEL);
+		ret += ddp_clk_disable(DISP1_LVDS_CTS);
 		ret += ddp_clk_disable(DISP1_DPI0_PIXEL);
 		ret += ddp_clk_disable(DISP1_DPI0_ENGINE);
-		ret += ddp_clk_enable(DISP1_LVDS_PIXEL);
-		ret += ddp_clk_enable(DISP1_LVDS_CTS);
-		/*clk_unprepare(MM_CLK_MUX_DPI0_SEL);*/
-		/*ret += ddp_module_clock_enable(APMIXED_LVDSPLL, false);*/
+		ret += ddp_clk_disable(TOP_RG_FDPI0);
 		if (ret > 0)
 			pr_err("DPI0 power manager off return FALSE 1\n");
 #endif
@@ -1061,6 +1054,7 @@ int ddp_dpi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 #else
 		ret += ddp_clk_disable(DISP1_DPI1_PIXEL);
 		ret += ddp_clk_disable(DISP1_DPI1_ENGINE);
+		ret += ddp_clk_disable(TOP_RG_FDPI1);
 		if (ret > 0)
 			pr_err("DPI1 power manager off return FALSE 1\n");
 #endif
