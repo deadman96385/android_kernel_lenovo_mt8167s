@@ -383,6 +383,7 @@ static unsigned int mt_gpufreqs_num;
 static struct mt_gpufreq_table_info *mt_gpufreqs;
 static struct mt_gpufreq_table_info *mt_gpufreqs_default;
 static struct mt_gpufreq_power_table_info *mt_gpufreqs_power;
+static struct mtk_gpu_power_info *mt_gpufreqs_power_info;
 
 static struct mt_gpufreq_pmic_t *mt_gpufreq_pmic;
 
@@ -995,6 +996,7 @@ static void mt_setup_gpufreqs_power_table(int num)
 	int i = 0, temp = 0;
 
 	mt_gpufreqs_power = kzalloc((num) * sizeof(struct mt_gpufreq_power_table_info), GFP_KERNEL);
+	mt_gpufreqs_power_info = kzalloc((num) * sizeof(struct mtk_gpu_power_info), GFP_KERNEL);
 	if (mt_gpufreqs_power == NULL)
 		return;
 
@@ -1022,6 +1024,8 @@ static void mt_setup_gpufreqs_power_table(int num)
 						 mt_gpufreqs_power[i].gpufreq_volt,
 						 temp);
 
+		mt_gpufreqs_power_info[i].gpufreq_khz = mt_gpufreqs_power[i].gpufreq_khz;
+		mt_gpufreqs_power_info[i].gpufreq_power = mt_gpufreqs_power[i].gpufreq_power;
 		gpufreq_info("mt_gpufreqs_power[%d].gpufreq_khz = %u\n", i,
 				 mt_gpufreqs_power[i].gpufreq_khz);
 		gpufreq_info("mt_gpufreqs_power[%d].gpufreq_volt = %u\n", i,
@@ -1031,8 +1035,7 @@ static void mt_setup_gpufreqs_power_table(int num)
 	}
 
 #ifdef CONFIG_THERMAL
-	/* CJ Fix me? */
-	/* mtk_gpufreq_register(mt_gpufreqs_power, num); */
+	mtk_gpufreq_register(mt_gpufreqs_power_info, num);
 #endif
 }
 
