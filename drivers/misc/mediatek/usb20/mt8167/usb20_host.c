@@ -398,8 +398,10 @@ static void musb_id_pin_work(struct work_struct *data)
 	} else {
 		DBG(0, "devctl is %x\n", musb_readb(mtk_musb->mregs, MUSB_DEVCTL));
 		musb_writeb(mtk_musb->mregs, MUSB_DEVCTL, 0);
+		#ifndef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
 		if (wake_lock_active(&mtk_musb->usb_lock))
 			wake_unlock(&mtk_musb->usb_lock);
+		#endif
 		musb_platform_set_vbus(mtk_musb, 0);
 
 	/* for no VBUS sensing IP */
@@ -417,6 +419,10 @@ static void musb_id_pin_work(struct work_struct *data)
 #else
 		mt_usb_check_reconnect();/*ALPS01688604, IDDIG noise caused by MHL init*/
 #endif
+		#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+		if (wake_lock_active(&mtk_musb->usb_lock))
+			wake_unlock(&mtk_musb->usb_lock);
+		#endif
 		mtk_musb->state = OTG_STATE_B_IDLE;
 		MUSB_DEV_MODE(mtk_musb);
 		switch_int_to_host(mtk_musb);
