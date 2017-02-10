@@ -141,19 +141,12 @@ static struct snd_soc_dai_link mt8167_evb_dais[] = {
 		.dpcm_capture = 1,
 	},
 	{
-		.name = "MTK Codec Out",
+		.name = "MTK Codec",
 		.cpu_dai_name = "INT ADDA",
 		.no_pcm = 1,
-		.codec_name = "snd-soc-dummy",
-		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "mt8167-codec",
+		.codec_dai_name = "mt8167-codec-dai",
 		.dpcm_playback = 1,
-	},
-	{
-		.name = "MTK Codec In",
-		.cpu_dai_name = "INT ADDA",
-		.no_pcm = 1,
-		.codec_name = "snd-soc-dummy",
-		.codec_dai_name = "snd-soc-dummy-dai",
 		.dpcm_capture = 1,
 	},
 	{
