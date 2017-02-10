@@ -133,8 +133,7 @@ struct reset_control *rstc;
 #if CONSYS_PMIC_CTRL_ENABLE
 #if !defined(CONFIG_MTK_LEGACY)
 struct regulator *reg_VCN18;
-struct regulator *reg_VCN33_BT;
-struct regulator *reg_VCN33_WIFI;
+struct regulator *reg_VCN35;
 #endif
 #endif
 
@@ -317,20 +316,15 @@ static INT32 mtk_wmt_probe(struct platform_device *pdev)
 
 #if CONSYS_PMIC_CTRL_ENABLE
 #if !defined(CONFIG_MTK_LEGACY)
-	reg_VCN18 = regulator_get(&pdev->dev, "vcn18");
+	reg_VCN18 = devm_regulator_get(&pdev->dev, "vcn18");
 	if (IS_ERR(reg_VCN18)) {
 		ret = PTR_ERR(reg_VCN18);
 		WMT_PLAT_ERR_FUNC("Regulator_get VCN_1V8 fail, ret=%d\n", ret);
 	}
-	reg_VCN33_BT = regulator_get(&pdev->dev, "vcn33_bt");
-	if (IS_ERR(reg_VCN33_BT)) {
-		ret = PTR_ERR(reg_VCN33_BT);
-		WMT_PLAT_ERR_FUNC("Regulator_get VCN33_BT fail, ret=%d\n", ret);
-	}
-	reg_VCN33_WIFI = regulator_get(&pdev->dev, "vcn33_wifi");
-	if (IS_ERR(reg_VCN33_WIFI)) {
-		ret = PTR_ERR(reg_VCN33_WIFI);
-		WMT_PLAT_ERR_FUNC("Regulator_get VCN33_WIFI fail, ret=%d\n", ret);
+	reg_VCN35 = devm_regulator_get(&pdev->dev, "vcn35");
+	if (IS_ERR(reg_VCN35)) {
+		ret = PTR_ERR(reg_VCN35);
+		WMT_PLAT_ERR_FUNC("Regulator_get VCN_3V5 fail, ret=%d\n", ret);
 	}
 #endif
 #endif
@@ -378,6 +372,12 @@ VOID mtk_wcn_consys_power_on(VOID)
 		WMT_PLAT_ERR_FUNC("pm_runtime_get_sync() fail(%d)\n", iRet);
 	else
 		WMT_PLAT_INFO_FUNC("pm_runtime_get_sync() CONSYS ok\n");
+
+	iRet = device_init_wakeup(&my_pdev->dev, true);
+	if (iRet)
+		WMT_PLAT_ERR_FUNC("device_init_wakeup(true) fail.\n");
+	else
+		WMT_PLAT_INFO_FUNC("device_init_wakeup(true) CONSYS ok\n");
 #endif /* defined(CONFIG_MTK_CLKMGR) */
 
 }
@@ -393,6 +393,12 @@ VOID mtk_wcn_consys_power_off(VOID)
 		WMT_PLAT_ERR_FUNC("conn_power_off fail(%d)\n", iRet);
 	WMT_PLAT_DBG_FUNC("conn_power_off ok\n");
 #else
+	iRet = device_init_wakeup(&my_pdev->dev, false);
+	if (iRet)
+		WMT_PLAT_ERR_FUNC("device_init_wakeup(false) fail.\n");
+	else
+		WMT_PLAT_INFO_FUNC("device_init_wakeup(false) CONSYS ok\n");
+
 	iRet = pm_runtime_put_sync(&my_pdev->dev);
 	if (iRet)
 		WMT_PLAT_ERR_FUNC("pm_runtime_put_sync() fail.\n");
@@ -919,25 +925,25 @@ INT32 mtk_wcn_consys_hw_bt_paldo_ctrl(UINT32 enable)
 #if defined(CONFIG_MTK_LEGACY)
 		hwPowerOn(MT6351_POWER_LDO_VCN33_BT, VOL_3300 * 1000, "wcn_drv");
 #else
-		if (reg_VCN33_BT) {
-			regulator_set_voltage(reg_VCN33_BT, 3300000, 3300000);
-			if (regulator_enable(reg_VCN33_BT))
+		if (reg_VCN35) {
+			regulator_set_voltage(reg_VCN35, 3500000, 3500000);
+			if (regulator_enable(reg_VCN35))
 				WMT_PLAT_ERR_FUNC("WMT do BT PMIC on fail!\n");
 		}
 #endif
-		/* TODO: PMIC owner will provide VCN35 BT/WIFI ctrl API*/
+		upmu_set_vcn35_on_ctrl_bt(1);
 #endif
 		WMT_PLAT_DBG_FUNC("WMT do BT PMIC on\n");
 	} else {
 		/*do BT PMIC off */
 		/*switch BT PALDO control from HW mode to SW mode:0x416[5]-->0x0 */
 #if CONSYS_PMIC_CTRL_ENABLE
-		/* TODO: PMIC owner will provide VCN35 BT/WIFI ctrl API*/
+		upmu_set_vcn35_on_ctrl_bt(0);
 #if defined(CONFIG_MTK_LEGACY)
 		hwPowerDown(MT6351_POWER_LDO_VCN33_BT, "wcn_drv");
 #else
-		if (reg_VCN33_BT)
-			regulator_disable(reg_VCN33_BT);
+		if (reg_VCN35)
+			regulator_disable(reg_VCN35);
 #endif
 #endif
 		WMT_PLAT_DBG_FUNC("WMT do BT PMIC off\n");
@@ -957,25 +963,25 @@ INT32 mtk_wcn_consys_hw_wifi_paldo_ctrl(UINT32 enable)
 #if defined(CONFIG_MTK_LEGACY)
 		hwPowerOn(MT6351_POWER_LDO_VCN33_WIFI, VOL_3300 * 1000, "wcn_drv");
 #else
-		if (reg_VCN33_WIFI) {
-			regulator_set_voltage(reg_VCN33_WIFI, 3300000, 3300000);
-			if (regulator_enable(reg_VCN33_WIFI))
+		if (reg_VCN35) {
+			regulator_set_voltage(reg_VCN35, 3500000, 3500000);
+			if (regulator_enable(reg_VCN35))
 				WMT_PLAT_ERR_FUNC("WMT do WIFI PMIC on fail!\n");
 		}
 #endif
-		/* TODO: PMIC owner will provide VCN35 BT/WIFI ctrl API*/
+		upmu_set_vcn35_on_ctrl_wifi(1);
 #endif
 		WMT_PLAT_DBG_FUNC("WMT do WIFI PMIC on\n");
 	} else {
 		/*do WIFI PMIC off */
 		/*switch WIFI PALDO control from HW mode to SW mode:0x418[14]-->0x0 */
 #if CONSYS_PMIC_CTRL_ENABLE
-		/* TODO: PMIC owner will provide VCN35 BT/WIFI ctrl API*/
+		upmu_set_vcn35_on_ctrl_wifi(0);
 #if defined(CONFIG_MTK_LEGACY)
 		hwPowerDown(MT6351_POWER_LDO_VCN33_WIFI, "wcn_drv");
 #else
-		if (reg_VCN33_WIFI)
-			regulator_disable(reg_VCN33_WIFI);
+		if (reg_VCN35)
+			regulator_disable(reg_VCN35);
 #endif
 
 #endif

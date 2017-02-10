@@ -135,6 +135,8 @@
 	pinctrl-1 = <&gpslna_pins_init>;
 	pinctrl-2 = <&gpslna_pins_oh>;
 	pinctrl-3 = <&gpslna_pins_ol>;
+	vcn18-supply = <&mt6392_vcn18_reg>;
+	vcn35-supply = <&mt6392_vcn35_reg>;
 	status = "okay";
 };
 

@@ -670,7 +670,7 @@
 			compatible = "mediatek,btif";
 			reg = <0 0x1100e000 0 0x1000>;
 			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&infracfg CLK_INFRA_BTIF>, <&infracfg CLK_INFRA_AP_DMA>;
+			clocks = <&topckgen CLK_TOP_BTIF>, <&topckgen CLK_TOP_APDMA>;
 			clock-names = "btifc", "apdmac";
 		};/* End of btif */
 
@@ -1186,7 +1186,7 @@
 			compatible = "mediatek,wifi";
 			reg = <0 0x180f0000 0 0x005c>;
 			interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&infracfg CLK_INFRA_AP_DMA>;
+			clocks = <&topckgen CLK_TOP_APDMA>;
 			clock-names = "wifi-dma";
 		};
 
