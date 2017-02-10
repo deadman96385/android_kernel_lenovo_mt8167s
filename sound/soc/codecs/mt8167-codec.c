@@ -69,8 +69,6 @@ struct mt8167_codec_priv {
 
 #define MT8167_CODEC_NAME "mt8167-codec"
 
-#define NO_RG_ACCESS /* remove it after we can access hw registers */
-
 static int mt8167_codec_startup(struct snd_pcm_substream *substream,
 			struct snd_soc_dai *codec_dai)
 {
@@ -1014,7 +1012,7 @@ static int mt8167_codec_hpl_dc_comp_get(struct snd_kcontrol *kcontrol,
 		codec_data->is_lch_dc_calibrated = true;
 	}
 	ucontrol->value.integer.value[0] = codec_data->lch_dccomp_val;
-#ifdef NO_RG_ACCESS
+#if 1 /* use temp value until hp calibration is ready */
 	ucontrol->value.integer.value[0] = 2048;
 #endif
 	return 0;
@@ -1047,7 +1045,7 @@ static int mt8167_codec_hpr_dc_comp_get(struct snd_kcontrol *kcontrol,
 		codec_data->is_rch_dc_calibrated = true;
 	}
 	ucontrol->value.integer.value[0] = codec_data->rch_dccomp_val;
-#ifdef NO_RG_ACCESS
+#if 1 /* use temp value until hp calibration is ready */
 	ucontrol->value.integer.value[0] = 2048;
 #endif
 	return 0;
@@ -1180,18 +1178,10 @@ static const char * const pga_mux_text[] = {
 };
 
 static SOC_ENUM_SINGLE_DECL(mt8167_codec_left_pga_mux_enum,
-#ifdef NO_RG_ACCESS /* remove it after we can access hw registers */
-	SND_SOC_NOPM, 0, pga_mux_text);
-#else
 	AUDIO_CODEC_CON00, 28, pga_mux_text);
-#endif
 
 static SOC_ENUM_SINGLE_DECL(mt8167_codec_right_pga_mux_enum,
-#ifdef NO_RG_ACCESS /* remove it after we can access hw registers */
-	SND_SOC_NOPM, 0, pga_mux_text);
-#else
 	AUDIO_CODEC_CON00, 10, pga_mux_text);
-#endif
 
 static const struct snd_kcontrol_new mt8167_codec_left_pga_mux =
 	SOC_DAPM_ENUM("Left PGA Mux", mt8167_codec_left_pga_mux_enum);
@@ -1507,16 +1497,10 @@ static int apmixedsys_reg_read(void *context,
 			(struct mt8167_codec_priv *) context;
 	int ret = 0;
 
-#ifdef NO_RG_ACCESS /* remove it after we can access hw registers */
-	*val = 0;
-	dev_dbg(codec_data->codec->dev, "%s reg 0x%x, val: 0x%x\n",
-		__func__, reg, *val);
-#else
 	if (!(codec_data && codec_data->regmap_modules[REGMAP_APMIXEDSYS]))
 		return -1;
 	ret = regmap_read(codec_data->regmap_modules[REGMAP_APMIXEDSYS],
 			(reg & (~APMIXED_OFFSET)), val);
-#endif
 	return ret;
 }
 
@@ -1527,15 +1511,10 @@ static int apmixedsys_reg_write(void *context,
 			(struct mt8167_codec_priv *) context;
 	int ret = 0;
 
-#ifdef NO_RG_ACCESS /* remove it after we can access hw registers */
-	dev_dbg(codec_data->codec->dev, "%s reg 0x%x, val: 0x%x\n",
-		__func__, reg, val);
-#else
 	if (!(codec_data && codec_data->regmap_modules[REGMAP_APMIXEDSYS]))
 		return -1;
 	ret = regmap_write(codec_data->regmap_modules[REGMAP_APMIXEDSYS],
 			(reg & (~APMIXED_OFFSET)), val);
-#endif
 	return ret;
 }
 
@@ -1816,11 +1795,9 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 		if (!codec_data->regmap_modules[i]) {
 			dev_err(dev, "%s failed to get %s\n",
 				__func__, modules_dt_regmap_str[i]);
-#ifndef NO_RG_ACCESS /* remove it after we can access hw registers */
 			devm_kfree(dev, codec_data);
 			ret = -EPROBE_DEFER;
 			break;
-#endif
 		}
 	}
 
