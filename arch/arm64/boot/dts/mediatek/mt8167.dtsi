@@ -481,7 +481,7 @@
 				     "mediatek,mt6735-sys_cirq",
 				     "mediatek,sys_cirq";
 			reg = <0 0x10202000 0 0x1000>;
-			interrupts = <GIC_SPI 214 IRQ_TYPE_LEVEL_LOW>;
+			interrupts = <GIC_SPI 218 IRQ_TYPE_LEVEL_LOW>;
 			mediatek,cirq_num = <147>;
 			mediatek,spi_start_offset = <72>;
 		};
