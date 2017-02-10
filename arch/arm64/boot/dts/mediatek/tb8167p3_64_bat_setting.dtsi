@@ -76,7 +76,7 @@
 	q_max_pos_0_h_current = <1601>;
 	q_max_neg_10_h_current = <870>;
 	/* Discharge percentage, 1: D5, 0: D2 */
-	oam_d5 = <1>;
+	oam_d5 = <0>;
 
 	change_tracking_point = <1>;
 	/* SW OCV tracking setting */
