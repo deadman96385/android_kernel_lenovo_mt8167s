@@ -67,7 +67,7 @@ extern struct keypad_dts_data kpd_dts_data;
 #define KPD_YES 1
 
 #define KPD_AUTOTEST	KPD_NO
-#define KPD_DEBUG	KPD_YES
+#define KPD_DEBUG	KPD_NO
 
 #if KPD_AUTOTEST
 #define PRESS_OK_KEY		_IO('k', 1)
