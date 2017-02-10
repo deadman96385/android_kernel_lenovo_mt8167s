@@ -260,6 +260,8 @@ extern LCM_DRIVER nt35695_fhd_dsi_vdo_auo_nt50358_laneswap_mt6799_lcm_drv;
 extern LCM_DRIVER claa101fp01_dsi_vdo_lcm_drv;
 extern LCM_DRIVER r61322_fhd_dsi_vdo_sharp_lfr_lcm_drv;
 extern LCM_DRIVER s6e3ha3_wqhd_2k_cmd_laneswap_drv;
+extern LCM_DRIVER otm1287_wxga_dsi_vdo_auo_guoxian_lcm_drv;
+extern LCM_DRIVER jd9365_wxga_dsi_vdo_hsd_pingbo_lcm_drv;
 #ifdef BUILD_LK
 extern void mdelay(unsigned long msec);
 #endif

@@ -1003,6 +1003,14 @@ LCM_DRIVER *lcm_driver_list[] = {
 #if defined(S6E3HA3_WQHD_2K_CMD_LANESWAP)
 	&s6e3ha3_wqhd_2k_cmd_laneswap_drv,
 #endif
+#if defined(OTM1287_WXGA_DSI_VDO_AUO_GUOXIAN)
+	&otm1287_wxga_dsi_vdo_auo_guoxian_lcm_drv,
+#endif
+
+#if defined(JD9365_WXGA_DSI_VDO_HSD_PINGBO)
+	&jd9365_wxga_dsi_vdo_hsd_pingbo_lcm_drv,
+#endif
+
 };
 
 unsigned char lcm_name_list[][128] = {
