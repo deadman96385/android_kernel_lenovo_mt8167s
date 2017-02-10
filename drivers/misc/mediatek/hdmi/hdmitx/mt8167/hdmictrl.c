@@ -1478,7 +1478,8 @@ void vSetHDMIAudioIn(void)
 		bChMapping = bGetChannelMapping();
 
 		vDisableDsdConfig();
-
+		vWriteHdmiGRLMsk(HDCP_STATUS_RESET, RG_SPD_IIS_SEL | RG_N_DIV2,
+				 RG_SPD_IIS_SEL | RG_N_DIV2);
 		vSetHdmiI2SChNum(_stAvdAVInfo.ui1_aud_out_ch_number, bChMapping);
 		vSetHdmiIecI2s(SV_I2S);
 	}
