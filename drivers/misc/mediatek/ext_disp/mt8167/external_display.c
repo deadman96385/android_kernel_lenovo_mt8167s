@@ -678,7 +678,7 @@ static void _cmdq_build_trigger_loop(void)
 	}
 
 	/* dump trigger loop instructions to check whether dpmgr_path_build_cmdq works correctly */
-	cmdqRecDumpCommand(pgc->cmdq_handle_trigger);
+	/* cmdqRecDumpCommand(pgc->cmdq_handle_trigger); */
 	EXT_DISP_LOG("ext display BUILD cmdq trigger loop finished\n");
 }
 
@@ -958,6 +958,10 @@ static int ext_disp_rdma_update_kthread(void *data)
 		if (kthread_should_stop())
 			break;
 
+		if (pgc->state != EXTD_INIT && pgc->state != EXTD_RESUME && pgc->suspend_config != 1) {
+			EXT_DISP_LOG("ext disp is already slept, state:%d\n", pgc->state);
+			continue;
+		}
 		_ext_disp_path_lock();
 		data_config = dpmgr_path_get_last_config(pgc->dpmgr_handle);
 		data_config->rdma_config.is_interlace = true;
@@ -1071,9 +1075,11 @@ int ext_disp_init(char *lcm_name, unsigned int session)
 	init_waitqueue_head(&rdma_update_wq);
 	mutex_init(&(pgc->vsync_lock));
 
-	rdma_update_task = kthread_create(ext_disp_rdma_update_kthread,
+	if (!rdma_update_task) {
+		rdma_update_task = kthread_create(ext_disp_rdma_update_kthread,
 							 NULL, "ext_disp_rdma_update");
-	wake_up_process(rdma_update_task);
+		wake_up_process(rdma_update_task);
+	}
 
 	pgc->state = EXTD_INIT;
 

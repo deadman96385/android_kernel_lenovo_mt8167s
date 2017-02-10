@@ -2158,7 +2158,7 @@ static void dpmgr_irq_handler(enum DISP_MODULE_ENUM module, unsigned int regvalu
 
 int dpmgr_init(void)
 {
-	DDPPRINT("ddp manager init\n");
+	DDPMSG("ddp manager init\n");
 	if (ddp_manager_init)
 		return 0;
 	ddp_manager_init = 1;

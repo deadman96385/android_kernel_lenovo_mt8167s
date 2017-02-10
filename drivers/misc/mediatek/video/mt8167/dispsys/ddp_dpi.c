@@ -549,7 +549,7 @@ int LVDSTX_IsEnabled(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 
 int ddp_dpi_reset(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
-	pr_warn("DISP/DPI,ddp_dpi_reset\n");
+	DDPDBG("DISP/DPI,ddp_dpi_reset\n");
 
 	DPI_OUTREGBIT(cmdq_handle, struct DPI_REG_RST, DPI_REG[DPI_IDX(module)]->DPI_RST, RST, 1);
 	DPI_OUTREGBIT(cmdq_handle, struct DPI_REG_RST, DPI_REG[DPI_IDX(module)]->DPI_RST, RST, 0);
@@ -565,7 +565,7 @@ int ddp_dpi_start(enum DISP_MODULE_ENUM module, void *cmdq)
 int ddp_dpi_trigger(enum DISP_MODULE_ENUM module, void *cmdq)
 {
 	if (s_isDpiStart == false) {
-		pr_warn("DISP/DPI,ddp_dpi_start\n");
+		DDPDBG("DISP/DPI,ddp_dpi_start\n");
 		ddp_dpi_reset(module, cmdq);
 		/*enable DPI */
 		DPI_OUTREG32(cmdq, &DPI_REG[DPI_IDX(module)]->DPI_EN, 0x00000001);
@@ -577,7 +577,7 @@ int ddp_dpi_trigger(enum DISP_MODULE_ENUM module, void *cmdq)
 
 int ddp_dpi_stop(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
-	pr_warn("DISP/DPI,ddp_dpi_stop\n");
+	DDPDBG("DISP/DPI,ddp_dpi_stop\n");
 
 	/*disable DPI and background, and reset DPI */
 	DPI_OUTREG32(cmdq_handle, &DPI_REG[DPI_IDX(module)]->DPI_EN, 0x00000000);
@@ -651,7 +651,7 @@ int ddp_dpi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 {
 	unsigned int i;
 
-	pr_warn("DISP/DPI,ddp_dpi_init- %p\n", cmdq);
+	DDPMSG("DISP/DPI, init %s - %p\n", ddp_get_module_name(module), cmdq);
 
 	DPI_REG[0] = (struct DPI_REGS *) (DISPSYS_DPI0_BASE);
 	DPI_REG[1] = (struct DPI_REGS *) (DISPSYS_DPI1_BASE);
@@ -674,7 +674,7 @@ int ddp_dpi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 
 int ddp_dpi_deinit(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
-	pr_warn("DISP/DPI,ddp_dpi_deinit- %p\n", cmdq_handle);
+	DDPMSG("DISP/DPI, deinit %s - %p\n", ddp_get_module_name(module), cmdq_handle);
 
 	ddp_dpi_stop(module, cmdq_handle);
 	ddp_dpi_power_off(module, cmdq_handle);
@@ -792,7 +792,7 @@ void LVDS_PLL_Init(enum DISP_MODULE_ENUM module, void *cmdq_handle, uint32_t PLL
 		ASSERT(0);
 	}
 
-	pr_warn("DPI0 LVDSPLL_init: pll_clock = %d MHz, bclk = %ld MHz\n", PLL_CLK, bclk);
+	DDPMSG("DPI0 LVDSPLL_init: pll_clock = %d MHz, bclk = %ld MHz\n", PLL_CLK, bclk);
 
 	bclk = bclk * 1000000;
 
@@ -835,7 +835,7 @@ void LVDS_ANA_Init(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 	lcm_udelay(20);
 	/*clear mipi influence register */
 	MASKREG32(MIPI_TX_REG_BASE + 0x40, (1 << 11), (0 << 11));
-	pr_warn("LVDS_ANA_init finished\n");
+	DDPDBG("LVDS_ANA_init finished\n");
 }
 
 void LVDS_DIG_RST(enum DISP_MODULE_ENUM module, void *cmdq_handle)
@@ -850,7 +850,7 @@ void LVDS_DIG_Init(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 	DPI_OUTREG32(cmdq_handle, DDP_REG_LVDS_TX + 0x20, 0x00000007);
 	DPI_OUTREG32(cmdq_handle, DDP_REG_BASE_MMSYS_CONFIG + 0x90c, 0x00010000);	/*enable LVDS fifo out */
 	LVDS_DIG_RST(module, cmdq_handle);	/*ADD for suspend&resume blurred screen issue */
-	pr_warn("LVDS_DIG_init finished\n");
+	DDPDBG("LVDS_DIG_init finished\n");
 
 #if 0
 	/* pattern enable for 800 x 1280 */
@@ -886,13 +886,13 @@ void ddp_dpi_lvds_config(enum DISP_MODULE_ENUM module, LCM_DPI_FORMAT format, vo
 	LVDS_DIG_Init(module, cmdq_handle);
 	if (format == LCM_DPI_FORMAT_RGB666)
 		DPI_OUTREG32(cmdq_handle, DDP_REG_LVDS_TX, 0x00000010);
-	pr_warn("LVDS_config finished\n");
+	DDPDBG("LVDS_config finished\n");
 }
 
 void ddp_dpi_RGB_config(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	DPI_OUTREG32(cmdq_handle, DDP_REG_BASE_MMSYS_CONFIG + 0x90c, 0x00000001);	/*enable RGB out */
-	pr_warn("RGB config finished\n");
+	DDPDBG("RGB config finished\n");
 }
 
 void ddp_lvds_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
@@ -909,7 +909,7 @@ void ddp_lvds_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 		      LVDSTX_ANA_DRV_EN, 0x00);
 	DPI_OUTREG32(cmdq_handle, DDP_REG_LVDS_TX + 0x18, 0x00000000);
 	DPI_OUTREG32(cmdq_handle, DDP_REG_LVDS_TX + 0x20, 0x00000000);
-	pr_warn("LVDS_power_off finished\n");
+	DDPDBG("LVDS_power_off finished\n");
 }
 
 int ddp_dpi_config(enum DISP_MODULE_ENUM module, struct disp_ddp_path_config *config, void *cmdq_handle)
@@ -919,7 +919,7 @@ int ddp_dpi_config(enum DISP_MODULE_ENUM module, struct disp_ddp_path_config *co
 									       DISP_MODULE_DPI1))) {
 		LCM_DPI_PARAMS *dpi_config = &(config->dispif_config.dpi);
 
-		pr_warn("DISP/DPI,ddp_dpi_config DPI status:%x, cmdq:%p\n",
+		DDPDBG("DISP/DPI,ddp_dpi_config DPI status:%x, cmdq:%p\n",
 			INREG32(&DPI_REG[DPI_IDX(module)]->STATUS), cmdq_handle);
 		ddp_dpi_ConfigCLK(module, cmdq_handle, dpi_config->clk_pol, dpi_config->lvds_tx_en);
 		ddp_dpi_ConfigSize(module, cmdq_handle, dpi_config->width, dpi_config->height);
@@ -960,7 +960,7 @@ int ddp_dpi_config(enum DISP_MODULE_ENUM module, struct disp_ddp_path_config *co
 						  Is_interlace_resolution(dpi_config->dpi_clock));
 			s_isDpi1Config = true;
 		}
-		pr_warn("DISP/DPI,ddp_dpi_config done\n");
+		DDPDBG("DISP/DPI,ddp_dpi_config done\n");
 	}
 
 	return 0;
@@ -970,8 +970,8 @@ int ddp_dpi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	int ret = 0;
 
-	pr_warn("DISP/DPI, ddp_dpi_power_on, s_isDpiPowerOn %d, s_isDpi1PowerOn %d\n",
-		s_isDpiPowerOn, s_isDpi1PowerOn);
+	DDPMSG("DISP/DPI, power on %s, s_isDpiPowerOn %d, s_isDpi1PowerOn %d\n",
+		ddp_get_module_name(module), s_isDpiPowerOn, s_isDpi1PowerOn);
 	if ((!s_isDpiPowerOn) && (module == DISP_MODULE_DPI0)) {
 #ifdef CONFIG_MTK_CLKMGR
 		enable_mux(MT_MUX_DPI0, "dpi0");
@@ -1016,8 +1016,8 @@ int ddp_dpi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	int ret = 0;
 
-	pr_warn("DISP/DPI, ddp_dpi_power_off, s_isDpiPowerOn %d, s_isDpi1PowerOn %d\n",
-		s_isDpiPowerOn, s_isDpi1PowerOn);
+	DDPMSG("DISP/DPI, power off %s, s_isDpiPowerOn %d, s_isDpi1PowerOn %d\n",
+		ddp_get_module_name(module), s_isDpiPowerOn, s_isDpi1PowerOn);
 	if ((s_isDpiPowerOn) && (module == DISP_MODULE_DPI0)) {
 		ddp_lvds_power_off(module, cmdq_handle);
 #ifdef CONFIG_MTK_CLKMGR

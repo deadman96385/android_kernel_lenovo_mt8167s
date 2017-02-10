@@ -295,6 +295,7 @@ done:
 	mutex_unlock(&disp_session_lock);
 
 	DISPPR_FENCE("new session:0x%x\n", config->session_id);
+	DISPMSG("new session:0x%x\n", config->session_id);
 	is_hwc_enabled = 1;
 
 	return ret;
@@ -309,6 +310,8 @@ int disp_destroy_session(struct disp_session_config *config)
 	int i;
 
 	DISPMSG("disp_destroy_session, 0x%x\n", config->session_id);
+
+	release_session_buffer(DISP_SESSION_TYPE(config->session_id), 0xFF, 0);
 
 	/* 1.To check if this session exists already, and remove it */
 	mutex_lock(&disp_session_lock);
@@ -329,7 +332,6 @@ int disp_destroy_session(struct disp_session_config *config)
 
 	mutex_unlock(&disp_session_lock);
 
-	release_session_buffer(DISP_SESSION_TYPE(config->session_id), 0xFF, 0);
 #if defined(OVL_TIME_SHARING)
 	if (session == MAKE_DISP_SESSION(DISP_SESSION_MEMORY, 2))
 		ovl2mem_setlayernum(0);
@@ -339,6 +341,7 @@ int disp_destroy_session(struct disp_session_config *config)
 	/* 2. Destroy this session */
 	if (DISP_SESSION_TYPE(config->session_id) == DISP_SESSION_EXTERNAL)
 		external_display_switch_mode(config->mode, session_config, config->session_id);
+
 	if (ret == 0)
 		DISPDBG("Destroy session(0x%x)\n", session);
 	else
