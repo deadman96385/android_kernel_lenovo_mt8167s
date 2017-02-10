@@ -134,80 +134,80 @@ unsigned int g_mobilelog;
 void init_mtkfb_mmp_events(void)
 {
 	if (MTKFB_MMP_Events.MTKFB == 0) {
-		MTKFB_MMP_Events.MTKFB = MMProfileRegisterEvent(MMP_RootEvent, "MTKFB");
+		MTKFB_MMP_Events.MTKFB = mmprofile_register_event(MMP_RootEvent, "MTKFB");
 		MTKFB_MMP_Events.PanDisplay =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "PanDisplay");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "PanDisplay");
 		MTKFB_MMP_Events.CreateSyncTimeline =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "CreateSyncTimeline");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "CreateSyncTimeline");
 		MTKFB_MMP_Events.SetOverlayLayer =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "SetOverlayLayer");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "SetOverlayLayer");
 		MTKFB_MMP_Events.SetOverlayLayers =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "SetOverlayLayers");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "SetOverlayLayers");
 		MTKFB_MMP_Events.SetMultipleLayers =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "SetMultipleLayers");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "SetMultipleLayers");
 		MTKFB_MMP_Events.CreateSyncFence =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "CreateSyncFence");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "CreateSyncFence");
 		MTKFB_MMP_Events.IncSyncTimeline =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "IncSyncTimeline");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "IncSyncTimeline");
 		MTKFB_MMP_Events.SignalSyncFence =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "SignalSyncFence");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "SignalSyncFence");
 		MTKFB_MMP_Events.TrigOverlayOut =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "TrigOverlayOut");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "TrigOverlayOut");
 		MTKFB_MMP_Events.UpdateScreenImpl =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "UpdateScreenImpl");
-		MTKFB_MMP_Events.VSync = MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "VSync");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "UpdateScreenImpl");
+		MTKFB_MMP_Events.VSync = mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "VSync");
 		MTKFB_MMP_Events.UpdateConfig =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "UpdateConfig");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "UpdateConfig");
 		MTKFB_MMP_Events.EsdCheck =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.UpdateConfig, "EsdCheck");
+		    mmprofile_register_event(MTKFB_MMP_Events.UpdateConfig, "EsdCheck");
 		MTKFB_MMP_Events.ConfigOVL =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.UpdateConfig, "ConfigOVL");
+		    mmprofile_register_event(MTKFB_MMP_Events.UpdateConfig, "ConfigOVL");
 		MTKFB_MMP_Events.ConfigAAL =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.UpdateConfig, "ConfigAAL");
+		    mmprofile_register_event(MTKFB_MMP_Events.UpdateConfig, "ConfigAAL");
 		MTKFB_MMP_Events.ConfigMemOut =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.UpdateConfig, "ConfigMemOut");
+		    mmprofile_register_event(MTKFB_MMP_Events.UpdateConfig, "ConfigMemOut");
 		MTKFB_MMP_Events.ScreenUpdate =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "ScreenUpdate");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "ScreenUpdate");
 		MTKFB_MMP_Events.CaptureFramebuffer =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "CaptureFB");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "CaptureFB");
 		MTKFB_MMP_Events.RegUpdate =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "RegUpdate");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "RegUpdate");
 		MTKFB_MMP_Events.EarlySuspend =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "EarlySuspend");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "EarlySuspend");
 		MTKFB_MMP_Events.DispDone =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "DispDone");
-		MTKFB_MMP_Events.DSICmd = MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "DSICmd");
-		MTKFB_MMP_Events.DSIIRQ = MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "DSIIrq");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "DispDone");
+		MTKFB_MMP_Events.DSICmd = mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "DSICmd");
+		MTKFB_MMP_Events.DSIIRQ = mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "DSIIrq");
 		MTKFB_MMP_Events.WaitVSync =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "WaitVSync");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "WaitVSync");
 		MTKFB_MMP_Events.LayerDump =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "LayerDump");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "LayerDump");
 		MTKFB_MMP_Events.Layer[0] =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.LayerDump, "Layer0");
+		    mmprofile_register_event(MTKFB_MMP_Events.LayerDump, "Layer0");
 		MTKFB_MMP_Events.Layer[1] =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.LayerDump, "Layer1");
+		    mmprofile_register_event(MTKFB_MMP_Events.LayerDump, "Layer1");
 		MTKFB_MMP_Events.Layer[2] =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.LayerDump, "Layer2");
+		    mmprofile_register_event(MTKFB_MMP_Events.LayerDump, "Layer2");
 		MTKFB_MMP_Events.Layer[3] =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.LayerDump, "Layer3");
+		    mmprofile_register_event(MTKFB_MMP_Events.LayerDump, "Layer3");
 		MTKFB_MMP_Events.OvlDump =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "OvlDump");
-		MTKFB_MMP_Events.FBDump = MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "FBDump");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "OvlDump");
+		MTKFB_MMP_Events.FBDump = mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "FBDump");
 		MTKFB_MMP_Events.DSIRead =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "DSIRead");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "DSIRead");
 		MTKFB_MMP_Events.GetLayerInfo =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "GetLayerInfo");
+		    mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "GetLayerInfo");
 		MTKFB_MMP_Events.LayerInfo[0] =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.GetLayerInfo, "LayerInfo0");
+		    mmprofile_register_event(MTKFB_MMP_Events.GetLayerInfo, "LayerInfo0");
 		MTKFB_MMP_Events.LayerInfo[1] =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.GetLayerInfo, "LayerInfo1");
+		    mmprofile_register_event(MTKFB_MMP_Events.GetLayerInfo, "LayerInfo1");
 		MTKFB_MMP_Events.LayerInfo[2] =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.GetLayerInfo, "LayerInfo2");
+		    mmprofile_register_event(MTKFB_MMP_Events.GetLayerInfo, "LayerInfo2");
 		MTKFB_MMP_Events.LayerInfo[3] =
-		    MMProfileRegisterEvent(MTKFB_MMP_Events.GetLayerInfo, "LayerInfo3");
-		MTKFB_MMP_Events.IOCtrl = MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "IOCtrl");
-		MTKFB_MMP_Events.Debug = MMProfileRegisterEvent(MTKFB_MMP_Events.MTKFB, "Debug");
-		MMProfileEnableEventRecursive(MTKFB_MMP_Events.MTKFB, 1);
+		    mmprofile_register_event(MTKFB_MMP_Events.GetLayerInfo, "LayerInfo3");
+		MTKFB_MMP_Events.IOCtrl = mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "IOCtrl");
+		MTKFB_MMP_Events.Debug = mmprofile_register_event(MTKFB_MMP_Events.MTKFB, "Debug");
+		mmprofile_enable_event_recursive(MTKFB_MMP_Events.MTKFB, 1);
 	}
 }
 

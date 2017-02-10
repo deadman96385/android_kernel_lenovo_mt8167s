@@ -3284,7 +3284,7 @@ int ddp_dsi_build_cmdq(enum DISP_MODULE_ENUM module, void *cmdq_trigger_handle, 
 				}
 			}
 
-			MMProfileLogEx(ddp_mmp_get_events()->esd_rdlcm, MMProfileFlagPulse,
+			mmprofile_log_ex(ddp_mmp_get_events()->esd_rdlcm, MMPROFILE_FLAG_PULSE,
 				       AS_UINT32(&read_data0),
 				       AS_UINT32(&(dsi_params->lcm_esd_check_table[i])));
 

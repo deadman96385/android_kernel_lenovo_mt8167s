@@ -217,7 +217,7 @@ enum DAL_STATUS DAL_Clean(void)
 	if (mfc_handle == NULL)
 		return DAL_STATUS_NOT_READY;
 
-	MMProfileLogEx(ddp_mmp_get_events()->dal_clean, MMProfileFlagStart, 0, 0);
+	mmprofile_log_ex(ddp_mmp_get_events()->dal_clean, MMPROFILE_FLAG_START, 0, 0);
 
 	if (down_interruptible(&dal_sem)) {
 		pr_debug("DISP/DAL Can't get semaphore in %s()\n", __func__);
@@ -277,7 +277,7 @@ enum DAL_STATUS DAL_Clean(void)
 
 	up(&dal_sem);
 
-	MMProfileLogEx(ddp_mmp_get_events()->dal_clean, MMProfileFlagEnd, 0, 0);
+	mmprofile_log_ex(ddp_mmp_get_events()->dal_clean, MMPROFILE_FLAG_END, 0, 0);
 	return ret;
 }
 EXPORT_SYMBOL(DAL_Clean);
@@ -321,7 +321,7 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 	if (fmt == NULL)
 		return DAL_STATUS_INVALID_ARGUMENT;
 
-	MMProfileLogEx(ddp_mmp_get_events()->dal_printf, MMProfileFlagStart, 0, 0);
+	mmprofile_log_ex(ddp_mmp_get_events()->dal_printf, MMPROFILE_FLAG_START, 0, 0);
 
 	if (down_interruptible(&dal_sem)) {
 		pr_debug("DISP/DAL Can't get semaphore in %s()\n",  __func__);
@@ -398,7 +398,7 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 
 	up(&dal_sem);
 
-	MMProfileLogEx(ddp_mmp_get_events()->dal_printf, MMProfileFlagEnd, 0, 0);
+	mmprofile_log_ex(ddp_mmp_get_events()->dal_printf, MMPROFILE_FLAG_END, 0, 0);
 
 	return ret;
 }

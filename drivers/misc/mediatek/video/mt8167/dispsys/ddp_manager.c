@@ -251,7 +251,7 @@ int dpmgr_module_notify(enum DISP_MODULE_ENUM module, enum DISP_PATH_EVENT event
 {
 	struct ddp_path_handle *handle = find_handle_by_module(module);
 
-	MMProfileLogEx(ddp_mmp_get_events()->primary_display_aalod_trigger, MMProfileFlagPulse,
+	mmprofile_log_ex(ddp_mmp_get_events()->primary_display_aalod_trigger, MMPROFILE_FLAG_PULSE,
 		       module, 0);
 	return dpmgr_signal_event(handle, event);
 	return 0;
@@ -788,7 +788,7 @@ int dpmgr_path_enable_cascade(disp_path_handle dp_handle, void *cmdq_handle)
 	if (ovl_get_status() != DDP_OVL1_STATUS_PRIMARY && ovl_get_status() != DDP_OVL1_STATUS_SUB_REQUESTING)
 		ovl_set_status(DDP_OVL1_STATUS_PRIMARY);
 
-	MMProfileLogEx(ddp_mmp_get_events()->cascade_enable, MMProfileFlagPulse, 0, 0);
+	mmprofile_log_ex(ddp_mmp_get_events()->cascade_enable, MMPROFILE_FLAG_PULSE, 0, 0);
 
 	return 0;
 }
@@ -845,7 +845,7 @@ int dpmgr_path_disable_cascade(disp_path_handle dp_handle, void *cmdq_handle)
 			ddp_modules_driver[DISP_MODULE_OVL1]->deinit(DISP_MODULE_OVL1, cmdq_handle);
 	}
 
-	MMProfileLogEx(ddp_mmp_get_events()->cascade_disable, MMProfileFlagPulse, 0, 0);
+	mmprofile_log_ex(ddp_mmp_get_events()->cascade_disable, MMPROFILE_FLAG_PULSE, 0, 0);
 	return 0;
 }
 
@@ -2027,8 +2027,8 @@ int dpmgr_wait_event_timeout(disp_path_handle dp_handle, enum DISP_PATH_EVENT ev
 		if (ret == 0) {
 			DISP_LOG_E("wait %s timeout on scenario %s\n", path_event_name(event),
 				   ddp_get_scenario_name(handle->scenario));
-			MMProfileLogEx(ddp_mmp_get_events()->dpmgr_wait_event_timeout,
-				       MMProfileFlagPulse, (unsigned long int)ddp_get_scenario_name(handle->scenario),
+			mmprofile_log_ex(ddp_mmp_get_events()->dpmgr_wait_event_timeout,
+				       MMPROFILE_FLAG_PULSE, (unsigned long int)ddp_get_scenario_name(handle->scenario),
 				       event);
 			/* dpmgr_check_status(dp_handle); */	/* uncomment to show more timeout info */
 			/* dpmgr_path_reset(dp_handle, 0); */
@@ -2132,8 +2132,8 @@ static void dpmgr_irq_handler(enum DISP_MODULE_ENUM module, unsigned int regvalu
 					       path_event_name(j), handle->wq_list[j].data,
 					       ddp_get_scenario_name(handle->scenario));
 					wake_up_interruptible(&(handle->wq_list[j].wq));
-					/* MMProfileLogEx(ddp_mmp_get_events()->primary_wakeup,*/
-					/*		MMProfileFlagPulse, j, irq_bit);*/
+					/* mmprofile_log_ex(ddp_mmp_get_events()->primary_wakeup,*/
+					/*		MMPROFILE_FLAG_PULSE, j, irq_bit);*/
 				}
 			}
 		}

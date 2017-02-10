@@ -107,7 +107,7 @@ static struct event_string_map event_map[] = {
 
 
 
-static MMP_Event dprec_mmp_event_spy(enum DPREC_LOGGER_ENUM l)
+static mmp_event dprec_mmp_event_spy(enum DPREC_LOGGER_ENUM l)
 {
 	switch (l & 0xffffff) {
 	case DPREC_LOGGER_PRIMARY_MUTEX:
@@ -138,13 +138,13 @@ static MMP_Event dprec_mmp_event_spy(enum DPREC_LOGGER_ENUM l)
 	return 0xffff;
 }
 
-static void dprec_to_mmp(unsigned int type_logsrc, MMP_LogType mmp_log, unsigned int data1,
+static void dprec_to_mmp(unsigned int type_logsrc, mmp_log_type mmp_log, unsigned int data1,
 			 unsigned data2)
 {
-	int MMP_Event = dprec_mmp_event_spy(type_logsrc);
+	int mmp_event = dprec_mmp_event_spy(type_logsrc);
 
-	if (MMP_Event < MMProfileMaxEventCount)  /* if (MMP_Event < 0xffff) */
-		MMProfileLogEx(MMP_Event, mmp_log, data1, data2);
+	if (mmp_event < MMProfileMaxEventCount)  /* if (mmp_event < 0xffff) */
+		mmprofile_log_ex(mmp_event, mmp_log, data1, data2);
 
 }
 
@@ -345,7 +345,7 @@ void dprec_logger_trigger(unsigned int type_logsrc, unsigned int val1, unsigned 
 	struct dprec_logger *l;
 	unsigned long long time;
 
-	dprec_to_mmp(type_logsrc, MMProfileFlagPulse, val1, val2);
+	dprec_to_mmp(type_logsrc, MMPROFILE_FLAG_PULSE, val1, val2);
 
 	spin_lock_irqsave(&gdprec_logger_spinlock, flags);
 	time = get_current_time_us();
@@ -414,7 +414,7 @@ void dprec_logger_start(unsigned int type_logsrc, unsigned int val1, unsigned in
 	struct dprec_logger *l;
 	unsigned long long time;
 
-	dprec_to_mmp(type_logsrc, MMProfileFlagStart, val1, val2);
+	dprec_to_mmp(type_logsrc, MMPROFILE_FLAG_START, val1, val2);
 	spin_lock_irqsave(&gdprec_logger_spinlock, flags);
 	l = &logger[source];
 	time = get_current_time_us();
@@ -439,7 +439,7 @@ void dprec_logger_done(unsigned int type_logsrc, unsigned int val1, unsigned int
 	struct dprec_logger *l;
 	unsigned long long time;
 
-	dprec_to_mmp(type_logsrc, MMProfileFlagEnd, val1, val2);
+	dprec_to_mmp(type_logsrc, MMPROFILE_FLAG_END, val1, val2);
 
 	spin_lock_irqsave(&gdprec_logger_spinlock, flags);
 	l = &logger[source];
@@ -470,16 +470,16 @@ done:
 }
 
 void dprec_logger_event_init(struct dprec_logger_event *p, char *name, uint32_t level,
-			     MMP_Event *mmp_root)
+			     mmp_event *mmp_root)
 {
 	if (p) {
 		scnprintf(p->name, ARRAY_SIZE(p->name), name);
 		if (mmp_root)
-			p->mmp = MMProfileRegisterEvent(*mmp_root, name);
+			p->mmp = mmprofile_register_event(*mmp_root, name);
 		else
-			p->mmp = MMProfileRegisterEvent(ddp_mmp_get_events()->DDP, name);
+			p->mmp = mmprofile_register_event(ddp_mmp_get_events()->DDP, name);
 
-		MMProfileEnableEventRecursive(p->mmp, 1);
+		mmprofile_enable_event_recursive(p->mmp, 1);
 
 		p->level = level;
 
@@ -580,7 +580,7 @@ void dprec_start(struct dprec_logger_event *event, unsigned int val1, unsigned i
 {
 	if (event) {
 		if (event->level & DPREC_LOGGER_LEVEL_MMP)
-			MMProfileLogEx(event->mmp, MMProfileFlagStart, val1, val2);
+			mmprofile_log_ex(event->mmp, MMPROFILE_FLAG_START, val1, val2);
 
 		if (event->level & DPREC_LOGGER_LEVEL_LOGGER) {
 			unsigned long flags = 0;
@@ -623,7 +623,7 @@ void dprec_done(struct dprec_logger_event *event, unsigned int val1, unsigned in
 {
 	if (event) {
 		if (event->level & DPREC_LOGGER_LEVEL_MMP)
-			MMProfileLogEx(event->mmp, MMProfileFlagEnd, val1, val2);
+			mmprofile_log_ex(event->mmp, MMPROFILE_FLAG_END, val1, val2);
 
 		if (event->level & DPREC_LOGGER_LEVEL_LOGGER) {
 			unsigned long flags = 0;
@@ -668,7 +668,7 @@ void dprec_trigger(struct dprec_logger_event *event, unsigned int val1, unsigned
 {
 	if (event) {
 		if (event->level & DPREC_LOGGER_LEVEL_MMP)
-			MMProfileLogEx(event->mmp, MMProfileFlagPulse, val1, val2);
+			mmprofile_log_ex(event->mmp, MMPROFILE_FLAG_PULSE, val1, val2);
 
 		if (event->level & DPREC_LOGGER_LEVEL_LOGGER) {
 			unsigned long flags = 0;
@@ -726,7 +726,7 @@ void dprec_submit(struct dprec_logger_event *event, unsigned int val1, unsigned 
 {
 	if (event) {
 		if (event->level & DPREC_LOGGER_LEVEL_MMP)
-			MMProfileLogEx(event->mmp, MMProfileFlagPulse, val1, val2);
+			mmprofile_log_ex(event->mmp, MMPROFILE_FLAG_PULSE, val1, val2);
 
 		if (event->level & DPREC_LOGGER_LEVEL_LOGGER)
 			;
@@ -768,7 +768,7 @@ void dprec_logger_submit(unsigned int type_logsrc, unsigned long long period,
 
 	spin_unlock_irqrestore(&gdprec_logger_spinlock, flags);
 
-	dprec_to_mmp(type_logsrc, MMProfileFlagPulse, (unsigned int)l->period_max_frame, fence_idx);
+	dprec_to_mmp(type_logsrc, MMPROFILE_FLAG_PULSE, (unsigned int)l->period_max_frame, fence_idx);
 }
 
 static unsigned long long ts_dprec_reset;
@@ -925,7 +925,7 @@ void dprec_stub_event(enum DISP_PATH_EVENT event)
 	/* DISP_REG_SET(NULL,DISP_REG_CONFIG_MUTEX_INTEN,0xffffffff); */
 	if (event == DISP_PATH_EVENT_IF_VSYNC) {
 		vsync_cnt++;
-		/* MMProfileLogEx(ddp_mmp_get_events()->vsync_count, MMProfileFlagPulse, vsync_cnt, 0); */
+		/* mmprofile_log_ex(ddp_mmp_get_events()->vsync_count, MMPROFILE_FLAG_PULSE, vsync_cnt, 0); */
 		dprec_start(&dprec_vsync_irq_event, 0, 0);
 		dprec_done(&dprec_vsync_irq_event, 0, 0);
 	}
@@ -1211,7 +1211,7 @@ void dprec_logger_done(unsigned int type_logsrc, unsigned int val1, unsigned int
 }
 
 void dprec_logger_event_init(struct dprec_logger_event *p, char *name, uint32_t level,
-			     MMP_Event *mmp_root)
+			     mmp_event *mmp_root)
 {
 }
 
