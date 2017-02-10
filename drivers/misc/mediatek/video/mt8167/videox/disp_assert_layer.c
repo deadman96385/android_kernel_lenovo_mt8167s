@@ -126,7 +126,7 @@ enum DAL_STATUS DAL_Init(unsigned long layerVA, unsigned long layerPA)
 	if (ret != MFC_STATUS_OK) {
 		pr_debug("DISP/DAL: Warning: call MFC_XXX function failed in %s(), line: %d, ret: %x\n",
 			__func__, __LINE__, ret);
-		return ret;
+		return DAL_STATUS_FATAL_ERROR;
 	}
 
 	/* DAL_Clean(); */
@@ -155,7 +155,7 @@ enum DAL_STATUS DAL_SetColor(unsigned int fgColor, unsigned int bgColor)
 	if (ret != MFC_STATUS_OK) {
 		pr_debug("DISP/DAL: Warning: call MFC_XXX function failed in %s(), line: %d, ret: %x\n",
 			__func__, __LINE__, ret);
-		return ret;
+		return DAL_STATUS_FATAL_ERROR;
 	}
 
 	up(&dal_sem);
@@ -228,7 +228,7 @@ enum DAL_STATUS DAL_Clean(void)
 	if (r != MFC_STATUS_OK) {
 		pr_debug("DISP/DAL: Warning: call MFC_XXX function failed in %s(), line: %d, ret: %x\n",
 			__func__, __LINE__, r);
-		return r;
+		return DAL_STATUS_FATAL_ERROR;
 	}
 
 	ctxt->screen_color = 0;
@@ -342,7 +342,7 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 		if (r != MFC_STATUS_OK) {
 			pr_debug("DISP/DAL: Warning: call MFC_XXX function failed in %s(), line: %d, ret: %x\n",
 				__func__, __LINE__, r);
-			return r;
+			return DAL_STATUS_FATAL_ERROR;
 		}
 
 		session_input = &captured_session_input[DISP_SESSION_PRIMARY - 1];
@@ -382,7 +382,7 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 	if (r != MFC_STATUS_OK) {
 		pr_debug("DISP/DAL: Warning: call MFC_XXX function failed in %s(), line: %d, ret: %x\n",
 			__func__, __LINE__, r);
-		return r;
+		return DAL_STATUS_FATAL_ERROR;
 	}
 
 	/*flush_cache_all();*/
