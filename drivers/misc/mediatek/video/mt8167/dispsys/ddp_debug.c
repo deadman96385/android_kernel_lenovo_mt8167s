@@ -139,6 +139,7 @@ unsigned int gEnableIRQ = 1;
 /* #error user_error */
 #endif
 unsigned int gDisableSODIForTriggerLoop = 1;
+unsigned int force_sec;
 
 static char STR_HELP[] =
 	"USAGE:\n"
@@ -441,6 +442,13 @@ static void process_dbg_opt(const char *opt)
 			else
 				gUltraEnable = 0;
 			sprintf(buf, "gUltraEnable: %d\n", gUltraEnable);
+		} else if (enable == 13) {
+			if (force_sec == 0)
+				force_sec = 1;
+			else
+				force_sec = 0;
+			pr_err("force_sec: %d\n", force_sec);
+			sprintf(buf, "force_sec: %d\n", force_sec);
 		}
 	} else if (strncmp(opt, "mmp", 3) == 0) {
 		init_ddp_mmp_events();
