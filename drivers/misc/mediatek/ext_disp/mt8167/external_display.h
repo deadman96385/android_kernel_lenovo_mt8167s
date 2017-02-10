@@ -91,6 +91,7 @@ struct ext_disp_input_config {
 	unsigned int security;
 	unsigned int dirty;
 };
+extern int enable_ut;
 
 void ext_disp_probe(void);
 int ext_disp_init(char *lcm_name, unsigned int session);
