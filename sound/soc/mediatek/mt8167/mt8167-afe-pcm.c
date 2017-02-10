@@ -190,7 +190,7 @@ static int mt8167_afe_set_i2s_out(struct mtk_afe *afe, unsigned int rate,
 	if (fs < 0)
 		return -EINVAL;
 
-	val = AFE_I2S_CON1_TDMOUT_MUX |
+	val = AFE_I2S_CON1_I2S2_TO_PAD |
 	      AFE_I2S_CON1_LOW_JITTER_CLK |
 	      AFE_I2S_CON1_RATE(fs) |
 	      AFE_I2S_CON1_FORMAT_I2S;
@@ -1290,6 +1290,11 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 
 	regmap_update_bits(afe->regmap, AFE_HDMI_OUT_CON0,
 			   AFE_HDMI_OUT_CON0_CH_MASK, runtime->channels << 4);
+
+	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S) ||
+	    (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM))
+		regmap_update_bits(afe->regmap, AFE_I2S_CON1,
+			   AFE_I2S_CON1_TDMOUT_MUX_MASK, AFE_I2S_CON1_TDMOUT_TO_PAD);
 	return 0;
 }
 
