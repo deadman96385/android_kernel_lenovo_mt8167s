@@ -192,19 +192,4 @@
 			"150", "151", "152", "153", "154", "155", "156", "157", "158", "159",
 			"160", "161", "162", "163", "164", "165", "166", "167", "168", "169";
 	};
-
-	bring-up-pd-mfg-async {
-		compatible = "mediatek,scpsys-bring-up";
-		power-domains = <&scpsys MT8167_POWER_DOMAIN_MFG_ASYNC>;
-	};
-
-	bring-up-pd-mfg-2d {
-		compatible = "mediatek,scpsys-bring-up";
-		power-domains = <&scpsys MT8167_POWER_DOMAIN_MFG_2D>;
-	};
-
-	bring-up-pd-mfg {
-		compatible = "mediatek,scpsys-bring-up";
-		power-domains = <&scpsys MT8167_POWER_DOMAIN_MFG>;
-	};
 };
