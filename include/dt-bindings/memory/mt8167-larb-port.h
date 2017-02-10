@@ -20,7 +20,7 @@
 
 #define MT8167_LARB0_PORT(port)		(port)
 #define MT8167_LARB1_PORT(port)		((port) + MT8167_LARB0_PORT_NUM)
-#define MT8167_LARB2_PORT(port)		((port) + MT8167_LARB1_PORT_NUM)
+#define MT8167_LARB2_PORT(port)		((port) + MT8167_LARB0_PORT_NUM + MT8167_LARB1_PORT_NUM)
 
 /* larb0 */
 #define M4U_PORT_DISP_OVL0		MT8167_LARB0_PORT(0)
