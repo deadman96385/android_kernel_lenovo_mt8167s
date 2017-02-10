@@ -1650,6 +1650,8 @@
 			compatible = "mediatek,mtee";
 			clocks = <&topckgen CLK_TOP_GCPU_B>, <&topckgen CLK_TOP_TRNG>;
 			clock-names = "GCPU", "TRNG";
+			pm-devs = <&larb1>;
+			pm-names = "isp";
 		};
 
 		mtgpufreq {
