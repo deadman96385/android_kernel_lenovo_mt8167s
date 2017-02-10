@@ -50,12 +50,13 @@ enum eDDP_CLK_ID disp_pwm_get_clkid(unsigned int clk_req)
 
 	switch (clk_req) {
 	case 1:
-		clkid = UNIVPLL2_D4;
+		clkid = UNIVPLL_D12;
 		break;
-	case 2:
+	/*case 2:
 		clkid = SYSPLL4_D2;
 		break;
-	case 3:
+	*/
+	case 0:
 		clkid = DISP_PWM_26M;
 		break;
 	default:
