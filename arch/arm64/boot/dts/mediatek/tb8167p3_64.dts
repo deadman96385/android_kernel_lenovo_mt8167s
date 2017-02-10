@@ -70,6 +70,7 @@
 		mediatek,pwrap-regmap = <&pwrap>;
 		mediatek,speaker-mode = <0>; /* 0(CLASSD) 1(CLASSAB) */
 		mediatek,dmic-wire-mode = <1>; /* 0(ONE_WIRE) 1(TWO_WIRE) */
+		mediatek,headphone-cap-sel = <1>; /* 0(10UF) 1(22UF) 2(33UF) 3(47UF) */
 	};
 
 	panel: panel@0 {
