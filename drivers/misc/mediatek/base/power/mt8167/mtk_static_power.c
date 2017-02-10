@@ -19,8 +19,8 @@
 #endif /* #if !defined (__CTP__) */
 
 /* #include <asm/system.h> */
-#include "mt_spower_data.h"
-#include "mt_static_power.h"
+#include "mtk_spower_data.h"
+#include "mtk_static_power.h"
 
 /*********************************
  * macro for log
