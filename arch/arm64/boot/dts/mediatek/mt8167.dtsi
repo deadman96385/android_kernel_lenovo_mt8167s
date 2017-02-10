@@ -234,7 +234,6 @@
 			compatible = "mediatek,mt8167-infracfg", "syscon";
 			reg = <0 0x10001000 0 0x1000>;
 			#clock-cells = <1>;
-			#reset-cells = <1>;
 		};
 
 		btcvsd@10001000 {
@@ -304,8 +303,8 @@
 					<GIC_SPI 169 IRQ_TYPE_LEVEL_LOW>,
 					<GIC_SPI 170 IRQ_TYPE_LEVEL_LOW>;
 			infracfg = <&infracfg>;
-			clocks = <&clk26m>,
-				 <&topckgen CLK_TOP_MM_SEL>;
+			clocks = <&topckgen CLK_TOP_SLOW_MFG_SEL>,
+				 <&topckgen CLK_TOP_SMI_MM_SEL>;
 			clock-names = "mfg", "mm";
 		};
 
@@ -715,6 +714,12 @@
 			clock-names = "topck", "pll";
 		};
 
+		mfgcfg: mfgcfg@13ffe000 {
+			compatible = "mediatek,mt8167-mfgcfg", "syscon";
+			reg = <0 0x13ffe000 0 0x1000>;
+			#clock-cells = <1>;
+		};
+
 		mmc0: mmc@11120000 {
 			compatible = "mediatek,mt8167-mmc";
 			reg = <0 0x11120000 0 0x1000>;
@@ -733,6 +738,12 @@
 					<&clk_null>;
 			clock-names = "source", "hclk";
 			status = "disabled";
+		};
+
+		audiotop: audiotop@11140000 {
+			compatible = "mediatek,mt8167-audiotop", "syscon";
+			reg = <0 0x11140000 0 0x1000>;
+			#clock-cells = <1>;
 		};
 
 		usb1: usb@11190000 {
@@ -1140,6 +1151,8 @@
 		};
 
 		vencsys: vencsys@17000000 {
+			/* TODO: remove vencsys: not supported in MT8167 */
+			status = "disabled";
 			compatible = "mediatek,mt8167-vencsys", "syscon";
 			reg = <0 0x17000000 0 0x1000>;
 			#clock-cells = <1>;
