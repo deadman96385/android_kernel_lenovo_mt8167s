@@ -37,8 +37,8 @@ extern unsigned int rdma_start_irq_cnt[2];
 extern unsigned int rdma_done_irq_cnt[2];
 extern unsigned int rdma_underflow_irq_cnt[2];
 extern unsigned int rdma_targetline_irq_cnt[2];
-extern unsigned int mutex_start_irq_cnt;
-extern unsigned int mutex_done_irq_cnt;
+extern unsigned int mutex_start_irq_cnt[5];
+extern unsigned int mutex_done_irq_cnt[5];
 extern atomic_t ESDCheck_byCPU;
 
 irqreturn_t disp_irq_handler(int irq, void *dev_id);
