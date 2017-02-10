@@ -22,7 +22,6 @@
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
 #include <linux/device.h>
-#include <linux/pm_runtime.h>
 
 
 #ifdef CONFIG_DEBUG_FS
@@ -147,8 +146,6 @@ static ssize_t mt8167_afe_read_file(struct file *file, char __user *user_buf,
 	if (!buf)
 		return -ENOMEM;
 
-	pm_runtime_get_sync(afe->dev);
-
 	clk_prepare_enable(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
 
 	for (i = 0; i < ARRAY_SIZE(afe_dump_regs); i++) {
@@ -161,8 +158,6 @@ static ssize_t mt8167_afe_read_file(struct file *file, char __user *user_buf,
 	}
 
 	clk_disable_unprepare(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
-
-	pm_runtime_put(afe->dev);
 
 	ret = simple_read_from_buffer(user_buf, count, pos, buf, n);
 
@@ -203,15 +198,11 @@ static ssize_t mt8167_afe_write_file(struct file *file, const char __user *user_
 	if (kstrtoul(value_str, 16, &value))
 		return -EINVAL;
 
-	pm_runtime_get_sync(afe->dev);
-
 	mt8167_afe_enable_main_clk(afe);
 
 	regmap_write(afe->regmap, reg, value);
 
 	mt8167_afe_disable_main_clk(afe);
-
-	pm_runtime_put(afe->dev);
 
 	return buf_size;
 }
@@ -232,8 +223,6 @@ static ssize_t mt8167_afe_hdmi_read_file(struct file *file, char __user *user_bu
 	if (!buf)
 		return -ENOMEM;
 
-	pm_runtime_get_sync(afe->dev);
-
 	clk_prepare_enable(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
 
 	for (i = 0; i < ARRAY_SIZE(hdmi_dump_regs); i++) {
@@ -246,8 +235,6 @@ static ssize_t mt8167_afe_hdmi_read_file(struct file *file, char __user *user_bu
 	}
 
 	clk_disable_unprepare(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
-
-	pm_runtime_put(afe->dev);
 
 	ret = simple_read_from_buffer(user_buf, count, pos, buf, n);
 
@@ -272,8 +259,6 @@ static ssize_t mt8167_afe_tdm_in_read_file(struct file *file, char __user *user_
 	if (!buf)
 		return -ENOMEM;
 
-	pm_runtime_get_sync(afe->dev);
-
 	clk_prepare_enable(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
 
 	for (i = 0; i < ARRAY_SIZE(tdmi_in_dump_regs); i++) {
@@ -286,8 +271,6 @@ static ssize_t mt8167_afe_tdm_in_read_file(struct file *file, char __user *user_
 	}
 
 	clk_disable_unprepare(afe->clocks[MT8167_CLK_TOP_PDN_AUD]);
-
-	pm_runtime_put(afe->dev);
 
 	ret = simple_read_from_buffer(user_buf, count, pos, buf, n);
 

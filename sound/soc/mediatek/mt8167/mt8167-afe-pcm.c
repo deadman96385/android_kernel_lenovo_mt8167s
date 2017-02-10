@@ -1371,7 +1371,7 @@ static int mt8167_afe_hdmi_trigger(struct snd_pcm_substream *substream, int cmd,
 		regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
 				   AUD_TCON0_PDN_HDMI, 0);
 
-		/* TODO: align the connection logic with HDMI Tx */
+		/* align the connection logic with HDMI Tx */
 		/* set connections:  O28~O35: L/R/LFE/C/LS/RS/CH7/CH8 */
 		if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI)
 			regmap_write(afe->regmap, AFE_HDMI_CONN0,
@@ -1891,8 +1891,6 @@ static const struct snd_soc_dai_ops mt8167_afe_tdm_in_ops = {
 	.trigger	= mt8167_afe_tdm_in_trigger,
 };
 
-static int mt8167_afe_runtime_suspend(struct device *dev);
-static int mt8167_afe_runtime_resume(struct device *dev);
 static int mt8167_afe_suspend(struct device *dev);
 static int mt8167_afe_resume(struct device *dev);
 
@@ -2654,22 +2652,6 @@ err_irq:
 	return IRQ_HANDLED;
 }
 
-static int mt8167_afe_runtime_suspend(struct device *dev)
-{
-	/* TODO: check if runtime suspend get exexuted without PM domain attached */
-	dev_info(dev, "%s\n", __func__);
-
-	return mt8167_afe_suspend(dev);
-}
-
-static int mt8167_afe_runtime_resume(struct device *dev)
-{
-	/* TODO: check if runtime resume get exexuted without PM domain attached */
-	dev_info(dev, "%s\n", __func__);
-
-	return mt8167_afe_resume(dev);
-}
-
 static int mt8167_afe_suspend(struct device *dev)
 {
 	struct mtk_afe *afe = dev_get_drvdata(dev);
@@ -2846,16 +2828,10 @@ static const struct of_device_id mt8167_afe_pcm_dt_match[] = {
 };
 MODULE_DEVICE_TABLE(of, mt8167_afe_pcm_dt_match);
 
-static const struct dev_pm_ops mt8167_afe_pm_ops = {
-	SET_RUNTIME_PM_OPS(mt8167_afe_runtime_suspend, mt8167_afe_runtime_resume,
-			   NULL)
-};
-
 static struct platform_driver mt8167_afe_pcm_driver = {
 	.driver = {
 		   .name = "mtk-afe-pcm",
 		   .of_match_table = mt8167_afe_pcm_dt_match,
-		   .pm = &mt8167_afe_pm_ops,
 	},
 	.probe = mt8167_afe_pcm_dev_probe,
 	.remove = mt8167_afe_pcm_dev_remove,
