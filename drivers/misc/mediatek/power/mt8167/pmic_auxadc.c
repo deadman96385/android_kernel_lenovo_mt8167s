@@ -42,7 +42,7 @@
 static DEFINE_MUTEX(mt6392_adc_mutex);
 
 #define VOLTAGE_FULL_RANGE     1800
-static int count_time_out = 10;
+static int count_time_out = 100;
 
 static const u32 mt6392_auxadc_regs[] = {
 	MT6392_AUXADC_ADC0, MT6392_AUXADC_ADC1, MT6392_AUXADC_ADC2,
@@ -78,14 +78,13 @@ int PMIC_IMM_GetOneChannelValue(unsigned int dwChannel, int deCount, int trimd)
 	int raw_data, adc_result;
 	int adc_div = 0, raw_mask = 0, r_val_temp = 0;
 	int count = 0;
-	int reg_val_sum = 0, reg_val_avg = 0;
+	int raw_data_sum = 0, raw_data_avg = 0;
 	int u4Sample_times = 0;
-
-	mutex_lock(&mt6392_adc_mutex);
 
 	do {
 		/*defined channel 5 for TYEPC_CC1, channel 6 for TYPEC_CC2*/
 		/*defined channel 7 for CHG_DP, channel 8 for CHG_DM*/
+		mutex_lock(&mt6392_adc_mutex);
 		if ((dwChannel == 5) || (dwChannel == 6)) {
 			ret = pmic_config_interface(MT6392_TYPE_C_CTRL, 0x0, 0xffff, 0);
 			if (ret < 0) {
@@ -181,6 +180,7 @@ int PMIC_IMM_GetOneChannelValue(unsigned int dwChannel, int deCount, int trimd)
 			pr_debug("PMIC_IMM_GetOneChannelValue adc get ready Fail\n");
 			return -ETIMEDOUT;
 		}
+		count = 0;
 
 		/* get the raw data and calculate the adc result of adc */
 		ret = pmic_read_interface(mt6392_auxadc_regs[dwChannel], &reg_val, 0xffff, 0);
@@ -188,57 +188,57 @@ int PMIC_IMM_GetOneChannelValue(unsigned int dwChannel, int deCount, int trimd)
 			mutex_unlock(&mt6392_adc_mutex);
 			return ret;
 		}
-		reg_val_sum += reg_val;
 
+		mutex_unlock(&mt6392_adc_mutex);
+
+		switch (dwChannel) {
+		case 0:
+		case 1:
+			r_val_temp = 3;
+			raw_mask = 0x7fff;
+			adc_div = 32768;
+			break;
+
+		case 2:
+		case 3:
+		case 4:
+			r_val_temp = 1;
+			raw_mask = 0xfff;
+			adc_div = 4096;
+			break;
+
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+			r_val_temp = 2;
+			raw_mask = 0xfff;
+			adc_div = 4096;
+			break;
+
+		case 9:
+		case 10:
+		case 11:
+		case 12:
+		case 13:
+		case 14:
+		case 15:
+			r_val_temp = 1;
+			raw_mask = 0xfff;
+			adc_div = 4096;
+			break;
+		}
+
+		/* get auxadc raw data */
+		raw_data = reg_val & raw_mask;
+		raw_data_sum += raw_data;
 		u4Sample_times++;
 	} while (u4Sample_times < deCount);
-	reg_val_avg = reg_val_sum / deCount;
 
-	mutex_unlock(&mt6392_adc_mutex);
-
-	switch (dwChannel) {
-	case 0:
-	case 1:
-		r_val_temp = 3;
-		raw_mask = 0x7fff;
-		adc_div = 32768;
-		break;
-
-	case 2:
-	case 3:
-	case 4:
-		r_val_temp = 1;
-		raw_mask = 0xfff;
-		adc_div = 4096;
-		break;
-
-	case 5:
-	case 6:
-	case 7:
-	case 8:
-		r_val_temp = 2;
-		raw_mask = 0xfff;
-		adc_div = 4096;
-		break;
-
-	case 9:
-	case 10:
-	case 11:
-	case 12:
-	case 13:
-	case 14:
-	case 15:
-		r_val_temp = 1;
-		raw_mask = 0xfff;
-		adc_div = 4096;
-		break;
-	}
-
-	/* get auxadc raw data */
-	raw_data = reg_val_avg & raw_mask;
+	raw_data_avg = raw_data_sum / deCount;
 
 	/* get auxadc real result*/
-	adc_result = (raw_data * r_val_temp * VOLTAGE_FULL_RANGE) / adc_div;
+	adc_result = (raw_data_avg * r_val_temp * VOLTAGE_FULL_RANGE) / adc_div;
 
 	return adc_result;
 }
