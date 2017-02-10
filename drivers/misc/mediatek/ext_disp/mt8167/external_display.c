@@ -371,59 +371,6 @@ static int _build_path_direct_link(void)
 	return ret;
 }
 
-#ifdef SVP_UNIT_TEST
-KREE_SESSION_HANDLE display_secure_memory_session_handle(void)
-{
-	static KREE_SESSION_HANDLE disp_secure_memory_session;
-
-	/* TODO: the race condition here is not taken into consideration. */
-	if (!disp_secure_memory_session) {
-		TZ_RESULT ret;
-
-		ret = KREE_CreateSession(TZ_TA_MEM_UUID, &disp_secure_memory_session);
-		if (ret != TZ_RESULT_SUCCESS) {
-			EXT_DISP_ERR("KREE_CreateSession fail, ret=%d\n", ret);
-			return 0;
-		}
-	}
-	EXT_DISP_LOG("disp_secure_memory_session_handle() session = %x\n",
-	(unsigned int)disp_secure_memory_session);
-
-	return disp_secure_memory_session;
-}
-
-KREE_SECUREMEM_HANDLE allocate_decouple_sec_buffer(unsigned int buffer_size)
-{
-	TZ_RESULT ret;
-	KREE_SECUREMEM_HANDLE mem_handle;
-
-	/* allocate secure buffer by tz api */
-	ret = KREE_AllocSecurechunkmemWithTag(display_secure_memory_session_handle(),
-						&mem_handle, 0, buffer_size, "disp");
-	if (ret != TZ_RESULT_SUCCESS) {
-		EXT_DISP_ERR("KREE_AllocSecurechunkmemWithTag fail, ret = %d\n", ret);
-		return -1;
-	}
-	EXT_DISP_LOG("KREE_AllocSecurechunkmemWithTag handle = 0x%x\n", mem_handle);
-
-	return mem_handle;
-}
-
-KREE_SECUREMEM_HANDLE free_decouple_sec_buffer(KREE_SECUREMEM_HANDLE mem_handle)
-{
-	TZ_RESULT ret;
-
-	ret = KREE_UnreferenceSecurechunkmem(display_secure_memory_session_handle(), mem_handle);
-
-	if (ret != TZ_RESULT_SUCCESS)
-		EXT_DISP_ERR("KREE_UnreferenceSecurechunkmem fail, ret = %d\n", ret);
-
-	EXT_DISP_LOG("KREE_UnreferenceSecurechunkmem handle = 0x%x\n", mem_handle);
-
-	return ret;
-	}
-#endif
-
 static int ext_init_decouple_buffers(void)
 {
 	int i = 0;
@@ -442,13 +389,6 @@ static int ext_init_decouple_buffers(void)
 			EXT_DISP_LOG("extd alloc decouple buffer: 0x%x\n", pgc->dc_buf[i]);
 		}
 	}
-
-#ifdef SVP_UNIT_TEST
-	for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
-		pgc->dc_sec_buf[i] = allocate_decouple_sec_buffer(buffer_size);
-		EXT_DISP_LOG("extd alloc decouple secure buffer: 0x%x\n", pgc->dc_sec_buf[i]);
-	}
-#endif
 
 	pgc->decouple_rdma_config.height = ext_disp_get_height();
 	pgc->decouple_rdma_config.width = ext_disp_get_width();
@@ -478,10 +418,46 @@ static int ext_deinit_decouple_buffer(void)
 
 	for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
 		if (pgc->decouple_buffer_info[i]) {
+			EXT_DISP_LOG("extd free decouple buffer: 0x%x\n", pgc->dc_buf[i]);
 			ion_free(pgc->decouple_buffer_info[i]->client, pgc->decouple_buffer_info[i]->handle);
 			kfree(pgc->decouple_buffer_info[i]);
 			pgc->decouple_buffer_info[i] = NULL;
 		}
+	}
+
+	return 0;
+}
+
+static int ext_alloc_sec_buffer(void)
+{
+	int i;
+	int height = 1080;
+	int width = 1920;
+	int bpp = 3;
+	int buffer_size = width * height * bpp;
+
+	if (pgc->dc_sec_buf[0])
+		return 0;
+
+	for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
+		pgc->dc_sec_buf[i] = alloc_sec_buffer(buffer_size);
+		EXT_DISP_LOG("extd alloc decouple secure buffer: 0x%x\n", pgc->dc_sec_buf[i]);
+	}
+
+	return 0;
+}
+
+static int ext_free_sec_buffer(void)
+{
+	int i = 0;
+
+	if (pgc->dc_sec_buf[0] == 0)
+		return 0;
+
+	for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
+		free_sec_buffer(pgc->dc_sec_buf[i]);
+		EXT_DISP_LOG("extd free decouple secure buffer: 0x%x\n", pgc->dc_sec_buf[i]);
+		pgc->dc_sec_buf[i] = 0;
 	}
 
 	return 0;
@@ -1308,6 +1284,9 @@ static int _rdma_fence_release_callback(uint32_t userdata)
 	cmdqBackupReadSlot(pgc->rdma_info, 0, &(fence_idx));
 	mtkfb_release_fence(pgc->session, 0, fence_idx - 1);
 
+	/* after normal rdma */
+	ext_free_sec_buffer();
+
 	return 0;
 }
 
@@ -1427,6 +1406,17 @@ static void ext_check_is_interlace_output(struct disp_ddp_path_config *config)
 }
 #endif
 
+bool ext_disp_check_secure(struct disp_session_input_config *input)
+{
+	int i;
+
+	for (i = 0; i < input->config_layer_num; i++)
+		if (input->config[i].security == DISP_SECURE_BUFFER)
+			return true;
+
+	return false;
+}
+
 int ext_disp_config_input_multiple(struct disp_session_input_config *input, int idx, unsigned int session)
 {
 	int ret = 0;
@@ -1468,6 +1458,9 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 #if defined(CONFIG_MTK_HDMI_SUPPORT)
 	ext_check_is_interlace_output(data_config);
 #endif
+
+	if (ext_disp_check_secure(input))
+		ext_alloc_sec_buffer();
 
 	/* hope we can use only 1 input struct for input config, just set layer number */
 	if (_should_config_ovl_input()) {

@@ -384,3 +384,5 @@ int _config_wdma_output(struct WDMA_CONFIG_STRUCT *wdma_config, disp_path_handle
 int _config_rdma_input_data(struct RDMA_CONFIG_STRUCT *rdma_config, disp_path_handle disp_handle,
 					struct cmdqRecStruct *cmdq_handle);
 int init_cmdq_slots(cmdqBackupSlotHandle *pSlot, int count, int init_val);
+int alloc_sec_buffer(int size);
+int free_sec_buffer(unsigned int handle);

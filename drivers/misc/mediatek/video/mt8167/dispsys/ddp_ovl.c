@@ -994,9 +994,6 @@ static int ovl_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_confi
 
 	cmdq_engine = CMDQ_ENG_DISP_OVL0;
 
-	if (force_sec)
-		has_sec_layer = 1;
-
 	if (has_sec_layer) {
 		cmdqRecSetSecure(handle, 1);
 		/* set engine as sec */
