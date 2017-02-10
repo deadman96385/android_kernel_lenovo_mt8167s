@@ -201,13 +201,13 @@
 		reg = <0x2c>;
 	};
 
-	cap_touch@38 {
+	cap_touch@40 {
 		compatible = "mediatek,cap_touch";
-		reg = <0x38>;
+		reg = <0x40>;
 		interrupt-parent = <&pio>;
-		interrupts = <46 IRQ_TYPE_EDGE_FALLING>;
-		int-gpio = <&pio 35 0>;
-		rst-gpio = <&pio 45 0>;
+		interrupts = <100 IRQ_TYPE_EDGE_FALLING>;
+		int-gpio = <&pio 100 0>;
+		rst-gpio = <&pio 101 0>;
 	};
 
 	strobe_main@63 {
@@ -506,21 +506,51 @@
 	/* CONSYS GPIO Settings - End */
 
 	CTP_pins_default: eint0default {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_100_CMDAT0__FUNC_GPIO100>;
+			slew-rate = <0>;
+			bias-disable;
+		};
 	};
 
 	CTP_pins_eint_as_int: eint@0 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_100_CMDAT0__FUNC_GPIO100>;
+			slew-rate = <0>;
+			bias-disable;
+		};
 	};
 
 	CTP_pins_eint_output0: eintoutput0 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_100_CMDAT0__FUNC_GPIO100>;
+			slew-rate = <1>;
+			output-low;
+		};
 	};
 
 	CTP_pins_eint_output1: eintoutput1 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_100_CMDAT0__FUNC_GPIO100>;
+			slew-rate = <1>;
+			output-high;
+		};
 	};
 
 	CTP_pins_rst_output0: rstoutput0 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_101_CMDAT1__FUNC_GPIO101>;
+			slew-rate = <1>;
+			output-low;
+		};
 	};
 
 	CTP_pins_rst_output1: rstoutput1 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_101_CMDAT1__FUNC_GPIO101>;
+			slew-rate = <1>;
+			output-high;
+		};
 	};
 
 	flashlight_pins_default: default {
@@ -749,7 +779,8 @@
 };
 
 &touch {
-	tpd-resolution = <800 1280>;
+	vtouch-supply = <&mt6392_vgp1_reg>;
+	tpd-resolution = <600 1024>;
 	use-tpd-button = <0>;
 	tpd-key-num = <4>;
 	tpd-key-local= <139 172 158 0>;
