@@ -420,18 +420,16 @@ int ovl2mem_deinit(void)
 
 	DISPFUNC();
 
-	_ovl2mem_path_lock(__func__);
-
 	if (pgc->state == 0)
 		goto Exit;
 
-	ovl2mem_wait_done();
+	_ovl2mem_path_lock(__func__);
 
+	ovl2mem_wait_done();
 	dpmgr_path_stop(pgc->dpmgr_handle, CMDQ_DISABLE);
 	dpmgr_path_reset(pgc->dpmgr_handle, CMDQ_DISABLE);
 	dpmgr_path_deinit(pgc->dpmgr_handle, CMDQ_DISABLE);
 	dpmgr_destroy_path(pgc->dpmgr_handle, NULL);
-
 	cmdqRecDestroy(pgc->cmdq_handle_config);
 
 	pgc->dpmgr_handle = NULL;
@@ -442,9 +440,9 @@ int ovl2mem_deinit(void)
 	atomic_set(&g_release_ticket, 1);
 	ovl2mem_layer_num = 0;
 
-Exit:
 	_ovl2mem_path_unlock(__func__);
 
+Exit:
 	DISPMSG("ovl2mem_deinit done\n");
 	return ret;
 }
