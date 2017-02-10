@@ -147,7 +147,7 @@ static const flashdev_info_t gen_FlashTable_p[] = {
 	{{0x45, 0xDE, 0x94, 0x93, 0x76, 0x51}, 6, 5, IO_8BIT/* IO_TOGGLESDR*/, 0x800000, 4096, 16384, 1280, 0x10401011,
 	 0x33418010, 0x01010400, 80, VEND_SANDISK, 1024, "SDTNSGAMA008G ", MULTI_PLANE,
 	 {SANDISK_16K,
-	  {0xEF, 0xEE, 0x5D, 33, 0x11, 0, 0xFFFFFFFE, RTYPE_SANDISK, {0x80, 0x00}, {0x80, 0x01} },
+	  {0xEF, 0xEE, 0x5D, 32, 0x11, 0, 0xFFFFFFFD, RTYPE_SANDISK, {0x80, 0x00}, {0x80, 0x01} },
 	  {RAND_TYPE_SAMSUNG, {0x2D2D, 1, 1, 1, 1, 1} } },
 	  NAND_FLASH_MLC_HYBER, {FALSE, FALSE, FALSE, FALSE, 0xA2, 0xFF, FALSE, 0xFF, 8, 0xFF}, false },
 	{{0x45, 0xDE, 0x94, 0x93, 0x76, 0x57}, 6, 5, IO_8BIT, 0x800000, 4096, 16384, 1280, 0x10401011,
@@ -4312,6 +4312,27 @@ u32 sandisk_1znm_rrtry_slc[25] = {
 	0x00000038,
 };
 
+u32 sandisk_1znm_8GB_rrtry_setting[32] = {
+	0x00000000, 0x78780404, 0x747C0404, 0x78040000,
+	0x7C7C0404, 0x7C000000, 0x74000000, 0x78040808,
+	0x78047C7C, 0x7C007C7C, 0x707C0404, 0x74747C7C,
+	0x70780000, 0x78080C0C, 0x7C7C7878, 0x04080404,
+	0x78087878, 0x70787C7C, 0x6C707878, 0x6C740000,
+	0x74000808, 0x6C787C7C, 0x04040000, 0x6C747474,
+	0x707C7878, 0x74000C0C, 0x080C0404, 0x747C7878,
+	0x68707878, 0x70000808, 0x780C1010, 0x080C0000,
+};
+
+u32 sandisk_1znm_8GB_rrtry_slc[25] = {
+	0x00000000, 0x00000004, 0x0000007C, 0x00000008,
+	0x00000078, 0x0000000C, 0x00000074, 0x00000010,
+	0x00000070, 0x00000014, 0x0000006C, 0x00000018,
+	0x00000068, 0x0000001C, 0x00000064, 0x00000020,
+	0x00000060, 0x00000024, 0x0000005C, 0x00000028,
+	0x00000058, 0x0000002C, 0x00000030, 0x00000034,
+	0x00000038,
+};
+
 u32 sandisk_tlc_rrtbl_12h[40] = {
 	0x00000000, 0x08000004, 0x00000404, 0x04040408,
 	0x08040408, 0x0004080C, 0x04040810, 0x0C0C0C00,
@@ -4459,11 +4480,17 @@ static u32 mtk_nand_rrtry_setting(flashdev_info_t deviceinfo, enum readRetryType
 	/* if(RTYPE_MICRON == type || RTYPE_SANDISK== type || RTYPE_TOSHIBA== type || RTYPE_HYNIX== type) */
 	{
 		if (retryStart == 0xFFFFFFFE) {
-			/* sandisk 1znm MLC */
+			/* sandisk 1znm 16GB MLC */
 			if (devinfo.tlcControl.slcopmodeEn)
 				value = sandisk_1znm_rrtry_slc[loopNo];
 			else
 				value = sandisk_1znm_rrtry_setting[loopNo];
+		} else if (retryStart == 0xFFFFFFFD) {
+			/* sandisk 1znm 8GB MLC */
+			if (devinfo.tlcControl.slcopmodeEn)
+				value = sandisk_1znm_8GB_rrtry_slc[loopNo];
+			else
+				value = sandisk_1znm_8GB_rrtry_setting[loopNo];
 		} else if (retryStart != 0xFFFFFFFF)
 			value = retryStart + loopNo;
 		else
