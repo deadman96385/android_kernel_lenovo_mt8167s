@@ -342,27 +342,12 @@
 	};
 
 	aud_pins_default: audiodefault {
-		pins_extamp_default {
-			pins = <MT8167_PIN_22_EINT22__FUNC_GPIO22>;
-			slew-rate = <1>;
-			output-low;
-		};
 	};
 
 	aud_pins_extamp_on: audexampon {
-		pins_cmd_dat {
-			pins = <MT8167_PIN_22_EINT22__FUNC_GPIO22>;
-			slew-rate = <1>;
-			output-high;
-		};
 	};
 
 	aud_pins_extamp_off: audexampoff {
-		pins_cmd_dat {
-			pins = <MT8167_PIN_22_EINT22__FUNC_GPIO22>;
-			slew-rate = <1>;
-			output-low;
-		};
 	};
 
 	aud_pins_i2s1_mode0: audi2s1mode0 {
