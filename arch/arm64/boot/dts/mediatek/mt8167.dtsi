@@ -1398,5 +1398,11 @@
 	lcm: lcm {
 		compatible = "mediatek,lcm";
 	};
+
+	clkitg: clkitg {
+		compatible = "simple-bus";
+	};
+
 };
 
+#include "mt8167-clkitg.dtsi"
