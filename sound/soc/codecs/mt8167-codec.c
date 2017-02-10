@@ -478,7 +478,8 @@ static int mt8167_codec_voice_amp_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMU:
 		/* restore gain (fade in ?) */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON02,
-			GENMASK(12, 9), (codec_data->pga_gain[LOUT_PGA_GAIN]) << 9);
+			GENMASK(12, 9),
+			(codec_data->pga_gain[LOUT_PGA_GAIN]) << 9);
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		/* store gain */
@@ -492,7 +493,8 @@ static int mt8167_codec_voice_amp_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMD:
 		/* restore gain */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON02,
-			GENMASK(12, 9), (codec_data->pga_gain[LOUT_PGA_GAIN]) << 9);
+			GENMASK(12, 9),
+			(codec_data->pga_gain[LOUT_PGA_GAIN]) << 9);
 		break;
 	default:
 		break;
@@ -682,9 +684,11 @@ static void mt8167_codec_hp_depop_disable(
 			BIT(22), 0x0);
 	/* restore gain */
 	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON01,
-			GENMASK(2, 0), codec_data->pga_gain[HP_L_PGA_GAIN]);
+			GENMASK(2, 0),
+			codec_data->pga_gain[HP_L_PGA_GAIN]);
 	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON01,
-			GENMASK(5, 3), codec_data->pga_gain[HP_R_PGA_GAIN] << 3);
+			GENMASK(5, 3),
+			(codec_data->pga_gain[HP_R_PGA_GAIN]) << 3);
 }
 
 static int mt8167_codec_depop_vcm_event(struct snd_soc_dapm_widget *w,
@@ -1770,6 +1774,13 @@ static void mt8167_codec_init_regs(struct mt8167_codec_priv *codec_data)
 		AUDIO_CODEC_CON00, BIT(17), 0x0);
 	snd_soc_update_bits(codec_data->codec,
 		AUDIO_CODEC_CON01, BIT(31), 0x0);
+
+	/* setup default gain */
+	/* +4dB for voice buf gain */
+	codec_data->pga_gain[LOUT_PGA_GAIN] = 0xB;
+	snd_soc_update_bits(codec_data->codec,
+		AUDIO_CODEC_CON02, GENMASK(12, 9),
+		(codec_data->pga_gain[LOUT_PGA_GAIN]) << 9);
 
 	mt8167_codec_hp_depop_setup(codec_data);
 }
