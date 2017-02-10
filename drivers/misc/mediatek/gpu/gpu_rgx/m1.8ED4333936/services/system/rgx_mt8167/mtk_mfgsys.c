@@ -134,7 +134,6 @@ static const char * const top_mfg_clk_name[] = {
 };
 #define MAX_TOP_MFG_CLK ARRAY_SIZE(top_mfg_clk_name)
 
-/***** CJ need to modify *****/
 #define REG_MFG_AXI BIT(0)
 #define REG_MFG_MEM BIT(1)
 #define REG_MFG_G3D BIT(2)
@@ -144,8 +143,6 @@ static const char * const top_mfg_clk_name[] = {
 #define REG_MFG_CG_STA 0x00
 #define REG_MFG_CG_SET 0x04
 #define REG_MFG_CG_CLR 0x08
-/**********/
-
 
 #ifdef CONFIG_MTK_SEGMENT_TEST
 static IMG_UINT32 efuse_mfg_enable;
@@ -293,20 +290,6 @@ static IMG_VOID mtk_mfg_disable_clock(IMG_BOOL bForce)
 {
 	struct mtk_mfg_base *mfg_base = GET_MTK_MFG_BASE(sPVRLDMDev);
 	int i;
-#if 0 /*defined(MTK_USE_HW_APM)*/ /** CJ, ask vincent, why need to wait BUS idle? **/
-	volatile int polling_count = 200000;
-
-	if (bForce == IMG_FALSE) {
-		do {
-			/* 0x13FFF000[16]
-			 * 1'b1: bus idle
-			 * 1'b0: bus busy
-			 */
-			if (DRV_Reg32(g_pvRegsKM) & MFG_BUS_IDLE_BIT)
-				break;
-		} while (polling_count--);
-	}
-#endif
 
 	/* Disable(gated) mfg clock */
 	mtk_mfg_set_clock_gating(mfg_base->reg_base);
@@ -536,7 +519,6 @@ unsigned int MTKCommitFreqForPVR(unsigned long ui32NewFreq)
 
 static void MTKFreqInputBoostCB(unsigned int ui32BoostFreqID)
 {
-/* CJ Fix Me */
 #if 0
 	if (g_iSkipCount > 0)
 		return;
@@ -676,7 +658,6 @@ static IMG_UINT32 MTKCalPowerIndex(IMG_VOID)
 #endif
 
 
-/* CJ Need to  re-write the function, because the Power-Index Calculation should be different */
 static IMG_VOID MTKCalGpuLoading(unsigned int *pui32Loading, unsigned int *pui32Block, unsigned int *pui32Idle)
 {
 
@@ -1225,9 +1206,6 @@ PVRSRV_ERROR MTKMFGSystemInit(void)
 		}
 	}
 #endif
-#ifndef MTK_PM_SUPPORT
-	MTKEnableMfgClock();
-#endif
 	return PVRSRV_OK;
 
 #ifndef ENABLE_COMMON_DVFS
@@ -1363,22 +1341,6 @@ err_iounmap_reg_base:
 	return err;
 }
 
-#if 0 /* CJ have not find the correct de-init call*/
-static int mtk_mfg_unbind_device_resource(struct platform_device *pdev,
-				   struct mtk_mfg_base *mfg_base)
-{
-	mfg_base->pdev = NULL;
-
-	if (mfg_base->mfg_notifier.notifier_call) {
-		unregister_reboot_notifier(&mfg_base->mfg_notifier);
-		mfg_base->mfg_notifier.notifier_call = NULL;
-	}
-	iounmap(mfg_base->reg_base);
-	pm_runtime_disable(&pdev->dev);
-
-	return 0;
-}
-#endif
 
 int MTKRGXDeviceInit(void *pvOSDevice)
 {

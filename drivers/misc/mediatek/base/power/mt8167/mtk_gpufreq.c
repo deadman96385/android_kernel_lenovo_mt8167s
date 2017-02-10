@@ -95,6 +95,9 @@
  ****************************/
 #define MT_GPUFREQ_DYNAMIC_POWER_TABLE_UPDATE
 
+/* there is no PBM feature in mt8167 */
+#define DISABLE_PBM_FEATURE
+
 /***************************
  * Define for random test
  ****************************/
@@ -113,6 +116,7 @@
  * PMIC
  * external IC
  */
+/* mt8167 doesn't the setting */
 /* #define VGPU_SET_BY_PMIC_WRAP */
 #define VGPU_SET_BY_PMIC
 /* #define VGPU_SET_BY_EXTIC */
@@ -348,7 +352,6 @@ static unsigned int g_gpufreq_max_id;
 static unsigned int g_limited_max_id;
 static unsigned int g_limited_min_id;
 
-/*CJ Fix Me*/
 static bool mt_gpufreq_debug;
 static bool mt_gpufreq_pause;
 static bool mt_gpufreq_keep_max_frequency_state;
@@ -505,31 +508,11 @@ static unsigned int mt_gpufreq_get_dvfs_table_type(void)
 static struct task_struct *mt_gpufreq_up_task;
 static void mt_gpufreq_clock_switch(unsigned int freq_new);
 
-/*CJ, only for test mmpll*/
-#if 0
-void mt_gpufreq_set_mmpll(void)
-{
-	static int counter;
-
-	counter++;
-	if (counter % 10 == 0) {
-		if (counter % 20 == 0) {
-			gpufreq_err("mt_gpufreq_set_mmpll set to GPU_DVFS_FREQ4/299MHz\n");
-			mt_gpufreq_clock_switch(GPU_DVFS_FREQ4);
-		} else {
-			gpufreq_err("mt_gpufreq_set_mmpll set to GPU_DVFS_FREQ5/253.5MHz\n");
-			mt_gpufreq_clock_switch(GPU_DVFS_FREQ5);
-		}
-	}
-}
-#endif
 
 static int mt_gpufreq_input_boost_task(void *data)
 {
 	while (1) {
 		gpufreq_dbg("@%s: begin\n", __func__);
-		/*CJ, only for test mmpll*/
-		/*mt_gpufreq_set_mmpll();*/
 
 		if (g_pGpufreq_input_boost_notify != NULL) {
 			gpufreq_dbg("@%s: g_pGpufreq_input_boost_notify\n", __func__);
@@ -746,7 +729,7 @@ static void mt_gpufreq_notify_pbm_gpuoff(struct work_struct *work)
 /* Set VGPU enable/disable when GPU clock be switched on/off */
 unsigned int mt_gpufreq_voltage_enable_set(unsigned int enable)
 {
-	/*CJ mt8167, gpu uses vcore, the enable/disable is always on*/
+	/* mt8167, gpu uses vcore, the enable/disable is always on*/
 	if (mt_gpufreq_ready == false) {
 		gpufreq_warn("@%s: GPU DVFS not ready!\n", __func__);
 		return DRIVER_NOT_READY;
@@ -1213,7 +1196,6 @@ static void mt_gpufreq_volt_switch(unsigned int volt_old, unsigned int volt_new)
 
 static unsigned int _mt_gpufreq_get_cur_freq(void)
 {
-	/* CJ, can I get from where? */
 	return g_cur_gpu_freq;
 }
 
@@ -1233,7 +1215,7 @@ static unsigned int _mt_gpufreq_get_cur_volt(void)
 
 static void _mt_gpufreq_kick_pbm(int enable)
 {
-#ifndef DISABLE_PBM_FEATURE /* CJ, we don't define DISABLE_PBM_FEATURE */
+#ifndef DISABLE_PBM_FEATURE
 	int i;
 	int tmp_idx = -1;
 	unsigned int found = 0;
@@ -1250,8 +1232,7 @@ static void _mt_gpufreq_kick_pbm(int enable)
 				if (mt_gpufreqs_power[i].gpufreq_volt == cur_volt) {
 					power = mt_gpufreqs_power[i].gpufreq_power;
 					found = 1;
-					/* CJ Fix Me */
-					/* kicker_pbm_by_gpu(true, power, cur_volt / 100); */
+					kicker_pbm_by_gpu(true, power, cur_volt / 100);
 					gpufreq_dbg
 						("@%s: request GPU power = %d, cur_volt = %d, cur_freq = %d\n",
 						 __func__, power, cur_volt / 100, cur_freq);
@@ -1266,8 +1247,7 @@ static void _mt_gpufreq_kick_pbm(int enable)
 			if (tmp_idx != -1 && tmp_idx < mt_gpufreqs_num) {
 				/* use freq to found corresponding power budget */
 				power = mt_gpufreqs_power[tmp_idx].gpufreq_power;
-				/* CJ Fix Me */
-				/* kicker_pbm_by_gpu(true, power, cur_volt / 100); */
+				kicker_pbm_by_gpu(true, power, cur_volt / 100);
 				gpufreq_dbg
 					("@%s: request GPU power = %d, cur_volt = %d, cur_freq = %d\n",
 					 __func__, power, cur_volt / 100, cur_freq);
@@ -1279,8 +1259,7 @@ static void _mt_gpufreq_kick_pbm(int enable)
 			}
 		}
 	} else {
-		/* CJ Fix Me */
-		/* kicker_pbm_by_gpu(false, 0, cur_volt / 100); */
+		kicker_pbm_by_gpu(false, 0, cur_volt / 100);
 	}
 #endif
 }
@@ -1629,8 +1608,6 @@ void mt_gpufreq_oc_callback(enum BATTERY_OC_LEVEL oc_level)
 
 	mt_gpufreq_oc_level = oc_level;
 
-	/* CJ Fix Me ?*/
-	#if 1
 	/* BATTERY_OC_LEVEL_1: >= 5.5A  */
 	if (oc_level == BATTERY_OC_LEVEL_1) {
 		if (mt_gpufreq_oc_limited_index != mt_gpufreq_oc_limited_index_1) {
@@ -1645,7 +1622,6 @@ void mt_gpufreq_oc_callback(enum BATTERY_OC_LEVEL oc_level)
 			mt_gpufreq_oc_protect(mt_gpufreq_oc_limited_index_0);	/* Unlimit */
 		}
 	}
-	#endif
 }
 #endif
 
@@ -1681,8 +1657,6 @@ void mt_gpufreq_low_batt_volume_callback(enum BATTERY_PERCENT_LEVEL low_battery_
 
 	mt_gpufreq_low_battery_volume = low_battery_volume;
 
-	/* CJ Fix Me ?*/
-#if 1
 	/* LOW_BATTERY_VOLUME_1: <= 15%, LOW_BATTERY_VOLUME_0: >15% */
 	if (low_battery_volume == BATTERY_PERCENT_LEVEL_1) {
 		if (mt_gpufreq_low_batt_volume_limited_index !=
@@ -1703,7 +1677,6 @@ void mt_gpufreq_low_batt_volume_callback(enum BATTERY_PERCENT_LEVEL low_battery_
 			mt_gpufreq_low_batt_volume_protect(mt_gpufreq_low_bat_volume_limited_index_0);	/* Unlimit */
 		}
 	}
-#endif
 }
 #endif
 
@@ -1761,8 +1734,6 @@ void mt_gpufreq_low_batt_volt_callback(enum LOW_BATTERY_LEVEL low_battery_level)
 	} else
 #endif
 
-	/* CJ Fix Me ?*/
-#if 1
 	if (low_battery_level == LOW_BATTERY_LEVEL_2) {
 		if (mt_gpufreq_low_batt_volt_limited_index !=
 			mt_gpufreq_low_bat_volt_limited_index_2) {
@@ -1780,7 +1751,6 @@ void mt_gpufreq_low_batt_volt_callback(enum LOW_BATTERY_LEVEL low_battery_level)
 			mt_gpufreq_low_batt_volt_protect(mt_gpufreq_low_bat_volt_limited_index_0);
 		}
 	}
-#endif
 }
 #endif
 
@@ -1950,7 +1920,7 @@ void mt_gpufreq_set_power_limit_by_pbm(unsigned int limited_power)
 #endif
 }
 
-/* CJ, what is PBM? */
+#if 0
 unsigned int mt_gpufreq_get_leakage_mw(void)
 {
 #ifndef DISABLE_PBM_FEATURE
@@ -1980,6 +1950,7 @@ unsigned int mt_gpufreq_get_leakage_mw(void)
 	return 0;
 #endif
 }
+#endif
 
 /************************************************
  * return current GPU thermal limit index
@@ -2118,7 +2089,6 @@ void mt_gpufreq_late_resume(struct early_suspend *h)
 }
 #endif
 
-/* CJ, Need to restore early ?*/
 static int mt_gpufreq_pm_restore_early(struct device *dev)
 {
 	int i = 0;
@@ -2243,17 +2213,6 @@ static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 		regulator_is_enabled(mt_gpufreq_pmic->reg_vgpu),
 		_mt_gpufreq_get_cur_volt());
 
-	/* CJ Fix it, should not set here, test only*/
-#if 0
-	/* VGPU */
-	regulator_set_voltage(mt_gpufreq_pmic->reg_vgpu, GPU_DVFS_VOLT2 * 10, (GPU_DVFS_VOLT2 + 100) * 10);
-	/* Freq */
-	pr_err("[ERROR] mt_gpufreq_clock_switch set to 312Mz");
-	mt_dfs_mmpll(0xF8000);	/* 403MHz, 0x820F8000 */
-	mt_dfs_mmpll(0xF4000);	/* 396.5MHz, 0x820F4000 */
-	mt_dfs_mmpll(0xC0000);	/* 312MHz, 0x820C0000 */
-#endif
-
 #ifdef MT_GPUFREQ_AEE_RR_REC
 	aee_rr_rec_gpu_dvfs_status(aee_rr_curr_gpu_dvfs_status() | (1 << GPU_DVFS_IS_VGPU_ENABLED));
 #endif
@@ -2287,7 +2246,7 @@ static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 	rc = input_register_handler(&mt_gpufreq_input_handler);
 #endif
 
-#ifdef MT_GPUFREQ_LOW_BATT_VOLT_PROTECT /* CJ Fix Me, Need Thermal Help*/
+#ifdef MT_GPUFREQ_LOW_BATT_VOLT_PROTECT
 	for (i = 0; i < mt_gpufreqs_num; i++) {
 		if (mt_gpufreqs[i].gpufreq_khz == MT_GPUFREQ_LOW_BATT_VOLT_LIMIT_FREQ_1) {
 			mt_gpufreq_low_bat_volt_limited_index_1 = i;
@@ -2305,7 +2264,7 @@ static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 	/* register_low_battery_notify(&mt_gpufreq_low_batt_volt_callback, LOW_BATTERY_PRIO_GPU); */
 #endif
 
-#ifdef MT_GPUFREQ_LOW_BATT_VOLUME_PROTECT /* CJ Fix Me, Need Thermal Help*/
+#ifdef MT_GPUFREQ_LOW_BATT_VOLUME_PROTECT
 	pr_err("[ERROR] mt_gpufreq_pdrv_probe 17");
 	for (i = 0; i < mt_gpufreqs_num; i++) {
 		if (mt_gpufreqs[i].gpufreq_khz == MT_GPUFREQ_LOW_BATT_VOLUME_LIMIT_FREQ_1) {
@@ -2318,7 +2277,7 @@ static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 	/*				BATTERY_PERCENT_PRIO_GPU);		*/
 #endif
 
-#ifdef MT_GPUFREQ_OC_PROTECT /* CJ Fix Me, Need Thermal Help*/
+#ifdef MT_GPUFREQ_OC_PROTECT
 	pr_err("[ERROR] mt_gpufreq_pdrv_probe 18");
 	for (i = 0; i < mt_gpufreqs_num; i++) {
 		if (mt_gpufreqs[i].gpufreq_khz == MT_GPUFREQ_OC_LIMIT_FREQ_1) {
@@ -2330,7 +2289,6 @@ static int mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 	/* register_battery_oc_notify(&mt_gpufreq_oc_callback, BATTERY_OC_PRIO_GPU); */
 #endif
 
-/* CJ, What is PBM? */
 #ifndef DISABLE_PBM_FEATURE
 	INIT_DEFERRABLE_WORK(&notify_pbm_gpuoff_work, mt_gpufreq_notify_pbm_gpuoff);
 #endif
