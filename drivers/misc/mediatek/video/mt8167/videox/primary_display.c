@@ -5565,6 +5565,7 @@ int primary_display_wait_for_vsync(void *config)
 {
 	struct disp_session_vsync_config *c = (struct disp_session_vsync_config *) config;
 	int ret = 0;
+	unsigned long long ts = 0ULL;
 	/* kick idle manager here to ensure sodi is disabled when screen update begin(not 100% ensure) */
 	primary_display_idlemgr_kick((char *)__func__);
 
@@ -5583,9 +5584,9 @@ int primary_display_wait_for_vsync(void *config)
 		usleep_range(16000, 17000);
 		goto done;
 	}
-	ret = dpmgr_wait_event(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC);
+	ret = dpmgr_wait_event_ts(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC, &ts);
 	if (pgc->vsync_drop)
-		ret = dpmgr_wait_event(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC);
+		ret = dpmgr_wait_event_ts(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC, &ts);
 
 	if (ret != 0)
 		DISPCHECK("vsync signaled by unknown signal ret=%d\n", ret);
