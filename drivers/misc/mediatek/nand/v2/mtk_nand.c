@@ -888,7 +888,6 @@ void nand_prepare_clock(void)
 		clk_prepare(nfi_ecc_pclk);
 	}
 	if (mtk_nfi_dev_comp->chip_ver == 3) {
-		pr_debug("%s %d\n", __func__, __LINE__);
 		clk_prepare(nfi_rgecc);
 
 		if (g_bSyncOrToggle == true)
@@ -913,7 +912,6 @@ void nand_unprepare_clock(void)
 		clk_unprepare(nfi_ecc_pclk);
 	}
 	if (mtk_nfi_dev_comp->chip_ver == 3) {
-		pr_debug("%s %d\n", __func__, __LINE__);
 		clk_unprepare(nfi_rgecc);
 
 		if (g_bSyncOrToggle == true)
@@ -1555,8 +1553,6 @@ int mtk_nand_interface_async(void)
 	u32 val = 0;
 	struct gFeatureSet *feature_set = &(devinfo.feature_set.FeatureSet);
 
-	pr_debug("[%s] Start to change ASYNC interface\n", __func__);
-
 	if (g_bSyncOrToggle == TRUE) {
 
 		mtk_nand_GetFeature(NULL, feature_set->gfeatureCmd,
@@ -1592,9 +1588,7 @@ int mtk_nand_interface_async(void)
 		DRV_WriteReg32(NFI_ACCCON_REG32, devinfo.timmingsetting);
 
 		g_bSyncOrToggle = FALSE;
-		pr_debug("Disable DDR mode\n");
-	} else
-		pr_debug("Already legacy mode\n");
+	}
 
 	return 0;
 }
@@ -10202,7 +10196,6 @@ static int mtk_nand_resume(struct platform_device *pdev)
 #endif
 #endif
 		udelay(200);
-		pr_debug("[NFI] delay 200us for power on reset flow!\n");
 		nand_prepare_clock();
 		nand_enable_clock();
 		DRV_WriteReg16(NFI_CNFG_REG16, host->saved_para.sNFI_CNFG_REG16);
