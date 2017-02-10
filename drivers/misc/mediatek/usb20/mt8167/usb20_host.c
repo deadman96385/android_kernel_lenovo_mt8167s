@@ -415,6 +415,9 @@ static void musb_id_pin_work(struct work_struct *data)
 #endif
 
 #if !defined(MTK_HDMI_SUPPORT)
+		#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+		spin_lock(&mtk_musb->lock);
+		#endif
 		musb_stop(mtk_musb);
 #else
 		mt_usb_check_reconnect();/*ALPS01688604, IDDIG noise caused by MHL init*/
