@@ -49,6 +49,7 @@
 #include <mt-plat/upmu_common.h>
 #include "mt-plat/sync_write.h"
 #include "mt-plat/mtk_pmic_wrap.h"
+#include "mt-plat/mtk_chip.h"
 
 #include "mach/mtk_fhreg.h"
 #include "mach/mtk_freqhopping.h"
@@ -150,12 +151,15 @@
 #define GPU_DVFS_FREQ4	(299000) /* KHz */
 #define GPU_DVFS_FREQ5	(253500) /* KHz */
 #else /* for E1 */
-#define GPU_DVFS_FREQ0  (574000) /* KHz */
-#define GPU_DVFS_FREQ1  (468000) /* KHz */
-#define GPU_DVFS_FREQ2  (430000) /* KHz */
-#define GPU_DVFS_FREQ3  (390000) /* KHz */
-#define GPU_DVFS_FREQ4  (299000) /* KHz */
-#define GPU_DVFS_FREQ5  (253500) /* KHz */
+#define GPU_DVFS_FREQ0_e1	(574000) /* KHz */
+#define GPU_DVFS_FREQ0		(598000) /* KHz */
+#define GPU_DVFS_FREQ1_e1	(468000) /* KHz */
+#define GPU_DVFS_FREQ1		(494000) /* KHz */
+#define GPU_DVFS_FREQ2		(430000) /* KHz */
+#define GPU_DVFS_FREQ3_e1	(390000) /* KHz */
+#define GPU_DVFS_FREQ3		(403000) /* KHz */
+#define GPU_DVFS_FREQ4		(299000) /* KHz */
+#define GPU_DVFS_FREQ5		(253500) /* KHz */
 #endif
 
 #define GPUFREQ_LAST_FREQ_LEVEL	(GPU_DVFS_FREQ5)
@@ -439,6 +443,17 @@ static unsigned int mt_gpufreq_get_dvfs_table_type(void)
 {
 	unsigned int gpu_speed_bounding = 0;
 	unsigned int type = 0;
+
+	if (mt_get_chip_sw_ver() == 0) { /* E1 */
+		mt_gpufreq_opp_tbl_e1_0[0].gpufreq_khz = GPU_DVFS_FREQ3_e1;
+
+		mt_gpufreq_opp_tbl_e1_1[0].gpufreq_khz = GPU_DVFS_FREQ1_e1;
+		mt_gpufreq_opp_tbl_e1_1[1].gpufreq_khz = GPU_DVFS_FREQ3_e1;
+
+		mt_gpufreq_opp_tbl_e1_2[0].gpufreq_khz = GPU_DVFS_FREQ0_e1;
+		mt_gpufreq_opp_tbl_e1_2[1].gpufreq_khz = GPU_DVFS_FREQ1_e1;
+		mt_gpufreq_opp_tbl_e1_2[2].gpufreq_khz = GPU_DVFS_FREQ3_e1;
+	}
 
 	/* Read the gpu efuse data*/
 	gpu_speed_bounding = get_devinfo_with_index(4);
