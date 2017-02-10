@@ -146,7 +146,7 @@
 			<&mmsys CLK_MM_DISP_AAL>,
 			<&mmsys CLK_MM_DISP_GAMMA>,
 			<&mmsys CLK_MM_DISP_DITHER>,
-			<&mmsys CLK_MM_DISP_UFOE_>,
+			<&mmsys CLK_MM_DISP_UFOE>,
 			<&mmsys CLK_MM_DISP_PWM_MM>,
 			<&mmsys CLK_MM_DISP_PWM_26M>,
 			<&mmsys CLK_MM_DSI_ENGINE>,

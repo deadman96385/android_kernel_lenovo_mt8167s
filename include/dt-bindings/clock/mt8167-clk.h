@@ -303,7 +303,7 @@
 #define CLK_MM_DISP_AAL			16
 #define CLK_MM_DISP_GAMMA		17
 #define CLK_MM_DISP_DITHER		18
-#define CLK_MM_DISP_UFOE_		19
+#define CLK_MM_DISP_UFOE		19
 #define CLK_MM_DISP_PWM_MM		20
 #define CLK_MM_DISP_PWM_26M		21
 #define CLK_MM_DSI_ENGINE		22
