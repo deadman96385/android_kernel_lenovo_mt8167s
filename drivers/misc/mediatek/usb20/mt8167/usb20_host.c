@@ -391,7 +391,7 @@ static void musb_id_pin_work(struct work_struct *data)
 		MUSB_HST_MODE(mtk_musb);
 		switch_int_to_device(mtk_musb);
 
-#ifdef CONFIG_PM_RUNTIME
+#ifdef CONFIG_PM
 		mtk_musb->is_active = 0;
 		DBG(0, "set active to 0 in Pm runtime issue\n");
 #endif
@@ -492,7 +492,7 @@ void musb_id_pin_sw_work(bool host_mode)
 		MUSB_HST_MODE(mtk_musb);
 		switch_int_to_device(mtk_musb);
 
-#ifdef CONFIG_PM_RUNTIME
+#ifdef CONFIG_PM
 		mtk_musb->is_active = 0;
 		DBG(0, "set active to 0 in Pm runtime issue\n");
 #endif
