@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/thermal.h>
 #include "mtk_power_throttle.h"
+#include "mtk_static_power.h"
 
 
 #define MIN_VOLT_SHIFT		(100000)
@@ -498,6 +499,7 @@ static int mtk_cpufreq_init(struct cpufreq_policy *policy)
 	unsigned long freq_long;
 	struct dev_pm_opp *opp;
 	int opp_idx = 0;
+	int	lv;
 
 	info = mtk_cpu_dvfs_info_lookup(policy->cpu);
 	if (!info) {
@@ -511,6 +513,47 @@ static int mtk_cpufreq_init(struct cpufreq_policy *policy)
 		pr_err("failed to init cpufreq table for cpu%d: %d\n",
 		       policy->cpu, ret);
 		return ret;
+	}
+
+	lv = get_devinfo_with_index(3) & 0x7;
+	/*
+	 * 1.5G: [1481, 1300, 1040, 747.5, 598]MHz
+	 * 1.4G: [1404, 1175, 1040, 747.5, 598]MHz
+	 * 1.3G: [1300, 1196, 1040, 747.5, 598]MHz
+	 * 1.1G: [      1105, 1040, 747.5, 598]MHz
+	 * 1.3G is default opp table in dts,
+	 * there are variant opp tables need to be updated
+	 */
+	if (lv == 1) {
+		/* efuse = 1, 1.5G */
+		cpufreq_for_each_valid_entry(pos, freq_table) {
+			freq_long = pos->frequency * 1000;
+			dev_pm_opp_remove(info->cpu_dev, freq_long);
+		}
+		/* now dev_pm_opp_get_opp_count(info->cpu_dev) is 0 */
+
+		/* add opp table by efuse */
+		dev_pm_opp_add(info->cpu_dev, 598000000, 1150000);
+		dev_pm_opp_add(info->cpu_dev, 747500000, 1150000);
+		dev_pm_opp_add(info->cpu_dev, 1040000000, 1200000);
+		dev_pm_opp_add(info->cpu_dev, 1300000000, 1300000);
+		dev_pm_opp_add(info->cpu_dev, 1481000000, 1300000);
+
+		dev_pm_opp_free_cpufreq_table(info->cpu_dev, &freq_table);
+		dev_pm_opp_init_cpufreq_table(info->cpu_dev, &freq_table);
+	} else if (lv == 0 || lv == 2) {
+		/* efuse = 0, default 1.3G */
+		/* efuse = 2, 1.3G */
+	} else {
+		/* will not appear in mt8167 now */
+		/* efuse = 3, 1.2G */
+		/* efuse = 4, 1.1G */
+		/* efuse = 5, 1.0G */
+		/* efuse = 6, Not Define */
+		/* efuse = 7, 1.4G */
+		pr_err("%s: invalid efuse value: %d\n", __func__, lv);
+		ret = -EINVAL;
+		goto out_free_cpufreq_table;
 	}
 
 	ret = cpufreq_table_validate_and_show(policy, freq_table);
