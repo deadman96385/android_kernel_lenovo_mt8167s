@@ -1707,7 +1707,6 @@ static void _cmdq_build_trigger_loop(void)
 		/* wait and clear stream_done, HW will assert mutex enable automatically in frame done reset. */
 		/* todo: should let dpmanager to decide wait which mutex's eof. */
 
-		/* ret = cmdqRecWait(pgc->cmdq_handle_trigger, CMDQ_EVENT_DISP_RDMA0_EOF); */
 		ret = cmdqRecWait(pgc->cmdq_handle_trigger,
 				  dpmgr_path_get_mutex(pgc->dpmgr_handle) +
 				  CMDQ_EVENT_MUTEX0_STREAM_EOF);
@@ -3301,10 +3300,7 @@ int _trigger_display_interface(int blocking, void *callback, unsigned int userda
 		if (primary_display_is_video_mode() == 1)
 			disp_set_sodi(1, pgc->cmdq_handle_config);
 
-		if (primary_display_is_video_mode() == 1)
-			cmdqRecWaitNoClear(pgc->cmdq_handle_config, CMDQ_EVENT_DISP_RDMA0_EOF);
-		else
-			_cmdq_insert_wait_frame_done_token();
+		_cmdq_insert_wait_frame_done_token_mira(pgc->cmdq_handle_config);
 
 		/* 3. disable AODI by CMDQ before config */
 		if (primary_display_is_video_mode() == 1)
@@ -3532,7 +3528,6 @@ int _esd_check_config_handle_vdo(void)
 	cmdqRecReset(pgc->cmdq_handle_config_esd);
 
 	/* wait stream eof first */
-	cmdqRecWait(pgc->cmdq_handle_config_esd, CMDQ_EVENT_DISP_RDMA0_EOF);
 	cmdqRecWait(pgc->cmdq_handle_config_esd, CMDQ_EVENT_MUTEX0_STREAM_EOF);
 
 #ifdef DISP_DUMP_EVENT_STATUS
@@ -3748,8 +3743,6 @@ int primary_display_esd_check(void)
 				cmdqRecReset(pgc->cmdq_handle_config_esd);
 
 				/* wait stream eof first */
-				ret = cmdqRecWait(pgc->cmdq_handle_config_esd, CMDQ_EVENT_DISP_RDMA0_EOF);
-
 				cmdqRecWait(pgc->cmdq_handle_config_esd, CMDQ_EVENT_MUTEX0_STREAM_EOF);
 
 				_primary_path_lock(__func__);
@@ -4191,7 +4184,6 @@ static int primary_display_vdo_pullclk_worker_kthread(void *data)
 		cmdqRecReset(pgc->cmdq_handle_config_esd);
 
 		/* wait stream eof first*/
-		cmdqRecWait(pgc->cmdq_handle_config_esd, CMDQ_EVENT_DISP_RDMA0_EOF);
 		cmdqRecWait(pgc->cmdq_handle_config_esd, CMDQ_EVENT_MUTEX0_STREAM_EOF);
 
 
@@ -4285,12 +4277,6 @@ static int _disp_primary_path_check_trigger(void *data)
 #endif
 			cmdqRecReset(handle);
 
-#ifndef MTK_FB_CMDQ_DISABLE
-			if (primary_display_is_video_mode())
-				cmdqRecWaitNoClear(handle, CMDQ_EVENT_DISP_RDMA0_EOF);
-			else
-				cmdqRecWaitNoClear(handle, CMDQ_SYNC_TOKEN_STREAM_EOF);
-#endif
 			if (gResetOVLInAALTrigger == 1) {
 				ovl_reset_by_cmdq(handle, DISP_MODULE_OVL0);
 				if (ovl_get_status() != DDP_OVL1_STATUS_SUB)
@@ -4346,7 +4332,8 @@ unsigned int cmdqDdpDumpInfo(uint64_t engineFlag, char *pOutBuf, unsigned int bu
 
 	/* try to set event by CPU to avoid blocking auto test such as Monkey/MTBF */
 	cmdqCoreSetEvent(CMDQ_SYNC_TOKEN_STREAM_EOF);
-	cmdqCoreSetEvent(CMDQ_EVENT_DISP_RDMA0_EOF);
+	cmdqCoreSetEvent(dpmgr_path_get_mutex(pgc->dpmgr_handle) +
+				  CMDQ_EVENT_MUTEX0_STREAM_EOF);
 
 	return 0;
 }
@@ -5446,6 +5433,8 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 	rdma_set_target_line(DISP_MODULE_RDMA0, primary_display_get_height() * 1 / 2,
 			     pgc->cmdq_handle_config);
 	rdma_set_target_line(DISP_MODULE_RDMA0, primary_display_get_height() * 1 / 2, NULL);
+
+	dpmgr_path_enable_irq(pgc->dpmgr_handle, NULL, DDP_IRQ_LEVEL_ALL);
 
 	if (primary_display_use_cmdq == CMDQ_ENABLE) {
 		ret = dpmgr_path_config(pgc->dpmgr_handle, data_config, pgc->cmdq_handle_config);
@@ -7231,11 +7220,7 @@ int primary_display_user_cmd(unsigned int cmd, unsigned long arg)
 #else
 	ret = cmdqRecCreate(CMDQ_SCENARIO_PRIMARY_DISP, &handle);
 	cmdqRecReset(handle);
-
-	if (primary_display_is_video_mode())
-		cmdqRecWaitNoClear(handle, CMDQ_EVENT_DISP_RDMA0_EOF);
-	else
-		cmdqRecWaitNoClear(handle, CMDQ_SYNC_TOKEN_STREAM_EOF);
+	_cmdq_insert_wait_frame_done_token_mira(handle);
 #endif
 	cmdqsize = cmdqRecGetInstructionCount(handle);
 
