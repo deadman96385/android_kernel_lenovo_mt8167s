@@ -508,30 +508,19 @@ int tscpu_thermal_clock_off(void)
 #else
 void tscpu_thermal_clock_on(void)
 {
-	int ret = 0;
-	pr_debug("tscpu_thermal_clock_on\n");
-	ret = clk_prepare(clk_auxadc);
-	if (!ret) {
-		dump_stack();
-		pr_err("Prepare auxadc clock fail!!!");
-	}
-	clk_enable(clk_auxadc);
+	tscpu_printk("tscpu_thermal_clock_on\n");
 
-	ret = clk_prepare(clk_peri_therm);
-	if (!ret) {
-		dump_stack();
-		pr_err("Prepare thermal clock fail!!!");
-	}
-	clk_enable(clk_peri_therm);
+	if (clk_prepare_enable(clk_auxadc))
+		pr_err("%s enable auxadc clk fail.", __func__);
+	if (clk_prepare_enable(clk_peri_therm))
+		pr_err("%s enable thermal clk fail.", __func__);
 }
 
 void tscpu_thermal_clock_off(void)
 {
-	pr_debug("tscpu_thermal_clock_off\n");
-	clk_disable(clk_peri_therm);
-	clk_unprepare(clk_peri_therm);
-	clk_disable(clk_auxadc);
-	clk_unprepare(clk_auxadc);
+	tscpu_printk("tscpu_thermal_clock_off\n");
+	clk_disable_unprepare(clk_peri_therm);
+	clk_disable_unprepare(clk_auxadc);
 }
 
 #endif
