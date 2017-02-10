@@ -1580,7 +1580,7 @@
 		ice: ice_debug {
 			compatible = "mediatek,mt8167-ice_debug",
 				     "mediatek,mt8173-ice_debug";
-			clocks = <&infracfg CLK_INFRA_DEBUGSYS>;
+			clocks = <&topckgen CLK_TOP_DEBUGSYS>;
 			clock-names = "ice_dbg";
 		};
 
