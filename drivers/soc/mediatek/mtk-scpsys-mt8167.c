@@ -70,6 +70,8 @@ enum clk_id {
 	CLK_NONE,
 	CLK_MM,
 	CLK_MFG,
+	CLK_AXI_MFG,
+	CLK_VDEC,
 	CLK_VENC,
 	CLK_VENC_LT,
 	CLK_ETHIF,
@@ -334,6 +336,8 @@ static void init_clks(struct platform_device *pdev, struct clk *clk[CLK_MAX])
 	enum clk_id clk_ids[] = {
 		CLK_MM,
 		CLK_MFG,
+		CLK_AXI_MFG,
+		CLK_VDEC,
 		CLK_VENC,
 		CLK_VENC_LT,
 		CLK_ETHIF
@@ -342,6 +346,8 @@ static void init_clks(struct platform_device *pdev, struct clk *clk[CLK_MAX])
 	static const char * const clk_names[] = {
 		"mm",
 		"mfg",
+		"axi_mfg",
+		"vdec",
 		"venc",
 		"venc_lt",
 		"ethif",
@@ -496,7 +502,7 @@ static const struct scp_domain_data scp_domain_data_mt8167[] = {
 		.ctl_offs = SPM_VDE_PWR_CON,
 		.sram_pdn_bits = GENMASK(8, 8),
 		.sram_pdn_ack_bits = GENMASK(12, 12),
-		.clk_id = {CLK_MM},
+		.clk_id = {CLK_MM, CLK_VDEC},
 		.active_wakeup = true,
 	},
 	[MT8167_POWER_DOMAIN_ISP] = {
@@ -515,7 +521,7 @@ static const struct scp_domain_data scp_domain_data_mt8167[] = {
 		.sram_pdn_bits = 0,
 		.sram_pdn_ack_bits = 0,
 		.bus_prot_mask = BIT(2) | BIT(5),
-		.clk_id = {CLK_MFG},
+		.clk_id = {CLK_MFG, CLK_AXI_MFG},
 		.active_wakeup = true,
 	},
 	[MT8167_POWER_DOMAIN_MFG_2D] = {
