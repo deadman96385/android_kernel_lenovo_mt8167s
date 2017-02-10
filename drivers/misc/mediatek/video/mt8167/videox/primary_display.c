@@ -1925,9 +1925,6 @@ static void _cmdq_stop_trigger_loop(void)
 	ret = cmdqRecStopLoop(pgc->cmdq_handle_trigger);
 
 	DISPCHECK("primary display STOP cmdq trigger loop finished\n");
-
-	cmdqCoreSetEvent(CMDQ_EVENT_DISP_RDMA0_EOF);
-	cmdqCoreSetEvent(CMDQ_EVENT_MUTEX0_STREAM_EOF);
 #endif
 }
 
@@ -4793,8 +4790,13 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 		if (ret == 0) {
 			cmdqBackupReadSlot(pgc->rdma_buff_info, 1, &(rdma_pitch_sec));
 			rdma_pitch_sec = rdma_pitch_sec >> 30;
-			if (rdma_pitch_sec == DISP_NORMAL_BUFFER)
+			if (rdma_pitch_sec == DISP_NORMAL_BUFFER) {
 				_primary_path_lock(__func__);
+				if (pgc->state == DISP_SLEPT) {
+					_primary_path_unlock(__func__);
+					return ret;
+				}
+			}
 			cmdqRecReset(cmdq_handle);
 			_cmdq_insert_wait_frame_done_token_mira(cmdq_handle);
 			cmdqBackupReadSlot(pgc->rdma_buff_info, 0, &addr);
@@ -5225,7 +5227,7 @@ unsigned long get_dim_layer_mva_addr(void)
 		int frame_buffer_size = ALIGN_TO(DISP_GetScreenWidth(),
 						 MTK_FB_ALIGNMENT) * DISP_GetScreenHeight() * 4;
 
-		dim_layer_mva = pgc->framebuffer_mva + 2 * frame_buffer_size;
+		dim_layer_mva = pgc->framebuffer_mva;
 		DISPMSG("init dim layer mva %lu, size %d", dim_layer_mva, frame_buffer_size);
 	}
 	return dim_layer_mva;
@@ -5991,6 +5993,20 @@ int primary_display_get_lcm_index(void)
 	return index;
 }
 
+static void primary_display_check_clock(void)
+{
+	unsigned int cg0, cg1;
+
+	cg0 = DISP_REG_GET(DISP_REG_CONFIG_MMSYS_CG_CON0);
+	cg1 = DISP_REG_GET(DISP_REG_CONFIG_MMSYS_CG_CON1);
+
+	if ((cg0 & 0x3) != 0x0)
+		DISPERR("smi clock is not enable, display will be abnormal\n");
+
+	if ((cg1 & 0xc) != 0x0 && (cg1 & 0x30) != 0x0)
+		DISPERR("dpi/dsi clock is not enable, display will be abnormal\n");
+}
+
 int primary_display_resume(void)
 {
 	enum DISP_STATUS ret = DISP_STATUS_OK;
@@ -6041,6 +6057,7 @@ int primary_display_resume(void)
 	DISPCHECK("dpmanager path power on[begin]\n");
 	dpmgr_path_power_on(pgc->dpmgr_handle, CMDQ_DISABLE);
 	DISPCHECK("dpmanager path power on[end]\n");
+	primary_display_check_clock();
 
 	if (_is_decouple_mode(pgc->session_mode) && !pgc->force_on_wdma_path)
 		dpmgr_path_power_on(pgc->ovl2mem_path_handle, CMDQ_DISABLE);

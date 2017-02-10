@@ -184,6 +184,12 @@ int disp_get_session_number(void)
 	return session_cnt;
 }
 
+int disp_mgr_get_session_info(struct disp_session_info *info)
+{
+	return primary_display_get_info(info);
+}
+
+
 #ifdef OVL_CASCADE_SUPPORT
 struct OVL_CONFIG_STRUCT ovl2mem_in_cached_config[2*DDP_OVL_LAYER_MUN] = {
 	{.layer = 0, .isDirty = 1}
@@ -1248,7 +1254,7 @@ static int set_external_buffer(struct disp_session_input_config *input)
 				input->config[i].sur_aen = 0;
 				input->config[i].src_fmt = DISP_FORMAT_RGB888;
 				input->config[i].src_pitch = input->config[i].src_width;
-				input->config[i].src_phy_addr = 0;
+				input->config[i].src_phy_addr = (void *)get_dim_layer_mva_addr();
 				input->config[i].next_buff_idx = 0;
 				/* force dim layer as non-sec */
 				input->config[i].security = DISP_NORMAL_BUFFER;
