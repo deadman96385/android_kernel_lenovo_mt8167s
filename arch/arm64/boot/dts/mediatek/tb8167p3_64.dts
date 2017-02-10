@@ -615,8 +615,8 @@
 
 		pins_clk {
 			pinmux = <MT8167_PIN_116_MSDC0_CLK__FUNC_MSDC0_CLK>;
-			drive-strength = <MTK_DRIVE_6mA>;
-			bias-pull-down = <MTK_PUPD_SET_R1R0_01>;
+			drive-strength = <MTK_DRIVE_8mA>;
+			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
 		};
 
 		pins_rst {
@@ -633,13 +633,13 @@
 				<MT8167_PIN_109_MSDC1_DAT3__FUNC_MSDC1_DAT3>,
 				<MT8167_PIN_104_MSDC1_CMD__FUNC_MSDC1_CMD>;
 			input-enable;
-			drive-strength = <MTK_DRIVE_8mA>;
-			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+			drive-strength = <MTK_DRIVE_6mA>;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
 		};
 
 		pins_clk {
 			pinmux = <MT8167_PIN_105_MSDC1_CLK__FUNC_MSDC1_CLK>;
-			drive-strength = <MTK_DRIVE_8mA>;
+			drive-strength = <MTK_DRIVE_6mA>;
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
 		};
 
@@ -657,13 +657,13 @@
 				<MT8167_PIN_109_MSDC1_DAT3__FUNC_MSDC1_DAT3>,
 				<MT8167_PIN_104_MSDC1_CMD__FUNC_MSDC1_CMD>;
 			input-enable;
-			drive-strength = <MTK_DRIVE_4mA>;
-			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+			drive-strength = <MTK_DRIVE_6mA>;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
 		};
 
 		pins_clk {
 			pinmux = <MT8167_PIN_105_MSDC1_CLK__FUNC_MSDC1_CLK>;
-			drive-strength = <MTK_DRIVE_4mA>;
+			drive-strength = <MTK_DRIVE_8mA>;
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
 		};
 	};
