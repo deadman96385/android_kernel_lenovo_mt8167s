@@ -39,7 +39,7 @@
 			<&clk26m>,
 			<&topckgen CLK_TOP_SEJ>,
 			<&topckgen CLK_TOP_MEMSLP_DLYER>,
-			<&topckgen CLK_TOP_SPI>,
+			<&clk26m>,
 			<&topckgen CLK_TOP_APXGPT>,
 			<&clk26m>,
 			<&clk26m>,
