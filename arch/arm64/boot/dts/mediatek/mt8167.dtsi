@@ -476,6 +476,25 @@
 			interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_LOW>;
 		};
 
+		nfi: nfi@11001000 {
+			compatible = "mediatek,mt8167-nfi";
+			reg = <0 0x11001000 0 0x1000>;
+			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_LOW>;
+			clocks = <&infracfg CLK_INFRA_NFI>, <&infracfg CLK_INFRA_NFI_ECC>,
+				 <&infracfg CLK_INFRA_NFI_BCLK>, <&infracfg CLK_INFRA_NFI_ECC_66M>,
+				 <&infracfg CLK_INFRA_NFI_66M>;
+			clock-names = "nfi_hclk", "nfiecc_bclk", "nfi_bclk",
+				      "nfiecc_pclk", "nfi_pclk";
+			status = "disabled";
+		};
+
+		nfiecc: nfiecc@11002000 {
+			compatible = "mediatek,mt8167-nfiecc";
+			reg = <0 0x11002000 0 0x1000>;
+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_LOW>;
+			status = "disabled";
+		};
+
 		auxadc: auxadc@11003000 {
 			compatible = "mediatek,mt8167-auxadc";
 			reg = <0 0x11003000 0 0x1000>;
@@ -651,30 +670,6 @@
 			clocks = <&infracfg CLK_INFRA_BTIF>, <&infracfg CLK_INFRA_AP_DMA>;
 			clock-names = "btifc", "apdmac";
 		};/* End of btif */
-
-		nfi: nfi@11001000 {
-			compatible = "mediatek,mt8167-nfi";
-			reg = <0 0x11001000 0 0x1000>;
-			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&infracfg CLK_INFRA_NFI>, <&infracfg CLK_INFRA_NFI_ECC>,
-				 <&infracfg CLK_INFRA_NFI_BCLK>, <&topckgen CLK_TOP_ONFI_SEL>,
-				 <&clk26m>, <&topckgen CLK_TOP_SYSPLL2_D2>,
-				 <&topckgen CLK_TOP_SYSPLL_D7>, <&infracfg CLK_INFRA_NFI_SEL>,
-				 <&topckgen CLK_TOP_AXI_SEL>, <&infracfg CLK_INFRA_ONFI_D2>,
-				 <&infracfg CLK_INFRA_NFI_ECC_66M>, <&infracfg CLK_INFRA_NFI_66M>,
-				 <&infracfg CLK_INFRA_ONFI>;
-			clock-names = "nfi_hclk", "nfiecc_bclk", "nfi_bclk",
-				      "onfi_sel", "onfi_clk26m", "onfi_mode5",
-				      "onfi_mode4", "nfi_bclk_sel", "nfi_ahb_clk",
-				      "nfi_1xpad_clk", "nfiecc_pclk", "nfi_pclk",
-				      "onfi_pad_clk";
-		};
-
-		nfiecc: nfiecc@11002000 {
-			compatible = "mediatek,mt8167-nfiecc";
-			reg = <0 0x11002000 0 0x1000>;
-			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_LOW>;
-		};
 
 		disp_pwm0: disp_pwm0@1100f000 {
 			compatible = "mediatek,mt8167-disp_pwm";
