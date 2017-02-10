@@ -1235,16 +1235,18 @@
 				<0 0x11011000 0 0x10>, /* HDMI DDC  */
 				<0 0x1001a000 0 0xbc>; /* HDMI CEC  */
 			interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&infracfg CLK_INFRA_CEC>,
-				 <&infracfg CLK_INFRA_CEC_26M>,
-				 <&mmsys CLK_MM_HDMI_PIXEL>,
-				 <&mmsys CLK_MM_HDMI_PLLCK>,
+			clocks = <&topckgen CLK_TOP_26M_HDMI_SIFM>,
+				 <&topckgen CLK_TOP_26M_CEC>,
+				 <&topckgen CLK_TOP_32K_CEC>,
+				 <&mmsys CLK_MM_HDMI_PXL>,
+				 <&mmsys CLK_MM_HDMI_PLL>,
 				 <&mmsys CLK_MM_HDMI_ADSP_BCK>,
 				 <&mmsys CLK_MM_HDMI_SPDIF>;
-			clock-names = "cec_pdn",
+			clock-names = "clk_ddc",
 				      "clk_cec_26m",
-				      "mmsys_hdmi_pll",
+				      "clk_cec_32k",
 				      "mmsys_hdmi_pixel",
+				      "mmsys_hdmi_pll",
 				      "mmsys_hdmi_audio",
 				      "mmsys_hdmi_spidif";
 			status = "disabled";
