@@ -431,6 +431,8 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
 		return ret;
 	}
 
+	clk_prepare_enable(cpu_clk);
+
 	inter_clk = clk_get(cpu_dev, "intermediate");
 	if (IS_ERR(inter_clk)) {
 		if (PTR_ERR(inter_clk) == -EPROBE_DEFER)
@@ -524,8 +526,10 @@ out_free_resources:
 		regulator_put(proc_reg);
 	if (!IS_ERR(sram_reg))
 		regulator_put(sram_reg);
-	if (!IS_ERR(cpu_clk))
+	if (!IS_ERR(cpu_clk)) {
+		clk_disable_unprepare(cpu_clk);
 		clk_put(cpu_clk);
+	}
 	if (!IS_ERR(inter_clk))
 		clk_put(inter_clk);
 
@@ -538,8 +542,10 @@ static void mtk_cpu_dvfs_info_release(struct mtk_cpu_dvfs_info *info)
 		regulator_put(info->proc_reg);
 	if (!IS_ERR(info->sram_reg))
 		regulator_put(info->sram_reg);
-	if (!IS_ERR(info->cpu_clk))
+	if (!IS_ERR(info->cpu_clk)) {
+		clk_disable_unprepare(info->cpu_clk);
 		clk_put(info->cpu_clk);
+	}
 	if (!IS_ERR(info->inter_clk))
 		clk_put(info->inter_clk);
 
