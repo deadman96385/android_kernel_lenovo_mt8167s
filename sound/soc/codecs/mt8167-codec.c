@@ -38,6 +38,15 @@ enum dmic_wire_mode {
 	DMIC_TWO_WIRE,
 };
 
+enum codec_pga_gain_enum_id {
+	HP_L_PGA_GAIN = 0,
+	HP_R_PGA_GAIN,
+	LOUT_PGA_GAIN,
+	UL_L_PGA_GAIN,
+	UL_R_PGA_GAIN,
+	PGA_GAIN_MAX,
+};
+
 struct mt8167_codec_priv {
 #ifdef CONFIG_MTK_SPEAKER
 	struct mt6392_codec_priv mt6392_data;
@@ -50,9 +59,7 @@ struct mt8167_codec_priv {
 	uint32_t rch_dccomp_val; /* R-ch DC compensation value */
 	bool is_lch_dc_calibrated;
 	bool is_rch_dc_calibrated;
-	uint32_t left_audio_amp_gain;
-	uint32_t right_audio_amp_gain;
-	uint32_t voice_amp_gain;
+	uint32_t pga_gain[PGA_GAIN_MAX];
 	uint32_t dmic_wire_mode;
 	uint32_t loopback_type;
 #ifdef CONFIG_DEBUG_FS
@@ -405,7 +412,7 @@ static int mt8167_codec_left_audio_amp_event(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		/* store gain */
-		codec_data->left_audio_amp_gain =
+		codec_data->pga_gain[HP_L_PGA_GAIN] =
 			snd_soc_read(codec, AUDIO_CODEC_CON01) &
 				GENMASK(2, 0);
 		/* set to small gain for depop sequence */
@@ -422,7 +429,8 @@ static int mt8167_codec_left_audio_amp_event(struct snd_soc_dapm_widget *w,
 			AUDIO_CODEC_CON02_ABUF_INSHORT);
 		/* restore gain */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON01,
-				GENMASK(2, 0), codec_data->left_audio_amp_gain);
+				GENMASK(2, 0),
+				codec_data->pga_gain[HP_L_PGA_GAIN]);
 		break;
 	default:
 		break;
@@ -442,7 +450,7 @@ static int mt8167_codec_right_audio_amp_event(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		/* store gain */
-		codec_data->right_audio_amp_gain =
+		codec_data->pga_gain[HP_R_PGA_GAIN] =
 			snd_soc_read(codec, AUDIO_CODEC_CON01) &
 				GENMASK(5, 3);
 		/* set to small gain for depop sequence */
@@ -453,7 +461,7 @@ static int mt8167_codec_right_audio_amp_event(struct snd_soc_dapm_widget *w,
 		/* restore gain */
 		snd_soc_update_bits(codec,
 			AUDIO_CODEC_CON01, GENMASK(5, 3),
-			codec_data->right_audio_amp_gain);
+			codec_data->pga_gain[HP_R_PGA_GAIN]);
 		break;
 	default:
 		break;
@@ -473,7 +481,7 @@ static int mt8167_codec_voice_amp_event(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		/* store gain */
-		codec_data->voice_amp_gain =
+		codec_data->pga_gain[LOUT_PGA_GAIN] =
 			snd_soc_read(codec, AUDIO_CODEC_CON02) &
 				GENMASK(12, 9);
 		/* set to small gain for depop sequence */
@@ -483,11 +491,11 @@ static int mt8167_codec_voice_amp_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMU:
 		/* restore gain (fade in ?) */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON02,
-			GENMASK(12, 9), codec_data->voice_amp_gain);
+			GENMASK(12, 9), codec_data->pga_gain[LOUT_PGA_GAIN]);
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		/* store gain */
-		codec_data->voice_amp_gain =
+		codec_data->pga_gain[LOUT_PGA_GAIN] =
 			snd_soc_read(codec, AUDIO_CODEC_CON02) &
 				GENMASK(12, 9);
 		/* set to small gain for depop sequence (fade out ?) */
@@ -497,7 +505,7 @@ static int mt8167_codec_voice_amp_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMD:
 		/* restore gain */
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON02,
-			GENMASK(12, 9), codec_data->voice_amp_gain);
+			GENMASK(12, 9), codec_data->pga_gain[LOUT_PGA_GAIN]);
 		break;
 	default:
 		break;
@@ -638,10 +646,10 @@ static void mt8167_codec_hp_depop_enable(
 			struct mt8167_codec_priv *codec_data)
 {
 	/* store gain */
-	codec_data->left_audio_amp_gain =
+	codec_data->pga_gain[HP_L_PGA_GAIN] =
 		snd_soc_read(codec_data->codec, AUDIO_CODEC_CON01) &
 			GENMASK(2, 0);
-	codec_data->right_audio_amp_gain =
+	codec_data->pga_gain[HP_R_PGA_GAIN] =
 		snd_soc_read(codec_data->codec, AUDIO_CODEC_CON01) &
 			GENMASK(5, 3);
 	/* set to small gain for depop sequence */
@@ -675,9 +683,9 @@ static void mt8167_codec_hp_depop_disable(
 			BIT(22), 0x0);
 	/* restore gain */
 	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON01,
-			GENMASK(2, 0), codec_data->left_audio_amp_gain);
+			GENMASK(2, 0), codec_data->pga_gain[HP_L_PGA_GAIN]);
 	snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON01,
-			GENMASK(5, 3), codec_data->right_audio_amp_gain);
+			GENMASK(5, 3), codec_data->pga_gain[HP_R_PGA_GAIN]);
 }
 
 static int mt8167_codec_depop_vcm_event(struct snd_soc_dapm_widget *w,
@@ -855,6 +863,133 @@ static const unsigned int ul_pga_gain_tlv[] = {
 	0, 5, TLV_DB_SCALE_ITEM(-600, 600, 0),
 };
 
+/* Headset_PGAL_GAIN
+ * Headset_PGAR_GAIN
+ * {-2, 0, +2, +4, +6, +8, +10, +12} dB
+ */
+static const char *const headset_pga_gain_text[] = {
+	"-2dB", "+0dB", "+2dB", "+4dB",
+	"+6dB", "+8dB", "+10dB", "+12dB",
+};
+
+/* Lineout_PGA_GAIN
+ * {-18, -16, -14, -12, -10, ..., +12} dB
+ */
+static const char *const lineout_pga_gain_text[] = {
+	"-18dB", "-16dB", "-14dB", "-12dB",
+	"-10dB", "-8dB", "-6dB", "-4dB",
+	"-2dB", "+0dB", "+2dB", "+4dB",
+	"+6dB", "+8dB", "+10dB", "+12dB",
+};
+
+/* Audio_PGA1_Setting
+ * Audio_PGA2_Setting
+ * {-6, 0, +6, +12, +18, +24} dB
+ */
+static const char *const ul_pga_gain_text[] = {
+	"-6dB", "+0dB", "+6dB", "+12dB", "+18dB", "+24dB"
+};
+
+static const struct soc_enum mt8167_codec_pga_gain_enums[] = {
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(headset_pga_gain_text),
+		headset_pga_gain_text),
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(headset_pga_gain_text),
+		headset_pga_gain_text),
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(lineout_pga_gain_text),
+		lineout_pga_gain_text),
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(ul_pga_gain_text),
+		ul_pga_gain_text),
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(ul_pga_gain_text),
+		ul_pga_gain_text),
+};
+
+static int mt8167_codec_get_gain_enum_id(const char *name)
+{
+	if (!strcmp(name, "Headset_PGAL_GAIN"))
+		return HP_L_PGA_GAIN;
+	if (!strcmp(name, "Headset_PGAR_GAIN"))
+		return HP_R_PGA_GAIN;
+	if (!strcmp(name, "Lineout_PGA_GAIN"))
+		return LOUT_PGA_GAIN;
+	if (!strcmp(name, "Audio_PGA1_Setting"))
+		return UL_L_PGA_GAIN;
+	if (!strcmp(name, "Audio_PGA2_Setting"))
+		return UL_R_PGA_GAIN;
+	return -EINVAL;
+}
+
+static int mt8167_codec_pga_gain_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+	int id = mt8167_codec_get_gain_enum_id(kcontrol->id.name);
+	uint32_t value = 0;
+
+	switch (id) {
+	case HP_L_PGA_GAIN:
+	case HP_R_PGA_GAIN:
+	case LOUT_PGA_GAIN:
+	case UL_L_PGA_GAIN:
+	case UL_R_PGA_GAIN:
+		value = codec_data->pga_gain[id];
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	ucontrol->value.integer.value[0] = value;
+
+	return 0;
+}
+
+static int mt8167_codec_pga_gain_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+	struct soc_enum *e = (struct soc_enum *)kcontrol->private_value;
+	int id = mt8167_codec_get_gain_enum_id(kcontrol->id.name);
+	uint32_t value = ucontrol->value.integer.value[0];
+
+	if (value >= e->items)
+		return -EINVAL;
+
+	dev_dbg(codec_data->codec->dev,
+		"%s id %d, value %u\n", __func__, id, value);
+
+	switch (id) {
+	case HP_L_PGA_GAIN:
+		snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON01,
+			GENMASK(2, 0), value);
+		break;
+	case HP_R_PGA_GAIN:
+		snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON01,
+			GENMASK(5, 3), value << 3);
+		break;
+	case LOUT_PGA_GAIN:
+		snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON02,
+			GENMASK(12, 9), value << 9);
+		break;
+	case UL_L_PGA_GAIN:
+		snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON00,
+			GENMASK(27, 25), value << 25);
+		break;
+	case UL_R_PGA_GAIN:
+		snd_soc_update_bits(codec_data->codec, AUDIO_CODEC_CON00,
+			GENMASK(9, 7), value << 7);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	codec_data->pga_gain[id] = value;
+
+	return 0;
+}
+
 /* HPL Calibration */
 static int mt8167_codec_hpl_dc_comp_get(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
@@ -990,6 +1125,31 @@ static const struct snd_kcontrol_new mt8167_codec_controls[] = {
 	SOC_DOUBLE_TLV("PGA Capture Volume",
 		AUDIO_CODEC_CON00, 25, 7, 5, 0,
 		ul_pga_gain_tlv),
+	/* Headset_PGAL_GAIN */
+	SOC_ENUM_EXT("Headset_PGAL_GAIN",
+		mt8167_codec_pga_gain_enums[HP_L_PGA_GAIN],
+		mt8167_codec_pga_gain_get,
+		mt8167_codec_pga_gain_put),
+	/* Headset_PGAR_GAIN */
+	SOC_ENUM_EXT("Headset_PGAR_GAIN",
+		mt8167_codec_pga_gain_enums[HP_R_PGA_GAIN],
+		mt8167_codec_pga_gain_get,
+		mt8167_codec_pga_gain_put),
+	/* Lineout_PGA_GAIN */
+	SOC_ENUM_EXT("Lineout_PGA_GAIN",
+		mt8167_codec_pga_gain_enums[LOUT_PGA_GAIN],
+		mt8167_codec_pga_gain_get,
+		mt8167_codec_pga_gain_put),
+	/* Audio_PGA1_Setting */
+	SOC_ENUM_EXT("Audio_PGA1_Setting",
+		mt8167_codec_pga_gain_enums[UL_L_PGA_GAIN],
+		mt8167_codec_pga_gain_get,
+		mt8167_codec_pga_gain_put),
+	/* Audio_PGA2_Setting */
+	SOC_ENUM_EXT("Audio_PGA2_Setting",
+		mt8167_codec_pga_gain_enums[UL_R_PGA_GAIN],
+		mt8167_codec_pga_gain_get,
+		mt8167_codec_pga_gain_put),
 	/* HP calibration */
 	SOC_SINGLE_EXT("Audio HPL Offset",
 		SND_SOC_NOPM, 0, 0x8000, 0,
@@ -1068,19 +1228,19 @@ static const struct snd_kcontrol_new mt8167_codec_line_out_mux =
 
 /* AIF DL_UL loopback Switch */
 static const struct snd_kcontrol_new mt8167_codec_aif_dl_ul_lpbk_ctrl =
-	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0);
+	SOC_DAPM_SINGLE_VIRT("Switch", 1);
 
 /* DMIC Data Gen Switch */
 static const struct snd_kcontrol_new mt8167_codec_dmic_data_gen_ctrl =
-	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0);
+	SOC_DAPM_SINGLE_VIRT("Switch", 1);
 
 /* AMIC Data Gen Switch */
 static const struct snd_kcontrol_new mt8167_codec_amic_data_gen_ctrl =
-	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0);
+	SOC_DAPM_SINGLE_VIRT("Switch", 1);
 
 /* SDM Tone Gen Switch */
 static const struct snd_kcontrol_new mt8167_codec_sdm_tone_gen_ctrl =
-	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0);
+	SOC_DAPM_SINGLE_VIRT("Switch", 1);
 
 static const struct snd_soc_dapm_widget mt8167_codec_dapm_widgets[] = {
 	/* stream domain */
