@@ -64,6 +64,7 @@ struct mt8167_codec_priv {
 	uint32_t pga_gain[PGA_GAIN_MAX];
 	uint32_t dmic_wire_mode;
 	uint32_t loopback_type;
+	bool dl_en;
 	struct clk *clk;
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs;
@@ -1068,7 +1069,7 @@ static int mt8167_codec_hpr_dc_comp_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-/* UL to DL loopback */
+/* UL to DL loopback (Codec_Loopback_Select) */
 #define ENUM_TO_STR(enum) #enum
 static const char * const mt8167_codec_loopback_text[] = {
 	ENUM_TO_STR(CODEC_LOOPBACK_NONE),
@@ -1120,6 +1121,54 @@ static int mt8167_codec_loopback_put(struct snd_kcontrol *kcontrol,
 			codec_data->codec, next_lpbk_type);
 
 	codec_data->loopback_type = ucontrol->value.integer.value[0];
+	return 0;
+}
+
+/* Codec_DL_Switch */
+static const char * const mt8167_codec_dl_switch_text[] = { "Off", "On" };
+
+static const struct soc_enum mt8167_codec_dl_switch_enum =
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(mt8167_codec_dl_switch_text),
+		mt8167_codec_dl_switch_text);
+
+static int mt8167_codec_dl_switch_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+
+	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
+	ucontrol->value.integer.value[0] = codec_data->dl_en;
+	return 0;
+}
+
+static int mt8167_codec_dl_switch_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+	uint32_t prev_dl_en = codec_data->dl_en;
+	uint32_t next_dl_en = ucontrol->value.integer.value[0];
+
+	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
+
+	if (next_dl_en == prev_dl_en) {
+		dev_dbg(codec_data->codec->dev, "%s dummy action\n", __func__);
+		return 0;
+	}
+
+	if (prev_dl_en)
+		/* turn off */
+		snd_soc_update_bits(codec_data->codec,
+			ABB_AFE_CON0, BIT(0), 0x0);
+	else
+		/* turn on */
+		snd_soc_update_bits(codec_data->codec,
+			ABB_AFE_CON0, BIT(0), BIT(0));
+
+	codec_data->dl_en = next_dl_en;
 	return 0;
 }
 
@@ -1175,6 +1224,11 @@ static const struct snd_kcontrol_new mt8167_codec_controls[] = {
 		mt8167_codec_loopback_enum,
 		mt8167_codec_loopback_get,
 		mt8167_codec_loopback_put),
+	/* for factory usage */
+	SOC_ENUM_EXT("Codec_DL_Switch",
+		mt8167_codec_dl_switch_enum,
+		mt8167_codec_dl_switch_get,
+		mt8167_codec_dl_switch_put),
 };
 
 /* Left PGA Mux/Right PGA Mux */
@@ -1705,6 +1759,10 @@ static const struct file_operations mt8167_codec_debug_ops = {
 static void mt8167_codec_init_regs(struct mt8167_codec_priv *codec_data)
 {
 	dev_dbg(codec_data->codec->dev, "%s\n", __func__);
+
+	/* Select CLK from PLL */
+	snd_soc_update_bits(codec_data->codec,
+		AUDIO_CODEC_CON03, BIT(19), BIT(19));
 
 	/* disable chopper of uplink */
 	snd_soc_update_bits(codec_data->codec,
