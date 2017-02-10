@@ -301,6 +301,7 @@ uint32_t DISP_GetActiveWidth(void);
 int disp_hal_allocate_framebuffer(phys_addr_t pa_start, phys_addr_t pa_end, unsigned long *va,
 				  unsigned long *mva);
 int primary_display_is_video_mode(void);
+int primary_display_is_directlink_mode(void);
 int primary_display_is_decouple_mode(void);
 int primary_display_is_mirror_mode(void);
 int primary_display_is_ovl1to2_handle(struct cmdqRecStruct *handle);

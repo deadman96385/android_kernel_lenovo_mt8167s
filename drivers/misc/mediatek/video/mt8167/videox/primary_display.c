@@ -249,6 +249,15 @@ static inline int _is_decouple_mode(enum DISP_MODE mode)
 		return 0;
 }
 
+static inline int _is_directlink_mode(enum DISP_MODE mode)
+{
+	if (mode == DISP_SESSION_DIRECT_LINK_MODE || mode == DISP_SESSION_DIRECT_LINK_MIRROR_MODE)
+		return 1;
+	else
+		return 0;
+}
+
+
 struct mutex esd_mode_switch_lock;
 static void _primary_path_esd_check_lock(void)
 {
@@ -2104,6 +2113,32 @@ static unsigned int _get_switch_dc_buffer(void)
 #endif
 }
 
+static int _update_ovl_from_wdma_info(struct OVL_CONFIG_STRUCT *ovl_config,
+		struct WDMA_CONFIG_STRUCT *wdma_config)
+{
+	ovl_config->layer = 0;
+	ovl_config->layer_en = 1;
+	ovl_config->addr = wdma_config->dstAddress;
+	ovl_config->src_x = 0;
+	ovl_config->src_y = 0;
+	ovl_config->src_w = wdma_config->srcWidth;
+	ovl_config->src_h = wdma_config->srcHeight;
+	ovl_config->src_pitch = wdma_config->dstPitch;
+	ovl_config->fmt = wdma_config->outputFormat;
+	ovl_config->dst_x = 0;
+	ovl_config->dst_y = 0;
+	ovl_config->dst_w = wdma_config->srcWidth;
+	ovl_config->dst_h = wdma_config->srcHeight;
+
+	memset(&ovl_config[1], 0, sizeof(struct OVL_CONFIG_STRUCT));
+	memset(&ovl_config[2], 0, sizeof(struct OVL_CONFIG_STRUCT));
+
+	if (!isAEEEnabled)
+		memset(&ovl_config[3], 0, sizeof(struct OVL_CONFIG_STRUCT));
+
+	return 0;
+}
+
 static int _DL_switch_to_DC_fast(void)
 {
 	int ret = 0;
@@ -2130,6 +2165,7 @@ static int _DL_switch_to_DC_fast(void)
 
 	/* 1.save a temp frame to intermediate buffer */
 	directlink_path_add_memory(&wdma_config);
+	_update_ovl_from_wdma_info(last_primary_config.ovl_config, &wdma_config);
 
 	/* 2.reset primary handle */
 	_cmdq_reset_config_handle();
@@ -2168,6 +2204,9 @@ static int _DL_switch_to_DC_fast(void)
 	if (!secure_path_on)
 		cmdqRecDisablePrefetch(pgc->cmdq_handle_config);
 	_cmdq_flush_config_handle(1, NULL, 0);
+
+	/* when switch to dl, ovl will use wdma output buffer as input */
+	mtkfb_release_session_fence(primary_session_id);
 
 	/* ddp_mmp_rdma_layer(&rdma_config, 0,  20, 20); */
 
@@ -7532,6 +7571,11 @@ int primary_display_is_video_mode(void)
 {
 	/* TODO: we should store the video/cmd mode in runtime, because we will support cmd/vdo dynamic switch */
 	return disp_lcm_is_video_mode(pgc->plcm);
+}
+
+int primary_display_is_directlink_mode(void)
+{
+	return _is_directlink_mode(pgc->session_mode);
 }
 
 int primary_display_is_decouple_mode(void)
