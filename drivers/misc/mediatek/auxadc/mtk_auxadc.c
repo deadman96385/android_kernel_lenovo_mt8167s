@@ -479,7 +479,9 @@ void mt_auxadc_hal_init(struct platform_device *dev)
 
 static void mt_auxadc_hal_suspend(void)
 {
+#if !defined(AUXADC_SPM)
 	pr_debug("******** MT auxadc driver suspend!! ********\n");
+#endif
 #if defined(AUXADC_SPM)
 	AUXADC_SET_BITS((0x3 << 6) | (0x3 << 16), AUXADC_TS_X_BUFFER);
 	AUXADC_CLR_BITS(0xffff << 0, AUXADC_CON1);
@@ -512,7 +514,9 @@ static void mt_auxadc_hal_resume(void)
 #endif
 #endif
 
+#if !defined(AUXADC_SPM)
 	pr_debug("******** MT auxadc driver resume!! ********\n");
+#endif
 #if !defined(AUXADC_CLOCK_BY_SPM)
 #if !defined(CONFIG_MTK_CLKMGR)
 	pr_debug("auxadc resume enable clock.\n");
