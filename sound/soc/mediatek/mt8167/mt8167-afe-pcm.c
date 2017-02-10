@@ -1368,8 +1368,7 @@ static int mt8167_afe_hdmi_trigger(struct snd_pcm_substream *substream, int cmd,
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
-		regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
-				   AUD_TCON0_PDN_HDMI, 0);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_HDMI);
 
 		/* align the connection logic with HDMI Tx */
 		/* set connections:  O28~O35: L/R/LFE/C/LS/RS/CH7/CH8 */
@@ -1401,8 +1400,7 @@ static int mt8167_afe_hdmi_trigger(struct snd_pcm_substream *substream, int cmd,
 		/* disable Out control */
 		regmap_update_bits(afe->regmap, AFE_HDMI_OUT_CON0, 0x1, 0);
 
-		regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
-				   AUD_TCON0_PDN_HDMI, AUD_TCON0_PDN_HDMI);
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_HDMI);
 
 		return 0;
 	default:
