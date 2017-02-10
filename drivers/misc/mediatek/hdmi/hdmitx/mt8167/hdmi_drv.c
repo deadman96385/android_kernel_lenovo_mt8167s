@@ -939,8 +939,7 @@ static void hdmi_clock_enable(bool bEnable)
 	if (bEnable) {
 		HDMI_DRV_LOG("Enable hdmi clocks\n");
 		for (i = 0; i < HDMI_SEL_CLOCK_NUM; i++) {
-			if ((i != INFRA_SYS_CLK_DDC)
-				&& (i != INFRA_SYS_CEC_26M) && (i != INFRA_SYS_CEC_32K)) {
+			if ((i != INFRA_SYS_CEC_26M) && (i != INFRA_SYS_CEC_32K)) {
 				clk_prepare(hdmi_ref_clock[i]);
 				clk_enable(hdmi_ref_clock[i]);
 			}
@@ -948,8 +947,7 @@ static void hdmi_clock_enable(bool bEnable)
 	} else {
 		HDMI_DRV_LOG("Disable hdmi clocks\n");
 		for (i = HDMI_SEL_CLOCK_NUM - 1; i >= 0; i--) {
-			if ((i != INFRA_SYS_CLK_DDC)
-				&& (i != INFRA_SYS_CEC_26M) && (i != INFRA_SYS_CEC_32K)) {
+			if ((i != INFRA_SYS_CEC_26M) && (i != INFRA_SYS_CEC_32K)) {
 				clk_disable(hdmi_ref_clock[i]);
 				clk_unprepare(hdmi_ref_clock[i]);
 			}
@@ -1027,8 +1025,6 @@ int hdmi_internal_power_on(void)
 		clk_prepare(hdmi_ref_clock[INFRA_SYS_CEC_26M]);
 		clk_enable(hdmi_ref_clock[INFRA_SYS_CEC_26M]);
 	}
-	clk_prepare(hdmi_ref_clock[INFRA_SYS_CLK_DDC]);
-	clk_enable(hdmi_ref_clock[INFRA_SYS_CLK_DDC]);
 #if defined(MHL_BRIDGE_SUPPORT)
 	mhl_bridge_drv->power_on();
 #endif
@@ -1114,6 +1110,10 @@ void hdmi_internal_power_off(void)
 		HDMI_PLUG_LOG("hdmi irq for clock:hdmi plug out\n");
 		hdmi_clockenable = 0;
 		hdmi_clock_enable(false);
+	}
+	if (hdmi_cec_on == 0) {
+		clk_disable(hdmi_ref_clock[INFRA_SYS_CEC_26M]);
+		clk_unprepare(hdmi_ref_clock[INFRA_SYS_CEC_26M]);
 	}
 	if (r_hdmi_timer.function)
 		del_timer_sync(&r_hdmi_timer);
