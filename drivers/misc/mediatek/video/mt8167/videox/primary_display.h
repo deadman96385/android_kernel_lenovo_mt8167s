@@ -196,9 +196,10 @@ struct display_primary_path_context {
 	struct mutex lock;
 	struct mutex capture_lock;
 	struct mutex vsync_lock;
-#ifdef DISP_SWITCH_DST_MODE
+/* TODO: need sync switch dst mode */
+/* #ifdef DISP_SWITCH_DST_MODE */
 	struct mutex switch_dst_lock;
-#endif
+/* #endif */
 	struct mutex cmd_lock;
 	struct disp_lcm_handle *plcm;
 	struct cmdqRecStruct *cmdq_handle_config_esd;
