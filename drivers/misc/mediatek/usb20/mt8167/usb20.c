@@ -335,7 +335,7 @@ void mt_usb_clock_prepare(void)
 {
 	int retval = 0;
 
-	DBG(0, "usb_power = %d\n", mtk_usb_power);
+	DBG(1, "usb_power = %d\n", mtk_usb_power);
 	retval = clk_prepare(usbpll_clk);
 	if (retval)
 		DBG(0, KERN_WARNING "prepare fail\n");
@@ -350,7 +350,7 @@ void mt_usb_clock_prepare(void)
 
 void mt_usb_clock_unprepare(void)
 {
-	DBG(0, "usb_power = %d\n", mtk_usb_power);
+	DBG(1, "usb_power = %d\n", mtk_usb_power);
 
 	clk_unprepare(usbmcu_clk);
 	clk_unprepare(usb_clk);
