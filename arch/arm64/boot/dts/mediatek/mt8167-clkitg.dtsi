@@ -16,7 +16,7 @@
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
-			<&topckgen CLK_TOP_SMI_MM>,
+			<&clk26m>,
 			<&topckgen CLK_TOP_THEM>,
 			<&topckgen CLK_TOP_APDMA>,
 			<&clk26m>,
