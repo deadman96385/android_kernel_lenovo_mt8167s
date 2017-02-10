@@ -796,6 +796,7 @@ OUT:
 }
 EXPORT_SYMBOL(sched_update_nr_heavy_prod);
 
+#ifdef CONFIG_MTK_SCHED_EAS_POWER_SUPPORT
 static struct timer_list tracker_timer;
 
 static void tracker_isr(unsigned long data)
@@ -803,6 +804,7 @@ static void tracker_isr(unsigned long data)
 	sched_max_util_task_tracking();
 	mod_timer(&tracker_timer, jiffies + HZ/32); /* 32ms */
 }
+#endif
 
 static int init_heavy_tlb(void)
 {
@@ -881,11 +883,12 @@ static int init_heavy_tlb(void)
 				(unsigned long int)cluster_heavy_tbl[cid].max_capacity);
 		}
 
-
+#ifdef CONFIG_MTK_SCHED_EAS_POWER_SUPPORT
 		init_timer_deferrable(&tracker_timer);
 		tracker_timer.function = tracker_isr;
 		tracker_timer.expires = jiffies + HZ/32; /*32ms*/
 		add_timer(&tracker_timer);
+#endif
 
 		init_heavy = 1;
 	}
