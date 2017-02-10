@@ -229,26 +229,20 @@ extern u32 spm_irq_7;
 
 /* PCM Flags store in PCM_RESERVE4(0xB18)*/
 #define SPM_CPU_PDN_DIS		(1U << 0)
-#define SPM_INFRA_PDN_DIS	(1U << 1)
-#define SPM_DDRPHY_PDN_DIS	(1U << 2)
-#define SPM_VCORE_DVS_DIS	(1U << 3)
-#define SPM_PASR_DIS		(1U << 4)
-#define SPM_DPD_DIS		    (1U << 5)
-#define SPM_MEMPLL_CG_EN	(1U << 6)
-#define SPM_SODI_EMI_DIS	(1U << 7)
-#define SPM_MAINPLL_PDN_DIS	(1U << 8)
-#define SPM_CPU_DVS_DIS		(1U << 9)
-#define SPM_CPU_DORMANT		(1U << 10)
-#define SPM_EXT_VSEL_GPIO103    (1U << 11)
-#define SPM_DDR_HIGH_SPEED		(1U << 12)
-
-#define SPM_DISABLE_ATF_ABORT     (1U << 13)
-#define SPM_MEMPLL_1PLL_3PLL_SEL  (1U << 16)
-#define SPM_VCORE_DVS_POSITION	  (1U << 17)
-#define SPM_BUCK_SEL				(1U << 18)
-#define SPM_DRAM_RANK1_ADDR_SEL0	(1U << 19)	/* 0x60000000 */
-#define SPM_DRAM_RANK1_ADDR_SEL1	(1U << 20)	/* 0x80000000 */
-#define SPM_DRAM_RANK1_ADDR_SEL2	(1U << 21)	/* 0xc0000000 */
+#define SPM_CPUTOP_PDN_DIS	(1U << 1)
+#define SPM_L2_DORMANT_DIS	(1U << 2)
+#define SPM_MCU_PDN_DIS		(1U << 3)
+#define SPM_BUS26M_DIS		(1U << 4)
+#define SPM_MPLLOFF_DIS	        (1U << 5)
+#define SPM_DDRPHY_S1_DIS	(1U << 6)
+#define SPM_DDRPHY_S0_DIS	(1U << 7)
+#define SPM_FHC_SLEEP_DIS	(1U << 8)
+#define SPM_VPROC_LOW_DIS	(1U << 9)
+#define SPM_INFRA_PDN_DIS	(1U << 10)
+#define SPM_26M_DIS		(1U << 11)
+#define SPM_26M_OFF_DIS		(1U << 12)
+#define SPM_XO_OFF_DIS		(1U << 13)
+#define SPM_PLL_OFF_DIS		(1U << 15)
 
 /* Wakeup Source*/
 #define SPM_WAKE_SRC_LIST	{	\

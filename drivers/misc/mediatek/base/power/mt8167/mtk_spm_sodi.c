@@ -361,6 +361,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	aee_rr_rec_sodi_val(1 << SPM_SODI_ENTER);
 #endif
 
+#if 0
 #if !defined(CONFIG_ARCH_MT6580)
 #if defined(CONFIG_ARM_PSCI) || defined(CONFIG_MTK_PSCI)
 	spm_flags &= ~SPM_DISABLE_ATF_ABORT;
@@ -368,12 +369,14 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	spm_flags |= SPM_DISABLE_ATF_ABORT;
 #endif
 #endif
+#endif
 
+#if 0
 	if (gSpm_SODI_mempll_pwr_mode == 1)
 		spm_flags |= SPM_MEMPLL_CG_EN;	/* MEMPLL CG mode */
 	else
 		spm_flags &= ~SPM_MEMPLL_CG_EN;	/* DDRPHY power down mode */
-
+#endif
 	set_pwrctrl_pcm_flags(pwrctrl, spm_flags);
 
 #if SODI_SUPPORT_MTIDLE

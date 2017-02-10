@@ -132,16 +132,23 @@ static u32 slp_time = 30;
 
 static u32 slp_spm_flags = {
 #if 1				/* normal suspend */
-	0
+	SPM_L2_DORMANT_DIS | SPM_VPROC_LOW_DIS
 #else				/* legacy suspend */
-	SPM_CPU_PDN_DIS | SPM_INFRA_PDN_DIS | SPM_DDRPHY_PDN_DIS
+	SPM_L2_DORMANT_DIS | SPM_VPROC_LOW_DIS | SPM_CPU_PDN_DIS | SPM_INFRA_PDN_DIS |
+	SPM_DDRPHY_S1_DIS | SPM_26M_DIS
+	/* SPM_L2_DORMANT_DIS | SPM_VPROC_LOW_DIS | SPM_INFRA_PDN_DIS */
 #endif
 };
 
 #if SLP_SLEEP_DPIDLE_EN
 static u32 slp_spm_deepidle_flags = {
-	/* SPM_CPU_PDN_DIS */
-	0
+#if 1				/* normal suspend */
+	SPM_INFRA_PDN_DIS | SPM_26M_OFF_DIS
+	/* SPM_BUS26M_DIS | SPM_MPLLOFF_DIS | SPM_FHC_SLEEP_DIS | SPM_26M_DIS */
+#else
+	SPM_CPU_PDN_DIS | SPM_DDRPHY_S1_DIS | SPM_VPROC_LOW_DIS | SPM_INFRA_PDN_DIS |
+	SPM_26M_OFF_DIS
+#endif
 };
 #endif
 
@@ -383,6 +390,7 @@ bool slp_will_infra_pdn(void)
 	return is_infra_pdn(slp_spm_flags);
 }
 
+#if 0
 /*
  * en: 1: enable pasr, 0: disable pasr
  * value: pasr setting (RK1, MR17 for RK0)
@@ -399,7 +407,9 @@ void slp_pasr_en(bool en, u32 value)
 		}
 	}
 }
+#endif
 
+#if 0
 /*
  * en: 1: enable DPD, 0: disable DPD
  */
@@ -412,6 +422,7 @@ void slp_dpd_en(bool en)
 			slp_spm_flags |= SPM_DPD_DIS;
 	}
 }
+#endif
 
 static int __init slp_module_init(void)
 {
