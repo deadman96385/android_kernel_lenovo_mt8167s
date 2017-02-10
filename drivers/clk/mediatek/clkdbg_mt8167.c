@@ -652,6 +652,36 @@ static const char * const *get_pwr_names(void)
 }
 
 /*
+ * clkdbg dump_clks
+ */
+
+void setup_provider_clk(struct provider_clk *pvdck)
+{
+	static const struct {
+		const char *pvdname;
+		u32 pwr_mask;
+	} pvd_pwr_mask[] = {
+		{"mfgcfg",  BIT(25)},
+		{"mmsys",   BIT(3)},
+		{"imgsys",  BIT(5)},
+		{"vdecsys", BIT(7)},
+	};
+
+	int i;
+	const char *pvdname = pvdck->provider_name;
+
+	if (!pvdname)
+		return;
+
+	for (i = 0; i < ARRAY_SIZE(pvd_pwr_mask); i++) {
+		if (strcmp(pvdname, pvd_pwr_mask[i].pvdname) == 0) {
+			pvdck->pwr_mask = pvd_pwr_mask[i].pwr_mask;
+			return;
+		}
+	}
+}
+
+/*
  * init functions
  */
 
@@ -663,6 +693,7 @@ static struct clkdbg_ops clkdbg_mt8167_ops = {
 	.get_all_regnames = get_all_regnames,
 	.get_all_clk_names = get_all_clk_names,
 	.get_pwr_names = get_pwr_names,
+	.setup_provider_clk = setup_provider_clk,
 };
 
 static int __init clkdbg_mt8167_init(void)
