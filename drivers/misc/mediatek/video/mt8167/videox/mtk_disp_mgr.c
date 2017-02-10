@@ -332,11 +332,6 @@ int disp_destroy_session(struct disp_session_config *config)
 
 	mutex_unlock(&disp_session_lock);
 
-#if defined(OVL_TIME_SHARING)
-	if (session == MAKE_DISP_SESSION(DISP_SESSION_MEMORY, 2))
-		ovl2mem_setlayernum(0);
-#endif
-
 	DISPPR_FENCE("destroy_session done\n");
 	/* 2. Destroy this session */
 	if (DISP_SESSION_TYPE(config->session_id) == DISP_SESSION_EXTERNAL)
