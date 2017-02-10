@@ -67,8 +67,8 @@ static imgsensor_info_struct imgsensor_info = {
 
 	.pre = {
 		.pclk = 42000000,	/* record different mode's pclk */
-		.linelength = 1680,	/* record different mode's linelength */
-		.framelength = 1250,	/* record different mode's framelength */
+		.linelength = 1120,	/* record different mode's linelength */
+		.framelength = 1246,	/* record different mode's framelength */
 		.startx = 0,	/* record different mode's startx of grabwindow */
 		.starty = 0,	/* record different mode's starty of grabwindow */
 		.grabwindow_width = 1600,	/* record different mode's width of grabwindow */
@@ -80,8 +80,8 @@ static imgsensor_info_struct imgsensor_info = {
 		},
 	.cap = {
 		.pclk = 42000000,
-		.linelength = 1680,
-		.framelength = 1250,
+		.linelength = 1120,
+		.framelength = 1246,
 		.startx = 0,
 		.starty = 0,
 		.grabwindow_width = 1600,
@@ -91,8 +91,8 @@ static imgsensor_info_struct imgsensor_info = {
 		},
 	.cap1 = {
 		 .pclk = 42000000,
-		 .linelength = 1680,
-		 .framelength = 1250,
+		 .linelength = 1120,
+		 .framelength = 1246,
 		 .startx = 0,
 		 .starty = 0,
 		 .grabwindow_width = 1600,
@@ -102,8 +102,8 @@ static imgsensor_info_struct imgsensor_info = {
 		 },
 	.normal_video = {
 			 .pclk = 42000000,
-			 .linelength = 1680,
-			 .framelength = 1250,
+			 .linelength = 1120,
+			 .framelength = 1246,
 			 .startx = 0,
 			 .starty = 0,
 			 .grabwindow_width = 1600,
@@ -113,8 +113,8 @@ static imgsensor_info_struct imgsensor_info = {
 			 },
 	.hs_video = {
 		     .pclk = 42000000,
-		     .linelength = 1680,
-		     .framelength = 1250,
+		     .linelength = 1120,
+		     .framelength = 1246,
 		     .startx = 0,
 		     .starty = 0,
 		     .grabwindow_width = 1600,
@@ -124,8 +124,8 @@ static imgsensor_info_struct imgsensor_info = {
 		     },
 	.slim_video = {
 		       .pclk = 42000000,
-		       .linelength = 1680,
-		       .framelength = 1250,
+		       .linelength = 1120,
+		       .framelength = 1246,
 		       .startx = 0,
 		       .starty = 0,
 		       .grabwindow_width = 1600,
@@ -510,12 +510,12 @@ static void sensor_init(void)
 	/* /////////////////////////////////////////////////// */
 	/* ////////////////      ANALOG & CISCTL      /////////////// */
 	/* /////////////////////////////////////////////////// */
-	write_cmos_sensor(0x03, 0x07);
-	write_cmos_sensor(0x04, 0xd0);
-	write_cmos_sensor(0x05, 0x03);
-	write_cmos_sensor(0x06, 0x4c);
+	write_cmos_sensor(0x03, 0x0b);  /* 07 */
+	write_cmos_sensor(0x04, 0xb8);  /* d0 */
+	write_cmos_sensor(0x05, 0x01);  /* 03 */
+	write_cmos_sensor(0x06, 0x22);  /* 4c */
 	write_cmos_sensor(0x07, 0x00);
-	write_cmos_sensor(0x08, 0x12);
+	write_cmos_sensor(0x08, 0x14);  /* 12 */
 	write_cmos_sensor(0x0a, 0x00);
 	write_cmos_sensor(0x0c, 0x04);
 	write_cmos_sensor(0x0d, 0x04);
