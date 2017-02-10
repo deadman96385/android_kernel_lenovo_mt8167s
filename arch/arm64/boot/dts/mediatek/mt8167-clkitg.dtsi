@@ -77,7 +77,7 @@
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
-			<&topckgen CLK_TOP_RG_VDEC>,
+			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
 			<&topckgen CLK_TOP_RG_AXI_MFG>,
