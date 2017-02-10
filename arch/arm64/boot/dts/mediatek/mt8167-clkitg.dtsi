@@ -17,7 +17,7 @@
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
-			<&topckgen CLK_TOP_THEM>,
+			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
 			<&clk26m>,
