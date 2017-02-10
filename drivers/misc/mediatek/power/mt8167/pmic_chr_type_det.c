@@ -18,6 +18,15 @@
 /* ============================================================*/
 /*extern function*/
 /* ============================================================*/
+void __attribute__((weak)) Charger_Detect_Init(void)
+{
+	pr_notice("Charger_Detect_Init not be porting in USB driver\n");
+}
+
+void __attribute__((weak)) Charger_Detect_Release(void)
+{
+	pr_notice("Charger_Detect_Release not be porting in USB driver\n");
+}
 
 #if defined(CONFIG_POWER_EXT) || defined(CONFIG_MTK_FPGA)
 
