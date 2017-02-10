@@ -66,6 +66,7 @@
 #include <mt-plat/mtk_boot_common.h>
 #include "hdmiavd.h"
 #include "hdmicmd.h"
+#include "mtk_smi.h"
 
 #if (defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT))
 #include "hdmi_ca.h"
@@ -1035,7 +1036,7 @@ int hdmi_internal_power_on(void)
 		gpio_direction_output(hdmi_power_control_pin, 1);
 		gpio_set_value(hdmi_power_control_pin, 1);
 	}
-
+	mtk_smi_larb_clock_on(0, true);
 	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_01, HDMI_PCLK_FREE_RUN, HDMI_PCLK_FREE_RUN);
 	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_01, HDMI_OUT_FIFO_EN, HDMI_OUT_FIFO_EN);
 	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_00, ANLG_ON | HDMI_SPIDIF_ON, ANLG_ON | HDMI_SPIDIF_ON);
@@ -1111,6 +1112,7 @@ void hdmi_internal_power_off(void)
 		hdmi_clockenable = 0;
 		hdmi_clock_enable(false);
 	}
+	mtk_smi_larb_clock_off(0, true);
 	if (hdmi_cec_on == 0) {
 		clk_disable(hdmi_ref_clock[INFRA_SYS_CEC_26M]);
 		clk_unprepare(hdmi_ref_clock[INFRA_SYS_CEC_26M]);
