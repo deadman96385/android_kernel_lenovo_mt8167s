@@ -302,7 +302,7 @@
 };
 
 &led6 {
-	ate_gpio = <&pio 70 0>;
+	ate_gpio = <&pio 43 0>;
 };
 
 &mmc0 {
