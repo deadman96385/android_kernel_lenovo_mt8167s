@@ -1098,10 +1098,10 @@ int ext_disp_init(char *lcm_name, unsigned int session)
 	if (ext_disp_use_cmdq == CMDQ_ENABLE)
 		_cmdq_reset_config_handle();
 
-	init_waitqueue_head(&rdma_update_wq);
 	mutex_init(&(pgc->vsync_lock));
 
 	if (!rdma_update_task) {
+		init_waitqueue_head(&rdma_update_wq);
 		rdma_update_task = kthread_create(ext_disp_rdma_update_kthread,
 							 NULL, "ext_disp_rdma_update");
 		wake_up_process(rdma_update_task);
@@ -1676,8 +1676,6 @@ void ext_disp_get_curr_addr(unsigned long *input_curr_addr, int module)
 	/* fence release use cmdq callback, this just no need */
 	for (i = 0; i < EXTD_OVERLAY_CNT; i++)
 		input_curr_addr[i] = 0;
-
-	return;
 }
 
 int ext_disp_factory_test(int mode, void *config)
