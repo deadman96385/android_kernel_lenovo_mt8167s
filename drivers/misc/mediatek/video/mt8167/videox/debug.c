@@ -86,7 +86,7 @@ struct MTKFB_MMP_Events_t MTKFB_MMP_Events;
 /* extern unsigned int gCaptureFBPeriod; */
 /* extern struct task_struct *capturefb_task; */
 /* extern wait_queue_head_t gCaptureFBWQ; */
-/* extern OVL_CONFIG_STRUCT cached_layer_config[DDP_OVL_LAYER_MUN]; */
+/* extern struct OVL_CONFIG_STRUCT cached_layer_config[DDP_OVL_LAYER_MUN]; */
 /* extern void hdmi_force_init(void); */
 #endif
 /* extern void mtkfb_vsync_log_enable(int enable); */
@@ -98,13 +98,13 @@ struct MTKFB_MMP_Events_t MTKFB_MMP_Events;
 struct dentry *mtkfb_layer_dbgfs[DDP_OVL_LAYER_MUN];
 
 
-typedef struct {
+struct MTKFB_LAYER_DBG_OPTIONS {
 	uint32_t layer_index;
 	unsigned long working_buf;
 	uint32_t working_size;
-} MTKFB_LAYER_DBG_OPTIONS;
+};
 
-MTKFB_LAYER_DBG_OPTIONS mtkfb_layer_dbg_opt[DDP_OVL_LAYER_MUN];
+struct MTKFB_LAYER_DBG_OPTIONS mtkfb_layer_dbg_opt[DDP_OVL_LAYER_MUN];
 
 #endif
 #ifdef ROME_TODO
@@ -116,14 +116,14 @@ MTKFB_LAYER_DBG_OPTIONS mtkfb_layer_dbg_opt[DDP_OVL_LAYER_MUN];
 
 static const long int DEFAULT_LOG_FPS_WND_SIZE = 30;
 
-typedef struct {
+struct DBG_OPTIONS {
 	unsigned int en_fps_log;
 	unsigned int en_touch_latency_log;
 	unsigned int log_fps_wnd_size;
 	unsigned int force_dis_layers;
-} DBG_OPTIONS;
+};
 
-static DBG_OPTIONS dbg_opt = { 0 };
+static struct DBG_OPTIONS dbg_opt = { 0 };
 
 static bool enable_ovl1_to_mem = true;
 unsigned int g_mobilelog;
@@ -220,7 +220,7 @@ static inline int is_layer_enable(unsigned int roi_ctl, unsigned int layer)
 /* FPS Log */
 /* --------------------------------------------------------------------------- */
 
-typedef struct {
+struct FPS_LOGGER {
 	long int current_lcd_time_us;
 	long int current_te_delay_time_us;
 	long int total_lcd_time_us;
@@ -234,10 +234,10 @@ typedef struct {
 	long int hdmi_start_time_us;
 	long int trigger_hdmi_time_us;
 	unsigned int trigger_hdmi_count;
-} FPS_LOGGER;
+};
 
-static FPS_LOGGER fps = { 0 };
-static FPS_LOGGER hdmi_fps = { 0 };
+static struct FPS_LOGGER fps = { 0 };
+static struct FPS_LOGGER hdmi_fps = { 0 };
 
 static long int get_current_time_us(void)
 {
@@ -382,7 +382,7 @@ void DBG_OnHDMIDone(void)
 /* --------------------------------------------------------------------------- */
 /* Command Processor */
 /* --------------------------------------------------------------------------- */
-/* extern int DSI_BIST_Pattern_Test(DISP_MODULE_ENUM module, struct cmdqRecStruct cmdq, bool enable,*/
+/* extern int DSI_BIST_Pattern_Test(enum DISP_MODULE_ENUM module, struct cmdqRecStruct cmdq, bool enable,*/
 /*				 unsigned int color); */
 
 bool get_ovl1_to_mem_on(void)
@@ -648,7 +648,7 @@ static void process_dbg_opt(const char *opt)
 	} else if (strncmp(opt, "_efuse_test", 11) == 0) {
 		primary_display_check_test();
 	} else if (strncmp(opt, "trigger", 7) == 0) {
-		display_primary_path_context *ctx = primary_display_path_lock("debug");
+		struct display_primary_path_context *ctx = primary_display_path_lock("debug");
 
 		if (ctx)
 			dpmgr_signal_event(ctx->dpmgr_handle, DISP_PATH_EVENT_TRIGGER);
@@ -1030,10 +1030,10 @@ static const struct file_operations debug_fops = {
 
 static int layer_debug_open(struct inode *inode, struct file *file)
 {
-	MTKFB_LAYER_DBG_OPTIONS *dbgopt;
+	struct MTKFB_LAYER_DBG_OPTIONS *dbgopt;
 	/* /record the private data */
 	file->private_data = inode->i_private;
-	dbgopt = (MTKFB_LAYER_DBG_OPTIONS *) file->private_data;
+	dbgopt = (struct MTKFB_LAYER_DBG_OPTIONS *) file->private_data;
 
 	dbgopt->working_size = DISP_GetScreenWidth() * DISP_GetScreenHeight() * 2 + 32;
 	dbgopt->working_buf = (unsigned long)vmalloc(dbgopt->working_size);
@@ -1053,7 +1053,7 @@ static ssize_t layer_debug_read(struct file *file, char __user *ubuf, size_t cou
 static ssize_t layer_debug_write(struct file *file,
 				 const char __user *ubuf, size_t count, loff_t *ppos)
 {
-	MTKFB_LAYER_DBG_OPTIONS *dbgopt = (MTKFB_LAYER_DBG_OPTIONS *) file->private_data;
+	struct MTKFB_LAYER_DBG_OPTIONS *dbgopt = (struct MTKFB_LAYER_DBG_OPTIONS *) file->private_data;
 
 	pr_debug("DISP/DBG mtkfb_layer%d write is not implemented yet\n", dbgopt->layer_index);
 
@@ -1062,9 +1062,9 @@ static ssize_t layer_debug_write(struct file *file,
 
 static int layer_debug_release(struct inode *inode, struct file *file)
 {
-	MTKFB_LAYER_DBG_OPTIONS *dbgopt;
+	struct MTKFB_LAYER_DBG_OPTIONS *dbgopt;
 
-	dbgopt = (MTKFB_LAYER_DBG_OPTIONS *) file->private_data;
+	dbgopt = (struct MTKFB_LAYER_DBG_OPTIONS *) file->private_data;
 
 	if (dbgopt->working_buf != 0)
 		vfree((void *)dbgopt->working_buf);

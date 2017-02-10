@@ -36,7 +36,7 @@
 
 unsigned int met_tag_on;
 
-static const char *const parse_color_format(DpColorFormat fmt)
+static const char *const parse_color_format(enum DP_COLOR_ENUM fmt)
 {
 	switch (fmt) {
 	case eBGR565:
@@ -79,7 +79,7 @@ static void ddp_disp_refresh_tag_start(unsigned int index)
 {
 	static unsigned long sBufAddr[RDMA_NUM];
 
-	static RDMA_BASIC_STRUCT rdmaInfo;
+	static struct RDMA_BASIC_STRUCT rdmaInfo;
 	char tag_name[30] = { '\0' };
 
 	rdma_get_info(index, &rdmaInfo);
@@ -108,7 +108,7 @@ static void ddp_inout_info_tag(unsigned int index)
 	static unsigned int sLayerBufWidth[OVL_NUM][OVL_LAYER_NUM_PER_OVL];
 	static unsigned int sLayerBufHeight[OVL_NUM][OVL_LAYER_NUM_PER_OVL];
 
-	OVL_BASIC_STRUCT ovlInfo[OVL_LAYER_NUM];
+	struct OVL_BASIC_STRUCT ovlInfo[OVL_LAYER_NUM];
 	unsigned int i, idx, enLayerCnt, layerCnt;
 	char tag_name[30] = { '\0' };
 
@@ -174,7 +174,7 @@ static void ddp_err_irq_met_tag(const char *name)
 	met_tag_oneshot(DDP_IRQ_EER_ID, name, 0);
 }
 
-static void met_irq_handler(DISP_MODULE_ENUM module, unsigned int reg_val)
+static void met_irq_handler(enum DISP_MODULE_ENUM module, unsigned int reg_val)
 {
 	int index = 0;
 	char tag_name[30] = { '\0' };

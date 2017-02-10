@@ -14,7 +14,7 @@
 #ifndef __MTK_OVL_H__
 #define __MTK_OVL_H__
 #include "primary_display.h"
-typedef struct {
+struct ovl2mem_in_config {
 	unsigned int layer;
 	unsigned int layer_en;
 	unsigned int buffer_source;
@@ -49,9 +49,9 @@ typedef struct {
 	unsigned int connected_type;
 	unsigned int security;
 	unsigned int dirty;
-} ovl2mem_in_config;
+};
 
-typedef struct {
+struct ovl2mem_io_config {
 	unsigned int fmt;
 	unsigned long addr;
 	unsigned long addr_sub_u;
@@ -68,14 +68,14 @@ typedef struct {
 	unsigned int security;
 	unsigned int dirty;
 	int mode;
-} ovl2mem_io_config;
+};
 
 void ovl2mem_setlayernum(int layer_num);
 int ovl2mem_get_info(void *info);
 int get_ovl2mem_ticket(void);
 int ovl2mem_init(unsigned int session);
-int ovl2mem_input_config(ovl2mem_in_config *input);
-int ovl2mem_output_config(disp_mem_output_config *out);
+int ovl2mem_input_config(struct ovl2mem_in_config *input);
+int ovl2mem_output_config(struct disp_mem_output_config *out);
 int ovl2mem_trigger(int blocking, void *callback, unsigned int userdata);
 void ovl2mem_wait_done(void);
 int ovl2mem_deinit(void);

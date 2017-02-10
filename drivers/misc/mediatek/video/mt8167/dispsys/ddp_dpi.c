@@ -156,7 +156,7 @@ static void lcm_send_data(uint32_t data)
 
 /*
 *
-static void _BackupDPIRegisters(DISP_MODULE_ENUM module)
+static void _BackupDPIRegisters(enum DISP_MODULE_ENUM module)
 {
     UINT32 i;
     DPI_REGS *reg = &regBackup;
@@ -168,7 +168,7 @@ static void _BackupDPIRegisters(DISP_MODULE_ENUM module)
     }
 }
 
-static void _RestoreDPIRegisters(DISP_MODULE_ENUM module)
+static void _RestoreDPIRegisters(enum DISP_MODULE_ENUM module)
 {
     UINT32 i;
     DPI_REGS *reg = &regBackup;
@@ -183,13 +183,13 @@ static void _RestoreDPIRegisters(DISP_MODULE_ENUM module)
 
 /*the functions declare*/
 /*DPI clock setting - use TVDPLL provide DPI clock for HDMI*/
-DPI_STATUS ddp_dpi_ConfigPclk(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, unsigned int clk_req,
-			      DPI_POLARITY polarity)
+enum DPI_STATUS ddp_dpi_ConfigPclk(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, unsigned int clk_req,
+			      enum DPI_POLARITY polarity)
 {
 	unsigned int dpickpol = 1, dpickoutdiv = 1, dpickdut = 1;
 	unsigned int pcw = 0, postdiv = 0, ck_div = 0;
 	unsigned long bclk = 0;
-	eDDP_CLK_ID clksrc = 0;
+	enum eDDP_CLK_ID clksrc = 0;
 	struct DPI_REG_OUTPUT_SETTING ctrl = DPI_REG[DPI_IDX(module)]->OUTPUT_SETTING;
 	struct DPI_REG_CLKCNTL clkcon = DPI_REG[DPI_IDX(module)]->DPI_CLKCON;
 
@@ -342,7 +342,7 @@ DPI_STATUS ddp_dpi_ConfigPclk(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmd
 	return DPI_STATUS_OK;
 }
 
-DPI_STATUS ddp_dpi_ConfigCLK(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, DPI_POLARITY polarity,
+enum DPI_STATUS ddp_dpi_ConfigCLK(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, enum DPI_POLARITY polarity,
 			     bool LVDSEN)
 {
 	struct DPI_REG_OUTPUT_SETTING pol = DPI_REG[DPI_IDX(module)]->OUTPUT_SETTING;
@@ -362,7 +362,7 @@ DPI_STATUS ddp_dpi_ConfigCLK(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq
 	return DPI_STATUS_OK;
 }
 
-DPI_STATUS ddp_dpi_ConfigDE(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, DPI_POLARITY polarity)
+enum DPI_STATUS ddp_dpi_ConfigDE(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, enum DPI_POLARITY polarity)
 {
 	struct DPI_REG_OUTPUT_SETTING pol = DPI_REG[DPI_IDX(module)]->OUTPUT_SETTING;
 
@@ -372,8 +372,8 @@ DPI_STATUS ddp_dpi_ConfigDE(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 	return DPI_STATUS_OK;
 }
 
-DPI_STATUS ddp_dpi_ConfigVsync(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, DPI_POLARITY polarity,
-			       uint32_t pulseWidth, uint32_t backPorch, uint32_t frontPorch)
+enum DPI_STATUS ddp_dpi_ConfigVsync(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+			enum DPI_POLARITY polarity,	uint32_t pulseWidth, uint32_t backPorch, uint32_t frontPorch)
 {
 	struct DPI_REG_TGEN_VWIDTH_LODD vwidth_lodd = DPI_REG[DPI_IDX(module)]->TGEN_VWIDTH_LODD;
 	struct DPI_REG_TGEN_VPORCH_LODD vporch_lodd = DPI_REG[DPI_IDX(module)]->TGEN_VPORCH_LODD;
@@ -398,8 +398,8 @@ DPI_STATUS ddp_dpi_ConfigVsync(DISP_MODULE_ENUM module, struct cmdqRecStruct *cm
 	return DPI_STATUS_OK;
 }
 
-DPI_STATUS ddp_dpi_ConfigHsync(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, DPI_POLARITY polarity,
-			       uint32_t pulseWidth, uint32_t backPorch, uint32_t frontPorch)
+enum DPI_STATUS ddp_dpi_ConfigHsync(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+			enum DPI_POLARITY polarity, uint32_t pulseWidth, uint32_t backPorch, uint32_t frontPorch)
 {
 	struct DPI_REG_TGEN_HPORCH hporch = DPI_REG[DPI_IDX(module)]->TGEN_HPORCH;
 	struct DPI_REG_OUTPUT_SETTING pol = DPI_REG[DPI_IDX(module)]->OUTPUT_SETTING;
@@ -416,7 +416,7 @@ DPI_STATUS ddp_dpi_ConfigHsync(DISP_MODULE_ENUM module, struct cmdqRecStruct *cm
 	return DPI_STATUS_OK;
 }
 
-DPI_STATUS ddp_dpi_ConfigDualEdge(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool enable,
+enum DPI_STATUS ddp_dpi_ConfigDualEdge(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool enable,
 				  uint32_t mode)
 {
 	DPI_OUTREGBIT(cmdq, struct DPI_REG_OUTPUT_SETTING, DPI_REG[DPI_IDX(module)]->OUTPUT_SETTING,
@@ -431,7 +431,7 @@ DPI_STATUS ddp_dpi_ConfigDualEdge(DISP_MODULE_ENUM module, struct cmdqRecStruct 
 	return DPI_STATUS_OK;
 }
 
-DPI_STATUS ddp_dpi_ConfigBG(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool enable, int BG_W,
+enum DPI_STATUS ddp_dpi_ConfigBG(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool enable, int BG_W,
 			    int BG_H)
 {
 	if (enable == false) {
@@ -453,7 +453,7 @@ DPI_STATUS ddp_dpi_ConfigBG(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 	return DPI_STATUS_OK;
 }
 
-DPI_STATUS ddp_dpi_ConfigSize(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, uint32_t width,
+enum DPI_STATUS ddp_dpi_ConfigSize(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, uint32_t width,
 			      uint32_t height)
 {
 	struct DPI_REG_SIZE size = DPI_REG[DPI_IDX(module)]->SIZE;
@@ -465,7 +465,7 @@ DPI_STATUS ddp_dpi_ConfigSize(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmd
 	return DPI_STATUS_OK;
 }
 
-DPI_STATUS ddp_dpi_EnableColorBar(DISP_MODULE_ENUM module)
+enum DPI_STATUS ddp_dpi_EnableColorBar(enum DISP_MODULE_ENUM module)
 {
 	/*enable internal pattern - color bar */
 	if (module == DISP_MODULE_DPI0)
@@ -476,7 +476,7 @@ DPI_STATUS ddp_dpi_EnableColorBar(DISP_MODULE_ENUM module)
 	return DPI_STATUS_OK;
 }
 
-DPI_STATUS ddp_dpi_yuv422_setting(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, uint32_t uvsw)
+enum DPI_STATUS ddp_dpi_yuv422_setting(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, uint32_t uvsw)
 {
 	struct DPI_REG_YUV422_SETTING uvset = DPI_REG[DPI_IDX(module)]->YUV422_SETTING;
 
@@ -486,7 +486,7 @@ DPI_STATUS ddp_dpi_yuv422_setting(DISP_MODULE_ENUM module, struct cmdqRecStruct 
 	return DPI_STATUS_OK;
 }
 
-DPI_STATUS ddp_dpi_CLPFSetting(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, uint8_t clpfType,
+enum DPI_STATUS ddp_dpi_CLPFSetting(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, uint8_t clpfType,
 			       bool roundingEnable)
 {
 	struct DPI_REG_CLPF_SETTING setting = DPI_REG[DPI_IDX(module)]->CLPF_SETTING;
@@ -498,7 +498,7 @@ DPI_STATUS ddp_dpi_CLPFSetting(DISP_MODULE_ENUM module, struct cmdqRecStruct *cm
 	return DPI_STATUS_OK;
 }
 
-DPI_STATUS ddp_dpi_ConfigHDMI(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, uint32_t yuv422en,
+enum DPI_STATUS ddp_dpi_ConfigHDMI(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, uint32_t yuv422en,
 			      uint32_t rgb2yuven, uint32_t ydfpen, uint32_t r601sel,
 			      uint32_t clpfen)
 {
@@ -520,7 +520,7 @@ DPI_STATUS ddp_dpi_ConfigHDMI(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmd
 DPI_VIDEO_1920x1080i_50Hz
 DPI_VIDEO_1920x1080i_60Hz
 */
-DPI_STATUS ddp_dpi_ConfigVsync_LEVEN(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+enum DPI_STATUS ddp_dpi_ConfigVsync_LEVEN(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 				     uint32_t pulseWidth, uint32_t backPorch, uint32_t frontPorch,
 				     bool fgInterlace)
 {
@@ -545,7 +545,7 @@ DPI_STATUS ddp_dpi_ConfigVsync_LEVEN(DISP_MODULE_ENUM module, struct cmdqRecStru
 	return DPI_STATUS_OK;
 }
 
-DPI_STATUS ddp_dpi_ConfigVsync_REVEN(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+enum DPI_STATUS ddp_dpi_ConfigVsync_REVEN(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 				     uint32_t pulseWidth, uint32_t backPorch, uint32_t frontPorch,
 				     bool fgInterlace)
 {
@@ -572,7 +572,7 @@ int Is_interlace_resolution(uint32_t resolution)
 		return false;
 }
 
-int LVDSTX_IsEnabled(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
+int LVDSTX_IsEnabled(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
 
 	/*int i = 0; */
@@ -586,7 +586,7 @@ int LVDSTX_IsEnabled(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 	return ret;
 }
 
-int ddp_dpi_reset(DISP_MODULE_ENUM module, void *cmdq_handle)
+int ddp_dpi_reset(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	pr_warn("DISP/DPI,ddp_dpi_reset\n");
 
@@ -596,12 +596,12 @@ int ddp_dpi_reset(DISP_MODULE_ENUM module, void *cmdq_handle)
 	return 0;
 }
 
-int ddp_dpi_start(DISP_MODULE_ENUM module, void *cmdq)
+int ddp_dpi_start(enum DISP_MODULE_ENUM module, void *cmdq)
 {
 	return 0;
 }
 
-int ddp_dpi_trigger(DISP_MODULE_ENUM module, void *cmdq)
+int ddp_dpi_trigger(enum DISP_MODULE_ENUM module, void *cmdq)
 {
 	if (s_isDpiStart == false) {
 		pr_warn("DISP/DPI,ddp_dpi_start\n");
@@ -614,7 +614,7 @@ int ddp_dpi_trigger(DISP_MODULE_ENUM module, void *cmdq)
 	return 0;
 }
 
-int ddp_dpi_stop(DISP_MODULE_ENUM module, void *cmdq_handle)
+int ddp_dpi_stop(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	pr_warn("DISP/DPI,ddp_dpi_stop\n");
 
@@ -637,14 +637,14 @@ int ddp_dpi_stop(DISP_MODULE_ENUM module, void *cmdq_handle)
 	return 0;
 }
 
-int ddp_dpi_is_busy(DISP_MODULE_ENUM module)
+int ddp_dpi_is_busy(enum DISP_MODULE_ENUM module)
 {
 	unsigned int status = INREG32(&DPI_REG[DPI_IDX(module)]->STATUS);
 
 	return (status & (0x1 << 16) ? 1 : 0);
 }
 
-int ddp_dpi_is_idle(DISP_MODULE_ENUM module)
+int ddp_dpi_is_idle(enum DISP_MODULE_ENUM module)
 {
 	return !ddp_dpi_is_busy(module);
 }
@@ -662,7 +662,7 @@ unsigned int ddp_dpi_get_cur_addr(bool rdma_mode, int layerid)
 
 
 #if ENABLE_DPI_INTERRUPT
-static irqreturn_t _DPI_InterruptHandler(DISP_MODULE_ENUM module, unsigned int param)
+static irqreturn_t _DPI_InterruptHandler(enum DISP_MODULE_ENUM module, unsigned int param)
 {
 	static int counter;
 	struct DPI_REG_INTERRUPT status = DPI_REG[DPI_IDX(module)]->INT_STATUS;
@@ -686,7 +686,7 @@ static irqreturn_t _DPI_InterruptHandler(DISP_MODULE_ENUM module, unsigned int p
 }
 #endif
 
-int ddp_dpi_init(DISP_MODULE_ENUM module, void *cmdq)
+int ddp_dpi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 {
 	unsigned int i;
 
@@ -717,7 +717,7 @@ int ddp_dpi_init(DISP_MODULE_ENUM module, void *cmdq)
 	return 0;
 }
 
-int ddp_dpi_deinit(DISP_MODULE_ENUM module, void *cmdq_handle)
+int ddp_dpi_deinit(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	pr_warn("DISP/DPI,ddp_dpi_deinit- %p\n", cmdq_handle);
 
@@ -727,7 +727,7 @@ int ddp_dpi_deinit(DISP_MODULE_ENUM module, void *cmdq_handle)
 	return 0;
 }
 
-int ddp_dpi_set_lcm_utils(DISP_MODULE_ENUM module, LCM_DRIVER *lcm_drv)
+int ddp_dpi_set_lcm_utils(enum DISP_MODULE_ENUM module, LCM_DRIVER *lcm_drv)
 {
 	/*DISPFUNC(); */
 	LCM_UTIL_FUNCS *utils = NULL;
@@ -748,12 +748,12 @@ int ddp_dpi_set_lcm_utils(DISP_MODULE_ENUM module, LCM_DRIVER *lcm_drv)
 	return 0;
 }
 
-int ddp_dpi_build_cmdq(DISP_MODULE_ENUM module, void *cmdq_trigger_handle, CMDQ_STATE state)
+int ddp_dpi_build_cmdq(enum DISP_MODULE_ENUM module, void *cmdq_trigger_handle, enum CMDQ_STATE state)
 {
 	return 0;
 }
 
-int ddp_dpi_dump(DISP_MODULE_ENUM module, int level)
+int ddp_dpi_dump(enum DISP_MODULE_ENUM module, int level)
 {
 	uint32_t i;
 
@@ -779,12 +779,12 @@ int ddp_dpi_dump(DISP_MODULE_ENUM module, int level)
 	return 0;
 }
 
-int ddp_dpi_ioctl(DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int ioctl_cmd,
+int ddp_dpi_ioctl(enum DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int ioctl_cmd,
 		  unsigned long *params)
 {
 
 	int ret = 0;
-	DDP_IOCTL_NAME ioctl = (DDP_IOCTL_NAME) ioctl_cmd;
+	enum DDP_IOCTL_NAME ioctl = (enum DDP_IOCTL_NAME) ioctl_cmd;
 
 	pr_debug("DISP/DPI,DPI ioctl: %d\n", ioctl);
 	DISPFUNC();
@@ -792,7 +792,7 @@ int ddp_dpi_ioctl(DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int ioctl
 	switch (ioctl) {
 	case DDP_DPI_FACTORY_TEST:
 		{
-			disp_ddp_path_config *config_info = (disp_ddp_path_config *) params;
+			struct disp_ddp_path_config *config_info = (struct disp_ddp_path_config *) params;
 
 			ddp_dpi_power_on(module, NULL);
 			ddp_dpi_stop(module, NULL);
@@ -811,12 +811,12 @@ int ddp_dpi_ioctl(DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int ioctl
 	return ret;
 }
 
-void LVDS_PLL_Init(DISP_MODULE_ENUM module, void *cmdq_handle, uint32_t PLL_CLK, uint32_t SSC_range,
+void LVDS_PLL_Init(enum DISP_MODULE_ENUM module, void *cmdq_handle, uint32_t PLL_CLK, uint32_t SSC_range,
 		   bool SSC_disable)
 {
 	unsigned int pixel_clock = 0;
 	unsigned long bclk = 0;	/*delta1 = 5, pdelta1 = 0; */
-	eDDP_CLK_ID clksrc = 0;
+	enum eDDP_CLK_ID clksrc = 0;
 
 	pixel_clock = PLL_CLK * 4;
 	if (pixel_clock > 500) {
@@ -861,7 +861,7 @@ void LVDS_PLL_Init(DISP_MODULE_ENUM module, void *cmdq_handle, uint32_t PLL_CLK,
 	 */
 }
 
-void LVDS_ANA_Init(DISP_MODULE_ENUM module, void *cmdq_handle)
+void LVDS_ANA_Init(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	DPI_OUTREG32(cmdq_handle, DDP_REG_LVDS_ANA + 0x18, 0x00203580);
 	DPI_OUTREG32(cmdq_handle, DDP_REG_LVDS_ANA + 0x14, 0x0010e040);
@@ -877,13 +877,13 @@ void LVDS_ANA_Init(DISP_MODULE_ENUM module, void *cmdq_handle)
 	pr_warn("LVDS_ANA_init finished\n");
 }
 
-void LVDS_DIG_RST(DISP_MODULE_ENUM module, void *cmdq_handle)
+void LVDS_DIG_RST(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	DPI_OUTREG32(cmdq_handle, DDP_REG_LVDS_TX + 0x34, 0x00000000);
 	DPI_OUTREG32(cmdq_handle, DDP_REG_LVDS_TX + 0x34, 0x00000003);
 }
 
-void LVDS_DIG_Init(DISP_MODULE_ENUM module, void *cmdq_handle)
+void LVDS_DIG_Init(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	DPI_OUTREG32(cmdq_handle, DDP_REG_LVDS_TX + 0x18, 0x00000001);
 	DPI_OUTREG32(cmdq_handle, DDP_REG_LVDS_TX + 0x20, 0x00000007);
@@ -919,7 +919,7 @@ void LVDS_DIG_Init(DISP_MODULE_ENUM module, void *cmdq_handle)
 #endif
 }
 
-void ddp_dpi_lvds_config(DISP_MODULE_ENUM module, LCM_DPI_FORMAT format, void *cmdq_handle)
+void ddp_dpi_lvds_config(enum DISP_MODULE_ENUM module, LCM_DPI_FORMAT format, void *cmdq_handle)
 {
 	LVDS_ANA_Init(module, cmdq_handle);
 	LVDS_DIG_Init(module, cmdq_handle);
@@ -928,13 +928,13 @@ void ddp_dpi_lvds_config(DISP_MODULE_ENUM module, LCM_DPI_FORMAT format, void *c
 	pr_warn("LVDS_config finished\n");
 }
 
-void ddp_dpi_RGB_config(DISP_MODULE_ENUM module, void *cmdq_handle)
+void ddp_dpi_RGB_config(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	DPI_OUTREG32(cmdq_handle, DDP_REG_BASE_MMSYS_CONFIG + 0x90c, 0x00000001);	/*enable RGB out */
 	pr_warn("RGB config finished\n");
 }
 
-void ddp_lvds_power_off(DISP_MODULE_ENUM module, void *cmdq_handle)
+void ddp_lvds_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	DPI_OUTREGBIT(cmdq_handle, struct LVDS_ANA_REG_CTL2, LVDS_ANA_REG->LVDSTX_ANA_CTL2,
 		      LVDSTX_ANA_LDO_EN, 0x0);
@@ -951,7 +951,7 @@ void ddp_lvds_power_off(DISP_MODULE_ENUM module, void *cmdq_handle)
 	pr_warn("LVDS_power_off finished\n");
 }
 
-int ddp_dpi_config(DISP_MODULE_ENUM module, disp_ddp_path_config *config, void *cmdq_handle)
+int ddp_dpi_config(enum DISP_MODULE_ENUM module, struct disp_ddp_path_config *config, void *cmdq_handle)
 {
 	if (((s_isDpiConfig == false) && (module == DISP_MODULE_DPI0)) || ((s_isDpi1Config == false)
 									   && (module ==
@@ -1005,7 +1005,7 @@ int ddp_dpi_config(DISP_MODULE_ENUM module, disp_ddp_path_config *config, void *
 	return 0;
 }
 
-int ddp_dpi_power_on(DISP_MODULE_ENUM module, void *cmdq_handle)
+int ddp_dpi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	int ret = 0;
 
@@ -1052,7 +1052,7 @@ int ddp_dpi_power_on(DISP_MODULE_ENUM module, void *cmdq_handle)
 	return 0;
 }
 
-int ddp_dpi_power_off(DISP_MODULE_ENUM module, void *cmdq_handle)
+int ddp_dpi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	int ret = 0;
 
@@ -1101,7 +1101,7 @@ int ddp_dpi_power_off(DISP_MODULE_ENUM module, void *cmdq_handle)
 	return 0;
 }
 
-bool ddp_dpi_is_top_filed(DISP_MODULE_ENUM module)
+bool ddp_dpi_is_top_filed(enum DISP_MODULE_ENUM module)
 {
 	if (module == DISP_MODULE_DPI1) {
 		if (DPI_REG[DPI_IDX(module)]->STATUS.FIELD == 0)
@@ -1112,7 +1112,7 @@ bool ddp_dpi_is_top_filed(DISP_MODULE_ENUM module)
 }
 
 
-DDP_MODULE_DRIVER ddp_driver_dpi0 = {
+struct DDP_MODULE_DRIVER ddp_driver_dpi0 = {
 	.module = DISP_MODULE_DPI0,
 	.init = ddp_dpi_init,
 	.deinit = ddp_dpi_deinit,
@@ -1131,7 +1131,7 @@ DDP_MODULE_DRIVER ddp_driver_dpi0 = {
 	.ioctl = ddp_dpi_ioctl
 };
 
-DDP_MODULE_DRIVER ddp_driver_dpi1 = {
+struct DDP_MODULE_DRIVER ddp_driver_dpi1 = {
 	.module = DISP_MODULE_DPI1,
 	.init = ddp_dpi_init,
 	.deinit = ddp_dpi_deinit,

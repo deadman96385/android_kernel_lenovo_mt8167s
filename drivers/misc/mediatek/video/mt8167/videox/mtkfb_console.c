@@ -48,14 +48,14 @@
 /* --------------------------------------------------------------------------- */
 uint32_t MFC_Get_Cursor_Offset(MFC_HANDLE handle)
 {
-	MFC_CONTEXT *ctxt = (MFC_CONTEXT *) handle;
+	struct MFC_CONTEXT *ctxt = (struct MFC_CONTEXT *) handle;
 
 	uint32_t offset = ctxt->cursor_col * MFC_FONT_WIDTH * MFC_BPP + ctxt->cursor_row * MFC_FONT_HEIGHT * MFC_PITCH;
 
 	return offset;
 }
 
-static void _MFC_DrawChar(MFC_CONTEXT *ctxt, uint32_t x, uint32_t y, char c)
+static void _MFC_DrawChar(struct MFC_CONTEXT *ctxt, uint32_t x, uint32_t y, char c)
 {
 	uint8_t ch = *((uint8_t *)&c);
 	const uint8_t *cdat;
@@ -95,7 +95,7 @@ static void _MFC_DrawChar(MFC_CONTEXT *ctxt, uint32_t x, uint32_t y, char c)
 }
 
 
-static void _MFC_ScrollUp(MFC_CONTEXT *ctxt)
+static void _MFC_ScrollUp(struct MFC_CONTEXT *ctxt)
 {
 	const uint32_t BG_COLOR = MAKE_TWO_RGB565_COLOR(MFC_BG_COLOR, MFC_BG_COLOR);
 
@@ -109,7 +109,7 @@ static void _MFC_ScrollUp(MFC_CONTEXT *ctxt)
 }
 
 
-static void _MFC_Newline(MFC_CONTEXT *ctxt)
+static void _MFC_Newline(struct MFC_CONTEXT *ctxt)
 {
 	/* /Bin:add for filling the color for the blank of this column */
 	while (ctxt->cursor_col < ctxt->cols) {
@@ -137,7 +137,7 @@ static void _MFC_Newline(MFC_CONTEXT *ctxt)
 			_MFC_Newline(ctxt);		\
 	} while (0)
 
-static void _MFC_Putc(MFC_CONTEXT *ctxt, const char c)
+static void _MFC_Putc(struct MFC_CONTEXT *ctxt, const char c)
 {
 	CHECK_NEWLINE();
 
@@ -165,11 +165,11 @@ static void _MFC_Putc(MFC_CONTEXT *ctxt, const char c)
 
 /* --------------------------------------------------------------------------- */
 
-MFC_STATUS MFC_Open(MFC_HANDLE *handle, void *fb_addr,
+enum MFC_STATUS MFC_Open(MFC_HANDLE *handle, void *fb_addr,
 		    unsigned int fb_width, unsigned int fb_height,
 		    unsigned int fb_bpp, unsigned int fg_color, unsigned int bg_color)
 {
-	MFC_CONTEXT *ctxt = NULL;
+	struct MFC_CONTEXT *ctxt = NULL;
 
 	if (NULL == handle || NULL == fb_addr)
 		return MFC_STATUS_INVALID_ARGUMENT;
@@ -177,7 +177,7 @@ MFC_STATUS MFC_Open(MFC_HANDLE *handle, void *fb_addr,
 	if (fb_bpp != 2)
 		return MFC_STATUS_NOT_IMPLEMENTED; /* only support RGB565 */
 
-	ctxt = kzalloc(sizeof(MFC_CONTEXT), GFP_KERNEL);
+	ctxt = kzalloc(sizeof(struct MFC_CONTEXT), GFP_KERNEL);
 	if (!ctxt)
 		return MFC_STATUS_OUT_OF_MEMORY;
 
@@ -199,13 +199,13 @@ MFC_STATUS MFC_Open(MFC_HANDLE *handle, void *fb_addr,
 	return MFC_STATUS_OK;
 }
 
-MFC_STATUS MFC_Open_Ex(MFC_HANDLE *handle, void *fb_addr,
+enum MFC_STATUS MFC_Open_Ex(MFC_HANDLE *handle, void *fb_addr,
 		       unsigned int fb_width, unsigned int fb_height,
 		       unsigned int fb_pitch, unsigned int fb_bpp,
 		       unsigned int fg_color, unsigned int bg_color)
 {
 
-	MFC_CONTEXT *ctxt = NULL;
+	struct MFC_CONTEXT *ctxt = NULL;
 
 	if (NULL == handle || NULL == fb_addr)
 		return MFC_STATUS_INVALID_ARGUMENT;
@@ -213,7 +213,7 @@ MFC_STATUS MFC_Open_Ex(MFC_HANDLE *handle, void *fb_addr,
 	if (fb_bpp != 2)
 		return MFC_STATUS_NOT_IMPLEMENTED; /* only support RGB565 */
 
-	ctxt = kzalloc(sizeof(MFC_CONTEXT), GFP_KERNEL);
+	ctxt = kzalloc(sizeof(struct MFC_CONTEXT), GFP_KERNEL);
 	if (!ctxt)
 		return MFC_STATUS_OUT_OF_MEMORY;
 
@@ -237,7 +237,7 @@ MFC_STATUS MFC_Open_Ex(MFC_HANDLE *handle, void *fb_addr,
 }
 
 
-MFC_STATUS MFC_Close(MFC_HANDLE handle)
+enum MFC_STATUS MFC_Close(MFC_HANDLE handle)
 {
 	if (!handle)
 		return MFC_STATUS_INVALID_ARGUMENT;
@@ -248,9 +248,9 @@ MFC_STATUS MFC_Close(MFC_HANDLE handle)
 }
 
 
-MFC_STATUS MFC_SetColor(MFC_HANDLE handle, unsigned int fg_color, unsigned int bg_color)
+enum MFC_STATUS MFC_SetColor(MFC_HANDLE handle, unsigned int fg_color, unsigned int bg_color)
 {
-	MFC_CONTEXT *ctxt = (MFC_CONTEXT *)handle;
+	struct MFC_CONTEXT *ctxt = (struct MFC_CONTEXT *)handle;
 
 	if (!ctxt)
 		return MFC_STATUS_INVALID_ARGUMENT;
@@ -270,9 +270,9 @@ MFC_STATUS MFC_SetColor(MFC_HANDLE handle, unsigned int fg_color, unsigned int b
 }
 
 
-MFC_STATUS MFC_ResetCursor(MFC_HANDLE handle)
+enum MFC_STATUS MFC_ResetCursor(MFC_HANDLE handle)
 {
-	MFC_CONTEXT *ctxt = (MFC_CONTEXT *)handle;
+	struct MFC_CONTEXT *ctxt = (struct MFC_CONTEXT *)handle;
 
 	if (!ctxt)
 		return MFC_STATUS_INVALID_ARGUMENT;
@@ -290,9 +290,9 @@ MFC_STATUS MFC_ResetCursor(MFC_HANDLE handle)
 }
 
 
-MFC_STATUS MFC_Print(MFC_HANDLE handle, const char *str)
+enum MFC_STATUS MFC_Print(MFC_HANDLE handle, const char *str)
 {
-	MFC_CONTEXT *ctxt = (MFC_CONTEXT *)handle;
+	struct MFC_CONTEXT *ctxt = (struct MFC_CONTEXT *)handle;
 	int count = 0;
 
 	if (!ctxt || !str)
@@ -314,9 +314,9 @@ MFC_STATUS MFC_Print(MFC_HANDLE handle, const char *str)
 	return MFC_STATUS_OK;
 }
 
-MFC_STATUS MFC_SetMem(MFC_HANDLE handle, const char *str, uint32_t color)
+enum MFC_STATUS MFC_SetMem(MFC_HANDLE handle, const char *str, uint32_t color)
 {
-	MFC_CONTEXT *ctxt = (MFC_CONTEXT *)handle;
+	struct MFC_CONTEXT *ctxt = (struct MFC_CONTEXT *)handle;
 	int count = 0;
 	int i, j;
 	uint32_t *ptr;
@@ -344,10 +344,10 @@ MFC_STATUS MFC_SetMem(MFC_HANDLE handle, const char *str, uint32_t color)
 	return MFC_STATUS_OK;
 }
 
-MFC_STATUS MFC_LowMemory_Printf(MFC_HANDLE handle, const char *str,
+enum MFC_STATUS MFC_LowMemory_Printf(MFC_HANDLE handle, const char *str,
 				uint32_t fg_color, uint32_t bg_color)
 {
-	MFC_CONTEXT *ctxt = (MFC_CONTEXT *)handle;
+	struct MFC_CONTEXT *ctxt = (struct MFC_CONTEXT *)handle;
 	int count = 0;
 	unsigned int col, row, fg_color_mfc, bg_color_mfc;
 

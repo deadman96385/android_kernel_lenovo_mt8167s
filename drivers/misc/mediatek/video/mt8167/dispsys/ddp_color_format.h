@@ -16,13 +16,13 @@
 
 #include "ddp_info.h"
 
-int fmt_bpp(DpColorFormat fmt);
-int fmt_swap(DpColorFormat fmt);
-int fmt_color_space(DpColorFormat fmt);
-int fmt_is_yuv422(DpColorFormat fmt);
-int fmt_is_yuv420(DpColorFormat fmt);
-int fmt_hw_value(DpColorFormat fmt);
-char *fmt_string(DpColorFormat fmt);
-DpColorFormat fmt_type(int unique, int swap);
+int fmt_bpp(enum DP_COLOR_ENUM fmt);
+int fmt_swap(enum DP_COLOR_ENUM fmt);
+int fmt_color_space(enum DP_COLOR_ENUM fmt);
+int fmt_is_yuv422(enum DP_COLOR_ENUM fmt);
+int fmt_is_yuv420(enum DP_COLOR_ENUM fmt);
+int fmt_hw_value(enum DP_COLOR_ENUM fmt);
+char *fmt_string(enum DP_COLOR_ENUM fmt);
+enum DP_COLOR_ENUM fmt_type(int unique, int swap);
 
 #endif

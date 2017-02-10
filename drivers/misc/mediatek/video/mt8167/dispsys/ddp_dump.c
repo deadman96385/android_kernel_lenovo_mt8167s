@@ -162,7 +162,7 @@ static char *ddp_get_mutex_module_name(unsigned int bit)
 	}
 }
 
-char *ddp_get_fmt_name(DISP_MODULE_ENUM module, unsigned int fmt)
+char *ddp_get_fmt_name(enum DISP_MODULE_ENUM module, unsigned int fmt)
 {
 	if (module == DISP_MODULE_WDMA0 || module == DISP_MODULE_WDMA1) {
 		switch (fmt) {
@@ -611,17 +611,17 @@ static void merge_dump_analysis(void)
 		DISP_REG_GET(DISP_REG_MERGE_DEBUG));
 }
 
-static void split_dump_reg(DISP_MODULE_ENUM module)
+static void split_dump_reg(enum DISP_MODULE_ENUM module)
 {
 	DDPDUMP("error: disp_split dose not exist! module=%d\n", module);
 }
 
-static void split_dump_analysis(DISP_MODULE_ENUM module)
+static void split_dump_analysis(enum DISP_MODULE_ENUM module)
 {
 	DDPDUMP("error: disp_split dose not exist! module=%d\n", module);
 }
 
-static void color_dump_reg(DISP_MODULE_ENUM module)
+static void color_dump_reg(enum DISP_MODULE_ENUM module)
 {
 	int index = 0;
 
@@ -640,7 +640,7 @@ static void color_dump_reg(DISP_MODULE_ENUM module)
 	DDPDUMP("(0xc54)COLOR_INTER_IP_H =0x%x\n", DISP_REG_GET(DISP_COLOR_INTERNAL_IP_HEIGHT));
 }
 
-static void color_dump_analysis(DISP_MODULE_ENUM module)
+static void color_dump_analysis(enum DISP_MODULE_ENUM module)
 {
 	int index = 0;
 
@@ -694,7 +694,7 @@ static void aal_dump_analysis(void)
 		(DISP_REG_GET(DISP_AAL_OUT_CNT) >> 16) & 0x1fff);
 }
 
-static void pwm_dump_reg(DISP_MODULE_ENUM module)
+static void pwm_dump_reg(enum DISP_MODULE_ENUM module)
 {
 #ifndef CONFIG_FPGA_EARLY_PORTING
 	int index = 0;
@@ -715,7 +715,7 @@ static void pwm_dump_reg(DISP_MODULE_ENUM module)
 #endif
 }
 
-static void pwm_dump_analysis(DISP_MODULE_ENUM module)
+static void pwm_dump_analysis(enum DISP_MODULE_ENUM module)
 {
 #ifndef CONFIG_FPGA_EARLY_PORTING
 	int index = 0;
@@ -778,7 +778,7 @@ static void dither_dump_analyze(void)
 		     (DISP_REG_GET(DISP_REG_DITHER_OUT_CNT) >> 16) & 0x1fff);
 }
 
-static void dsi_dump_reg(DISP_MODULE_ENUM module)
+static void dsi_dump_reg(enum DISP_MODULE_ENUM module)
 {
 	int i = 0;
 
@@ -846,7 +846,7 @@ static void dpi_dump_analysis(void)
 	DDPDUMP("DPI  clock_clear=%d\n", (DISP_REG_GET(DISP_REG_CLK_CFG_6_CLR) >> 7) & 0x1);
 }
 
-int ddp_dump_reg(DISP_MODULE_ENUM module)
+int ddp_dump_reg(enum DISP_MODULE_ENUM module)
 {
 	switch (module) {
 	case DISP_MODULE_WDMA0:
@@ -909,7 +909,7 @@ int ddp_dump_reg(DISP_MODULE_ENUM module)
 	return 0;
 }
 
-int ddp_dump_analysis(DISP_MODULE_ENUM module)
+int ddp_dump_analysis(enum DISP_MODULE_ENUM module)
 {
 #ifdef CONFIG_FPGA_EARLY_PORTING	/* reducing log for FPGA */
 	return 0;

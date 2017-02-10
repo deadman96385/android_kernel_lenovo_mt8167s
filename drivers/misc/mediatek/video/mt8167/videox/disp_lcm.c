@@ -35,7 +35,7 @@ int _lcm_count(void)
 	return lcm_count;
 }
 
-int _is_lcm_inited(disp_lcm_handle *plcm)
+int _is_lcm_inited(struct disp_lcm_handle *plcm)
 {
 	if (plcm) {
 		if (plcm->params && plcm->drv)
@@ -48,7 +48,7 @@ int _is_lcm_inited(disp_lcm_handle *plcm)
 	return 0;
 }
 
-LCM_PARAMS *_get_lcm_params_by_handle(disp_lcm_handle *plcm)
+LCM_PARAMS *_get_lcm_params_by_handle(struct disp_lcm_handle *plcm)
 {
 	if (plcm)
 		return plcm->params;
@@ -57,7 +57,7 @@ LCM_PARAMS *_get_lcm_params_by_handle(disp_lcm_handle *plcm)
 	return NULL;
 }
 
-LCM_DRIVER *_get_lcm_driver_by_handle(disp_lcm_handle *plcm)
+LCM_DRIVER *_get_lcm_driver_by_handle(struct disp_lcm_handle *plcm)
 {
 	if (plcm)
 		return plcm->drv;
@@ -66,7 +66,7 @@ LCM_DRIVER *_get_lcm_driver_by_handle(disp_lcm_handle *plcm)
 	return NULL;
 }
 
-void _dump_lcm_info(disp_lcm_handle *plcm)
+void _dump_lcm_info(struct disp_lcm_handle *plcm)
 {
 	LCM_DRIVER *l = NULL;
 	LCM_PARAMS *p = NULL;
@@ -784,14 +784,14 @@ void load_lcm_resources_from_DT(LCM_DRIVER *lcm_drv)
 }
 #endif
 
-disp_lcm_handle *disp_lcm_probe(char *plcm_name, LCM_INTERFACE_ID lcm_id)
+struct disp_lcm_handle *disp_lcm_probe(char *plcm_name, LCM_INTERFACE_ID lcm_id)
 {
 	int lcmindex = 0;
 	bool isLCMFound = false;
 	bool isLCMInited = false;
 	LCM_DRIVER *lcm_drv = NULL;
 	LCM_PARAMS *lcm_param = NULL;
-	disp_lcm_handle *plcm = NULL;
+	struct disp_lcm_handle *plcm = NULL;
 
 	DISPPRINT("%s\n", __func__);
 	DISPCHECK("plcm_name=%s\n", plcm_name);
@@ -849,7 +849,7 @@ disp_lcm_handle *disp_lcm_probe(char *plcm_name, LCM_INTERFACE_ID lcm_id)
 		return NULL;
 	}
 
-	plcm = kzalloc(sizeof(uint8_t *) * sizeof(disp_lcm_handle), GFP_KERNEL);
+	plcm = kzalloc(sizeof(uint8_t *) * sizeof(struct disp_lcm_handle), GFP_KERNEL);
 	lcm_param = kzalloc(sizeof(uint8_t *) * sizeof(LCM_PARAMS), GFP_KERNEL);
 	if (plcm && lcm_param) {
 		plcm->params = lcm_param;
@@ -899,7 +899,7 @@ FAIL:
 }
 
 
-int disp_lcm_init(disp_lcm_handle *plcm, int force)
+int disp_lcm_init(struct disp_lcm_handle *plcm, int force)
 {
 	LCM_DRIVER *lcm_drv = NULL;
 
@@ -927,7 +927,7 @@ int disp_lcm_init(disp_lcm_handle *plcm, int force)
 	return -1;
 }
 
-LCM_PARAMS *disp_lcm_get_params(disp_lcm_handle *plcm)
+LCM_PARAMS *disp_lcm_get_params(struct disp_lcm_handle *plcm)
 {
 	/* DISPFUNC(); */
 
@@ -937,7 +937,7 @@ LCM_PARAMS *disp_lcm_get_params(disp_lcm_handle *plcm)
 		return NULL;
 }
 
-LCM_INTERFACE_ID disp_lcm_get_interface_id(disp_lcm_handle *plcm)
+LCM_INTERFACE_ID disp_lcm_get_interface_id(struct disp_lcm_handle *plcm)
 {
 	DISPFUNC();
 
@@ -947,7 +947,7 @@ LCM_INTERFACE_ID disp_lcm_get_interface_id(disp_lcm_handle *plcm)
 		return LCM_INTERFACE_NOTDEFINED;
 }
 
-int disp_lcm_update(disp_lcm_handle *plcm, int x, int y, int w, int h, int force)
+int disp_lcm_update(struct disp_lcm_handle *plcm, int x, int y, int w, int h, int force)
 {
 	LCM_DRIVER *lcm_drv = NULL;
 
@@ -974,7 +974,7 @@ int disp_lcm_update(disp_lcm_handle *plcm, int x, int y, int w, int h, int force
 
 /* return 1: esd check fail */
 /* return 0: esd check pass */
-int disp_lcm_esd_check(disp_lcm_handle *plcm)
+int disp_lcm_esd_check(struct disp_lcm_handle *plcm)
 {
 	LCM_DRIVER *lcm_drv = NULL;
 
@@ -994,7 +994,7 @@ int disp_lcm_esd_check(disp_lcm_handle *plcm)
 
 
 
-int disp_lcm_esd_recover(disp_lcm_handle *plcm)
+int disp_lcm_esd_recover(struct disp_lcm_handle *plcm)
 {
 	LCM_DRIVER *lcm_drv = NULL;
 
@@ -1018,7 +1018,7 @@ int disp_lcm_esd_recover(disp_lcm_handle *plcm)
 
 
 
-int disp_lcm_suspend(disp_lcm_handle *plcm)
+int disp_lcm_suspend(struct disp_lcm_handle *plcm)
 {
 	LCM_DRIVER *lcm_drv = NULL;
 
@@ -1045,7 +1045,7 @@ int disp_lcm_suspend(disp_lcm_handle *plcm)
 
 
 
-int disp_lcm_resume(disp_lcm_handle *plcm)
+int disp_lcm_resume(struct disp_lcm_handle *plcm)
 {
 	LCM_DRIVER *lcm_drv = NULL;
 
@@ -1075,7 +1075,7 @@ int disp_lcm_resume(disp_lcm_handle *plcm)
 #ifdef MT_TODO
 #error "maybe CABC can be moved into lcm_ioctl??"
 #endif
-int disp_lcm_set_backlight(disp_lcm_handle *plcm, int level)
+int disp_lcm_set_backlight(struct disp_lcm_handle *plcm, int level)
 {
 	LCM_DRIVER *lcm_drv = NULL;
 
@@ -1099,12 +1099,12 @@ int disp_lcm_set_backlight(disp_lcm_handle *plcm, int level)
 
 
 
-int disp_lcm_ioctl(disp_lcm_handle *plcm, LCM_IOCTL ioctl, unsigned int arg)
+int disp_lcm_ioctl(struct disp_lcm_handle *plcm, LCM_IOCTL ioctl, unsigned int arg)
 {
 	return 0;
 }
 
-int disp_lcm_is_inited(disp_lcm_handle *plcm)
+int disp_lcm_is_inited(struct disp_lcm_handle *plcm)
 {
 	if (_is_lcm_inited(plcm))
 		return plcm->is_inited;
@@ -1112,7 +1112,7 @@ int disp_lcm_is_inited(disp_lcm_handle *plcm)
 		return 0;
 }
 
-unsigned int disp_lcm_ATA(disp_lcm_handle *plcm)
+unsigned int disp_lcm_ATA(struct disp_lcm_handle *plcm)
 {
 	unsigned int ret = 0;
 	LCM_DRIVER *lcm_drv = NULL;
@@ -1134,7 +1134,7 @@ unsigned int disp_lcm_ATA(disp_lcm_handle *plcm)
 	return 0;
 }
 
-void *disp_lcm_switch_mode(disp_lcm_handle *plcm, int mode)
+void *disp_lcm_switch_mode(struct disp_lcm_handle *plcm, int mode)
 {
 	LCM_DRIVER *lcm_drv = NULL;
 	LCM_DSI_MODE_SWITCH_CMD *lcm_cmd = NULL;
@@ -1160,7 +1160,7 @@ void *disp_lcm_switch_mode(disp_lcm_handle *plcm, int mode)
 	return NULL;
 }
 
-int disp_lcm_is_video_mode(disp_lcm_handle *plcm)
+int disp_lcm_is_video_mode(struct disp_lcm_handle *plcm)
 {
 	/* DISPFUNC(); */
 	LCM_PARAMS *lcm_param = NULL;
@@ -1200,7 +1200,7 @@ int disp_lcm_is_video_mode(disp_lcm_handle *plcm)
 	return 0;
 }
 
-int disp_lcm_set_cmd(disp_lcm_handle *plcm, void *handle, int *lcm_cmd, unsigned int cmd_num)
+int disp_lcm_set_cmd(struct disp_lcm_handle *plcm, void *handle, int *lcm_cmd, unsigned int cmd_num)
 {
 	LCM_DRIVER *lcm_drv = NULL;
 

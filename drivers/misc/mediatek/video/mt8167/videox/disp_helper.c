@@ -73,7 +73,7 @@ void disable_screen_idle_switch_decouple(void)
 
 static int _disp_helper_option_value[DISP_HELPER_OPTION_NUM] = {0};
 
-const char *disp_helper_option_spy(DISP_HELPER_OPTION option)
+const char *disp_helper_option_spy(enum DISP_HELPER_OPTION option)
 {
 	switch (option) {
 	case DISP_HELPER_OPTION_USE_CMDQ:
@@ -113,7 +113,7 @@ const char *disp_helper_option_spy(DISP_HELPER_OPTION option)
 	}
 }
 
-void disp_helper_set_option(DISP_HELPER_OPTION option, int value)
+void disp_helper_set_option(enum DISP_HELPER_OPTION option, int value)
 {
 	if (option < DISP_HELPER_OPTION_NUM) {
 		DISPCHECK("Set Option %d(%s) from (%d) to (%d)\n", option,
@@ -125,7 +125,7 @@ void disp_helper_set_option(DISP_HELPER_OPTION option, int value)
 	}
 }
 
-int disp_helper_get_option(DISP_HELPER_OPTION option)
+int disp_helper_get_option(enum DISP_HELPER_OPTION option)
 {
 	int ret = 0;
 
@@ -225,7 +225,7 @@ int disp_helper_get_option(DISP_HELPER_OPTION option)
 	}
 }
 
-DISP_HELPER_STAGE disp_helper_get_stage(void)
+enum DISP_HELPER_STAGE disp_helper_get_stage(void)
 {
 	return disp_global_stage & (~MAGIC_CODE);
 }

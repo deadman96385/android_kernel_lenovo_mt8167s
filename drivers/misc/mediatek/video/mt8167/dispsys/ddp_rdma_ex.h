@@ -47,7 +47,7 @@ enum RDMA_MODE {
 	RDMA_MODE_MEMORY = 1,
 };
 
-int rdma_clock_on(DISP_MODULE_ENUM module, void *handle);
-int rdma_clock_off(DISP_MODULE_ENUM module, void *handle);
+int rdma_clock_on(enum DISP_MODULE_ENUM module, void *handle);
+int rdma_clock_off(enum DISP_MODULE_ENUM module, void *handle);
 
 #endif

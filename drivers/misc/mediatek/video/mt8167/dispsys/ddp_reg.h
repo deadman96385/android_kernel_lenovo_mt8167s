@@ -91,13 +91,13 @@ static unsigned int module_list_scenario[DDP_SCENARIO_MAX][DDP_ENING_NUM] = {
 #endif
 
 /* 1st para is mout's input, 2nd para is mout's output */
-extern mout_t mout_map[DDP_MOUT_NUM];
+extern struct mout_t mout_map[DDP_MOUT_NUM];
 
 
-extern sel_t sel_out_map[DDP_SEL_OUT_NUM];
+extern struct sel_t sel_out_map[DDP_SEL_OUT_NUM];
 
 /* 1st para is sout's output, 2nd para is sout's input */
-extern sel_t sel_in_map[DDP_SEL_IN_NUM];
+extern struct sel_t sel_in_map[DDP_SEL_IN_NUM];
 
 
 /* from DTS, for debug */
@@ -145,71 +145,6 @@ static const unsigned int ddp_irq_num[DISP_REG_NUM] = {
 	0,	/*DISP_REG_MIPI*/
 	0,	/*DISP_LVDS_ANA*/
 	0	/*DISP_LVDS_TX*/
-};
-
-/* module bit in mutex */
-static const module_map_t module_mutex_map[DISP_MODULE_NUM] = {
-	{DISP_MODULE_OVL0, 6},
-	{DISP_MODULE_OVL1, 7},
-	{DISP_MODULE_RDMA0, 8},
-	{DISP_MODULE_RDMA1, 9},
-	{DISP_MODULE_WDMA0, 10},
-	{DISP_MODULE_COLOR0, 12},
-	{DISP_MODULE_CCORR, 11},
-	{DISP_MODULE_AAL, 13},
-	{DISP_MODULE_GAMMA, 14},
-	{DISP_MODULE_DITHER, 15},
-	{DISP_MODULE_UFOE, 16},
-	{DISP_MODULE_PWM0, 17},
-	{DISP_MODULE_WDMA1, -1},
-	{DISP_MODULE_DSI0, -1},
-	{DISP_MODULE_DPI0, -1},
-	{DISP_MODULE_DPI1, -1},
-	{DISP_MODULE_SMI, -1},
-	{DISP_MODULE_CONFIG, -1},
-	{DISP_MODULE_CMDQ, -1},
-	{DISP_MODULE_MUTEX, -1},
-	{DISP_MODULE_COLOR1, -1},
-	{DISP_MODULE_RDMA2, -1},
-	{DISP_MODULE_PWM1, -1},
-	{DISP_MODULE_OD, -1},
-};
-
-
-/* module can be connect if 1 */
-static const module_map_t module_can_connect[DISP_MODULE_NUM] = {
-	{DISP_MODULE_OVL0, 1},
-	{DISP_MODULE_OVL1, 0},
-	{DISP_MODULE_RDMA0, 1},
-	{DISP_MODULE_RDMA1, 1},
-	{DISP_MODULE_WDMA0, 1},
-	{DISP_MODULE_COLOR0, 1},
-	{DISP_MODULE_CCORR, 1},
-	{DISP_MODULE_AAL, 1},
-	{DISP_MODULE_GAMMA, 1},
-	{DISP_MODULE_DITHER, 1},
-	{DISP_MODULE_UFOE, 1},
-	{DISP_MODULE_PWM0, 0},
-	{DISP_MODULE_WDMA1, 0},
-	{DISP_MODULE_DSI0, 1},
-	{DISP_MODULE_DPI0, 1},
-	{DISP_MODULE_DPI1, 1},
-	{DISP_MODULE_SMI, 0},
-	{DISP_MODULE_CONFIG, 0},
-	{DISP_MODULE_CMDQ, 0},
-	{DISP_MODULE_MUTEX, 0},
-	{DISP_MODULE_COLOR1, 0},
-	{DISP_MODULE_RDMA2, 0},
-	{DISP_MODULE_PWM1, 0},
-	{DISP_MODULE_OD, 0},
-	{DISP_MODULE_MERGE, 0},
-	{DISP_MODULE_SPLIT0, 0},
-	{DISP_MODULE_SPLIT1, 0},
-	{DISP_MODULE_DSI1, 0},
-	{DISP_MODULE_DSIDUAL, 0},
-	{DISP_MODULE_SMI_LARB0, 0},
-	{DISP_MODULE_SMI_COMMON, 0},
-	{DISP_MODULE_UNKNOWN, 0},
 };
 
 

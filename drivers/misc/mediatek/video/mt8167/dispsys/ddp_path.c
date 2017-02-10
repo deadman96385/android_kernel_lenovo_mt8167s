@@ -36,7 +36,7 @@
 #pragma GCC optimize("O0")
 
 /* 1st para is mout's input, 2nd para is mout's output */
-mout_t mout_map[DDP_MOUT_NUM] = {
+struct mout_t mout_map[DDP_MOUT_NUM] = {
 	/* [0]OVL_MOUT */
 	{DISP_MODULE_OVL0, {{DISP_MODULE_COLOR0, 1 << 0}, {DISP_MODULE_WDMA0, 1 << 1}, {-1, 0} },
 	 0, 0},
@@ -51,7 +51,7 @@ mout_t mout_map[DDP_MOUT_NUM] = {
 	 0, 0},
 };
 
-sel_t sel_out_map[DDP_SEL_OUT_NUM] = {
+struct sel_t sel_out_map[DDP_SEL_OUT_NUM] = {
 	/* [0]RDMA0_SOUT */
 	{DISP_MODULE_RDMA0,
 	 {DISP_MODULE_UFOE, DISP_MODULE_COLOR0, DISP_MODULE_DSI0, DISP_MODULE_DPI0, DISP_MODULE_DPI1},
@@ -62,7 +62,7 @@ sel_t sel_out_map[DDP_SEL_OUT_NUM] = {
 };
 
 /* 1st para is sout's output, 2nd para is sout's input */
-sel_t sel_in_map[DDP_SEL_IN_NUM] = {
+struct sel_t sel_in_map[DDP_SEL_IN_NUM] = {
 	/* [0]COLOR_SEL */
 	{DISP_MODULE_COLOR0, {DISP_MODULE_RDMA0, DISP_MODULE_OVL0, -1},
 	 0, 0},
@@ -108,8 +108,71 @@ int ddp_path_init(void)
 	return 0;
 }
 
+/* module bit in mutex */
+static struct module_map_s module_mutex_map[DISP_MODULE_NUM] = {
+	{DISP_MODULE_OVL0, 6},
+	{DISP_MODULE_OVL1, 7},
+	{DISP_MODULE_RDMA0, 8},
+	{DISP_MODULE_RDMA1, 9},
+	{DISP_MODULE_WDMA0, 10},
+	{DISP_MODULE_COLOR0, 12},
+	{DISP_MODULE_CCORR, 11},
+	{DISP_MODULE_AAL, 13},
+	{DISP_MODULE_GAMMA, 14},
+	{DISP_MODULE_DITHER, 15},
+	{DISP_MODULE_UFOE, 16},
+	{DISP_MODULE_PWM0, 17},
+	{DISP_MODULE_WDMA1, -1},
+	{DISP_MODULE_DSI0, -1},
+	{DISP_MODULE_DPI0, -1},
+	{DISP_MODULE_DPI1, -1},
+	{DISP_MODULE_SMI, -1},
+	{DISP_MODULE_CONFIG, -1},
+	{DISP_MODULE_CMDQ, -1},
+	{DISP_MODULE_MUTEX, -1},
+	{DISP_MODULE_COLOR1, -1},
+	{DISP_MODULE_RDMA2, -1},
+	{DISP_MODULE_PWM1, -1},
+	{DISP_MODULE_OD, -1},
+};
 
-char *ddp_get_scenario_name(DDP_SCENARIO_ENUM scenario)
+/* module can be connect if 1 */
+static struct module_map_s module_can_connect[DISP_MODULE_NUM] = {
+	{DISP_MODULE_OVL0, 1},
+	{DISP_MODULE_OVL1, 0},
+	{DISP_MODULE_RDMA0, 1},
+	{DISP_MODULE_RDMA1, 1},
+	{DISP_MODULE_WDMA0, 1},
+	{DISP_MODULE_COLOR0, 1},
+	{DISP_MODULE_CCORR, 1},
+	{DISP_MODULE_AAL, 1},
+	{DISP_MODULE_GAMMA, 1},
+	{DISP_MODULE_DITHER, 1},
+	{DISP_MODULE_UFOE, 1},
+	{DISP_MODULE_PWM0, 0},
+	{DISP_MODULE_WDMA1, 0},
+	{DISP_MODULE_DSI0, 1},
+	{DISP_MODULE_DPI0, 1},
+	{DISP_MODULE_DPI1, 1},
+	{DISP_MODULE_SMI, 0},
+	{DISP_MODULE_CONFIG, 0},
+	{DISP_MODULE_CMDQ, 0},
+	{DISP_MODULE_MUTEX, 0},
+	{DISP_MODULE_COLOR1, 0},
+	{DISP_MODULE_RDMA2, 0},
+	{DISP_MODULE_PWM1, 0},
+	{DISP_MODULE_OD, 0},
+	{DISP_MODULE_MERGE, 0},
+	{DISP_MODULE_SPLIT0, 0},
+	{DISP_MODULE_SPLIT1, 0},
+	{DISP_MODULE_DSI1, 0},
+	{DISP_MODULE_DSIDUAL, 0},
+	{DISP_MODULE_SMI_LARB0, 0},
+	{DISP_MODULE_SMI_COMMON, 0},
+	{DISP_MODULE_UNKNOWN, 0},
+};
+
+char *ddp_get_scenario_name(enum DDP_SCENARIO_ENUM scenario)
 {
 	switch (scenario) {
 	case DDP_SCENARIO_PRIMARY_DISP:
@@ -144,7 +207,7 @@ char *ddp_get_scenario_name(DDP_SCENARIO_ENUM scenario)
 	}
 }
 
-int ddp_is_scenario_on_primary(DDP_SCENARIO_ENUM scenario)
+int ddp_is_scenario_on_primary(enum DDP_SCENARIO_ENUM scenario)
 {
 	int on_primary = 0;
 
@@ -175,7 +238,7 @@ int ddp_is_scenario_on_primary(DDP_SCENARIO_ENUM scenario)
 }
 
 
-char *ddp_get_mutex_sof_name(MUTEX_SOF mode)
+char *ddp_get_mutex_sof_name(enum MUTEX_SOF mode)
 {
 	switch (mode) {
 	case SOF_SINGLE:
@@ -192,7 +255,7 @@ char *ddp_get_mutex_sof_name(MUTEX_SOF mode)
 	}
 }
 
-char *ddp_get_mode_name(DDP_MODE ddp_mode)
+char *ddp_get_mode_name(enum DDP_MODE ddp_mode)
 {
 	switch (ddp_mode) {
 	case DDP_VIDEO_MODE:
@@ -485,9 +548,9 @@ static void ddp_disconnect_path_l(int *module_list, void *handle)
 }
 
 
-static MUTEX_SOF ddp_get_mutex_sof(DISP_MODULE_ENUM dest_module, DDP_MODE ddp_mode)
+static enum MUTEX_SOF ddp_get_mutex_sof(enum DISP_MODULE_ENUM dest_module, enum DDP_MODE ddp_mode)
 {
-	MUTEX_SOF mode = SOF_SINGLE;
+	enum MUTEX_SOF mode = SOF_SINGLE;
 
 	switch (dest_module) {
 	case DISP_MODULE_DSI0:
@@ -530,12 +593,12 @@ static MUTEX_SOF ddp_get_mutex_sof(DISP_MODULE_ENUM dest_module, DDP_MODE ddp_mo
 }
 
 /* id: mutex ID, 0~5 */
-static int ddp_mutex_set_l(int mutex_id, int *module_list, DDP_MODE ddp_mode, void *handle)
+static int ddp_mutex_set_l(int mutex_id, int *module_list, enum DDP_MODE ddp_mode, void *handle)
 {
 	int i = 0;
 	uint32_t value = 0;
 	int module_num = ddp_get_module_num_l(module_list);
-	MUTEX_SOF mode = ddp_get_mutex_sof(module_list[module_num - 1], ddp_mode);
+	enum MUTEX_SOF mode = ddp_get_mutex_sof(module_list[module_num - 1], ddp_mode);
 
 	if (mutex_id < DISP_MUTEX_DDP_FIRST || mutex_id > DISP_MUTEX_DDP_LAST) {
 		DDPERR("exceed mutex max (0 ~ %d)\n", DISP_MUTEX_DDP_LAST);
@@ -579,13 +642,13 @@ static int ddp_mutex_set_l(int mutex_id, int *module_list, DDP_MODE ddp_mode, vo
 	return 0;
 }
 
-static void ddp_check_mutex_l(int mutex_id, int *module_list, DDP_MODE ddp_mode)
+static void ddp_check_mutex_l(int mutex_id, int *module_list, enum DDP_MODE ddp_mode)
 {
 	int i = 0;
 	uint32_t real_value = 0;
 	uint32_t expect_value = 0;
 	uint32_t real_sof = 0;
-	MUTEX_SOF expect_sof = SOF_SINGLE;
+	enum MUTEX_SOF expect_sof = SOF_SINGLE;
 	int module_num = ddp_get_module_num_l(module_list);
 
 	if (mutex_id < DISP_MUTEX_DDP_FIRST || mutex_id > DISP_MUTEX_DDP_LAST) {
@@ -606,7 +669,7 @@ static void ddp_check_mutex_l(int mutex_id, int *module_list, DDP_MODE ddp_mode)
 	if ((uint32_t) expect_sof != real_sof) {
 		DDPDUMP("error:mutex %d sof error: expect %s, real %s\n", mutex_id,
 			ddp_get_mutex_sof_name(expect_sof),
-			ddp_get_mutex_sof_name((MUTEX_SOF) real_sof));
+			ddp_get_mutex_sof_name((enum MUTEX_SOF) real_sof));
 	}
 }
 
@@ -635,12 +698,12 @@ int ddp_mutex_hw_dcm_off(int mutex_idx, void *handle)
 	return 0;
 }
 
-int ddp_get_module_num(DDP_SCENARIO_ENUM scenario)
+int ddp_get_module_num(enum DDP_SCENARIO_ENUM scenario)
 {
 	return ddp_get_module_num_l(module_list_scenario[scenario]);
 }
 
-static void ddp_print_scenario(DDP_SCENARIO_ENUM scenario)
+static void ddp_print_scenario(enum DDP_SCENARIO_ENUM scenario)
 {
 	int i = 0;
 	char path[512] = { '\0' };
@@ -652,7 +715,7 @@ static void ddp_print_scenario(DDP_SCENARIO_ENUM scenario)
 	DDPMSG("scenario %s have modules: %s\n", ddp_get_scenario_name(scenario), path);
 }
 
-static int ddp_find_module_index(DDP_SCENARIO_ENUM ddp_scenario, DISP_MODULE_ENUM module)
+static int ddp_find_module_index(enum DDP_SCENARIO_ENUM ddp_scenario, enum DISP_MODULE_ENUM module)
 {
 	int i = 0;
 
@@ -666,7 +729,7 @@ static int ddp_find_module_index(DDP_SCENARIO_ENUM ddp_scenario, DISP_MODULE_ENU
 }
 
 /* set display interface when kernel init */
-int ddp_set_dst_module(DDP_SCENARIO_ENUM scenario, DISP_MODULE_ENUM dst_module)
+int ddp_set_dst_module(enum DDP_SCENARIO_ENUM scenario, enum DISP_MODULE_ENUM dst_module)
 {
 	int i = 0;
 
@@ -705,9 +768,9 @@ int ddp_set_dst_module(DDP_SCENARIO_ENUM scenario, DISP_MODULE_ENUM dst_module)
 	return 0;
 }
 
-DISP_MODULE_ENUM ddp_get_dst_module(DDP_SCENARIO_ENUM ddp_scenario)
+enum DISP_MODULE_ENUM ddp_get_dst_module(enum DDP_SCENARIO_ENUM ddp_scenario)
 {
-	DISP_MODULE_ENUM module_name = DISP_MODULE_UNKNOWN;
+	enum DISP_MODULE_ENUM module_name = DISP_MODULE_UNKNOWN;
 	int module_num = ddp_get_module_num_l(module_list_scenario[ddp_scenario]) - 1;
 
 	if (module_num >= 0)
@@ -720,12 +783,12 @@ DISP_MODULE_ENUM ddp_get_dst_module(DDP_SCENARIO_ENUM ddp_scenario)
 	return module_name;
 }
 
-int *ddp_get_scenario_list(DDP_SCENARIO_ENUM ddp_scenario)
+int *ddp_get_scenario_list(enum DDP_SCENARIO_ENUM ddp_scenario)
 {
 	return module_list_scenario[ddp_scenario];
 }
 
-int ddp_is_module_in_scenario(DDP_SCENARIO_ENUM ddp_scenario, DISP_MODULE_ENUM module)
+int ddp_is_module_in_scenario(enum DDP_SCENARIO_ENUM ddp_scenario, enum DISP_MODULE_ENUM module)
 {
 	int i = 0;
 
@@ -737,8 +800,8 @@ int ddp_is_module_in_scenario(DDP_SCENARIO_ENUM ddp_scenario, DISP_MODULE_ENUM m
 	return 0;
 }
 
-int ddp_insert_module(DDP_SCENARIO_ENUM ddp_scenario, DISP_MODULE_ENUM place,
-		      DISP_MODULE_ENUM module)
+int ddp_insert_module(enum DDP_SCENARIO_ENUM ddp_scenario, enum DISP_MODULE_ENUM place,
+		      enum DISP_MODULE_ENUM module)
 {
 	int i = DDP_ENING_NUM - 1;
 	int idx = ddp_find_module_index(ddp_scenario, place);
@@ -778,7 +841,7 @@ int ddp_insert_module(DDP_SCENARIO_ENUM ddp_scenario, DISP_MODULE_ENUM place,
 	return 0;
 }
 
-int ddp_remove_module(DDP_SCENARIO_ENUM ddp_scenario, DISP_MODULE_ENUM module)
+int ddp_remove_module(enum DDP_SCENARIO_ENUM ddp_scenario, enum DISP_MODULE_ENUM module)
 {
 	int i = 0;
 	int idx = ddp_find_module_index(ddp_scenario, module);
@@ -805,7 +868,7 @@ int ddp_remove_module(DDP_SCENARIO_ENUM ddp_scenario, DISP_MODULE_ENUM module)
 	return 0;
 }
 
-void ddp_connect_path(DDP_SCENARIO_ENUM scenario, void *handle)
+void ddp_connect_path(enum DDP_SCENARIO_ENUM scenario, void *handle)
 {
 	DDPDBG("path connect on scenario %s\n", ddp_get_scenario_name(scenario));
 	if (scenario == DDP_SCENARIO_PRIMARY_ALL) {
@@ -819,7 +882,7 @@ void ddp_connect_path(DDP_SCENARIO_ENUM scenario, void *handle)
 	}
 }
 
-void ddp_disconnect_path(DDP_SCENARIO_ENUM scenario, void *handle)
+void ddp_disconnect_path(enum DDP_SCENARIO_ENUM scenario, void *handle)
 {
 	DDPDBG("path disconnect on scenario %s\n", ddp_get_scenario_name(scenario));
 
@@ -835,7 +898,7 @@ void ddp_disconnect_path(DDP_SCENARIO_ENUM scenario, void *handle)
 	}
 }
 
-void ddp_check_path(DDP_SCENARIO_ENUM scenario)
+void ddp_check_path(enum DDP_SCENARIO_ENUM scenario)
 {
 	DDPDBG("path check path on scenario %s\n", ddp_get_scenario_name(scenario));
 
@@ -850,13 +913,13 @@ void ddp_check_path(DDP_SCENARIO_ENUM scenario)
 	}
 }
 
-void ddp_check_mutex(int mutex_id, DDP_SCENARIO_ENUM scenario, DDP_MODE mode)
+void ddp_check_mutex(int mutex_id, enum DDP_SCENARIO_ENUM scenario, enum DDP_MODE mode)
 {
 	DDPDBG("check mutex %d on scenario %s\n", mutex_id, ddp_get_scenario_name(scenario));
 	ddp_check_mutex_l(mutex_id, module_list_scenario[scenario], mode);
 }
 
-int ddp_mutex_set(int mutex_id, DDP_SCENARIO_ENUM scenario, DDP_MODE mode, void *handle)
+int ddp_mutex_set(int mutex_id, enum DDP_SCENARIO_ENUM scenario, enum DDP_MODE mode, void *handle)
 {
 	if (scenario < DDP_SCENARIO_MAX)
 		return ddp_mutex_set_l(mutex_id, module_list_scenario[scenario], mode, handle);
@@ -896,7 +959,7 @@ int ddp_mutex_reset(int mutex_id, void *handle)
 	return 0;
 }
 
-int ddp_mutex_add_module(int mutex_id, DISP_MODULE_ENUM module, void *handle)
+int ddp_mutex_add_module(int mutex_id, enum DISP_MODULE_ENUM module, void *handle)
 {
 	int value = 0;
 
@@ -911,7 +974,7 @@ int ddp_mutex_add_module(int mutex_id, DISP_MODULE_ENUM module, void *handle)
 	return 0;
 }
 
-int ddp_mutex_remove_module(int mutex_id, DISP_MODULE_ENUM module, void *handle)
+int ddp_mutex_remove_module(int mutex_id, enum DISP_MODULE_ENUM module, void *handle)
 {
 	int value = 0;
 
@@ -938,12 +1001,12 @@ int ddp_mutex_clear(int mutex_id, void *handle)
 	return 0;
 }
 
-int ddp_mutex_enable(int mutex_id, DDP_SCENARIO_ENUM scenario, void *handle)
+int ddp_mutex_enable(int mutex_id, enum DDP_SCENARIO_ENUM scenario, void *handle)
 {
 	return ddp_mutex_enable_l(mutex_id, handle);
 }
 
-int ddp_mutex_disenable(int mutex_id, DDP_SCENARIO_ENUM scenario, void *handle)
+int ddp_mutex_disenable(int mutex_id, enum DDP_SCENARIO_ENUM scenario, void *handle)
 {
 	DDPDBG("mutex %d disable\n", mutex_id);
 	DISP_REG_SET(handle, DISP_REG_CONFIG_MUTEX_EN(mutex_id), 0);
@@ -1095,7 +1158,7 @@ int ddp_insert_config_dirty_rec(void *handle)
 	return ret;
 }
 
-int disp_get_dst_module(DDP_SCENARIO_ENUM scenario)
+int disp_get_dst_module(enum DDP_SCENARIO_ENUM scenario)
 {
 	return ddp_get_dst_module(scenario);
 }

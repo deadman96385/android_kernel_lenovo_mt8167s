@@ -85,7 +85,7 @@ static ovl2mem_path_context *_get_context(void)
 	return &g_context;
 }
 
-CMDQ_SWITCH ovl2mem_cmdq_enabled(void)
+enum CMDQ_SWITCH ovl2mem_cmdq_enabled(void)
 {
 	return ovl2mem_use_cmdq;
 }
@@ -113,9 +113,9 @@ void ovl2mem_setlayernum(int layer_num)
 int ovl2mem_get_info(void *info)
 {
 	/* /DISPFUNC(); */
-	disp_session_info *dispif_info = (disp_session_info *) info;
+	struct disp_session_info *dispif_info = (struct disp_session_info *) info;
 
-	memset((void *)dispif_info, 0, sizeof(disp_session_info));
+	memset((void *)dispif_info, 0, sizeof(struct disp_session_info));
 
 	/* FIXME,  for decouple mode, should dynamic return 4 or 8, please refer to primary_display_get_info() */
 	dispif_info->maxLayerNum = ovl2mem_layer_num;
@@ -144,7 +144,7 @@ int ovl2mem_get_info(void *info)
 }
 
 
-static int _convert_disp_input_to_ovl(OVL_CONFIG_STRUCT *dst, primary_disp_input_config *src)
+static int _convert_disp_input_to_ovl(struct OVL_CONFIG_STRUCT *dst, struct primary_disp_input_config *src)
 {
 	if (src && dst) {
 		dst->layer = src->layer;
@@ -195,8 +195,8 @@ static int ovl2mem_callback(unsigned int userdata)
 	for (layid = 0; layid < (HW_OVERLAY_COUNT + 1); layid++) {
 		fence_idx = mtkfb_query_idx_by_ticket(pgc->session, layid, userdata);
 		if (fence_idx >= 0) {
-			disp_ddp_path_config *data_config = dpmgr_path_get_last_config(pgc->dpmgr_handle);
-			WDMA_CONFIG_STRUCT wdma_layer;
+			struct disp_ddp_path_config *data_config = dpmgr_path_get_last_config(pgc->dpmgr_handle);
+			struct WDMA_CONFIG_STRUCT wdma_layer;
 
 			wdma_layer.dstAddress = 0;
 			if (data_config && (layid >= HW_OVERLAY_COUNT)) {
@@ -232,11 +232,11 @@ int get_ovl2mem_ticket(void)
 
 }
 
-int ovl2mem_input_config(ovl2mem_in_config *input)
+int ovl2mem_input_config(struct ovl2mem_in_config *input)
 {
 	int ret = -1;
 	int i = 0;
-	disp_ddp_path_config *data_config;
+	struct disp_ddp_path_config *data_config;
 
 	DISPFUNC();
 	_ovl2mem_path_lock(__func__);
@@ -270,7 +270,7 @@ int ovl2mem_input_config(ovl2mem_in_config *input)
 		/*	    i, input[i].layer, input[i].layer_en, input[i].dirty, input[i].addr); */
 		if (input[i].dirty)
 			ret = _convert_disp_input_to_ovl(&(data_config->ovl_config[input[i].layer]),
-			(primary_disp_input_config *)&input[i]);
+			(struct primary_disp_input_config *)&input[i]);
 
 		data_config->ovl_dirty = 1;
 		dprec_logger_done(DPREC_LOGGER_PRIMARY_CONFIG, input->src_x, input->src_y);
@@ -288,10 +288,10 @@ int ovl2mem_input_config(ovl2mem_in_config *input)
 	return ret;
 }
 
-int ovl2mem_output_config(disp_mem_output_config *out)
+int ovl2mem_output_config(struct disp_mem_output_config *out)
 {
 	int ret = -1;
-	disp_ddp_path_config *data_config;
+	struct disp_ddp_path_config *data_config;
 
 	_ovl2mem_path_lock(__func__);
 	/* all dirty should be cleared in dpmgr_path_get_last_config() */

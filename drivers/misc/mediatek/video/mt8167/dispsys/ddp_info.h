@@ -22,7 +22,7 @@
 #include "ddp_ovl.h"
 #include <disp_session.h>
 
-typedef struct _OVL_CONFIG_STRUCT {
+struct OVL_CONFIG_STRUCT {
 	unsigned int ovl_index;
 	unsigned int layer;
 	unsigned int layer_en;
@@ -54,12 +54,12 @@ typedef struct _OVL_CONFIG_STRUCT {
 	unsigned int buff_idx;
 	unsigned int identity;
 	unsigned int connected_type;
-	DISP_BUFFER_TYPE security;
+	enum DISP_BUFFER_TYPE security;
 
 	unsigned int yuv_range;
-} OVL_CONFIG_STRUCT;
+};
 
-typedef struct _OVL_BASIC_STRUCT {
+struct OVL_BASIC_STRUCT {
 	unsigned int layer;
 	unsigned int layer_en;
 	unsigned int fmt;
@@ -68,41 +68,41 @@ typedef struct _OVL_BASIC_STRUCT {
 	unsigned int src_h;
 	unsigned int src_pitch;
 	unsigned int bpp;
-} OVL_BASIC_STRUCT;
+};
 
-typedef struct _RDMA_BASIC_STRUCT {
+struct RDMA_BASIC_STRUCT {
 	unsigned long addr;
 	unsigned int src_w;
 	unsigned int src_h;
 	unsigned int bpp;
-} RDMA_BASIC_STRUCT;
+};
 
-typedef struct _RDMA_CONFIG_STRUCT {
+struct RDMA_CONFIG_STRUCT {
 	unsigned idx;		/* instance index */
-	DpColorFormat inputFormat;
+	enum DP_COLOR_ENUM inputFormat;
 	unsigned long address;
 	unsigned pitch;
 	unsigned width;
 	unsigned height;
-	DISP_BUFFER_TYPE security;
-} RDMA_CONFIG_STRUCT;
+	enum DISP_BUFFER_TYPE security;
+};
 
-typedef struct _WDMA_CONFIG_STRUCT {
+struct WDMA_CONFIG_STRUCT {
 	unsigned srcWidth;
 	unsigned srcHeight;	/* input */
 	unsigned clipX;
 	unsigned clipY;
 	unsigned clipWidth;
 	unsigned clipHeight;	/* clip */
-	DpColorFormat outputFormat;
+	enum DP_COLOR_ENUM outputFormat;
 	unsigned long dstAddress;
 	unsigned dstPitch;	/* output */
 	unsigned int useSpecifiedAlpha;
 	unsigned char alpha;
-	DISP_BUFFER_TYPE security;
-} WDMA_CONFIG_STRUCT;
+	enum DISP_BUFFER_TYPE security;
+};
 
-typedef struct {
+struct disp_ddp_path_config {
 	/* for ovl */
 	bool ovl_dirty;
 	bool rdma_dirty;
@@ -110,81 +110,81 @@ typedef struct {
 	bool dst_dirty;
 	bool roi_dirty;
 	bool is_memory;
-	OVL_CONFIG_STRUCT ovl_config[OVL_LAYER_NUM];
-	RDMA_CONFIG_STRUCT rdma_config;
-	WDMA_CONFIG_STRUCT wdma_config;
+	struct OVL_CONFIG_STRUCT ovl_config[OVL_LAYER_NUM];
+	struct RDMA_CONFIG_STRUCT rdma_config;
+	struct WDMA_CONFIG_STRUCT wdma_config;
 	LCM_PARAMS dispif_config;
 	unsigned int lcm_bpp;
 	unsigned int dst_w;
 	unsigned int dst_h;
 	unsigned int fps;
-} disp_ddp_path_config;
+};
 
-typedef int (*ddp_module_notify)(DISP_MODULE_ENUM, DISP_PATH_EVENT);
+typedef int (*ddp_module_notify)(enum DISP_MODULE_ENUM, enum DISP_PATH_EVENT);
 
-typedef struct DDP_MODULE_DRIVER {
-	DISP_MODULE_ENUM module;
-	int (*init)(DISP_MODULE_ENUM module, void *handle);
-	int (*deinit)(DISP_MODULE_ENUM module, void *handle);
-	int (*config)(DISP_MODULE_ENUM module, disp_ddp_path_config *config, void *handle);
-	int (*start)(DISP_MODULE_ENUM module, void *handle);
-	int (*trigger)(DISP_MODULE_ENUM module, void *handle);
-	int (*stop)(DISP_MODULE_ENUM module, void *handle);
-	int (*reset)(DISP_MODULE_ENUM module, void *handle);
-	int (*power_on)(DISP_MODULE_ENUM module, void *handle);
-	int (*power_off)(DISP_MODULE_ENUM module, void *handle);
-	int (*suspend)(DISP_MODULE_ENUM module, void *handle);
-	int (*resume)(DISP_MODULE_ENUM module, void *handle);
-	int (*is_idle)(DISP_MODULE_ENUM module);
-	int (*is_busy)(DISP_MODULE_ENUM module);
-	int (*dump_info)(DISP_MODULE_ENUM module, int level);
-	int (*bypass)(DISP_MODULE_ENUM module, int bypass);
-	int (*build_cmdq)(DISP_MODULE_ENUM module, void *cmdq_handle, CMDQ_STATE state);
-	int (*set_lcm_utils)(DISP_MODULE_ENUM module, LCM_DRIVER *lcm_drv);
-	int (*set_listener)(DISP_MODULE_ENUM module, ddp_module_notify notify);
-	int (*cmd)(DISP_MODULE_ENUM module, int msg, unsigned long arg, void *handle);
-	int (*ioctl)(DISP_MODULE_ENUM module, void *handle, unsigned int ioctl_cmd,
+struct DDP_MODULE_DRIVER {
+	enum DISP_MODULE_ENUM module;
+	int (*init)(enum DISP_MODULE_ENUM module, void *handle);
+	int (*deinit)(enum DISP_MODULE_ENUM module, void *handle);
+	int (*config)(enum DISP_MODULE_ENUM module, struct disp_ddp_path_config *config, void *handle);
+	int (*start)(enum DISP_MODULE_ENUM module, void *handle);
+	int (*trigger)(enum DISP_MODULE_ENUM module, void *handle);
+	int (*stop)(enum DISP_MODULE_ENUM module, void *handle);
+	int (*reset)(enum DISP_MODULE_ENUM module, void *handle);
+	int (*power_on)(enum DISP_MODULE_ENUM module, void *handle);
+	int (*power_off)(enum DISP_MODULE_ENUM module, void *handle);
+	int (*suspend)(enum DISP_MODULE_ENUM module, void *handle);
+	int (*resume)(enum DISP_MODULE_ENUM module, void *handle);
+	int (*is_idle)(enum DISP_MODULE_ENUM module);
+	int (*is_busy)(enum DISP_MODULE_ENUM module);
+	int (*dump_info)(enum DISP_MODULE_ENUM module, int level);
+	int (*bypass)(enum DISP_MODULE_ENUM module, int bypass);
+	int (*build_cmdq)(enum DISP_MODULE_ENUM module, void *cmdq_handle, enum CMDQ_STATE state);
+	int (*set_lcm_utils)(enum DISP_MODULE_ENUM module, LCM_DRIVER *lcm_drv);
+	int (*set_listener)(enum DISP_MODULE_ENUM module, ddp_module_notify notify);
+	int (*cmd)(enum DISP_MODULE_ENUM module, int msg, unsigned long arg, void *handle);
+	int (*ioctl)(enum DISP_MODULE_ENUM module, void *handle, unsigned int ioctl_cmd,
 		      unsigned long *params);
-	int (*enable_irq)(DISP_MODULE_ENUM module, void *handle, DDP_IRQ_LEVEL irq_level);
-} DDP_MODULE_DRIVER;
+	int (*enable_irq)(enum DISP_MODULE_ENUM module, void *handle, enum DDP_IRQ_LEVEL irq_level);
+};
 
-char *ddp_get_module_name(DISP_MODULE_ENUM module);
-int ddp_get_module_max_irq_bit(DISP_MODULE_ENUM module);
+char *ddp_get_module_name(enum DISP_MODULE_ENUM module);
+int ddp_get_module_max_irq_bit(enum DISP_MODULE_ENUM module);
 
-extern DDP_MODULE_DRIVER *ddp_modules_driver[DISP_MODULE_NUM];
+extern struct DDP_MODULE_DRIVER *ddp_modules_driver[DISP_MODULE_NUM];
 
 /* TODO: FIXME */
 /* dsi */
-extern DDP_MODULE_DRIVER ddp_driver_dsi0;
-/* extern DDP_MODULE_DRIVER ddp_driver_dsi1; */
-/* extern DDP_MODULE_DRIVER ddp_driver_dsidual; */
+extern struct DDP_MODULE_DRIVER ddp_driver_dsi0;
+/* extern struct DDP_MODULE_DRIVER ddp_driver_dsi1; */
+/* extern struct DDP_MODULE_DRIVER ddp_driver_dsidual; */
 /* dpi */
-extern DDP_MODULE_DRIVER ddp_driver_dpi0;
-extern DDP_MODULE_DRIVER ddp_driver_dpi1;
+extern struct DDP_MODULE_DRIVER ddp_driver_dpi0;
+extern struct DDP_MODULE_DRIVER ddp_driver_dpi1;
 
 /* ovl */
-extern DDP_MODULE_DRIVER ddp_driver_ovl;
+extern struct DDP_MODULE_DRIVER ddp_driver_ovl;
 /* rdma */
-extern DDP_MODULE_DRIVER ddp_driver_rdma;
+extern struct DDP_MODULE_DRIVER ddp_driver_rdma;
 /* wdma */
-extern DDP_MODULE_DRIVER ddp_driver_wdma;
+extern struct DDP_MODULE_DRIVER ddp_driver_wdma;
 /* color */
-extern DDP_MODULE_DRIVER ddp_driver_color;
+extern struct DDP_MODULE_DRIVER ddp_driver_color;
 /* aal */
-extern DDP_MODULE_DRIVER ddp_driver_aal;
+extern struct DDP_MODULE_DRIVER ddp_driver_aal;
 /* od */
 #if defined(MTK_FB_OD_SUPPORT)
-extern DDP_MODULE_DRIVER ddp_driver_od;
+extern struct DDP_MODULE_DRIVER ddp_driver_od;
 #endif
 /* gamma */
-extern DDP_MODULE_DRIVER ddp_driver_gamma;
+extern struct DDP_MODULE_DRIVER ddp_driver_gamma;
 /* dither */
-extern DDP_MODULE_DRIVER ddp_driver_dither;
+extern struct DDP_MODULE_DRIVER ddp_driver_dither;
 /* ccorr */
-extern DDP_MODULE_DRIVER ddp_driver_ccorr;
+extern struct DDP_MODULE_DRIVER ddp_driver_ccorr;
 /* split */
-extern DDP_MODULE_DRIVER ddp_driver_split;
+extern struct DDP_MODULE_DRIVER ddp_driver_split;
 /* pwm */
-extern DDP_MODULE_DRIVER ddp_driver_pwm;
+extern struct DDP_MODULE_DRIVER ddp_driver_pwm;
 
 #endif

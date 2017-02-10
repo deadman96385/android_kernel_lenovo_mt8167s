@@ -80,11 +80,11 @@ static void __iomem *ddp_apmixed_base;
 #define clk_setl(addr, val) mt_reg_sync_writel(clk_readl(addr) | (val), addr)
 #define clk_clrl(addr, val) mt_reg_sync_writel(clk_readl(addr) & ~(val), addr)
 
-typedef enum {
+enum DSI_TE_MODE {
 	NO_TE  = 0,
 	BTA_TE = 1,
 	EXT_TE = 4,
-} DSI_TE_MODE;
+};
 
 void ddp_set_mipi26m(int en)
 {
@@ -260,7 +260,7 @@ static bool dsi_glitch_enable;
 LCM_DSI_PARAMS dsi_lcm_params;
 struct cmdqRecStruct *cmdq_forcb;
 
-static void _DSI_INTERNAL_IRQ_Handler(DISP_MODULE_ENUM module, /*struct cmdqRecStruct cmdq,*/unsigned int param)
+static void _DSI_INTERNAL_IRQ_Handler(enum DISP_MODULE_ENUM module, /*struct cmdqRecStruct cmdq,*/unsigned int param)
 {
 	int i = 0;
 	struct DSI_INT_STATUS_REG status;
@@ -330,7 +330,7 @@ static void _DSI_INTERNAL_IRQ_Handler(DISP_MODULE_ENUM module, /*struct cmdqRecS
 }
 
 
-static DSI_STATUS DSI_Reset(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
+static enum DSI_STATUS DSI_Reset(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
 	int i = 0;
 	unsigned int irq_en[2];
@@ -356,7 +356,7 @@ static DSI_STATUS DSI_Reset(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 	return DSI_STATUS_OK;
 }
 
-static int _dsi_is_video_mode(DISP_MODULE_ENUM module)
+static int _dsi_is_video_mode(enum DISP_MODULE_ENUM module)
 {
 	int i = 0;
 
@@ -369,7 +369,7 @@ static int _dsi_is_video_mode(DISP_MODULE_ENUM module)
 	return 0;
 }
 
-static DSI_STATUS DSI_SetMode(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, unsigned int mode)
+static enum DSI_STATUS DSI_SetMode(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, unsigned int mode)
 {
 	int i = 0;
 
@@ -379,7 +379,7 @@ static DSI_STATUS DSI_SetMode(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmd
 	return DSI_STATUS_OK;
 }
 
-static DSI_STATUS DSI_SetSwitchMode(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, unsigned int mode)
+static enum DSI_STATUS DSI_SetSwitchMode(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, unsigned int mode)
 {
 	int i = 0;
 
@@ -398,7 +398,7 @@ static DSI_STATUS DSI_SetSwitchMode(DISP_MODULE_ENUM module, struct cmdqRecStruc
 	return DSI_STATUS_OK;
 }
 
-DSI_STATUS DSI_DisableClk(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
+enum DSI_STATUS DSI_DisableClk(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
 	return DSI_STATUS_OK;
 }
@@ -451,7 +451,7 @@ void DSI_sw_clk_trail_cmdq(int module_idx, struct cmdqRecStruct *cmdq)
 	DISP_REG_SET(cmdq, &DSI_PHY_REG[module_idx]->MIPITX_DSI_SW_CTRL, 0x00000000);
 }
 
-void DSI_lane0_ULP_mode(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool enter)
+void DSI_lane0_ULP_mode(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool enter)
 {
 	int i = 0;
 
@@ -482,7 +482,7 @@ void DSI_lane0_ULP_mode(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, boo
 }
 
 
-void DSI_clk_ULP_mode(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool enter)
+void DSI_clk_ULP_mode(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool enter)
 {
 	int i = 0;
 
@@ -510,7 +510,7 @@ void DSI_clk_ULP_mode(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool 
 	}
 }
 
-bool DSI_clk_HS_state(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
+bool DSI_clk_HS_state(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
 	int i = 0;
 	struct DSI_PHY_LCCON_REG tmpreg;
@@ -522,7 +522,7 @@ bool DSI_clk_HS_state(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 	return false;
 }
 
-void DSI_clk_HSLP_mode(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
+void DSI_clk_HSLP_mode(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
 	int i = 0;
 
@@ -539,7 +539,7 @@ void DSI_manual_enter_HS(struct cmdqRecStruct *cmdq)
 	DSI_OUTREGBIT(cmdq, struct DSI_PHY_LCCON_REG, DSI_REG[0]->DSI_PHY_LCCON, LC_HS_TX_EN, 1);
 }
 
-void DSI_clk_HS_mode(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool enter)
+void DSI_clk_HS_mode(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool enter)
 {
 	int i = 0;
 
@@ -594,7 +594,7 @@ const char *_dsi_cmd_mode_parse_state(unsigned int state)
 	return "unknown";
 }
 
-DSI_STATUS DSI_DumpRegisters(DISP_MODULE_ENUM module, int level)
+enum DSI_STATUS DSI_DumpRegisters(enum DISP_MODULE_ENUM module, int level)
 {
 	uint32_t i;
 	/*
@@ -678,7 +678,7 @@ DSI_STATUS DSI_DumpRegisters(DISP_MODULE_ENUM module, int level)
 	return DSI_STATUS_OK;
 }
 
-int DSI_WaitVMDone(DISP_MODULE_ENUM module)
+int DSI_WaitVMDone(enum DISP_MODULE_ENUM module)
 {
 	int i = 0;
 	static const long WAIT_TIMEOUT = 2 * HZ;	/* 2 sec */
@@ -704,7 +704,7 @@ int DSI_WaitVMDone(DISP_MODULE_ENUM module)
 	return 0;
 }
 
-DSI_STATUS DSI_SleepOut(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
+enum DSI_STATUS DSI_SleepOut(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
 	DSI_OUTREGBIT(cmdq, struct DSI_MODE_CTRL_REG, DSI_REG[0]->DSI_MODE_CTRL, SLEEP_MODE, 1);
 	DSI_OUTREGBIT(cmdq, struct DSI_PHY_TIMCON4_REG,
@@ -714,7 +714,7 @@ DSI_STATUS DSI_SleepOut(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 }
 
 
-DSI_STATUS DSI_Wakeup(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
+enum DSI_STATUS DSI_Wakeup(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
 	DSI_OUTREGBIT(cmdq, struct DSI_START_REG, DSI_REG[0]->DSI_START, SLEEPOUT_START, 0);
 	DSI_OUTREGBIT(cmdq, struct DSI_START_REG, DSI_REG[0]->DSI_START, SLEEPOUT_START, 1);
@@ -726,7 +726,7 @@ DSI_STATUS DSI_Wakeup(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 	return DSI_STATUS_OK;
 }
 
-DSI_STATUS DSI_BackupRegisters(DISP_MODULE_ENUM module, void *cmdq)
+enum DSI_STATUS DSI_BackupRegisters(enum DISP_MODULE_ENUM module, void *cmdq)
 {
 	volatile struct DSI_REGS *regs = NULL;
 
@@ -762,7 +762,7 @@ DSI_STATUS DSI_BackupRegisters(DISP_MODULE_ENUM module, void *cmdq)
 }
 
 
-DSI_STATUS DSI_RestoreRegisters(DISP_MODULE_ENUM module, void *cmdq)
+enum DSI_STATUS DSI_RestoreRegisters(enum DISP_MODULE_ENUM module, void *cmdq)
 {
 	volatile struct DSI_REGS *regs = NULL;
 
@@ -794,7 +794,7 @@ DSI_STATUS DSI_RestoreRegisters(DISP_MODULE_ENUM module, void *cmdq)
 	return DSI_STATUS_OK;
 }
 
-DSI_STATUS DSI_BIST_Pattern_Test(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool enable,
+enum DSI_STATUS DSI_BIST_Pattern_Test(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, bool enable,
 				 unsigned int color)
 {
 	int i = 0;
@@ -808,7 +808,7 @@ DSI_STATUS DSI_BIST_Pattern_Test(DISP_MODULE_ENUM module, struct cmdqRecStruct *
 				      SW_CTL_EN, 1);
 
 			if (!_dsi_is_video_mode(module)) {
-				DSI_T0_INS t0;
+				struct DSI_T0_INS t0;
 
 				t0.CONFG = 0x09;
 				t0.Data_ID = 0x39;
@@ -835,7 +835,7 @@ DSI_STATUS DSI_BIST_Pattern_Test(DISP_MODULE_ENUM module, struct cmdqRecStruct *
 	return DSI_STATUS_OK;
 }
 
-void DSI_Config_VDO_Timing(DISP_MODULE_ENUM module, void *cmdq, LCM_DSI_PARAMS *dsi_params)
+void DSI_Config_VDO_Timing(enum DISP_MODULE_ENUM module, void *cmdq, LCM_DSI_PARAMS *dsi_params)
 {
 	int i = 0;
 	unsigned int line_byte;
@@ -911,7 +911,7 @@ int _dsi_ps_type_to_bpp(LCM_PS_TYPE ps)
 	return 0;
 }
 
-DSI_STATUS DSI_PS_Control(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, LCM_DSI_PARAMS *dsi_params,
+enum DSI_STATUS DSI_PS_Control(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, LCM_DSI_PARAMS *dsi_params,
 			  int w, int h)
 {
 	int i = 0;
@@ -960,7 +960,7 @@ DSI_STATUS DSI_PS_Control(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, L
 	return DSI_STATUS_OK;
 }
 
-DSI_STATUS DSI_TXRX_Control(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+enum DSI_STATUS DSI_TXRX_Control(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 			    LCM_DSI_PARAMS *dsi_params)
 {
 	int i = 0;
@@ -1017,7 +1017,7 @@ DSI_STATUS DSI_TXRX_Control(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 	return DSI_STATUS_OK;
 }
 
-int MIPITX_IsEnabled(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
+int MIPITX_IsEnabled(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
 	int i = 0;
 	int ret = 0;
@@ -1031,7 +1031,7 @@ int MIPITX_IsEnabled(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 	return ret;
 }
 
-unsigned int dsi_phy_get_clk(DISP_MODULE_ENUM module)
+unsigned int dsi_phy_get_clk(enum DISP_MODULE_ENUM module)
 {
 	int i = 0;
 	int j = 0;
@@ -1050,7 +1050,7 @@ unsigned int dsi_phy_get_clk(DISP_MODULE_ENUM module)
 	return 0;
 }
 
-void DSI_PHY_clk_setting(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, LCM_DSI_PARAMS *dsi_params)
+void DSI_PHY_clk_setting(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq, LCM_DSI_PARAMS *dsi_params)
 {
 #ifdef CONFIG_MTK_FPGA
 #ifdef FPGA_SET_CLK
@@ -1581,7 +1581,7 @@ void DSI_PHY_TIMCONFIG(LCM_DSI_PARAMS *lcm_params)
 }
 
 
-void DSI_PHY_clk_switch(DISP_MODULE_ENUM module, void *cmdq, int on)
+void DSI_PHY_clk_switch(enum DISP_MODULE_ENUM module, void *cmdq, int on)
 {
 	int i = 0;
 
@@ -1673,7 +1673,7 @@ void DSI_PHY_clk_switch(DISP_MODULE_ENUM module, void *cmdq, int on)
 	}
 }
 
-DSI_STATUS DSI_EnableClk(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
+enum DSI_STATUS DSI_EnableClk(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
 	DISPFUNC();
 
@@ -1685,7 +1685,7 @@ DSI_STATUS DSI_EnableClk(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 	return DSI_STATUS_OK;
 }
 
-DSI_STATUS DSI_Start(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
+enum DSI_STATUS DSI_Start(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
 	/* TODO: do we need this? */
 	DSI_OUTREGBIT(cmdq, struct DSI_START_REG, DSI_REG[0]->DSI_START, DSI_START, 0);
@@ -1693,7 +1693,7 @@ DSI_STATUS DSI_Start(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 	return DSI_STATUS_OK;
 }
 
-void DSI_Set_VM_CMD(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
+void DSI_Set_VM_CMD(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
 	DSI_OUTREGBIT(cmdq, struct DSI_VM_CMD_CON_REG, DSI_REG[0]->DSI_VM_CMD_CON,
 		      TS_VFP_EN, 1);
@@ -1702,7 +1702,7 @@ void DSI_Set_VM_CMD(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 	DDPMSG("DSI_Set_VM_CMD");
 }
 
-DSI_STATUS DSI_EnableVM_CMD(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
+enum DSI_STATUS DSI_EnableVM_CMD(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 {
 	DSI_OUTREGBIT(cmdq, struct DSI_START_REG, DSI_REG[0]->DSI_START, VM_CMD_START, 0);
 	DSI_OUTREGBIT(cmdq, struct DSI_START_REG, DSI_REG[0]->DSI_START, VM_CMD_START, 1);
@@ -1710,7 +1710,7 @@ DSI_STATUS DSI_EnableVM_CMD(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq)
 }
 
 /* / return value: the data length we got */
-uint32_t DSI_dcs_read_lcm_reg_v2(DISP_MODULE_ENUM module, void *cmdq, uint8_t cmd,
+uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8_t cmd,
 	uint8_t *buffer, uint8_t buffer_size)
 {
 	uint32_t max_try_count = 5;
@@ -1723,7 +1723,7 @@ uint32_t DSI_dcs_read_lcm_reg_v2(DISP_MODULE_ENUM module, void *cmdq, uint8_t cm
 	struct DSI_RX_DATA_REG read_data3;
 	int i = 0;
 #if 1
-	DSI_T0_INS t0;
+	struct DSI_T0_INS t0;
 
 #if ENABLE_DSI_INTERRUPT
 	static const long WAIT_TIMEOUT = HZ / 2;	/* 2 sec//Yifan Modified for ESD Check with out LCM */
@@ -1919,14 +1919,14 @@ uint32_t DSI_dcs_read_lcm_reg_v2(DISP_MODULE_ENUM module, void *cmdq, uint8_t cm
 	return recv_data_cnt;
 }
 
-void DSI_set_cmdq_V2(DISP_MODULE_ENUM module, void *cmdq, unsigned cmd,
+void DSI_set_cmdq_V2(enum DISP_MODULE_ENUM module, void *cmdq, unsigned cmd,
 	unsigned char count, unsigned char *para_list, unsigned char force_update)
 {
 	uint32_t i;
 	unsigned long goto_addr, mask_para, set_para;
 	/* uint32_t fbPhysAddr, fbVirAddr; */
-	DSI_T0_INS t0;
-	DSI_T2_INS t2;
+	struct DSI_T0_INS t0;
+	struct DSI_T2_INS t2;
 
 	DSI_WaitForNotBusy(module, cmdq);
 	if (cmd < 0xB0) {
@@ -2010,15 +2010,15 @@ void DSI_set_cmdq_V2(DISP_MODULE_ENUM module, void *cmdq, unsigned cmd,
 	}
 }
 
-void DSI_set_cmdq_V3(DISP_MODULE_ENUM module, void *cmdq,
+void DSI_set_cmdq_V3(enum DISP_MODULE_ENUM module, void *cmdq,
 	LCM_setting_table_V3 *para_tbl, unsigned int size, unsigned char force_update)
 {
 	uint32_t i;
 	unsigned long goto_addr, mask_para, set_para;
 	/* uint32_t fbPhysAddr, fbVirAddr; */
-	DSI_T0_INS t0;
-	/* DSI_T1_INS t1; */
-	DSI_T2_INS t2;
+	struct DSI_T0_INS t0;
+	/* struct DSI_T1_INS t1; */
+	struct DSI_T2_INS t2;
 
 	uint32_t index = 0;
 
@@ -2094,7 +2094,7 @@ void DSI_set_cmdq_V3(DISP_MODULE_ENUM module, void *cmdq,
 	} while (++index < size);
 }
 
-void DSI_set_cmdq(DISP_MODULE_ENUM module, void *cmdq,
+void DSI_set_cmdq(enum DISP_MODULE_ENUM module, void *cmdq,
 	unsigned int *pdata, unsigned int queue_size, unsigned char force_update)
 {
 	uint32_t i;
@@ -2122,7 +2122,7 @@ void _copy_dsi_params(LCM_DSI_PARAMS *src, LCM_DSI_PARAMS *dst)
 
 
 
-int DSI_Send_ROI(DISP_MODULE_ENUM module, void *handle, unsigned int x, unsigned int y,
+int DSI_Send_ROI(enum DISP_MODULE_ENUM module, void *handle, unsigned int x, unsigned int y,
 		 unsigned int width, unsigned int height)
 {
 	unsigned int x0 = x;
@@ -2218,7 +2218,7 @@ unsigned int DSI_dcs_read_lcm_reg_v2_wrapper_DSI0(uint8_t cmd, uint8_t *buffer, 
 
 static LCM_UTIL_FUNCS lcm_utils_dsi0;
 
-int ddp_dsi_set_lcm_utils(DISP_MODULE_ENUM module, LCM_DRIVER *lcm_drv)
+int ddp_dsi_set_lcm_utils(enum DISP_MODULE_ENUM module, LCM_DRIVER *lcm_drv)
 {
 	LCM_UTIL_FUNCS *utils = NULL;
 
@@ -2266,7 +2266,7 @@ int ddp_dsi_set_lcm_utils(DISP_MODULE_ENUM module, LCM_DRIVER *lcm_drv)
 
 static int dsi0_te_enable = 1;
 
-int DSI_ChangeClk(DISP_MODULE_ENUM module, void *cmdq, uint32_t clk)
+int DSI_ChangeClk(enum DISP_MODULE_ENUM module, void *cmdq, uint32_t clk)
 {
 	LCM_DSI_PARAMS lcm_params_for_clk_setting;
 
@@ -2303,10 +2303,10 @@ end:
 
 }
 
-int ddp_dsi_init(DISP_MODULE_ENUM module, void *cmdq)
+int ddp_dsi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 {
 #ifndef CONFIG_MTK_FPGA
-	DSI_STATUS ret = DSI_STATUS_OK;
+	enum DSI_STATUS ret = DSI_STATUS_OK;
 #endif
 	int i = 0;
 #ifndef CONFIG_MTK_CLKMGR
@@ -2383,9 +2383,9 @@ int ddp_dsi_init(DISP_MODULE_ENUM module, void *cmdq)
 	return DSI_STATUS_OK;
 }
 
-int ddp_dsi_deinit(DISP_MODULE_ENUM module, void *cmdq_handle)
+int ddp_dsi_deinit(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
-	DSI_STATUS ret = ddp_dsi_power_off(module, cmdq_handle);
+	enum DSI_STATUS ret = ddp_dsi_power_off(module, cmdq_handle);
 
 	ASSERT(ret == DSI_STATUS_OK);
 
@@ -2437,7 +2437,7 @@ void _dump_dsi_params(LCM_DSI_PARAMS *dsi_config)
 	}
 }
 
-static void DSI_PHY_CLK_LP_PerLine_config(DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
+static void DSI_PHY_CLK_LP_PerLine_config(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 					  LCM_DSI_PARAMS *dsi_params)
 {
 	int i;
@@ -2554,7 +2554,7 @@ static void DSI_PHY_CLK_LP_PerLine_config(DISP_MODULE_ENUM module, struct cmdqRe
 
 }
 
-int ddp_dsi_config(DISP_MODULE_ENUM module, disp_ddp_path_config *config, void *cmdq)
+int ddp_dsi_config(enum DISP_MODULE_ENUM module, struct disp_ddp_path_config *config, void *cmdq)
 {
 	int i = 0;
 	LCM_DSI_PARAMS *dsi_config = &(config->dispif_config.dsi);
@@ -2624,7 +2624,7 @@ done:
 	return 0;
 }
 
-int ddp_dsi_start(DISP_MODULE_ENUM module, void *cmdq)
+int ddp_dsi_start(enum DISP_MODULE_ENUM module, void *cmdq)
 {
 	DISPFUNC();
 	DSI_OUTREGBIT(cmdq, struct DSI_START_REG, DSI_REG[0]->DSI_START, DSI_START, 0);
@@ -2632,7 +2632,7 @@ int ddp_dsi_start(DISP_MODULE_ENUM module, void *cmdq)
 	return DSI_STATUS_OK;
 }
 
-int ddp_dsi_stop(DISP_MODULE_ENUM module, void *cmdq_handle)
+int ddp_dsi_stop(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	int i = 0;
 	unsigned int tmp = 0;
@@ -2673,7 +2673,7 @@ int ddp_dsi_stop(DISP_MODULE_ENUM module, void *cmdq_handle)
 	return 0;
 }
 
-int ddp_dsi_switch_lcm_mode(DISP_MODULE_ENUM module, void *params)
+int ddp_dsi_switch_lcm_mode(enum DISP_MODULE_ENUM module, void *params)
 {
 	int i = 0;
 	LCM_DSI_MODE_SWITCH_CMD lcm_cmd = *((LCM_DSI_MODE_SWITCH_CMD *) (params));
@@ -2706,7 +2706,7 @@ int ddp_dsi_switch_lcm_mode(DISP_MODULE_ENUM module, void *params)
 	return 0;
 }
 
-int ddp_dsi_switch_mode(DISP_MODULE_ENUM module, void *cmdq_handle, void *params)
+int ddp_dsi_switch_mode(enum DISP_MODULE_ENUM module, void *cmdq_handle, void *params)
 {
 	int i = 0;
 	LCM_DSI_MODE_SWITCH_CMD lcm_cmd = *((LCM_DSI_MODE_SWITCH_CMD *) (params));
@@ -2788,22 +2788,22 @@ int ddp_dsi_switch_mode(DISP_MODULE_ENUM module, void *cmdq_handle, void *params
 	return 0;
 }
 
-int ddp_dsi_clk_on(DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int level)
+int ddp_dsi_clk_on(enum DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int level)
 {
 	return 0;
 }
 
-int ddp_dsi_clk_off(DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int level)
+int ddp_dsi_clk_off(enum DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int level)
 {
 	return 0;
 }
 
-int ddp_dsi_ioctl(DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int ioctl_cmd,
+int ddp_dsi_ioctl(enum DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int ioctl_cmd,
 		  unsigned long *params)
 {
 	int ret = 0;
 	/* DISPFUNC(); */
-	DDP_IOCTL_NAME ioctl = (DDP_IOCTL_NAME) ioctl_cmd;
+	enum DDP_IOCTL_NAME ioctl = (enum DDP_IOCTL_NAME) ioctl_cmd;
 	/* DISPCHECK("[ddp_dsi_ioctl] index = %d\n", ioctl); */
 	switch (ioctl) {
 	case DDP_STOP_VIDEO_MODE:
@@ -2878,7 +2878,7 @@ int ddp_dsi_ioctl(DISP_MODULE_ENUM module, void *cmdq_handle, unsigned int ioctl
 	return ret;
 }
 
-int ddp_dsi_trigger(DISP_MODULE_ENUM module, void *cmdq)
+int ddp_dsi_trigger(enum DISP_MODULE_ENUM module, void *cmdq)
 {
 	int i = 0;
 	unsigned int data_array[16];
@@ -2892,7 +2892,7 @@ int ddp_dsi_trigger(DISP_MODULE_ENUM module, void *cmdq)
 	return 0;
 }
 
-int ddp_dsi_reset(DISP_MODULE_ENUM module, void *cmdq_handle)
+int ddp_dsi_reset(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	DSI_Reset(module, cmdq_handle);
 
@@ -2900,7 +2900,7 @@ int ddp_dsi_reset(DISP_MODULE_ENUM module, void *cmdq_handle)
 }
 
 
-int ddp_dsi_power_on(DISP_MODULE_ENUM module, void *cmdq_handle)
+int ddp_dsi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	int ret = 0;
 
@@ -2971,7 +2971,7 @@ int ddp_dsi_power_on(DISP_MODULE_ENUM module, void *cmdq_handle)
 }
 
 
-int ddp_dsi_power_off(DISP_MODULE_ENUM module, void *cmdq_handle)
+int ddp_dsi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 {
 	int i = 0;
 	int ret = 0;
@@ -3036,7 +3036,7 @@ int ddp_dsi_power_off(DISP_MODULE_ENUM module, void *cmdq_handle)
 }
 
 
-int ddp_dsi_is_busy(DISP_MODULE_ENUM module)
+int ddp_dsi_is_busy(enum DISP_MODULE_ENUM module)
 {
 	int i = 0;
 	int busy = 0;
@@ -3054,12 +3054,12 @@ int ddp_dsi_is_busy(DISP_MODULE_ENUM module)
 	return busy;
 }
 
-int ddp_dsi_is_idle(DISP_MODULE_ENUM module)
+int ddp_dsi_is_idle(enum DISP_MODULE_ENUM module)
 {
 	return !ddp_dsi_is_busy(module);
 }
 
-void DSI_WaitForNotBusy(DISP_MODULE_ENUM module, void *cmdq)
+void DSI_WaitForNotBusy(enum DISP_MODULE_ENUM module, void *cmdq)
 {
 	int timeOut;
 
@@ -3098,7 +3098,7 @@ static const char *dsi_mode_spy(LCM_DSI_MODE_CON mode)
 	}
 }
 
-void dsi_analysis(DISP_MODULE_ENUM module)
+void dsi_analysis(enum DISP_MODULE_ENUM module)
 {
 	int i = 0;
 
@@ -3127,7 +3127,7 @@ void dsi_analysis(DISP_MODULE_ENUM module)
 	}
 }
 
-int ddp_dsi_dump(DISP_MODULE_ENUM module, int level)
+int ddp_dsi_dump(enum DISP_MODULE_ENUM module, int level)
 {
 	if (!s_isDsiPowerOn)
 		return 0;
@@ -3142,13 +3142,13 @@ int ddp_dsi_dump(DISP_MODULE_ENUM module, int level)
 	return 0;
 }
 
-int ddp_dsi_build_cmdq(DISP_MODULE_ENUM module, void *cmdq_trigger_handle, CMDQ_STATE state)
+int ddp_dsi_build_cmdq(enum DISP_MODULE_ENUM module, void *cmdq_trigger_handle, enum CMDQ_STATE state)
 {
 	int ret = 0;
 	int i = 0;
 	int dsi_i = 0;
 	LCM_DSI_PARAMS *dsi_params = NULL;
-	DSI_T0_INS t0;
+	struct DSI_T0_INS t0;
 	struct DSI_RX_DATA_REG read_data0, read_data1, read_data2, read_data3;
 	unsigned char packet_type;
 	unsigned int recv_data_cnt = 0;
@@ -3432,24 +3432,24 @@ int ddp_dsi_build_cmdq(DISP_MODULE_ENUM module, void *cmdq_trigger_handle, CMDQ_
 	return ret;
 }
 
-DDP_MODULE_DRIVER ddp_driver_dsi0 = {
+struct DDP_MODULE_DRIVER ddp_driver_dsi0 = {
 
 	.module = DISP_MODULE_DSI0,
-	.init = (int (*)(DISP_MODULE_ENUM, void*)) ddp_dsi_init,
-	.deinit = (int (*)(DISP_MODULE_ENUM, void*)) ddp_dsi_deinit,
-	.config = (int (*)(DISP_MODULE_ENUM, disp_ddp_path_config*, void*)) ddp_dsi_config,
-	.build_cmdq = (int (*)(DISP_MODULE_ENUM, void*, CMDQ_STATE)) ddp_dsi_build_cmdq,
-	.trigger = (int (*)(DISP_MODULE_ENUM, void*)) ddp_dsi_trigger,
-	.start = (int (*)(DISP_MODULE_ENUM, void*)) ddp_dsi_start,
-	.stop = (int (*)(DISP_MODULE_ENUM, void*)) ddp_dsi_stop,
-	.reset = (int (*)(DISP_MODULE_ENUM, void*)) ddp_dsi_reset,
-	.power_on = (int (*)(DISP_MODULE_ENUM, void*)) ddp_dsi_power_on,
-	.power_off = (int (*)(DISP_MODULE_ENUM, void*)) ddp_dsi_power_off,
-	.is_idle = (int (*)(DISP_MODULE_ENUM)) ddp_dsi_is_idle,
-	.is_busy = (int (*)(DISP_MODULE_ENUM)) ddp_dsi_is_busy,
-	.dump_info = (int (*)(DISP_MODULE_ENUM, int)) ddp_dsi_dump,
-	.set_lcm_utils = (int (*)(DISP_MODULE_ENUM, LCM_DRIVER*)) ddp_dsi_set_lcm_utils,
-	.ioctl = (int (*)(DISP_MODULE_ENUM, void*, unsigned int, unsigned long*)) ddp_dsi_ioctl
+	.init = (int (*)(enum DISP_MODULE_ENUM, void*)) ddp_dsi_init,
+	.deinit = (int (*)(enum DISP_MODULE_ENUM, void*)) ddp_dsi_deinit,
+	.config = (int (*)(enum DISP_MODULE_ENUM, struct disp_ddp_path_config*, void*)) ddp_dsi_config,
+	.build_cmdq = (int (*)(enum DISP_MODULE_ENUM, void*, enum CMDQ_STATE)) ddp_dsi_build_cmdq,
+	.trigger = (int (*)(enum DISP_MODULE_ENUM, void*)) ddp_dsi_trigger,
+	.start = (int (*)(enum DISP_MODULE_ENUM, void*)) ddp_dsi_start,
+	.stop = (int (*)(enum DISP_MODULE_ENUM, void*)) ddp_dsi_stop,
+	.reset = (int (*)(enum DISP_MODULE_ENUM, void*)) ddp_dsi_reset,
+	.power_on = (int (*)(enum DISP_MODULE_ENUM, void*)) ddp_dsi_power_on,
+	.power_off = (int (*)(enum DISP_MODULE_ENUM, void*)) ddp_dsi_power_off,
+	.is_idle = (int (*)(enum DISP_MODULE_ENUM)) ddp_dsi_is_idle,
+	.is_busy = (int (*)(enum DISP_MODULE_ENUM)) ddp_dsi_is_busy,
+	.dump_info = (int (*)(enum DISP_MODULE_ENUM, int)) ddp_dsi_dump,
+	.set_lcm_utils = (int (*)(enum DISP_MODULE_ENUM, LCM_DRIVER*)) ddp_dsi_set_lcm_utils,
+	.ioctl = (int (*)(enum DISP_MODULE_ENUM, void*, unsigned int, unsigned long*)) ddp_dsi_ioctl
 };
 
 const LCM_UTIL_FUNCS PM_lcm_utils_dsi0 = {
@@ -3517,7 +3517,7 @@ void PanelMaster_set_CC(uint32_t dsi_index, uint32_t enable)
 	}
 }
 
-void PanelMaster_DSI_set_timing(uint32_t dsi_index, MIPI_TIMING timing)
+void PanelMaster_DSI_set_timing(uint32_t dsi_index, struct MIPI_TIMING timing)
 {
 	uint32_t hbp_byte;
 	LCM_DSI_PARAMS *dsi_params;
@@ -3701,7 +3701,7 @@ void PanelMaster_DSI_set_timing(uint32_t dsi_index, MIPI_TIMING timing)
 }
 
 
-uint32_t PanelMaster_get_dsi_timing(uint32_t dsi_index, MIPI_SETTING_TYPE type)
+uint32_t PanelMaster_get_dsi_timing(uint32_t dsi_index, enum MIPI_SETTING_TYPE type)
 {
 	uint32_t dsi_val;
 	struct DSI_REGS *dsi_reg;

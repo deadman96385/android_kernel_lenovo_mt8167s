@@ -24,26 +24,26 @@
 #endif
 
 
-typedef struct {
+struct DISP_WRITE_REG {
 	unsigned int reg;
 	unsigned int val;
 	unsigned int mask;
-} DISP_WRITE_REG;
+};
 
-typedef struct {
+struct DISP_READ_REG {
 	unsigned int reg;
 	unsigned int val;
 	unsigned int mask;
-} DISP_READ_REG;
+};
 
 #if 0
-typedef struct {
-	DISP_MODULE_ENUM module;
+struct disp_wait_irq_struct {
+	enum DISP_MODULE_ENUM module;
 	unsigned int timeout_ms;	/* timeout, unit is ms */
-} disp_wait_irq_struct;
+};
 #endif
 
-typedef struct DISP_EXEC_COMMAND {
+struct DISP_EXEC_COMMAND {
 	int taskID;
 	uint32_t scenario;
 	uint32_t priority;
@@ -51,20 +51,20 @@ typedef struct DISP_EXEC_COMMAND {
 	uint32_t *pFrameBaseSW;
 	uint32_t *pTileBaseSW;
 	uint32_t blockSize;
-} DISP_EXEC_COMMAND;
+};
 
-typedef struct {
+struct DISP_OVL_INFO {
 	int layer;
 
 	unsigned long addr;
-	DpColorFormat fmt;
+	enum DP_COLOR_ENUM fmt;
 
 	int x;
 	int y;
 	int w;
 	int h;			/* clip region */
 	int pitch;
-} DISP_OVL_INFO;
+};
 
 /* PQ */
 #define COLOR_TUNING_INDEX 19
@@ -84,8 +84,11 @@ typedef struct {
 #define GRASS_TONE_SIZE 6	/* (-2) */
 #define SKY_TONE_SIZE 3
 #define CCORR_COEF_CNT 4	/* ccorr feature */
+#define S_GAIN_BY_Y_CONTROL_CNT 5
+#define S_GAIN_BY_Y_HUE_PHASE_CNT 20
 
-typedef struct {
+
+struct DISP_PQ_PARAM {
 	unsigned int u4SHPGain;	/* 0 : min , 9 : max. */
 	unsigned int u4SatGain;	/* 0 : min , 9 : max. */
 	unsigned int u4PartialY;	/* 0 : min , 9 : max. */
@@ -94,29 +97,29 @@ typedef struct {
 	unsigned int u4Contrast;	/* 0 : min , 9 : max. */
 	unsigned int u4Brightness;	/* 0 : min , 9 : max. */
 	unsigned int u4Ccorr;	/* 0 : min , 3 : max.  ccorr feature */
-} DISP_PQ_PARAM;
+};
 
-typedef struct {
+struct DISP_PQ_WIN_PARAM {
 	int split_en;
 	int start_x;
 	int start_y;
 	int end_x;
 	int end_y;
-} DISP_PQ_WIN_PARAM;
+};
 
-typedef struct {
+struct DISP_PQ_MAPPING_PARAM {
 	int image;
 	int video;
 	int camera;
-} DISP_PQ_MAPPING_PARAM;
+};
 
-typedef struct {
+struct MDP_COLOR_CAP {
 	unsigned int en;
 	unsigned int pos_x;
 	unsigned int pos_y;
-} MDP_COLOR_CAP;
+};
 
-typedef struct {
+struct MDP_TDSHP_REG {
 	unsigned int TDS_GAIN_MID;
 	unsigned int TDS_GAIN_HIGH;
 	unsigned int TDS_COR_GAIN;
@@ -124,9 +127,9 @@ typedef struct {
 	unsigned int TDS_COR_ZERO;
 	unsigned int TDS_GAIN;
 	unsigned int TDS_COR_VALUE;
-} MDP_TDSHP_REG;
+};
 
-typedef struct {
+struct DISPLAY_PQ_T {
 	unsigned short GLOBAL_SAT[GLOBAL_SAT_SIZE];
 	unsigned short CONTRAST[CONTRAST_SIZE];
 	unsigned short BRIGHTNESS[BRIGHTNESS_SIZE];
@@ -139,10 +142,14 @@ typedef struct {
 	unsigned char SKIN_TONE_H[COLOR_TUNING_INDEX][SKIN_TONE_SIZE];
 	unsigned char GRASS_TONE_H[COLOR_TUNING_INDEX][GRASS_TONE_SIZE];
 	unsigned char SKY_TONE_H[COLOR_TUNING_INDEX][SKY_TONE_SIZE];
-	unsigned int CCORR_COEF[CCORR_COEF_CNT][3][3];
-} DISPLAY_PQ_T;
+	unsigned int  CCORR_COEF[CCORR_COEF_CNT][3][3];
+	unsigned char S_GAIN_BY_Y[S_GAIN_BY_Y_CONTROL_CNT][S_GAIN_BY_Y_HUE_PHASE_CNT];
+	unsigned char S_GAIN_BY_Y_EN;
+	unsigned char LSP_EN;
 
-typedef struct {
+};
+
+struct DISPLAY_COLOR_REG {
 	unsigned short GLOBAL_SAT;
 	unsigned short CONTRAST;
 	unsigned short BRIGHTNESS;
@@ -155,15 +162,19 @@ typedef struct {
 	unsigned char SKIN_TONE_H[SKIN_TONE_SIZE];
 	unsigned char GRASS_TONE_H[GRASS_TONE_SIZE];
 	unsigned char SKY_TONE_H[SKY_TONE_SIZE];
-} DISPLAY_COLOR_REG_T;
+	unsigned char S_GAIN_BY_Y[S_GAIN_BY_Y_CONTROL_CNT][S_GAIN_BY_Y_HUE_PHASE_CNT];
+	unsigned char S_GAIN_BY_Y_EN;
+	unsigned char LSP_EN;
 
-typedef struct {
+};
+
+struct DISPLAY_TDSHP_T {
 
 	unsigned int entry[THSHP_TUNING_INDEX][THSHP_PARAM_MAX];
 
-} DISPLAY_TDSHP_T;
+};
 
-typedef enum {
+enum PQ_DS_index_t {
 	DS_en = 0,
 	iUpSlope,
 	iUpThreshold,
@@ -188,16 +199,16 @@ typedef enum {
 	iGain_clip1,
 	iGain_clip0,
 	PQ_DS_INDEX_MAX
-} PQ_DS_index_t;
+};
 
 
-typedef struct {
+struct DISP_PQ_DS_PARAM {
 
 	int param[PQ_DS_INDEX_MAX];
 
-} DISP_PQ_DS_PARAM;
+};
 
-typedef enum {
+enum PQ_DC_index_t {
 	BlackEffectEnable = 0,
 	WhiteEffectEnable,
 	StrongBlackEffect,
@@ -238,17 +249,17 @@ typedef enum {
 	DCChangeSpeedLevel2,
 	ProtectRegionWeight,
 	DCEnable
-} PQ_DC_index_t;
+};
 
-typedef struct {
+struct DISP_PQ_DC_PARAM {
 
 	int param[40];
 
-} DISP_PQ_DC_PARAM;
+};
 
 
 /* OD */
-typedef struct {
+struct DISP_OD_CMD {
 	unsigned int size;
 	unsigned int type;
 	unsigned int ret;
@@ -256,21 +267,21 @@ typedef struct {
 	unsigned int param1;
 	unsigned int param2;
 	unsigned int param3;
-} DISP_OD_CMD;
+};
 
-typedef enum {
+enum DISP_INTERLACE_FORMAT {
 	DISP_INTERLACE_FORMAT_NONE,
 	DISP_INTERLACE_FORMAT_TOP_FIELD,
 	DISP_INTERLACE_FORMAT_BOTTOM_FIELD
-} DISP_INTERLACE_FORMAT;
+};
 
 struct device *disp_get_device(void);
 
 #define DISP_IOCTL_MAGIC        'x'
 
-#define DISP_IOCTL_WRITE_REG       _IOW(DISP_IOCTL_MAGIC, 1, DISP_WRITE_REG)	/* also defined in atci_pq_cmd.h */
-#define DISP_IOCTL_READ_REG        _IOWR(DISP_IOCTL_MAGIC, 2, DISP_READ_REG)	/* also defined in atci_pq_cmd.h */
-/* #define DISP_IOCTL_WAIT_IRQ        _IOR     (DISP_IOCTL_MAGIC, 3, disp_wait_irq_struct) */
+#define DISP_IOCTL_WRITE_REG       _IOW(DISP_IOCTL_MAGIC, 1, struct DISP_WRITE_REG)
+#define DISP_IOCTL_READ_REG        _IOWR(DISP_IOCTL_MAGIC, 2, struct DISP_READ_REG)
+/* #define DISP_IOCTL_WAIT_IRQ        _IOR     (DISP_IOCTL_MAGIC, 3, struct disp_wait_irq_struct) */
 #define DISP_IOCTL_DUMP_REG        _IOR(DISP_IOCTL_MAGIC, 4, int)
 #define DISP_IOCTL_LOCK_THREAD     _IOR(DISP_IOCTL_MAGIC, 5, int)
 #define DISP_IOCTL_UNLOCK_THREAD   _IOR(DISP_IOCTL_MAGIC, 6, int)
@@ -292,9 +303,9 @@ struct device *disp_get_device(void);
 
 #define DISP_IOCTL_RUN_DPF         _IOW(DISP_IOCTL_MAGIC, 30, int)
 #define DISP_IOCTL_CHECK_OVL       _IOR(DISP_IOCTL_MAGIC, 31, int)
-#define DISP_IOCTL_GET_OVL         _IOWR(DISP_IOCTL_MAGIC, 32, DISP_OVL_INFO)
+#define DISP_IOCTL_GET_OVL         _IOWR(DISP_IOCTL_MAGIC, 32, struct DISP_OVL_INFO)
 
-#define DISP_IOCTL_EXEC_COMMAND    _IOW(DISP_IOCTL_MAGIC, 33, DISP_EXEC_COMMAND)
+#define DISP_IOCTL_EXEC_COMMAND    _IOW(DISP_IOCTL_MAGIC, 33, struct DISP_EXEC_COMMAND)
 #define DISP_IOCTL_RESOURCE_REQUIRE   _IOR(DISP_IOCTL_MAGIC, 34, int)
 
 /* Add for AAL control - S */
@@ -319,52 +330,52 @@ struct device *disp_get_device(void);
 /* #define DISP_IOCTL_G_WAIT_REQUEST  _IOR     (DISP_IOCTL_MAGIC , 40 , DDPIOCTL_DdpkBitbltConfig) */
 /* #define DISP_IOCTL_T_INFORM_DONE   _IOW     (DISP_IOCTL_MAGIC , 41 , DDPIOCTL_DdpkBitbltInformDone) */
 
-#define DISP_IOCTL_SET_CLKON        _IOW(DISP_IOCTL_MAGIC, 50, DISP_MODULE_ENUM)
-#define DISP_IOCTL_SET_CLKOFF       _IOW(DISP_IOCTL_MAGIC, 51, DISP_MODULE_ENUM)
+#define DISP_IOCTL_SET_CLKON        _IOW(DISP_IOCTL_MAGIC, 50, enum DISP_MODULE_ENUM)
+#define DISP_IOCTL_SET_CLKOFF       _IOW(DISP_IOCTL_MAGIC, 51, enum DISP_MODULE_ENUM)
 
 #define DISP_IOCTL_MUTEX_CONTROL    _IOW(DISP_IOCTL_MAGIC, 55, int)	/* also defined in atci_pq_cmd.h */
 #define DISP_IOCTL_GET_LCMINDEX     _IOR(DISP_IOCTL_MAGIC, 56, int)
 
 /* PQ setting */
-#define DISP_IOCTL_SET_PQPARAM      _IOW(DISP_IOCTL_MAGIC, 60, DISP_PQ_PARAM)
-#define DISP_IOCTL_GET_PQPARAM      _IOR(DISP_IOCTL_MAGIC, 61, DISP_PQ_PARAM)
-#define DISP_IOCTL_GET_PQINDEX      _IOR(DISP_IOCTL_MAGIC, 63,  DISPLAY_PQ_T)
-#define DISP_IOCTL_SET_PQINDEX      _IOW(DISP_IOCTL_MAGIC, 64, DISPLAY_PQ_T)
-#define DISP_IOCTL_SET_TDSHPINDEX   _IOW(DISP_IOCTL_MAGIC, 65, DISPLAY_TDSHP_T)
-#define DISP_IOCTL_GET_TDSHPINDEX   _IOR(DISP_IOCTL_MAGIC, 66, DISPLAY_TDSHP_T)
-#define DISP_IOCTL_SET_PQ_CAM_PARAM _IOW(DISP_IOCTL_MAGIC, 67, DISP_PQ_PARAM)
-#define DISP_IOCTL_GET_PQ_CAM_PARAM _IOR(DISP_IOCTL_MAGIC, 68, DISP_PQ_PARAM)
-#define DISP_IOCTL_SET_PQ_GAL_PARAM _IOW(DISP_IOCTL_MAGIC, 69, DISP_PQ_PARAM)
-#define DISP_IOCTL_GET_PQ_GAL_PARAM _IOR(DISP_IOCTL_MAGIC, 70, DISP_PQ_PARAM)
+#define DISP_IOCTL_SET_PQPARAM      _IOW(DISP_IOCTL_MAGIC, 60, struct DISP_PQ_PARAM)
+#define DISP_IOCTL_GET_PQPARAM      _IOR(DISP_IOCTL_MAGIC, 61, struct DISP_PQ_PARAM)
+#define DISP_IOCTL_GET_PQINDEX      _IOR(DISP_IOCTL_MAGIC, 63, struct DISPLAY_PQ_T)
+#define DISP_IOCTL_SET_PQINDEX      _IOW(DISP_IOCTL_MAGIC, 64, struct DISPLAY_PQ_T)
+#define DISP_IOCTL_SET_TDSHPINDEX   _IOW(DISP_IOCTL_MAGIC, 65, struct DISPLAY_TDSHP_T)
+#define DISP_IOCTL_GET_TDSHPINDEX   _IOR(DISP_IOCTL_MAGIC, 66, struct DISPLAY_TDSHP_T)
+#define DISP_IOCTL_SET_PQ_CAM_PARAM _IOW(DISP_IOCTL_MAGIC, 67, struct DISP_PQ_PARAM)
+#define DISP_IOCTL_GET_PQ_CAM_PARAM _IOR(DISP_IOCTL_MAGIC, 68, struct DISP_PQ_PARAM)
+#define DISP_IOCTL_SET_PQ_GAL_PARAM _IOW(DISP_IOCTL_MAGIC, 69, struct DISP_PQ_PARAM)
+#define DISP_IOCTL_GET_PQ_GAL_PARAM _IOR(DISP_IOCTL_MAGIC, 70, struct DISP_PQ_PARAM)
 
 #define DISP_IOCTL_PQ_SET_BYPASS_COLOR  _IOW(DISP_IOCTL_MAGIC, 71, int)
-#define DISP_IOCTL_PQ_SET_WINDOW    _IOW(DISP_IOCTL_MAGIC, 72, DISP_PQ_WIN_PARAM)
+#define DISP_IOCTL_PQ_SET_WINDOW    _IOW(DISP_IOCTL_MAGIC, 72, struct DISP_PQ_WIN_PARAM)
 #define DISP_IOCTL_PQ_GET_TDSHP_FLAG    _IOR(DISP_IOCTL_MAGIC, 73, int)
 #define DISP_IOCTL_PQ_SET_TDSHP_FLAG    _IOW(DISP_IOCTL_MAGIC, 74, int)
-#define DISP_IOCTL_PQ_GET_DC_PARAM  _IOR(DISP_IOCTL_MAGIC, 75, DISP_PQ_DC_PARAM)
-#define DISP_IOCTL_PQ_SET_DC_PARAM  _IOW(DISP_IOCTL_MAGIC, 76, DISP_PQ_DC_PARAM)
-#define DISP_IOCTL_WRITE_SW_REG     _IOW(DISP_IOCTL_MAGIC, 77, DISP_WRITE_REG)	/* also defined in atci_pq_cmd.h */
-#define DISP_IOCTL_READ_SW_REG      _IOWR(DISP_IOCTL_MAGIC, 78, DISP_READ_REG)	/* also defined in atci_pq_cmd.h */
-#define DISP_IOCTL_SET_COLOR_REG    _IOWR(DISP_IOCTL_MAGIC, 79, DISPLAY_COLOR_REG_T)
+#define DISP_IOCTL_PQ_GET_DC_PARAM  _IOR(DISP_IOCTL_MAGIC, 75, struct DISP_PQ_DC_PARAM)
+#define DISP_IOCTL_PQ_SET_DC_PARAM  _IOW(DISP_IOCTL_MAGIC, 76, struct DISP_PQ_DC_PARAM)
+#define DISP_IOCTL_WRITE_SW_REG     _IOW(DISP_IOCTL_MAGIC, 77, struct DISP_WRITE_REG)
+#define DISP_IOCTL_READ_SW_REG      _IOWR(DISP_IOCTL_MAGIC, 78, struct DISP_READ_REG)
+#define DISP_IOCTL_SET_COLOR_REG    _IOWR(DISP_IOCTL_MAGIC, 79, struct DISPLAY_COLOR_REG)
 
 
 /* OD */
-#define DISP_IOCTL_OD_CTL           _IOWR(DISP_IOCTL_MAGIC, 80, DISP_OD_CMD)
+#define DISP_IOCTL_OD_CTL           _IOWR(DISP_IOCTL_MAGIC, 80, struct DISP_OD_CMD)
 
 /* OVL */
 #define DISP_IOCTL_OVL_ENABLE_CASCADE  _IOW(DISP_IOCTL_MAGIC, 90, int)
 #define DISP_IOCTL_OVL_DISABLE_CASCADE  _IOW(DISP_IOCTL_MAGIC, 91, int)
 
 /*PQ setting*/
-#define DISP_IOCTL_PQ_GET_DS_PARAM      _IOR(DISP_IOCTL_MAGIC, 100, DISP_PQ_DS_PARAM)
-#define DISP_IOCTL_PQ_GET_MDP_COLOR_CAP _IOR(DISP_IOCTL_MAGIC, 101, MDP_COLOR_CAP)
-#define DISP_IOCTL_PQ_GET_MDP_TDSHP_REG _IOR(DISP_IOCTL_MAGIC, 102, MDP_TDSHP_REG)
+#define DISP_IOCTL_PQ_GET_DS_PARAM      _IOR(DISP_IOCTL_MAGIC, 100, struct DISP_PQ_DS_PARAM)
+#define DISP_IOCTL_PQ_GET_MDP_COLOR_CAP _IOR(DISP_IOCTL_MAGIC, 101, struct MDP_COLOR_CAP)
+#define DISP_IOCTL_PQ_GET_MDP_TDSHP_REG _IOR(DISP_IOCTL_MAGIC, 102, struct MDP_TDSHP_REG)
 
 /* secure video path implementation: the handle value */
 #define DISP_IOCTL_SET_TPLAY_HANDLE    _IOW(DISP_IOCTL_MAGIC, 200, unsigned int)
 
 #ifndef CONFIG_MTK_CLKMGR
-typedef enum disp_clk_id {
+enum eDDP_CLK_ID {
 	DISP0_SMI_COMMON = 0,
 	DISP0_SMI_LARB0,
 	DISP0_FAKE_ENG,
@@ -403,16 +414,16 @@ typedef enum disp_clk_id {
 	UNIVPLL2_D4,
 	SYSPLL4_D2,
 	MAX_DISP_CLK_CNT
-} eDDP_CLK_ID;
+};
 
-int ddp_clk_prepare(eDDP_CLK_ID id);
-int ddp_clk_unprepare(eDDP_CLK_ID id);
-int ddp_clk_enable(eDDP_CLK_ID id);
-int ddp_clk_disable(eDDP_CLK_ID id);
-int ddp_clk_prepare_enable(eDDP_CLK_ID id);
-int ddp_clk_disable_unprepare(eDDP_CLK_ID id);
-int ddp_clk_set_parent(eDDP_CLK_ID id, eDDP_CLK_ID parent);
-int ddp_clk_set_rate(eDDP_CLK_ID id, unsigned long rate);
+int ddp_clk_prepare(enum eDDP_CLK_ID id);
+int ddp_clk_unprepare(enum eDDP_CLK_ID id);
+int ddp_clk_enable(enum eDDP_CLK_ID id);
+int ddp_clk_disable(enum eDDP_CLK_ID id);
+int ddp_clk_prepare_enable(enum eDDP_CLK_ID id);
+int ddp_clk_disable_unprepare(enum eDDP_CLK_ID id);
+int ddp_clk_set_parent(enum eDDP_CLK_ID id, enum eDDP_CLK_ID parent);
+int ddp_clk_set_rate(enum eDDP_CLK_ID id, unsigned long rate);
 #endif
 
 extern unsigned int dispsys_irq[DISP_REG_NUM];
@@ -429,7 +440,7 @@ extern struct DPI_REGS *DPI_REG[2];
 /*extern unsigned long DPI_TVDPLL_CON0;*/
 /*extern unsigned long DPI_TVDPLL_CON1;*/
 
-const char *ddp_get_reg_module_name(DISP_REG_ENUM reg);
+const char *ddp_get_reg_module_name(enum DISP_REG_ENUM reg);
 
 extern int m4u_enable_tf(int port, bool fgenable);
 
