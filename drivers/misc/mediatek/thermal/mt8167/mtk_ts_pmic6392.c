@@ -25,23 +25,16 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/uidgid.h>
+#include <linux/regmap.h>
+#include <linux/mfd/syscon.h>
 
-/*#include <mach/system.h>*/
 #include "mt-plat/mtk_thermal_monitor.h"
 #include "mtk_thermal_typedefs.h"
 #include "inc/mtk_thermal.h"
+#include <linux/regmap.h>
 
-/* #include <mach/pmic_mt6329_hw_bank1.h> */
-/* #include <mach/pmic_mt6329_sw_bank1.h> */
-/* #include <mach/pmic_mt6329_hw.h> */
-/* #include <mach/pmic_mt6329_sw.h> */
-/*#include <mach/upmu_common_sw.h>*/
-#include <mach/upmu_hw.h>
-/*#include <mach/upmu_sw.h>*/
-#include <mt-plat/mt_pmic_wrap.h>
-#include "inc/mtk_ts_cpu.h"
-
-struct proc_dir_entry *mtk_thermal_get_proc_drv_therm_dir_entry(void);
+#include <linux/mfd/mt6397/core.h>
+#include  <mt-plat/upmu_common.h>
 
 static kuid_t uid = KUIDT_INIT(0);
 static kgid_t gid = KGIDT_INIT(1000);
@@ -82,112 +75,99 @@ do {									\
 } while (0)
 
 /* Cali */
+static kal_int32 g_adc_ge;
+static kal_int32 g_adc_oe;
 static kal_int32 g_o_vts;
 static kal_int32 g_degc_cali;
 static kal_int32 g_adc_cali_en;
 static kal_int32 g_o_slope;
 static kal_int32 g_o_slope_sign;
 static kal_int32 g_id;
-static kal_int32 g_slope1;
-static kal_int32 g_slope2;
-static kal_int32 g_intercept;
 
-unsigned int __attribute__ ((weak))
-upmu_get_cid(void)
-{
-	return 0x2023;
-}
+static struct regmap *regmap_pmic_thermal;
 
 #define y_pmic_repeat_times	1
+#define THERMAL_NAME	"mt6392-thermal"
+
 static u16 pmic_read(u16 addr)
 {
 	u32 rdata = 0;
 
-	pwrap_read((u32) addr, &rdata);
+	regmap_read(regmap_pmic_thermal, (u32) addr, &rdata);
 	return (u16) rdata;
 }
 
 static void pmic_cali_prepare(void)
 {
-	kal_uint32 temp0, temp1;
+	kal_uint32 temp0, temp1, temp2, sign;
 
-	temp0 = pmic_read(0x63A);
-	temp1 = pmic_read(0x63C);
+	temp0 = pmic_read(0x1E2);
+	temp1 = pmic_read(0x1EA);
+	temp2 = pmic_read(0x1EC);
+	pr_info("Power/PMIC_Thermal: Reg(0x1E2)=0x%x, Reg(0x1EA)=0x%x, Reg(0x1EC)=0x%x\n", temp0,
+		temp1, temp2);
 
-	pr_debug("Power/PMIC_Thermal: Reg(0x63a)=0x%x, Reg(0x63c)=0x%x\n", temp0, temp1);
+	g_adc_ge = (temp0 >> 1) & 0x007f;
+	g_adc_oe = (temp0 >> 8) & 0x003f;
+	g_o_vts = ((temp2 & 0x0001) << 8) + ((temp1 >> 8) & 0x00ff);
+	g_degc_cali = (temp1 >> 2) & 0x003f;
+	g_adc_cali_en = (temp1 >> 1) & 0x0001;
+	g_o_slope_sign = (temp2 >> 1) & 0x0001;
+	g_o_slope = (temp2 >> 2) & 0x003f;
+	g_id = (temp2 >> 8) & 0x0001;
 
-	g_o_vts = ((temp1 & 0x001F) << 8) + ((temp0 >> 8) & 0x00FF);
-	g_degc_cali = (temp0 >> 2) & 0x003f;
-	g_adc_cali_en = (temp0 >> 1) & 0x0001;
-	g_o_slope_sign = (temp1 >> 5) & 0x0001;
+	sign = (temp0 >> 7) & 0x0001;
+	if (sign == 1)
+		g_adc_ge = g_adc_ge - 0x80;
 
-	/*
-	 *  CHIP ID
-	 *  E1 : 16'h1023
-	 *  E2 : 16'h2023
-	 *  E3 : 16'h3023
-	 */
-	if (upmu_get_cid() == 0x1023) {
-		g_id = (temp1 >> 12) & 0x0001;
-		g_o_slope = (temp1 >> 6) & 0x003f;
-	} else {
-		g_id = (temp1 >> 14) & 0x0001;
-		g_o_slope = (((temp1 >> 11) & 0x0007) << 3) + ((temp1 >> 6) & 0x007);
-	}
+	sign = (temp0 >> 13) & 0x0001;
+	if (sign == 1)
+		g_adc_oe = g_adc_oe - 0x40;
 
 	if (g_id == 0)
 		g_o_slope = 0;
 
-	if (g_adc_cali_en == 0) {	/* no calibration */
-		g_o_vts = 3698;
+	if (g_adc_cali_en != 1) {
+		/* no cali, use default value */
+		g_adc_ge = 0;
+		g_adc_oe = 0;
+		/* g_o_vts = 608; */
+		g_o_vts = 352;
 		g_degc_cali = 50;
 		g_o_slope = 0;
 		g_o_slope_sign = 0;
 	}
-
-	pr_debug("Power/PMIC_Thermal: g_ver= 0x%x, g_o_vts = 0x%x, g_degc_cali = 0x%x,",
-upmu_get_cid(), g_o_vts, g_degc_cali);
-	pr_debug("g_adc_cali_en = 0x%x, g_o_slope = 0x%x, g_o_slope_sign = 0x%x, g_id = 0x%x\n",
-g_adc_cali_en, g_o_slope, g_o_slope_sign, g_id);
-
-	mtktspmic_dprintk("Power/PMIC_Thermal: chip ver       = 0x%x\n", upmu_get_cid());
-	mtktspmic_dprintk("Power/PMIC_Thermal: g_o_vts        = 0x%x\n", g_o_vts);
-	mtktspmic_dprintk("Power/PMIC_Thermal: g_degc_cali    = 0x%x\n", g_degc_cali);
-	mtktspmic_dprintk("Power/PMIC_Thermal: g_adc_cali_en  = 0x%x\n", g_adc_cali_en);
-	mtktspmic_dprintk("Power/PMIC_Thermal: g_o_slope      = 0x%x\n", g_o_slope);
-	mtktspmic_dprintk("Power/PMIC_Thermal: g_o_slope_sign = 0x%x\n", g_o_slope_sign);
-	mtktspmic_dprintk("Power/PMIC_Thermal: g_id           = 0x%x\n", g_id);
 }
 
-
-static void pmic_cali_prepare2(void)
+static kal_int32 thermal_cal_exec(kal_uint32 ret)
 {
-	kal_int32 vbe_t;
-
-	g_slope1 = (100 * 1000);	/* 1000 is for 0.001 degree */
-	if (g_o_slope_sign == 0)
-		g_slope2 = -(171 + g_o_slope);
-	else
-		g_slope2 = -(171 - g_o_slope);
-	vbe_t = (-1) * (((g_o_vts + 9102) * 1800) / 32768) * 1000;
-	if (g_o_slope_sign == 0)
-		g_intercept = (vbe_t * 100) / (-(171 + g_o_slope));	/* 0.001 degree */
-	else
-		g_intercept = (vbe_t * 100) / (-(171 - g_o_slope));	/* 0.001 degree */
-	g_intercept = g_intercept + (g_degc_cali * (1000 / 2));	/* 1000 is for 0.1 degree */
-	pr_debug
-	    ("[Power/PMIC_Thermal] [Thermal calibration] SLOPE1=%d SLOPE2=%d INTERCEPT=%d, Vbe = %d\n",
-	     g_slope1, g_slope2, g_intercept, vbe_t);
-
-}
-
-static kal_int32 pmic_raw_to_temp(kal_uint32 ret)
-{
+	kal_int32 t_current = 0;
 	kal_int32 y_curr = ret;
-	kal_int32 t_current;
+	kal_int32 format_1 = 0;
+	kal_int32 format_2 = 0;
+	kal_int32 format_3 = 0;
+	kal_int32 format_4 = 0;
 
-	t_current = g_intercept + ((g_slope1 * y_curr) / (g_slope2));
-	/* mtktspmic_dprintk("[pmic_raw_to_temp] t_current=%d\n",t_current); */
+	if (ret == 0)
+		return 0;
+
+	format_1 = (g_degc_cali * 1000 / 2);
+	format_2 = (g_adc_ge + 1024) * (g_o_vts + 256) + g_adc_oe * 1024;
+	format_3 = (format_2 * 1200) / 1024 * 100 / 1024;
+	mtktspmic_dprintk("format1=%d, format2=%d, format3=%d\n", format_1, format_2, format_3);
+
+	if (g_o_slope_sign == 0) {
+		/* format_4 = ((format_3 * 1000) / (164+g_o_slope));//unit = 0.001 degress */
+		/* format_4 = (y_curr*1000 - format_3)*100 / (164+g_o_slope); */
+		format_4 = (y_curr * 100 - format_3) * 1000 / (171 + g_o_slope);
+	} else {
+		/* format_4 = ((format_3 * 1000) / (164-g_o_slope)); */
+		/* format_4 = (y_curr*1000 - format_3)*100 / (164-g_o_slope); */
+		format_4 = (y_curr * 100 - format_3) * 1000 / (171 - g_o_slope);
+	}
+	format_4 = format_4 - (2 * format_4);
+	t_current = (format_1) + format_4;	/* unit = 0.001 degress */
+/* tspmic_dprintk("[mtktspmic_get_hw_temp] T_PMIC=%d\n",t_current); */
 	return t_current;
 }
 
@@ -199,31 +179,27 @@ static int pre_temp1 = 0, PMIC_counter;
 static int mtktspmic_get_hw_temp(void)
 {
 	int temp = 0, temp1 = 0;
-	/* int temp3=0; */
+
 	mutex_lock(&TSPMIC_lock);
 
+	temp = PMIC_IMM_GetOneChannelValue(4, y_pmic_repeat_times, 2);
+	temp1 = thermal_cal_exec(temp);
 
-
-	temp = PMIC_IMM_GetOneChannelValue(3, y_pmic_repeat_times, 2);
-	temp1 = pmic_raw_to_temp(temp);
-	/* temp2 = pmic_raw_to_temp(675); */
-
-	mtktspmic_dprintk("[mtktspmic_get_hw_temp] PMIC_IMM_GetOneChannel 3=%d, T=%d\n", temp,
-			  temp1);
+	mtktspmic_dprintk("[mtktspmic_get_hw_temp] PMIC_IMM_GetOneChannel 4=%d, T=%d\n", temp, temp1);
 
 /* pmic_thermal_dump_reg(); // test */
 
 	if ((temp1 > 100000) || (temp1 < -30000)) {
-		pr_debug("[Power/PMIC_Thermal] raw=%d, PMIC T=%d", temp, temp1);
-/* Jerry 2013.3.24               pmic_thermal_dump_reg(); */
+		pr_info("[Power/PMIC_Thermal] raw=%d, PMIC T=%d", temp, temp1);
+/* pmic_thermal_dump_reg(); */
 	}
 
 	if ((temp1 > 150000) || (temp1 < -50000)) {
-		pr_debug("[Power/PMIC_Thermal] drop this data\n");
+		pr_info("[Power/PMIC_Thermal] drop this data\n");
 		temp1 = pre_temp1;
 	} else if ((PMIC_counter != 0)
 		   && (((pre_temp1 - temp1) > 30000) || ((temp1 - pre_temp1) > 30000))) {
-		pr_debug("[Power/PMIC_Thermal] drop this data 2\n");
+		pr_info("[Power/PMIC_Thermal] drop this data 2\n");
 		temp1 = pre_temp1;
 	} else {
 		/* update previous temp */
@@ -234,13 +210,11 @@ static int mtktspmic_get_hw_temp(void)
 			PMIC_counter++;
 	}
 
-
-
 	mutex_unlock(&TSPMIC_lock);
 	return temp1;
 }
 
-static int mtktspmic_get_temp(struct thermal_zone_device *thermal, unsigned long *t)
+static int mtktspmic_get_temp(struct thermal_zone_device *thermal, int *t)
 {
 	*t = mtktspmic_get_hw_temp();
 	return 0;
@@ -360,13 +334,13 @@ static int mtktspmic_get_trip_type(struct thermal_zone_device *thermal, int trip
 }
 
 static int mtktspmic_get_trip_temp(struct thermal_zone_device *thermal, int trip,
-				   unsigned long *temp)
+				   int *temp)
 {
 	*temp = trip_temp[trip];
 	return 0;
 }
 
-static int mtktspmic_get_crit_temp(struct thermal_zone_device *thermal, unsigned long *temperature)
+static int mtktspmic_get_crit_temp(struct thermal_zone_device *thermal, int *temperature)
 {
 	*temperature = mtktspmic_TEMP_CRIT;
 	return 0;
@@ -406,6 +380,7 @@ static int tspmic_sysrst_set_cur_state(struct thermal_cooling_device *cdev, unsi
 		pr_debug("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 
 		*(unsigned int *)0x0 = 0xdead;
+		/* arch_reset(0,NULL); */
 	}
 	return 0;
 }
@@ -415,7 +390,6 @@ static struct thermal_cooling_device_ops mtktspmic_cooling_sysrst_ops = {
 	.get_cur_state = tspmic_sysrst_get_cur_state,
 	.set_cur_state = tspmic_sysrst_set_cur_state,
 };
-
 
 static int mtktspmic_read(struct seq_file *m, void *v)
 {
@@ -441,6 +415,41 @@ g_bind5, g_bind6, g_bind7, g_bind8, g_bind9, interval * 1000);
 	return 0;
 }
 
+int mtktspmic_register_cooler(void)
+{
+	cl_dev_sysrst = mtk_thermal_cooling_device_register("mtktspmic-sysrst", NULL,
+							    &mtktspmic_cooling_sysrst_ops);
+	return 0;
+}
+
+int mtktspmic_register_thermal(void)
+{
+	mtktspmic_dprintk("[mtktspmic_register_thermal]\n");
+
+	/* trips : trip 0~2 */
+	thz_dev = mtk_thermal_zone_device_register("mtktspmic", num_trip, NULL,
+						   &mtktspmic_dev_ops, 0, 0, 0, interval * 1000);
+
+	return 0;
+}
+
+void mtktspmic_unregister_cooler(void)
+{
+	if (cl_dev_sysrst) {
+		mtk_thermal_cooling_device_unregister(cl_dev_sysrst);
+		cl_dev_sysrst = NULL;
+	}
+}
+
+void mtktspmic_unregister_thermal(void)
+{
+	mtktspmic_dprintk("[mtktspmic_unregister_thermal]\n");
+
+	if (thz_dev) {
+		mtk_thermal_zone_device_unregister(thz_dev);
+		thz_dev = NULL;
+	}
+}
 
 static ssize_t mtktspmic_write(struct file *file, const char __user *buffer, size_t count,
 			       loff_t *data)
@@ -523,42 +532,6 @@ trip_temp[7], trip_temp[8], trip_temp[9],	time_msec);
 	return -EINVAL;
 }
 
-int mtktspmic_register_cooler(void)
-{
-	cl_dev_sysrst = mtk_thermal_cooling_device_register("mtktspmic-sysrst", NULL,
-							    &mtktspmic_cooling_sysrst_ops);
-	return 0;
-}
-
-int mtktspmic_register_thermal(void)
-{
-	mtktspmic_dprintk("[mtktspmic_register_thermal]\n");
-
-	/* trips : trip 0~2 */
-	thz_dev = mtk_thermal_zone_device_register("mtktspmic", num_trip, NULL,
-						   &mtktspmic_dev_ops, 0, 0, 0, interval * 1000);
-
-	return 0;
-}
-
-void mtktspmic_unregister_cooler(void)
-{
-	if (cl_dev_sysrst) {
-		mtk_thermal_cooling_device_unregister(cl_dev_sysrst);
-		cl_dev_sysrst = NULL;
-	}
-}
-
-void mtktspmic_unregister_thermal(void)
-{
-	mtktspmic_dprintk("[mtktspmic_unregister_thermal]\n");
-
-	if (thz_dev) {
-		mtk_thermal_zone_device_unregister(thz_dev);
-		thz_dev = NULL;
-	}
-}
-
 static int mtktspmic_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, mtktspmic_read, NULL);
@@ -573,15 +546,16 @@ static const struct file_operations mtktspmic_fops = {
 	.release = single_release,
 };
 
-static int __init mtktspmic_init(void)
+static int mtktspmic_probe(struct platform_device *pdev)
 {
 	int err = 0;
 	struct proc_dir_entry *entry = NULL;
 	struct proc_dir_entry *mtktspmic_dir = NULL;
+	struct mt6397_chip *mt6392_chip = dev_get_drvdata(pdev->dev.parent);
 
-	mtktspmic_dprintk("[%s]\n", __func__);
+	regmap_pmic_thermal = mt6392_chip->regmap;
+
 	pmic_cali_prepare();
-	pmic_cali_prepare2();
 
 	err = mtktspmic_register_cooler();
 	if (err)
@@ -602,6 +576,26 @@ static int __init mtktspmic_init(void)
 err_unreg:
 	mtktspmic_unregister_cooler();
 	return err;
+}
+
+static int mtktspmic_remove(struct platform_device *pdev)
+{
+	if (thz_dev)
+		thermal_zone_device_unregister(thz_dev);
+	return 0;
+}
+
+static struct platform_driver mtk_thermal_pmic_driver = {
+		.probe = mtktspmic_probe,
+		.remove = mtktspmic_remove,
+		.driver =  {
+				.name = THERMAL_NAME,
+		},
+};
+
+static int __init mtktspmic_init(void)
+{
+	return platform_driver_register(&mtk_thermal_pmic_driver);
 }
 
 static void __exit mtktspmic_exit(void)

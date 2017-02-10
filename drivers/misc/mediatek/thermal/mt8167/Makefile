@@ -40,10 +40,8 @@ obj-$(CONFIG_THERMAL) += mtk_ts_bts.o
 obj-$(CONFIG_THERMAL) += mtk_ts_cpu.o
 #obj-$(CONFIG_THERMAL) += mtk_ts_abb.o
 #obj-$(CONFIG_THERMAL) += mtk_ts_all_ts.o
-#obj-$(CONFIG_THERMAL) += mtk_ts_pa.o
 #obj-$(CONFIG_THERMAL) += mtk_ts_battery.o
-#obj-$(CONFIG_THERMAL) += mtk_ts_pmic6323.o
-
+obj-$(CONFIG_THERMAL) += mtk_ts_pmic6392.o
 #obj-$(CONFIG_THERMAL) += tm_nth.o
 
 
