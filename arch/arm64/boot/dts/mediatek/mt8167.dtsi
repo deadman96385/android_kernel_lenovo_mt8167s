@@ -862,14 +862,6 @@
 			status = "disabled";
 		};
 
-		ptp_od: ptp_od@1100b000 {
-			compatible = "mediatek,mt8167-ptp_od";
-			reg = <0 0x1100b000 0 0x1000>;
-			interrupts = <GIC_SPI 125 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&infracfg CLK_INFRA_THERM>;
-			clock-names = "ptp_infra_therm";
-		};
-
 		thermal: thermal@1100d000 {
 			compatible = "mediatek,mt8167-thermal";
 			reg = <0 0x1100d000 0 0x1000>;
@@ -879,6 +871,12 @@
 			auxadc = <&auxadc>;
 			apmixedsys = <&apmixedsys>;
 			infracfg = <&infracfg>;
+		};
+
+		ptp_od: ptp_od@1100d000 {
+			compatible = "mediatek,mt8167-ptp_od";
+			reg = <0 0x1100d000 0 0x1000>;
+			interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_LOW>;
 		};
 
 		btif: btif@1100e000 {
