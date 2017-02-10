@@ -57,7 +57,6 @@ static kgid_t gid = KGIDT_INIT(1000);
 static unsigned int interval;	/* seconds, 0 : no auto polling */
 static int trip_temp[10] = { 120000, 110000, 100000, 90000, 80000, 70000, 65000, 60000, 55000, 50000 };
 static struct thermal_zone_device *thz_dev;
-static int mtkts_bts_debug_log;
 static int kernelmode;
 static int g_THERMAL_TRIP[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
@@ -90,8 +89,8 @@ int bts_cur_temp = 1;
 
 #define mtkts_bts_dprintk(fmt, args...)   \
 do {                                    \
-	if (mtkts_bts_debug_log) {                \
-		pr_debug("[Power/BTS_Thermal]" fmt, ##args); \
+	if (mtktscpu_debug_log & 0x8) {                \
+		pr_err("[Power/BTS_Thermal]" fmt, ##args); \
 	}                                   \
 } while (0)
 

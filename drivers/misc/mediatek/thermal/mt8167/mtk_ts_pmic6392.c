@@ -48,7 +48,6 @@ static unsigned int cl_dev_sysrst_state;
 static struct thermal_zone_device *thz_dev;
 
 static struct thermal_cooling_device *cl_dev_sysrst;
-static int mtktspmic_debug_log;
 static int kernelmode;
 
 static int g_THERMAL_TRIP[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -69,8 +68,8 @@ static char g_bind9[20] = { 0 };
 
 #define mtktspmic_dprintk(fmt, args...)   \
 do {									\
-	if (mtktspmic_debug_log) {				\
-		pr_debug("Power/PMIC_Thermal" fmt, ##args); \
+	if (mtktscpu_debug_log & 0x10) {                \
+		pr_err("Power/PMIC_Thermal" fmt, ##args); \
 	}								   \
 } while (0)
 
