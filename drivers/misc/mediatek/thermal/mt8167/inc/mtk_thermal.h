@@ -240,12 +240,11 @@ enum thermal_sensor_name {
 };
 
 enum thermal_bank_name {
-	THERMAL_BANK0     = 0,/*CPU (TS_MCU1) (TS1)*/
-	THERMAL_BANK1     = 1, /*GPU (TS_MCU2) (TS2)*/
-	THERMAL_BANK2     = 2,/*SOC (TS_MCU3) (TS3)*/
+	THERMAL_BANK0     = 0, /*CPU (TS_MCU1) (TS1)*/
+	THERMAL_BANK1     = 1, /*MFG (TS_MCU2) (TS2)*/
+	THERMAL_BANK2     = 2, /*GPU (TS_MCU3) (TS3)*/
 	THERMAL_BANK_NUM
 };
-
 
 struct TS_PTPOD {
 	unsigned int ts_MTS;
@@ -257,17 +256,13 @@ struct mtk_gpu_power_info {
 	unsigned int gpufreq_power;
 };
 
+/* ptp driver need this function */
 extern void get_thermal_slope_intercept(struct TS_PTPOD *ts_info, enum thermal_bank_name ts_bank);
+
+/* mtk_thermal_platform.c need this */
 extern void set_taklking_flag(bool flag);
-extern int tscpu_get_cpu_temp(void);
-extern int tscpu_get_temp_by_bank(enum thermal_bank_name ts_bank);
 
 #define THERMAL_WRAP_WR32(val, addr)  mt_reg_sync_writel((val), ((void *)addr))
-
-
-extern int get_immediate_cpu_wrap(void);
-extern int get_immediate_gpu_wrap(void);
-extern int get_immediate_soc_wrap(void);
 
 #if 1
 /*4 thermal sensors*/
@@ -299,7 +294,6 @@ enum MTK_THERMAL_SENSOR_CPU_ID_MET {
 };
 #endif
 
-
 extern int tscpu_get_cpu_temp_met(enum MTK_THERMAL_SENSOR_CPU_ID_MET id);
 extern int mtk_gpufreq_register(struct mtk_gpu_power_info *freqs, int num);
 
@@ -312,14 +306,9 @@ void tscpu_cancel_thermal_timer(void);
 void tscpu_start_thermal_timer(void);
 int mtkts_bts_get_hw_temp(void);
 
-int get_immediate_ts1_wrap(void);
-int get_immediate_ts2_wrap(void);
-int get_immediate_ts3_wrap(void);
-int get_immediate_ts4_wrap(void);
-int get_immediate_ts5_wrap(void);
-
-void mt_ptp_lock(unsigned long *x);
-void mt_ptp_unlock(unsigned long *x);
+extern int get_immediate_ts1_wrap(void);
+extern int get_immediate_ts2_wrap(void);
+extern int get_immediate_ts3_wrap(void);
 
 extern int mtktscpu_debug_log;
 
