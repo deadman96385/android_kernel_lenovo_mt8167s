@@ -992,7 +992,7 @@ static const struct mtk_gate top_clks[] __initconst = {
 	GATE_TOP1(CLK_TOP_AUX_TP, "aux_tp", "clk26m_ck",
 		31),
 	/* TOP2 */
-	GATE_TOP2(CLK_TOP_MSDC2, "msdc2", "rg_msdc2",
+	GATE_TOP2(CLK_TOP_MSDC2, "msdc2", "ahb_infra_sel",
 		0),
 	GATE_TOP2(CLK_TOP_RBIST, "rbist", "univpll_d12",
 		1),
@@ -1046,6 +1046,12 @@ static const struct mtk_gate top_clks[] __initconst = {
 		26),
 	GATE_TOP2(CLK_TOP_GCPU_B, "gcpu_b", "ahb_infra_sel",
 		27),
+	GATE_TOP2(CLK_TOP_MSDC0_INFRA, "msdc0_infra", "msdc0",
+		28),
+	GATE_TOP2(CLK_TOP_MSDC1_INFRA, "msdc1_infra", "msdc1",
+		29),
+	GATE_TOP2(CLK_TOP_MSDC2_INFRA, "msdc2_infra", "rg_msdc2",
+		30),
 	GATE_TOP2(CLK_TOP_USB_78M, "usb_78m", "usb_78m_sel",
 		31),
 	/* TOP3 */
