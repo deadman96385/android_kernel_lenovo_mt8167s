@@ -222,6 +222,28 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	aee_rr_rec_sodi_val(aee_rr_curr_sodi_val() | (1 << SPM_SODI_ENTER_SPM_FLOW));
 #endif
 
+#if CONFIG_SUPPORT_PCM_ALLINONE
+	if (!__spm_is_pcm_loaded())
+		__spm_init_pcm_AllInOne(pcmdesc);
+
+	__spm_init_event_vector(pcmdesc);
+
+	/* Display set SPM_PCM_SRC_REQ[0]=1'b1 to force DRAM not enter self-refresh mode */
+	if ((spm_read(SPM_PCM_SRC_REQ) & 0x00000001))
+		pwrctrl->pcm_apsrc_req = 1;
+	else
+		pwrctrl->pcm_apsrc_req = 0;
+
+	__spm_set_power_control(pwrctrl);
+
+	__spm_set_wakeup_event(pwrctrl);
+
+	spm_sodi_pre_process();
+
+	__spm_kick_pcm_to_run(pwrctrl);
+
+	__spm_set_pcm_cmd(PCM_CMD_SUSPEND_PCM);
+#else
 	__spm_reset_and_init_pcm(pcmdesc);
 
 	__spm_kick_im_to_fetch(pcmdesc);
@@ -243,6 +265,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	spm_sodi_pre_process();
 
 	__spm_kick_pcm_to_run(pwrctrl);
+#endif
 
 #if SPM_AEE_RR_REC
 	aee_rr_rec_sodi_val(aee_rr_curr_sodi_val() | (1 << SPM_SODI_ENTER_WFI));

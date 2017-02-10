@@ -285,6 +285,22 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 	aee_rr_rec_deepidle_val(aee_rr_curr_deepidle_val() | (1 << SPM_DEEPIDLE_ENTER_UART_SLEEP));
 #endif
 
+#if CONFIG_SUPPORT_PCM_ALLINONE
+	if (!__spm_is_pcm_loaded())
+		__spm_init_pcm_AllInOne(pcmdesc);
+
+	__spm_init_event_vector(pcmdesc);
+
+	__spm_set_power_control(pwrctrl);
+
+	__spm_set_wakeup_event(pwrctrl);
+
+	spm_dpidle_pre_process();
+
+	__spm_kick_pcm_to_run(pwrctrl);
+
+	__spm_set_pcm_cmd(PCM_CMD_SUSPEND_PCM);
+#else
 	__spm_reset_and_init_pcm(pcmdesc);
 
 	__spm_kick_im_to_fetch(pcmdesc);
@@ -300,6 +316,7 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 	spm_dpidle_pre_process();
 
 	__spm_kick_pcm_to_run(pwrctrl);
+#endif
 
 #if SPM_AEE_RR_REC
 	aee_rr_rec_deepidle_val(aee_rr_curr_deepidle_val() | (1 << SPM_DEEPIDLE_ENTER_WFI));
@@ -396,6 +413,27 @@ wake_reason_t spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data)
 	spm_crit2("sleep_deepidle, sec = %u, wakesrc = 0x%x [%u]\n",
 		  sec, pwrctrl->wake_src, is_cpu_pdn(pwrctrl->pcm_flags));
 
+#if CONFIG_SUPPORT_PCM_ALLINONE
+	if (!__spm_is_pcm_loaded())
+		__spm_init_pcm_AllInOne(pcmdesc);
+
+	if (request_uart_to_sleep()) {
+		last_wr = WR_UART_BUSY;
+		goto RESTORE_IRQ;
+	}
+
+	__spm_init_event_vector(pcmdesc);
+
+	__spm_set_power_control(pwrctrl);
+
+	__spm_set_wakeup_event(pwrctrl);
+
+	__spm_kick_pcm_to_run(pwrctrl);
+
+	spm_dpidle_pre_process();
+
+	__spm_set_pcm_cmd(PCM_CMD_SUSPEND_PCM);
+#else
 	__spm_reset_and_init_pcm(pcmdesc);
 
 	__spm_kick_im_to_fetch(pcmdesc);
@@ -416,6 +454,7 @@ wake_reason_t spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data)
 	__spm_kick_pcm_to_run(pwrctrl);
 
 	spm_dpidle_pre_process();
+#endif
 
 	spm_trigger_wfi_for_dpidle(pwrctrl);
 

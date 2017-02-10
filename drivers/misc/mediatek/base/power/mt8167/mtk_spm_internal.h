@@ -27,6 +27,8 @@
 /*
  * Config and Parameter
  */
+#define CONFIG_SUPPORT_PCM_ALLINONE		1
+
 #ifdef MTK_FORCE_CLUSTER1
 #define SPM_CTRL_BIG_CPU	1
 #else
@@ -150,6 +152,11 @@
 
 #define PCM_ASYNC_REQ		(1U << 1)
 
+#if CONFIG_SUPPORT_PCM_ALLINONE
+#define PCM_CMD_MASK		0xffff0000
+#define PCM_CMD_SUSPEND_PCM	0x50d10000
+#endif
+
 struct pcm_desc {
 	const char *version;	/* PCM code version */
 	const u32 *base;	/* binary array base */
@@ -239,6 +246,7 @@ struct wake_status {
 	u32 isr;		/* SLEEP_ISR_STATUS */
 	u32 r9;			/* PCM_REG9_DATA */
 	u32 log_index;
+	u32 apsrc_cnt;		/* PCM_RESERVE7 */
 };
 
 struct spm_lp_scen {
@@ -270,6 +278,12 @@ extern void __spm_get_wakeup_status(struct wake_status *wakesta);
 extern void __spm_clean_after_wakeup(void);
 extern wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
 						   const struct pcm_desc *pcmdesc, bool suspend);
+
+#if CONFIG_SUPPORT_PCM_ALLINONE
+extern unsigned int __spm_is_pcm_loaded(void);
+extern void __spm_init_pcm_AllInOne(const struct pcm_desc *pcmdesc);
+extern void __spm_set_pcm_cmd(unsigned int cmd);
+#endif
 
 enum pmic_wrap_phase_id {
 	PMIC_WRAP_PHASE_DEEPIDLE,
