@@ -954,12 +954,11 @@
 				<&topckgen CLK_TOP_RG_APLL2_D8_EN>;
 		};
 
-		mfg: mfg@13000000 {
-			compatible = "mediatek,mt8167-mfg", "mediatek,midgard-mfg";
-			reg = <0 0x13000000 0 0x1000>;
-			clocks = <&topckgen CLK_TOP_MFG_SEL>,
-				 <&topckgen CLK_TOP_MMPLL>;
-			clock-names = "topck", "pll";
+		mfg: clark@13000000 {
+			compatible = "mediatek,mt8167-clark";
+			reg = <0 0x13000000 0 0x80000>, <0 0x13ffe000 0 0x1000>;
+			interrupts = <GIC_SPI 185 IRQ_TYPE_LEVEL_LOW>;
+			interrupt-names = "RGX";
 		};
 
 		mfgcfg: mfgcfg@13ffe000 {
