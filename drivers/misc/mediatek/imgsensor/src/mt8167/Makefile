@@ -14,11 +14,23 @@
 #
 # Makefile for misc devices that really don't fit anywhere else.
 
+MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ARCH_MTK_PROJECT := $(subst ",,$(CONFIG_ARCH_MTK_PROJECT))
+
 define FILTER_PROJECT_DRV
 ifeq ($(wildcard $(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)/$(ARCH_MTK_PROJECT)/imgsensor/$(1)),)
 platform_drv += $(1)
 endif
 endef
+
+# custom setting: if demo board, set i2c bus number: 2
+ifneq (,$(findstring tb8167p,$(ARCH_MTK_PROJECT)))
+ccflags-y += -DSUPPORT_I2C_BUS_NUM1=2
+ccflags-y += -DSUPPORT_I2C_BUS_NUM2=2
+$(info "ARCH_MTK_PROJECT:$(ARCH_MTK_PROJECT), set I2C Bus num:2")
+else
+$(info "ARCH_MTK_PROJECT:$(ARCH_MTK_PROJECT)")
+endif
 
 obj-y				+= kd_sensorlist.o
 obj-y				+= camera_hw/
