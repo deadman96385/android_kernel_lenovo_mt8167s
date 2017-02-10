@@ -262,6 +262,7 @@ static void hdmi_get_params(struct HDMI_PARAMS *params)
 	memset(params, 0, sizeof(struct HDMI_PARAMS));
 	params->input_clock = input_resolution;
 	params->init_config.vformat = input_resolution;
+	params->is_force_awake = 1;
 
 	switch (input_resolution) {
 	case HDMI_VIDEO_720x480p_60Hz:
