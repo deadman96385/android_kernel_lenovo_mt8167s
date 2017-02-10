@@ -1424,6 +1424,9 @@
 		vdec_gcon@16000000 {
 			compatible = "mediatek,mt8167-vdec_gcon";
 			reg = <0 0x16000000 0 0x10000>;
+			clocks = <&vdecsys CLK_VDEC_CKEN>,
+				 <&vdecsys CLK_VDEC_LARB1_CKEN>;
+			clock-names = "apb", "smi";
 		};
 
 		larb2: larb@16010000 {
@@ -1440,7 +1443,10 @@
 		vdec@16020000 {
 			compatible = "mediatek,mt8167-vdec";
 			reg = <0 0x16020000 0 0x10000>;
-			interrupts = <GIC_SPI 212 IRQ_TYPE_LEVEL_LOW>;
+			clocks = <&topckgen CLK_TOP_VDEC_MM_SEL>,
+				 <&topckgen CLK_TOP_UNIVPLL_D4>;
+			clock-names = "vdec_sel", "normal";
+			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_LOW>;
 		};
 
 		jpgenc@17003000 {
