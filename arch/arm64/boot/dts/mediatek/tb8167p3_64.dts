@@ -568,7 +568,7 @@
 			<MT8167_PIN_4_EINT4__FUNC_DPI_D15>,
 			<MT8167_PIN_5_EINT5__FUNC_DPI_D16>,
 			<MT8167_PIN_6_EINT6__FUNC_DPI_D17>;
-			drive-strength = <MTK_DRIVE_8mA>;
+			drive-strength = <MTK_DRIVE_4mA>;
 		};
 	};
 
