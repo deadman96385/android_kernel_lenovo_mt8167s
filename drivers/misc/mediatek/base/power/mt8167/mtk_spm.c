@@ -394,4 +394,36 @@ int spm_golden_setting_cmp(bool en)
  */
 /* TODO: Add BSI control */
 
+#define SPMC_CPU_PWR_STA_MASK	0x10004
+#define SPM_CPU_PWR_STA_MASK	0x3C00
+#define SPM_CPU_PWR_STA_SHIFT	13
+unsigned int spm_get_cpu_pwr_status(void)
+{
+#if CONFIG_SPMC_MODE
+	u32 stat = 0;
+	u32 val;
+	u8 i;
+
+	for (i = 0; i < num_possible_cpus(); i++) {
+		val = spm_read(SPM_SPMC_MP0_CPU0_PWR_CON + 0x4*i) & SPMC_CPU_PWR_STA_MASK;
+		if (val != 0x0)
+			stat |= 0x1 << (SPM_CPU_PWR_STA_SHIFT - i);
+	}
+
+	return stat;
+#else
+	u32 val[2] = {0};
+	u32 stat = 0;
+
+	val[0] = spm_read(SPM_PWR_STATUS);
+	val[1] = spm_read(SPM_PWR_STATUS_2ND);
+
+	stat = val[0] & SPM_CPU_PWR_STA_MASK;
+	stat &= val[1] & SPM_CPU_PWR_STA_MASK;
+
+	return stat;
+#endif
+}
+EXPORT_SYMBOL(spm_get_cpu_pwr_status);
+
 MODULE_DESCRIPTION("SPM Driver v0.1");

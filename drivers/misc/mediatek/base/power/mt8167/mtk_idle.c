@@ -408,21 +408,7 @@ static bool is_valid_reg(void __iomem *addr)
 
 unsigned int __attribute__((weak)) spm_get_cpu_pwr_status(void)
 {
-	u32 val[2] = {0};
-	u32 stat = 0;
-	u32 cpu_mask = (PWR_STA_FC0 | PWR_STA_FC1 |
-			PWR_STA_FC2 | PWR_STA_FC3);
-
-	if (!is_valid_reg(scpsys_base))
-		return 0;
-
-	val[0] = idle_readl(SPM_PWR_STATUS);
-	val[1] = idle_readl(SPM_PWR_STATUS_2ND);
-
-	stat = val[0] & cpu_mask;
-	stat &= val[1] & cpu_mask;
-
-	return stat;
+	return 0;
 }
 
 enum subsys_id {
