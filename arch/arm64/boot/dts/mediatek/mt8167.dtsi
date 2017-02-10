@@ -728,10 +728,9 @@
 			compatible = "mediatek,mt8167-mmc";
 			reg = <0 0x11120000 0 0x1000>;
 			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&infracfg CLK_INFRA_MSDC3>,
-					<&infracfg CLK_INFRA_MSDC0>,
+			clocks = <&infracfg CLK_INFRA_MSDC0>,
 					<&clk_null>;
-			clock-names = "extra", "source", "hclk";
+			clock-names = "source", "hclk";
 			status = "disabled";
 		};
 
