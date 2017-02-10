@@ -795,10 +795,17 @@ static long vcodec_lockhw(unsigned long arg)
 #ifndef KS_POWER_WORKAROUND
 				vdec_power_on();
 #endif
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT	/* Morris Yang moved to TEE */
 				if (rHWLock.bSecureInst == VAL_FALSE) {
-					/* Add one line comment for avoid kernel coding style, WARNING:BRACES: */
-					enable_irq(VDEC_IRQ_ID);
+					if (request_irq(VDEC_IRQ_ID, (irq_handler_t) video_intr_dlr,
+						IRQF_TRIGGER_LOW, VCODEC_DEVNAME, NULL) < 0)
+						MODULE_MFV_LOGE("[VCODEC_DEBUG][ERROR] error to request dec irq\n");
+					else
+						MODULE_MFV_LOGD("[VCODEC_DEBUG] success to request dec irq\n");
 				}
+#else
+				enable_irq(VDEC_IRQ_ID);
+#endif
 			} else { /* Another one holding dec hw now */
 				MODULE_MFV_LOGE("VCODEC_LOCKHW E\n");
 				eVideoGetTimeOfDay(&rCurTime, sizeof(VAL_TIME_T));
@@ -1035,10 +1042,13 @@ static long vcodec_unlockhw(unsigned long arg)
 		if (grVcodecDecHWLock.pvHandle == (VAL_VOID_T *)pmem_user_v2p_video((VAL_ULONG_T)rHWLock.pvHandle)) {
 			grVcodecDecHWLock.pvHandle = 0;
 			grVcodecDecHWLock.eDriverType = VAL_DRIVER_TYPE_NONE;
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT	/* Morris Yang moved to TEE */
 			if (rHWLock.bSecureInst == VAL_FALSE) {
-				/* Add one line comment for avoid kernel coding style, WARNING:BRACES: */
-				disable_irq(VDEC_IRQ_ID);
+				free_irq(VDEC_IRQ_ID, NULL);
 			}
+#else
+			disable_irq(VDEC_IRQ_ID);
+#endif
 			/* TODO: check if turning power off is ok */
 #ifndef KS_POWER_WORKAROUND
 			vdec_power_off();
