@@ -20,9 +20,9 @@
 void av_hdmiset(enum AV_D_HDMI_DRV_SET_TYPE_T e_set_type, const void *pv_set_info,
 		unsigned char z_set_info_len)
 {
-	HDMI_AV_INFO_T *prAvInf;
+	struct HDMI_AV_INFO_T *prAvInf;
 
-	prAvInf = (HDMI_AV_INFO_T *) pv_set_info;
+	prAvInf = (struct HDMI_AV_INFO_T *) pv_set_info;
 
 	switch (e_set_type) {
 

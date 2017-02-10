@@ -30,7 +30,7 @@
 /* #include <mach/mt_gpio.h> */
 /* #include <mach/mt_pm_ldo.h> */
 #endif
-
+#include "hdmictrl.h"
 
 
 /* example to set hdmi clk */

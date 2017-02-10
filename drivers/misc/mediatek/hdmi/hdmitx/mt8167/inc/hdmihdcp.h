@@ -14,7 +14,7 @@
 #ifndef __hdmihdcp_h__
 #define __hdmihdcp_h__
 #ifdef CONFIG_MTK_INTERNAL_HDMI_SUPPORT
-
+#include "hdmi_drv.h"
 
 enum HDMI_NFY_PLUG_STATE_T {
 	HDMI_PLUG_OUT = 0,

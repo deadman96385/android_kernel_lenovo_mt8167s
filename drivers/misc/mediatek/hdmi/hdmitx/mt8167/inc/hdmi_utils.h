@@ -11,9 +11,6 @@
  * GNU General Public License for more details.
  */
 
-
-#include "hdmitx.h"
-
 #ifndef HDMI_UTILS_H
 #define HDMI_UTILS_H
 

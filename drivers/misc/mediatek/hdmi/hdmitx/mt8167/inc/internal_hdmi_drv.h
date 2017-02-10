@@ -15,9 +15,9 @@
 #ifndef __HDMI_DRV_H__
 #define __HDMI_DRV_H__
 
+#include "mtk_extd_mgr.h"
+#include "extd_hdmi_type.h"
 #ifdef CONFIG_MTK_INTERNAL_HDMI_SUPPORT
-#include "hdmitx.h"
-
 #include "hdmictrl.h"
 #include "hdmiedid.h"
 #include "hdmicec.h"
@@ -186,13 +186,13 @@ struct HDMI_UTIL_FUNCS {
 struct HDMI_DRIVER {
 	void (*set_util_funcs)(const struct HDMI_UTIL_FUNCS *util);
 	void (*get_params)(struct HDMI_PARAMS *params);
-	int (*hdmidrv_probe)(struct platform_device *pdev, unsigned long u8Res);
+	/* int (*hdmidrv_probe)(struct platform_device *pdev, unsigned long u8Res);*/
 	int (*init)(void);
 	int (*enter)(void);
 	int (*exit)(void);
 	void (*suspend)(void);
 	void (*resume)(void);
-	int (*audio_config)(enum HDMI_AUDIO_FORMAT aformat);
+	int (*audio_config)(enum HDMI_AUDIO_FORMAT aformat, int sampleBit);
 	int (*video_config)(HDMI_VIDEO_RESOLUTION vformat,
 			     enum HDMI_VIDEO_INPUT_FORMAT vin, enum HDMI_VIDEO_OUTPUT_FORMAT vou);
 	int (*video_enable)(unsigned char enable);
@@ -213,10 +213,10 @@ struct HDMI_DRIVER {
 	void (*setcecrxmode)(unsigned char u1cecrxmode);
 	void (*hdmistatus)(void);
 	void (*hdcpkey)(unsigned char *pbhdcpkey);
-	void (*getedid)(HDMI_EDID_T *pv_get_info);
+	void (*getedid)(struct HDMI_EDID_T *pv_get_info);
 	void (*setcecla)(struct CEC_DRV_ADDR_CFG_T *prAddr);
 	void (*sendsltdata)(unsigned char *pu1Data);
-	void (*getceccmd)(CEC_FRAME_DESCRIPTION_IO *frame);
+	void (*getceccmd)(struct CEC_FRAME_DESCRIPTION_IO *frame);
 	void (*getsltdata)(struct CEC_SLT_DATA *rCecSltData);
 	void (*setceccmd)(struct CEC_SEND_MSG_T *msg);
 	void (*getcectxstatus)(struct CEC_ACK_INFO_T *pt);
@@ -245,7 +245,7 @@ void hdmi_clock_enable(bool bEnable);
 
 int hdmi_internal_probe(struct platform_device *pdev);
 int hdmi_internal_video_config(HDMI_VIDEO_RESOLUTION vformat, enum HDMI_VIDEO_INPUT_FORMAT vin,
-			       enum HDMI_VIDEO_OUTPUT_FORMAT vout);
+			       int vout);
 
 void hdmi_poll_isr(unsigned long n);
 void cec_poll_isr(unsigned long n);

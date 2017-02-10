@@ -20,14 +20,13 @@
 #include "hdmihdcp.h"
 #include "hdmiedid.h"
 #include "hdmicec.h"
-/* #include <mach/mt_boot_common.h> */
 #include <mt-plat/mtk_boot_common.h>
-
+#include "hdmi_drv.h"
 #if (defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT) && defined(CONFIG_MTK_HDMI_HDCP_SUPPORT))
 #include "hdmi_ca.h"
 #endif
 
-HDMI_AV_INFO_T _stAvdAVInfo = { 0 };
+struct HDMI_AV_INFO_T _stAvdAVInfo = { 0 };
 
 static unsigned char _bAudInfoFm[5];
 static unsigned char _bAviInfoFm[5];
@@ -39,6 +38,8 @@ static unsigned char _bIsrc1Data[16] = { 0 };
 
 static unsigned int _u4NValue;
 
+static const unsigned char HDMI_VIDEO_ID_CODE[HDMI_VIDEO_RESOLUTION_NUM] = {
+2, 17, 4, 19, 5, 20, 34, 33, 32, 32, 34, 16, 31 };
 
 static const char *szHdmiResStr[HDMI_VIDEO_RESOLUTION_NUM] = {
 	"RES_480P",
@@ -363,34 +364,18 @@ void hdmi_infrasys_write(unsigned short u2Reg, unsigned int u4Data)
 
 }
 
-unsigned int hdmi_perisys_read(unsigned short u2Reg)
-{
-	unsigned int u4Data;
-
-	internal_hdmi_read(hdmi_ref_reg[PERISYS_REG] + u2Reg, &u4Data);
-	HDMI_DRV_LOG("[R]addr = 0x%04x, data = 0x%08x\n", u2Reg, u4Data);
-	return u4Data;
-}
-
-void hdmi_perisys_write(unsigned short u2Reg, unsigned int u4Data)
-{
-	HDMI_DRV_LOG("[W]addr= 0x%04x, data = 0x%08x\n", u2Reg, u4Data);
-	internal_hdmi_write(hdmi_ref_reg[PERISYS_REG] + u2Reg, u4Data);
-
-}
-
 unsigned int hdmi_pll_read(unsigned short u2Reg)
 {
 	unsigned int u4Data;
 
 	internal_hdmi_read(hdmi_ref_reg[AP_CCIF0] + u2Reg, &u4Data);
-	/*HDMI_PLL_LOG("[R]addr = 0x%04x, data = 0x%08x\n", u2Reg, u4Data);*/
+	/*HDMI_PLL_LOG("[R]addr = 0x%04x, data = 0x%08x\n", u2Reg, u4Data); */
 	return u4Data;
 }
 
 void hdmi_pll_write(unsigned short u2Reg, unsigned int u4Data)
 {
-	/*HDMI_PLL_LOG("[W]addr= 0x%04x, data = 0x%08x\n", u2Reg, u4Data);*/
+	/*HDMI_PLL_LOG("[W]addr= 0x%04x, data = 0x%08x\n", u2Reg, u4Data); */
 	internal_hdmi_write(hdmi_ref_reg[AP_CCIF0] + u2Reg, u4Data);
 }
 
@@ -582,13 +567,12 @@ void vHDMIAVMute(void)
 
 void vTxSignalOnOff(unsigned char bOn)
 {
-
 	if (bOn) {
 		vWriteIoPllMsk(HDMI_CON7, RG_HTPLL_AUTOK_EN, RG_HTPLL_AUTOK_EN);
 		vWriteIoPllMsk(HDMI_CON6, 0, RG_HTPLL_RLH_EN);
 		vWriteIoPllMsk(HDMI_CON6, (0x3 << RG_HTPLL_POSDIV), RG_HTPLL_POSDIV_MASK);
 		vWriteIoPllMsk(HDMI_CON2, RG_HDMITX_EN_MBIAS, RG_HDMITX_EN_MBIAS);
-		udelay(3);
+		udelay(10);
 		vWriteIoPllMsk(HDMI_CON6, RG_HTPLL_EN, RG_HTPLL_EN);
 		vWriteIoPllMsk(HDMI_CON2, RG_HDMITX_EN_TX_CKLDO, RG_HDMITX_EN_TX_CKLDO);
 		vWriteIoPllMsk(HDMI_CON0, (0xf << RG_HDMITX_EN_SLDO), RG_HDMITX_EN_SLDO_MASK);
@@ -609,7 +593,7 @@ void vTxSignalOnOff(unsigned char bOn)
 		vWriteIoPllMsk(HDMI_CON0, 0, RG_HDMITX_EN_SLDO_MASK);
 		vWriteIoPllMsk(HDMI_CON2, 0, RG_HDMITX_EN_TX_CKLDO);
 		vWriteIoPllMsk(HDMI_CON6, 0, RG_HTPLL_EN);
-		udelay(3);
+		udelay(10);
 		vWriteIoPllMsk(HDMI_CON2, 0, RG_HDMITX_EN_MBIAS);
 		vWriteIoPllMsk(HDMI_CON6, 0, RG_HTPLL_POSDIV_MASK);
 		vWriteIoPllMsk(HDMI_CON6, 0, RG_HTPLL_RLH_EN);
@@ -652,7 +636,7 @@ void vUnBlackHDMIOnly(void)
 	fgCaHDMIVideoUnMute(TRUE);
 #else
 
-	vWriteHdmiSYSMsk(HDMI_SYS_CFG20, HDMI_SECURE_MODE, 0x1 << 15);
+	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_01, HDMI_PSECURE_EN, HDMI_PSECURE_EN_MASK);
 	udelay(10);
 	vWriteHdmiGRLMsk(VIDEO_CFG_4, NORMAL_PATH, VIDEO_SOURCE_SEL);
 #endif
@@ -694,10 +678,16 @@ void vTmdsOnOffAndResetHdcp(unsigned char fgHdmiTmdsEnable)
 void vSetHDMITxPLL(unsigned char bResIndex, unsigned char bdeepmode)
 {
 	unsigned char u4Feq = 0;
-	unsigned int v4value1 = 0;
-	unsigned int v4value2 = 0;
-
-	HDMI_PLL_FUNC();
+	unsigned pre_imp_en = 0;
+	unsigned int pre_ibias;
+	unsigned int imp_en;
+	unsigned int imp_clk = 0x1c;
+	unsigned int imp_d0 = 0x1c;
+	unsigned int imp_d1 = 0x1c;
+	unsigned int imp_d2 = 0x1c;
+	unsigned int drv_ibias;
+	unsigned int pre_div = 0x3;
+	unsigned int post_div = 0x3;
 
 	if ((bResIndex == HDMI_VIDEO_720x480p_60Hz) || (bResIndex == HDMI_VIDEO_720x576p_50Hz))
 		u4Feq = 0;	/* 27M */
@@ -713,56 +703,42 @@ void vSetHDMITxPLL(unsigned char bResIndex, unsigned char bdeepmode)
 	else
 		u4Feq = 1;	/* 74M */
 
-	vWriteIoPllMsk(HDMI_CON6, (0x3 << RG_HTPLL_PREDIV), RG_HTPLL_PREDIV_MASK);
-	vWriteIoPllMsk(HDMI_CON6, (0x3 << RG_HTPLL_POSDIV), RG_HTPLL_POSDIV_MASK);
-	vWriteIoPllMsk(HDMI_CON6, (0x1 << RG_HTPLL_IC), RG_HTPLL_IC_MASK);
-	vWriteIoPllMsk(HDMI_CON6, (0x1 << RG_HTPLL_IR), RG_HTPLL_IR_MASK);
-	vWriteIoPllMsk(HDMI_CON2, ((POSDIV[u4Feq][bdeepmode - 1]) << RG_HDMITX_TX_POSDIV),
-		       RG_HDMITX_TX_POSDIV_MASK);
-	vWriteIoPllMsk(HDMI_CON6, ((FBKSEL[u4Feq][bdeepmode - 1]) << RG_HTPLL_FBKSEL),
-		       RG_HTPLL_FBKSEL_MASK);
-	vWriteIoPllMsk(HDMI_CON6, ((FBKDIV[u4Feq][bdeepmode - 1]) << RG_HTPLL_FBKDIV),
-		       RG_HTPLL_FBKDIV_MASK);
-	vWriteIoPllMsk(HDMI_CON7, ((DIVEN[u4Feq][bdeepmode - 1]) << RG_HTPLL_DIVEN),
-		       RG_HTPLL_DIVEN_MASK);
-	vWriteIoPllMsk(HDMI_CON6, ((HTPLLBP[u4Feq][bdeepmode - 1]) << RG_HTPLL_BP),
-		       RG_HTPLL_BP_MASK);
-	vWriteIoPllMsk(HDMI_CON6, ((HTPLLBC[u4Feq][bdeepmode - 1]) << RG_HTPLL_BC),
-		       RG_HTPLL_BC_MASK);
-	vWriteIoPllMsk(HDMI_CON6, ((HTPLLBR[u4Feq][bdeepmode - 1]) << RG_HTPLL_BR),
-		       RG_HTPLL_BR_MASK);
-
-	/* v4value1 = (dReadHdmiTOPCK(0x9170)&0xf8000000)>>26; */
-	/* v4value2 = dReadHdmiTOPCK(0x91c0)&0x003fffff; */
-
-	/*  v4value1 = (*(volatile unsigned int*)(0xf0206170))>>26; */
-	/* v4value2 = (*(volatile unsigned int*)(0xf02061c0))&0x003fffff; */
-
-	if (v4value1 == 0)
-		v4value1 = 0x2d;
-	if (v4value2 == 0)
-		v4value2 = 0x2d2d2d;
-
-	if ((u4Feq == 2) && (bdeepmode != HDMI_NO_DEEP_COLOR)) {
-		vWriteIoPllMsk(HDMI_CON1, RG_HDMITX_PRED_IMP, RG_HDMITX_PRED_IMP);
-		vWriteIoPllMsk(HDMI_CON1, (0x6 << RG_HDMITX_PRED_IBIAS), RG_HDMITX_PRED_IBIAS_MASK);
-		vWriteIoPllMsk(HDMI_CON0, (0xf << RG_HDMITX_EN_IMP), RG_HDMITX_EN_IMP_MASK);
-		vWriteIoPllMsk(HDMI_CON1, (v4value1 << RG_HDMITX_DRV_IMP), RG_HDMITX_DRV_IMP_MASK);
-		vWriteIoPllMsk(HDMI_CON4, v4value2, RG_HDMITX_RESERVE_MASK);
-		vWriteIoPllMsk(HDMI_CON0, (0x3c << RG_HDMITX_DRV_IBIAS), RG_HDMITX_DRV_IBIAS_MASK);
+	if ((u4Feq == 2) && (bdeepmode > HDMI_NO_DEEP_COLOR)) {
+		pre_imp_en = TRUE;
+		pre_ibias = 0xf;
+		imp_en = 0xf;
+		drv_ibias = 0x3c;
 	} else {
-		vWriteIoPllMsk(HDMI_CON1, 0, RG_HDMITX_PRED_IMP);
-		vWriteIoPllMsk(HDMI_CON1, (0x3 << RG_HDMITX_PRED_IBIAS), RG_HDMITX_PRED_IBIAS_MASK);
-		vWriteIoPllMsk(HDMI_CON0, (0x0 << RG_HDMITX_EN_IMP), RG_HDMITX_EN_IMP_MASK);
-		vWriteIoPllMsk(HDMI_CON1, (v4value1 << RG_HDMITX_DRV_IMP), RG_HDMITX_DRV_IMP_MASK);
-		vWriteIoPllMsk(HDMI_CON4, v4value2, RG_HDMITX_RESERVE_MASK);
-		vWriteIoPllMsk(HDMI_CON0, (0xa << RG_HDMITX_DRV_IBIAS), RG_HDMITX_DRV_IBIAS_MASK);
+		pre_imp_en = FALSE;
+		pre_ibias = 0xd;
+		imp_en = 0x0;
+		drv_ibias = 0xa;
 	}
 
-	/* power on sequence of hdmi */
-
+	vWriteIoPllMsk(HDMI_CON6, (pre_div << RG_HTPLL_PREDIV), RG_HTPLL_PREDIV_MASK);
+	vWriteIoPllMsk(HDMI_CON6, (post_div << RG_HTPLL_POSDIV), RG_HTPLL_POSDIV_MASK);
+	/* vWriteIoPllMsk(HDMI_CON6, (0x1 << RG_HTPLL_IC), RG_HTPLL_IC_MASK); */
+	/* vWriteIoPllMsk(HDMI_CON6, (0x1 << RG_HTPLL_IR), RG_HTPLL_IR_MASK); */
+	vWriteIoPllMsk(HDMI_CON6, (0x1 << RG_HTPLL_IC) | (0x1 << RG_HTPLL_IR),
+		       RG_HTPLL_IC_MASK | RG_HTPLL_IR_MASK);
+	/*POSDIV: 480P@3D need to be confirmed */
+	vWriteIoPllMsk(HDMI_CON2, ((POSDIV[u4Feq][bdeepmode - 1]) << RG_HDMITX_TX_POSDIV), RG_HDMITX_TX_POSDIV_MASK);
+	vWriteIoPllMsk(HDMI_CON6, ((FBKSEL[u4Feq][bdeepmode - 1]) << RG_HTPLL_FBKSEL), RG_HTPLL_FBKSEL_MASK);
+	vWriteIoPllMsk(HDMI_CON6, ((FBKDIV[u4Feq][bdeepmode - 1]) << RG_HTPLL_FBKDIV), RG_HTPLL_FBKDIV_MASK);
+	vWriteIoPllMsk(HDMI_CON7, ((DIVEN[u4Feq][bdeepmode - 1]) << RG_HTPLL_DIVEN), RG_HTPLL_DIVEN_MASK);
+	vWriteIoPllMsk(HDMI_CON6, ((HTPLLBP[u4Feq][bdeepmode - 1]) << RG_HTPLL_BP), RG_HTPLL_BP_MASK);
+	vWriteIoPllMsk(HDMI_CON6, ((HTPLLBC[u4Feq][bdeepmode - 1]) << RG_HTPLL_BC), RG_HTPLL_BC_MASK);
+	vWriteIoPllMsk(HDMI_CON6, ((HTPLLBR[u4Feq][bdeepmode - 1]) << RG_HTPLL_BR), RG_HTPLL_BR_MASK);
+	vWriteIoPllMsk(HDMI_CON1, pre_imp_en << RG_HDMITX_PRED_IMP_SHIFT, RG_HDMITX_PRED_IMP);
+	vWriteIoPllMsk(HDMI_CON1, (pre_ibias << RG_HDMITX_PRED_IBIAS), RG_HDMITX_PRED_IBIAS_MASK);
+	vWriteIoPllMsk(HDMI_CON0, (imp_en << RG_HDMITX_EN_IMP), RG_HDMITX_EN_IMP_MASK);
+	vWriteIoPllMsk(HDMI_CON1, (imp_clk << RG_HDMITX_DRV_IMP), RG_HDMITX_DRV_IMP_MASK);
+	vWriteIoPllMsk(HDMI_CON4, (imp_d0 << RG_HDMITX_D0_IMP_SHIFT)
+		       | (imp_d1 << RG_HDMITX_D1_IMP_SHIFT)
+		       | (imp_d2 << RG_HDMITX_D2_IMP_SHIFT),
+		       RG_HDMITX_D0_IMP_MASK | RG_HDMITX_D1_IMP_MASK | RG_HDMITX_D2_IMP_MASK);
+	vWriteIoPllMsk(HDMI_CON0, (drv_ibias << RG_HDMITX_DRV_IBIAS), RG_HDMITX_DRV_IBIAS_MASK);
 }
-
 
 
 void vEnableDeepColor(unsigned char ui1Mode)
@@ -780,16 +756,16 @@ void vEnableDeepColor(unsigned char ui1Mode)
 		u4Data = COLOR_8BIT_MODE;
 
 	if (u4Data == COLOR_8BIT_MODE)
-		vWriteHdmiSYSMsk(HDMI_SYS_CFG20, u4Data, DEEP_COLOR_MODE_MASK | DEEP_COLOR_EN);
+		vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_01, u4Data,
+				 DEEP_COLOR_MODE_MASK | DEEP_COLOR_EN);
 	else
-		vWriteHdmiSYSMsk(HDMI_SYS_CFG20, u4Data | DEEP_COLOR_EN,
+		vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_01, u4Data | DEEP_COLOR_EN,
 				 DEEP_COLOR_MODE_MASK | DEEP_COLOR_EN);
 
 }
 
 void vConfigHdmiSYS(unsigned char bResIndex)
 {
-#if 1
 	unsigned char u4Feq = 0;
 
 	if ((bResIndex == HDMI_VIDEO_720x480p_60Hz) || (bResIndex == HDMI_VIDEO_720x576p_50Hz))
@@ -806,47 +782,35 @@ void vConfigHdmiSYS(unsigned char bResIndex)
 	else
 		u4Feq = 1;	/* 74M */
 
-#if 0
 	/*Clear The TVDPLL Div argument,0:26M */
-	vWriteHdmiTOPCKMsk(CLK_CFG_7, 0, CLK_DPI1_SEL);
-#endif
-
-#endif
-	/*Clear The clk_hdmi_sel  */
-	vWriteHdmiTOPCKMsk(CLK_CFG_8, 0, CLK_HDMI_SEL);
-
-	/* vWriteHdmiSYSMsk(HDMI_SYS_CFG110, */
-	/* DPI1_PIXEL_CLK_EN|HDMI_PIXEL_CLK_EN|HDMI_PLL_CLK_EN, DPI1_PIXEL_CLK|HDMI_PIXEL_CLK|HDMI_PLL_CLK); */
-	/* MM_DISP_disable_clock(enum MT_CG_DISP1_HDMI_PIXEL); */
-	/* MM_DISP_disable_clock(enum MT_CG_DISP1_HDMI_PLLCK); */
-	/* MM_DISP_disable_clock(enum MT_CG_DISP1_DPI1_ENGINE); */
-
-	vWriteHdmiSYSMsk(HDMI_SYS_CFG20, 0, HDMI_OUT_FIFO_EN | MHL_MODE_ON);
-	udelay(100);
-	vWriteHdmiSYSMsk(HDMI_SYS_CFG20, HDMI_OUT_FIFO_EN, HDMI_OUT_FIFO_EN | MHL_MODE_ON);
-
-	udelay(100);
-	vWriteHdmiSYSMsk(HDMI_SYS_CFG20, HDMI_PP_MODE, HDMI_PP_MODE);
-#if 0
+	vWriteHdmiTOPCKMsk(CLK_MUX_SEL8, 0, RG_FDPI1_MUX_SEL_MASK);
 	if (u4Feq == 2)
-		vWriteHdmiTOPCKMsk(CLK_CFG_7, CLK_DPI1_SEL_D4, CLK_DPI1_SEL);
+		vWriteHdmiTOPCKMsk(CLK_MUX_SEL8, DPI1_148M_CLK_SEL, RG_FDPI1_MUX_SEL_MASK);
 	else if (u4Feq == 1)
-		vWriteHdmiTOPCKMsk(CLK_CFG_7, CLK_DPI1_SEL_D8, CLK_DPI1_SEL);
+		vWriteHdmiTOPCKMsk(CLK_MUX_SEL8, DPI1_78M_CLK_SEL, RG_FDPI1_MUX_SEL_MASK);
 	else if (u4Feq == 0)
-		vWriteHdmiTOPCKMsk(CLK_CFG_7, CLK_DPI1_SEL_D16, CLK_DPI1_SEL);
+		vWriteHdmiTOPCKMsk(CLK_MUX_SEL8, DPI1_37M_CLK_SEL, RG_FDPI1_MUX_SEL_MASK);
+	else
+		pr_err("Invalid resolution\n");
+	vWriteHdmiTOPCKMsk(CLK_GATING_CTRL8, RG_FDPI1_SW_CG_CLR, RG_FDPI1_SW_CG);
 
-#endif
-	vWriteHdmiTOPCKMsk(CLK_CFG_8, fhdmi_cts_ck, CLK_HDMI_SEL);
+	vWriteHdmiSYSMsk(MMSYS_CG_CON1, DPI1_PIXEL_CLK_CG_CLR | DPI1_ENGINE_CLK_CG_CLR,
+			 DPI1_PIXEL_CLK_CG | DPI1_ENGINE_CLK_CG);
+	vWriteHdmiSYSMsk(MMSYS_CG_CON1, HDMI_PIXEL_CLK_CG_CLR, HDMI_PIXEL_CLK_CG);
 
-	/*After Divide, Must Toggle the UPDATE Clock,or it will have no function */
-	vWriteHdmiTOPCKMsk(CLK_CFG_UPDATE, hdmi_ck_update | dpi1_ck_update,
-			   hdmi_ck_update | dpi1_ck_update);
+	if (_stAvdAVInfo.e_hdmi_aud_in == SV_SPDIF) {
+		vWriteHdmiSYSMsk(MMSYS_CG_CON1, HDMI_SPDIF_CLK_CG_CLR, HDMI_SPDIF_CLK_CG_CLR);
+		vWriteHdmiSYSMsk(MMSYS_CG_CON1, HDMI_ADSP_BCK_CG, HDMI_ADSP_BCK_CG);
+	} else {
+		vWriteHdmiSYSMsk(MMSYS_CG_CON1, HDMI_ADSP_BCK_CG_CLR, HDMI_ADSP_BCK_CG);
+		vWriteHdmiGRLMsk(HDCP_STATUS_RESET, RG_SPD_IIS_SEL | RG_N_DIV2,
+				 RG_SPD_IIS_SEL | RG_N_DIV2);
+	}
 
-
-
-	vWriteIoPllMsk(PLL_TEST_CON0, (0x3 << 16), TVDPLL_POSDIV_2);
-
-	/* vWriteHdmiTOPCKMsk(HDMICLK_CFG_9, AD_APLL_CK, CLK_APLL_SEL);*/
+	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_01, 0, HDMI_OUT_FIFO_EN | MHL_MODE_ON);
+	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_01, HDMI_OUT_FIFO_EN, HDMI_OUT_FIFO_EN | MHL_MODE_ON);
+	vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_01, HDMI_PP_MODE, HDMI_PP_MODE);
+	vWriteHdmiSYSMsk(MMSYS_CG_CON1, HDMI_PLL_CK_CG_CLR, HDMI_PLL_CK_CG);
 }
 
 
@@ -863,11 +827,11 @@ void vResetHDMI(unsigned char bRst)
 {
 	HDMI_DRV_FUNC();
 	if (bRst) {
-		vWriteHdmiSYSMsk(HDMI_SYS_CFG1C, HDMI_RST, HDMI_RST);
+		vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_00, HDMI_RST, HDMI_RST);
 	} else {
-		vWriteHdmiSYSMsk(HDMI_SYS_CFG1C, 0, HDMI_RST);
+		vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_00, 0, HDMI_RST);
 		vWriteHdmiGRLMsk(GRL_CFG3, 0, CFG3_CONTROL_PACKET_DELAY);
-		vWriteHdmiSYSMsk(HDMI_SYS_CFG1C, ANLG_ON, ANLG_ON);
+		vWriteHdmiSYSMsk(DISP_HDMI_SYS_CFG_00, ANLG_ON, ANLG_ON);
 	}
 }
 
@@ -1477,7 +1441,7 @@ void vSetHDMIAudioIn(void)
 {
 	unsigned char bI2sFmt, bData2, bChMapping = 0;
 
-	vSetChannelSwap(LFE_CC_SWAP);
+	/* vSetChannelSwap(LFE_CC_SWAP); */
 	vEnableIecTxRaw();
 
 	bData2 = vCheckPcmBitSize(0);

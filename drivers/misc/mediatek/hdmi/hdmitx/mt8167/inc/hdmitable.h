@@ -13,12 +13,6 @@
 
 #ifndef __hdmitable_h__
 #define __hdmitable_h__
-#include "hdmitx.h"
-
-static const unsigned char HDMI_VIDEO_ID_CODE[HDMI_VIDEO_RESOLUTION_NUM] = {
-2, 17, 4, 19, 5, 20, 34, 33, 32, 32, 34, 16, 31 };
-/* , , 480P,576P, ,, , ,720P60,720P50,1080I60,1080I50,,,1080P30,1080P25, */
-/*  1080P24, 1080P23.97, 1080P29.97, 1080p60,1080p50 */
 
 static const unsigned char POSDIV[3][4] = {
 {0x3, 0x3, 0x3, 0x2},	/* 27Mhz */

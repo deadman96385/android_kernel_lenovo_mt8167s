@@ -20,7 +20,13 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/ \
              -I$(srctree)/drivers/staging/android \
              -I$(srctree)/drivers/misc/mediatek/dispsys/$(CONFIG_MTK_PLATFORM) \
              -I$(srctree)/drivers/staging/android/ion \
-             -I$(srctree)/drivers/misc/mediatek/hdmi/hdmitx/$(CONFIG_MTK_PLATFORM)/inc/
+             -I$(srctree)/drivers/misc/mediatek/hdmi/inc/ \
+             -I$(srctree)/drivers/misc/mediatek/hdmi/hdmitx/$(CONFIG_MTK_PLATFORM)/inc/ \
+             -I$(srctree)/drivers/misc/mediatek//ext_disp/ \
+             -I$(srctree)/drivers/misc/mediatek/ext_disp/v1/ \
+             -I$(srctree)/drivers/misc/mediatek/include/mt-plat/ \
+             -I$(srctree)/drivers/misc/mediatek/include/mt-plat/trustzone/ \
+
 
 ifeq ($(CONFIG_MTK_INTERNAL_MHL_SUPPORT), y)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/hdmi/mhltx/$(CONFIG_MTK_PLATFORM)

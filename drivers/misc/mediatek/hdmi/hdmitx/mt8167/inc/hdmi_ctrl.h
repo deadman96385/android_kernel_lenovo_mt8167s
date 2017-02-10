@@ -44,8 +44,7 @@
 #include <linux/fs.h>
 #include <linux/string.h>
 #include <linux/completion.h>
-
-#include "internal_hdmi_drv.h"
+#include "hdmi_drv.h"
 
 /*#include <cust_eint.h>*/
 /*#include "cust_gpio_usage.h"*/

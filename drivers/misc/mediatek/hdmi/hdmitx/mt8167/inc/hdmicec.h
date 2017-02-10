@@ -14,8 +14,7 @@
 
 #ifndef __hdmicec_h__
 #define __hdmicec_h__
-#include "hdmitx.h"
-
+#include "extd_hdmi.h"
 
 enum HDMI_CEC_RX_MODE {
 	CEC_NORMAL_MODE = 0,
@@ -529,11 +528,11 @@ extern unsigned char hdmi_cec_isrprocess(unsigned char u1rxmode);
 extern void hdmi_cec_mainloop(unsigned char u1rxmode);
 extern void hdmi_CECMWSetLA(struct CEC_DRV_ADDR_CFG_T *prAddr);
 extern void hdmi_u4CecSendSLTData(unsigned char *pu1Data);
-extern void hdmi_CECMWGet(CEC_FRAME_DESCRIPTION_IO *frame);
+extern void hdmi_CECMWGet(struct CEC_FRAME_DESCRIPTION_IO *frame);
 extern void hdmi_GetSLTData(struct CEC_SLT_DATA *rCecSltData);
 extern void hdmi_CECMWSend(struct CEC_SEND_MSG_T *msg);
 extern void hdmi_CECMWSetEnableCEC(unsigned char u1EnCec);
-extern void hdmi_NotifyApiCECAddress(CEC_ADDRESS_IO *cecaddr);
+extern void hdmi_NotifyApiCECAddress(struct CEC_ADDRESS_IO *cecaddr);
 extern void hdmi_SetPhysicCECAddress(unsigned short u2pa, unsigned char u1la);
 extern unsigned int IS_HDMI_HTPLG(void);
 extern unsigned int IS_HDMI_PORD(void);
@@ -541,7 +540,7 @@ extern void vClear_cec_irq(void);
 extern void vEnable_hotplug_pord_int(unsigned char u1enable);
 extern void vCec_pdn_32k(void);
 extern void hdmi_cec_api_get_txsts(struct CEC_ACK_INFO_T *pt);
-extern void hdmi_cec_api_get_cmd(CEC_FRAME_DESCRIPTION_IO *frame);
+extern void hdmi_cec_api_get_cmd(struct CEC_FRAME_DESCRIPTION_IO *frame);
 extern void hdmi_cec_usr_cmd(unsigned int cmd, unsigned int *result);
 extern void hdmi_cec_power_on(unsigned char pwr);
 extern unsigned int hdmi_cec_read(unsigned short u2Reg);

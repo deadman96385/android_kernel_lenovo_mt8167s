@@ -25,6 +25,7 @@
 
 #include "hdmi_ctrl.h"
 #include "hdmiddc.h"
+#include "hdmictrl.h"
 /* #include <mach/mt_pmic_wrap.h> */
 
 /* #define hdmi_reg[HDMI_DDC]    (0xF1013000) */
