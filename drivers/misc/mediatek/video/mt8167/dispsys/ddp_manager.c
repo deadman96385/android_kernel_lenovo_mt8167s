@@ -1386,6 +1386,7 @@ int dpmgr_path_trigger(disp_path_handle dp_handle, void *trigger_loop_handle, in
 	return 0;
 }
 
+static int is_module_in_path(enum DISP_MODULE_ENUM module, struct ddp_path_handle *handle);
 int dpmgr_path_flush(disp_path_handle dp_handle, int encmdq)
 {
 	struct ddp_path_handle *handle;
@@ -1398,7 +1399,7 @@ int dpmgr_path_flush(disp_path_handle dp_handle, int encmdq)
 	DISP_LOG_I("path flush on scenario %s\n", ddp_get_scenario_name(handle->scenario));
 
 	DISP_LOG_V("dpmgr_path_flush: Reset OVL and enable mutex %d\n", handle->hwmutexid);
-	if (!encmdq)
+	if (is_module_in_path(DISP_MODULE_OVL0, handle) && !encmdq)
 		ovl_reset(DISP_MODULE_OVL0, cmdqHandle);
 
 	return ddp_mutex_enable(handle->hwmutexid, handle->scenario, cmdqHandle);

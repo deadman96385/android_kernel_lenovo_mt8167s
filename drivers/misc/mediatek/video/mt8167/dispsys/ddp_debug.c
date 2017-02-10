@@ -304,10 +304,7 @@ static void process_dbg_opt(const char *opt)
 		tmp = strsep(&p, ",");
 		ret = kstrtoul(tmp, 0, &enable);
 
-		if (enable)
-			irq_log_level = 1;
-		else
-			irq_log_level = 0;
+		irq_log_level = enable;
 
 		sprintf(buf, "irq_log: %d\n", irq_log_level);
 	} else if (strncmp(opt, "met_on:", 7) == 0) {
