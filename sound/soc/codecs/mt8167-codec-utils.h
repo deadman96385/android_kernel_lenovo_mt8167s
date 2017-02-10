@@ -16,12 +16,12 @@
 #ifndef __MT8167_CODEC_UTILS_H__
 #define __MT8167_CODEC_UTILS_H__
 
-uint32_t mt8167_codec_conv_dc_offset_to_comp_val(uint32_t dc_offset);
+uint32_t mt8167_codec_conv_dc_offset_to_comp_val(int32_t dc_offset);
 
 int mt8167_codec_get_hpl_cali_val(struct snd_soc_codec *codec,
-	uint32_t *dccomp_val, uint32_t *dc_offset);
+	uint32_t *dccomp_val, int32_t *dc_offset);
 int mt8167_codec_get_hpr_cali_val(struct snd_soc_codec *codec,
-	uint32_t *dccomp_val, uint32_t *dc_offset);
+	uint32_t *dccomp_val, int32_t *dc_offset);
 
 void mt8167_codec_turn_off_lpbk_path(struct snd_soc_codec *codec,
 	uint32_t lpbk_type);

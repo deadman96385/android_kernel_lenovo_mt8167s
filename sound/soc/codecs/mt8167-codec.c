@@ -58,8 +58,8 @@ struct mt8167_codec_priv {
 	struct regmap *regmap_modules[REGMAP_NUMS];
 	uint32_t lch_dccomp_val; /* L-ch DC compensation value */
 	uint32_t rch_dccomp_val; /* R-ch DC compensation value */
-	uint32_t lch_dc_offset; /* L-ch DC offset value */
-	uint32_t rch_dc_offset; /* R-ch DC offset value */
+	int32_t lch_dc_offset; /* L-ch DC offset value */
+	int32_t rch_dc_offset; /* R-ch DC offset value */
 	bool is_lch_dc_calibrated;
 	bool is_rch_dc_calibrated;
 	uint32_t pga_gain[PGA_GAIN_MAX];
