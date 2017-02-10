@@ -304,19 +304,6 @@
 	mediatek,kpd-hw-factory-key  = <0>;
 };
 
-&larb0 {
-	power-domains = <>;
-};
-
-&larb1 {
-	power-domains = <>;
-};
-
-&larb2 {
-	power-domains = <>;
-};
-
-
 &mmc0 {
 	pinctrl-names = "default", "state_uhs";
 	pinctrl-0 = <&mmc0_pins_default>;
@@ -740,10 +727,6 @@
 &ptp_od {
 	vproc-supply = <&mt6392_vproc_reg>;
 	vcore-supply = <&mt6392_vcore_reg>;
-};
-
-&smi_common {
-	power-domains = <>;
 };
 
 &touch {
