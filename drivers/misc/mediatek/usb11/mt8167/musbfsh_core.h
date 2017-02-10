@@ -88,6 +88,10 @@ extern int mtk11_isoc_ep_gpd_count;
 extern int musbfsh_host_dynamic_fifo;
 extern int musbfsh_host_dynamic_fifo_usage_msk;
 
+extern struct clk *usbpll_clk;
+extern struct clk *usbmcu_clk;
+extern struct clk *usb_clk;
+extern struct clk *icusb_clk;
 
 #define MT_USB1_IRQ_ID                      (105)
 #define USB1_BASE                   0xF1270000
@@ -113,6 +117,8 @@ extern struct device_node *usb11_dts_np;
 extern irqreturn_t musbfsh_h_ep0_irq(struct musbfsh *);
 extern void musbfsh_host_tx(struct musbfsh *, u8);
 extern void musbfsh_host_rx(struct musbfsh *, u8);
+extern int mt_usb11_clock_prepare(void);
+extern void mt_usb11_clock_unprepare(void);
 
 /****************************** CONSTANTS ********************************/
 

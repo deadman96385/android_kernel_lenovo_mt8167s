@@ -520,6 +520,11 @@ static int __init mt_usb11_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 
 	INFO("[Flow][USB11]%s:%d\n", __func__, __LINE__);
+	ret = mt_usb11_clock_prepare();
+	if (ret) {
+		dev_err(&pdev->dev, "musbfsh clock prepare fail\n");
+		goto err0;
+	}
 	glue = kzalloc(sizeof(*glue), GFP_KERNEL);
 	if (!glue) {
 		dev_err(&pdev->dev, "failed to allocate glue context\n");

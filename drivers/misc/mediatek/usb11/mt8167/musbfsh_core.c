@@ -1500,6 +1500,40 @@ static void musbfsh_restore_context(struct musbfsh *musbfsh)
 	musbfsh_writel(musbfsh_base, USB11_L1INTM, musbfsh->context.l1_int);
 }
 
+int mt_usb11_clock_prepare(void)
+{
+	int retval = 0;
+
+	INFO("mt_usb11_clock_prepare\n");
+	retval = clk_prepare(usbpll_clk);
+	if (retval)
+		goto exit;
+	retval = clk_prepare(usb_clk);
+	if (retval)
+		goto exit;
+
+	retval = clk_prepare(usbmcu_clk);
+	if (retval)
+		goto exit;
+	retval = clk_prepare(icusb_clk);
+	if (retval)
+		goto exit;
+
+	return 0;
+exit:
+	WARNING("[USB11] clock prepare fail\n");
+	return retval;
+}
+
+void mt_usb11_clock_unprepare(void)
+{
+	INFO("mt_usb11_clock_unprepare\n");
+
+	clk_unprepare(icusb_clk);
+	clk_unprepare(usbmcu_clk);
+	clk_unprepare(usb_clk);
+	clk_unprepare(usbpll_clk);
+}
 
 static int musbfsh_suspend(struct device *dev)
 {
@@ -1512,6 +1546,7 @@ static int musbfsh_suspend(struct device *dev)
 	musbfsh_save_context(musbfsh);
 	musbfsh_platform_set_power(musbfsh, 0);
 	spin_unlock_irqrestore(&musbfsh->lock, flags);
+	mt_usb11_clock_unprepare();
 	return 0;
 }
 
@@ -1520,8 +1555,14 @@ static int musbfsh_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	unsigned long flags;
 	struct musbfsh *musbfsh = dev_to_musbfsh(&pdev->dev);
+	int retval = 0;
 
 	WARNING("++\n");
+	retval = mt_usb11_clock_prepare();
+	if (retval) {
+		WARNING("!!musbfsh clock prepre fail,need to check!!\n");
+		return retval;
+	}
 	spin_lock_irqsave(&musbfsh->lock, flags);
 	musbfsh_platform_set_power(musbfsh, 1);
 	musbfsh_restore_context(musbfsh);
