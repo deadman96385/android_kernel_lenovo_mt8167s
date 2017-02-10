@@ -1636,8 +1636,8 @@
 
 		mtee {
 			compatible = "mediatek,mtee";
-			clocks = <&infracfg CLK_TOP_GCPU_B>;
-			clock-names = "GCPU";
+			clocks = <&topckgen CLK_TOP_GCPU_B>, <&topckgen CLK_TOP_TRNG>;
+			clock-names = "GCPU", "TRNG";
 		};
 
 		mtgpufreq {
