@@ -243,9 +243,8 @@ static signed int read_adc_v_bat_sense(void *data)
 #if defined(CONFIG_POWER_EXT)
 	*(signed int *)(data) = 4201;
 #else
-/*	*(signed int *)(data) = PMIC_IMM_GetOneChannelValue(VBAT_CHANNEL_NUMBER, *(signed int *)(data), 1);	*/
+	*(signed int *)(data) = PMIC_IMM_GetOneChannelValue(VBAT_CHANNEL_NUMBER, 1, 1);
 #endif
-
 	return STATUS_OK;
 }
 
@@ -254,7 +253,7 @@ static signed int read_adc_v_i_sense(void *data)
 #if defined(CONFIG_POWER_EXT)
 	*(signed int *)(data) = 4202;
 #else
-/*	*(signed int *)(data) = PMIC_IMM_GetOneChannelValue(ISENSE_CHANNEL_NUMBER, *(signed int *)(data), 1); */
+	*(signed int *)(data) = PMIC_IMM_GetOneChannelValue(ISENSE_CHANNEL_NUMBER, 1, 1);
 #endif
 
 	return STATUS_OK;
@@ -289,10 +288,7 @@ static signed int read_adc_v_bat_temp(void *data)
 		*(signed int *)(data) = ret;
 
 	#else
-		pr_debug("[read_adc_v_charger] return PMIC_IMM_GetOneChannelValue(4,times,1);\n");
-/*		*(signed int *)(data) =
-* PMIC_IMM_GetOneChannelValue(VBATTEMP_CHANNEL_NUMBER, *(signed int *)(data), 1);
- */
+		*(signed int *)(data) = PMIC_IMM_GetOneChannelValue(VBATTEMP_CHANNEL_NUMBER, 1, 1);
 	#endif
 #endif
 
@@ -306,7 +302,7 @@ static signed int read_adc_v_charger(void *data)
 #else
 	signed int val = 0;
 
-/*	val = PMIC_IMM_GetOneChannelValue(VCHARGER_CHANNEL_NUMBER, *(signed int *)(data), 1);	*/
+	val = PMIC_IMM_GetOneChannelValue(VCHARGER_CHANNEL_NUMBER, 1, 1);
 	val = (((R_CHARGER_1+R_CHARGER_2)*100*val)/R_CHARGER_2) / 100;
 
 	*(signed int *)(data) = val;

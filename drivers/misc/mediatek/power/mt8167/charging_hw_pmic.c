@@ -444,7 +444,7 @@ static unsigned int charging_get_charger_det_status(void *data)
 #if defined(CHRDET_SW_MODE_EN)
 	unsigned int vchr_val = 0;
 
-	vchr_val = PMIC_IMM_GetOneChannelValue(4, 5, 1);
+	vchr_val = PMIC_IMM_GetOneChannelValue(VCHARGER_CHANNEL_NUMBER, 1, 1);
 	vchr_val = (((330+39)*100*vchr_val)/39)/100;
 
 	if (vchr_val > 4300) {
