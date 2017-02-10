@@ -147,7 +147,7 @@ static int spm_irq_register(void)
 			r = -EPERM;
 		}
 	}
-#if 0 /* defined(CONFIG_ARCH_MT6580) */
+#if 0
 	mt_gic_set_priority(SPM_IRQ0_ID);
 #endif
 	return r;
