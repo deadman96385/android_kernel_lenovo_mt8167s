@@ -107,7 +107,7 @@ static IMG_BOOL g_bDeviceInit = IMG_FALSE;
 
 static IMG_BOOL g_bUnsync = IMG_FALSE;
 static IMG_UINT32 g_ui32_unsync_freq_id;
-
+static IMG_BOOL bCoreinitSucceeded = IMG_FALSE;
 
 
 static struct platform_device *sPVRLDMDev;
@@ -115,10 +115,19 @@ static struct platform_device *sMFGASYNCDev;
 static struct platform_device *sMFG2DDev;
 #define GET_MTK_MFG_BASE(x) (struct mtk_mfg_base *)(x->dev.platform_data)
 
-static char *top_mfg_clk_name[] = {
-	"mfg_mm_in_sel",
-	"mfg_axi_in_sel",
+static const char * const top_mfg_clk_sel_name[] = {
 	"mfg_slow_in_sel",
+	"mfg_axi_in_sel",
+	"mfg_mm_in_sel",
+};
+
+static const char * const top_mfg_clk_sel_parent_name[] = {
+	"slow",
+	"bus",
+	"engine",
+};
+
+static const char * const top_mfg_clk_name[] = {
 	"top_slow",
 	"top_axi",
 	"top_mm",
@@ -249,9 +258,6 @@ static void mtk_mfg_enable_hw_apm(void)
 	writel(0x00d800d8, mfg_base->reg_base + 0x528);
 	writel(0x9000001b, mfg_base->reg_base + 0x24);
 	writel(0x8000001b, mfg_base->reg_base + 0x24);
-
-	if (gpu_debug_enable)
-		PVR_DPF((PVR_DBG_ERROR, "mtk_mfg_enable_hw_apm"));
 }
 static void mtk_mfg_disable_hw_apm(void) {};
 #else
@@ -267,23 +273,19 @@ static IMG_VOID mtk_mfg_enable_clock(void)
 
 	ged_dvfs_gpu_clock_switch_notify(1);
 
-
 	/* Resume mfg power domain */
 	pm_runtime_get_sync(&mfg_base->mfg_async_pdev->dev);
 	pm_runtime_get_sync(&mfg_base->mfg_2d_pdev->dev);
 	pm_runtime_get_sync(&mfg_base->pdev->dev);
 
-
 	/* Prepare and enable mfg top clock */
-	for (i = 0; i < MAX_TOP_MFG_CLK; i++)
+	for (i = 0; i < MAX_TOP_MFG_CLK; i++) {
 		MTKCLK_prepare_enable(mfg_base->top_clk[i]);
+		clk_set_parent(mfg_base->top_clk_sel[i], mfg_base->top_clk_sel_parent[i]);
+	}
 
 	/* Enable(un-gated) mfg clock */
 	mtk_mfg_clr_clock_gating(mfg_base->reg_base);
-
-	if (gpu_debug_enable)
-		PVR_DPF((PVR_DBG_ERROR, "mtk_mfg_enable_clock"));
-
 }
 
 
@@ -320,9 +322,6 @@ static IMG_VOID mtk_mfg_disable_clock(IMG_BOOL bForce)
 	pm_runtime_put_sync(&mfg_base->mfg_async_pdev->dev);
 
 	ged_dvfs_gpu_clock_switch_notify(0);
-
-	if (gpu_debug_enable)
-		PVR_DPF((PVR_DBG_ERROR, "mtk_mfg_disable_clock"));
 }
 
 
@@ -537,6 +536,8 @@ unsigned int MTKCommitFreqForPVR(unsigned long ui32NewFreq)
 
 static void MTKFreqInputBoostCB(unsigned int ui32BoostFreqID)
 {
+/* CJ Fix Me */
+#if 0
 	if (g_iSkipCount > 0)
 		return;
 
@@ -551,7 +552,7 @@ static void MTKFreqInputBoostCB(unsigned int ui32BoostFreqID)
 	}
 
 	OSLockRelease(ghDVFSLock);
-
+#endif
 }
 
 static void MTKFreqPowerLimitCB(unsigned int ui32LimitFreqID)
@@ -862,9 +863,6 @@ PVRSRV_ERROR MTKDevPrePowerState(IMG_HANDLE hSysData, PVRSRV_DEV_POWER_STATE eNe
 {
 	struct mtk_mfg_base *mfg_base = GET_MTK_MFG_BASE(sPVRLDMDev);
 
-	if (gpu_debug_enable)
-		PVR_DPF((PVR_DBG_ERROR, "MTKDevPrePowerState"));
-
 	mutex_lock(&mfg_base->set_power_state);
 	if ((eNewPowerState == PVRSRV_DEV_POWER_STATE_OFF) &&
 	    (eCurrentPowerState == PVRSRV_DEV_POWER_STATE_ON)) {
@@ -894,9 +892,6 @@ PVRSRV_ERROR MTKDevPostPowerState(IMG_HANDLE hSysData, PVRSRV_DEV_POWER_STATE eN
 				  IMG_BOOL bForced)
 {
 	struct mtk_mfg_base *mfg_base = GET_MTK_MFG_BASE(sPVRLDMDev);
-
-	if (gpu_debug_enable)
-		PVR_DPF((PVR_DBG_ERROR, "MTKDevPostPowerState"));
 
 	mutex_lock(&mfg_base->set_power_state);
 	if ((eCurrentPowerState == PVRSRV_DEV_POWER_STATE_OFF) &&
@@ -1045,7 +1040,12 @@ unsigned int MTKGetCustomUpBoundGpuFreq(void)
 
 static IMG_UINT32 MTKGetGpuLoading(IMG_VOID)
 {
+#ifndef ENABLE_COMMON_DVFS
 	return gpu_loading;
+#else
+	MTKCalGpuLoading(&gpu_loading, &gpu_block, &gpu_idle);
+	return gpu_loading;
+#endif
 }
 
 static IMG_UINT32 MTKGetGpuBlock(IMG_VOID)
@@ -1199,6 +1199,8 @@ PVRSRV_ERROR MTKMFGSystemInit(void)
 	ged_dvfs_gpu_freq_commit_fp = MTKCommitFreqIdx;
 #endif
 #endif
+	/* Set the CB for ptpod use */
+	mt_gpufreq_mfgclock_notify_registerCB(MTKEnableMfgClock, MTKDisableMfgClock);
 
 #endif /* ifdef MTK_GPU_DVFS */
 
@@ -1224,7 +1226,7 @@ PVRSRV_ERROR MTKMFGSystemInit(void)
 	}
 #endif
 #ifndef MTK_PM_SUPPORT
-	/*MTKEnableMfgClock();*/
+	MTKEnableMfgClock();
 #endif
 	return PVRSRV_OK;
 
@@ -1282,14 +1284,22 @@ IMG_VOID MTKMFGSystemDeInit(void)
 }
 
 
-
 static int mtk_mfg_bind_device_resource(struct platform_device *pdev,
 				 struct mtk_mfg_base *mfg_base)
 {
 	int i, err;
-	int len = sizeof(struct clk *) * MAX_TOP_MFG_CLK;
+	int len_clk = sizeof(struct clk *) * MAX_TOP_MFG_CLK;
 
-	mfg_base->top_clk = devm_kzalloc(&pdev->dev, len, GFP_KERNEL);
+	mfg_base->top_clk_sel = devm_kzalloc(&pdev->dev, len_clk, GFP_KERNEL);
+	if (!mfg_base->top_clk_sel)
+		return -ENOMEM;
+
+
+	mfg_base->top_clk_sel_parent = devm_kzalloc(&pdev->dev, len_clk, GFP_KERNEL);
+	if (!mfg_base->top_clk_sel_parent)
+		return -ENOMEM;
+
+	mfg_base->top_clk = devm_kzalloc(&pdev->dev, len_clk, GFP_KERNEL);
 	if (!mfg_base->top_clk)
 		return -ENOMEM;
 
@@ -1297,6 +1307,28 @@ static int mtk_mfg_bind_device_resource(struct platform_device *pdev,
 	if (!mfg_base->reg_base) {
 		pr_err("Unable to ioremap registers pdev %p\n", pdev);
 		return -ENOMEM;
+	}
+
+	for (i = 0; i < MAX_TOP_MFG_CLK; i++) {
+		mfg_base->top_clk_sel_parent[i] = devm_clk_get(&pdev->dev,
+						    top_mfg_clk_sel_parent_name[i]);
+		if (IS_ERR(mfg_base->top_clk_sel_parent[i])) {
+			err = PTR_ERR(mfg_base->top_clk_sel_parent[i]);
+			dev_err(&pdev->dev, "devm_clk_get %s failed !!!\n",
+				top_mfg_clk_sel_parent_name[i]);
+			goto err_iounmap_reg_base;
+		}
+	}
+
+	for (i = 0; i < MAX_TOP_MFG_CLK; i++) {
+		mfg_base->top_clk_sel[i] = devm_clk_get(&pdev->dev,
+						    top_mfg_clk_sel_name[i]);
+		if (IS_ERR(mfg_base->top_clk_sel[i])) {
+			err = PTR_ERR(mfg_base->top_clk_sel[i]);
+			dev_err(&pdev->dev, "devm_clk_get %s failed !!!\n",
+				top_mfg_clk_sel_name[i]);
+			goto err_iounmap_reg_base;
+		}
 	}
 
 	for (i = 0; i < MAX_TOP_MFG_CLK; i++) {
@@ -1309,6 +1341,7 @@ static int mtk_mfg_bind_device_resource(struct platform_device *pdev,
 			goto err_iounmap_reg_base;
 		}
 	}
+
 	if (!sMFGASYNCDev || !sMFG2DDev) {
 		dev_err(&pdev->dev, "Failed to get pm_domain\n");
 		err = -EPROBE_DEFER;
@@ -1367,8 +1400,15 @@ int MTKRGXDeviceInit(void *pvOSDevice)
 	mutex_init(&mfg_base->set_power_state);
 	pdev->dev.platform_data = mfg_base;
 
+	bCoreinitSucceeded = IMG_TRUE;
 	return 0;
 }
+
+bool mt_gpucore_ready(void)
+{
+	return (bCoreinitSucceeded == IMG_TRUE);
+}
+EXPORT_SYMBOL(mt_gpucore_ready);
 
 
 #ifndef ENABLE_COMMON_DVFS

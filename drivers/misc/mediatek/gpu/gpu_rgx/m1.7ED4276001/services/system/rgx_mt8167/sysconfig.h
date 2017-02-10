@@ -53,7 +53,7 @@
 #define RGX_HW_CORE_CLOCK_SPEED 500000000
 #define RGX_HW_SYSTEM_NAME "RGX HW"
 
-#define SYS_RGX_ACTIVE_POWER_LATENCY_MS (3)
+#define SYS_RGX_ACTIVE_POWER_LATENCY_MS (50)
 
 static IMG_UINT32 gauiBIFTilingHeapXStrides[RGXFWIF_NUM_BIF_TILING_CONFIGS] = {
 	0, /* BIF tiling heap 1 x-stride */
