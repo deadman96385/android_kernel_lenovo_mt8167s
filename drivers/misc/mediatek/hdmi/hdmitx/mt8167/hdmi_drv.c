@@ -1108,7 +1108,7 @@ void hdmi_internal_power_off(void)
 	}
 
 	if (hdmi_clockenable == 1) {
-		HDMI_PLUG_LOG("hdmi irq for clock:hdmi plug out\n");
+		HDMI_PLUG_LOG("hdmi internal power off:disable clock\n");
 		hdmi_clockenable = 0;
 		hdmi_clock_enable(false);
 	}
@@ -1749,6 +1749,12 @@ void cec_timer_impl(void)
 void hdmi_irq_impl(void)
 {
 	msleep(50);
+
+	if (down_interruptible(&hdmi_update_mutex)) {
+		pr_err("[hdmi][HDMI] can't get semaphore in %s()\n", __func__);
+		return;
+	}
+
 	if ((hdmi_hotplugstate != HDMI_STATE_HOT_PLUG_OUT)
 	    && (bCheckPordHotPlug(HOTPLUG_MODE) == FALSE)) {
 		bCheckHDCPStatus(0xfb);
@@ -1780,7 +1786,7 @@ void hdmi_irq_impl(void)
 		vPlugDetectService(HDMI_STATE_HOT_PLUG_IN_ONLY);
 		HDMI_PLUG_LOG("hdmi plug in only return\n");
 	}
-
+	up(&hdmi_update_mutex);
 
 }
 
