@@ -1629,8 +1629,9 @@ static void tpd_suspend(struct device *h)
 *	green_mode(i2c_client, MODE_OFF);
 *	check_mem_data(i2c_client);
 * #endif
-*	tpd_gpio_output(GTP_RST_PORT, 0);
- */
+*/
+	tpd_gpio_output(GTP_RST_PORT, 0);
+
 	GSL_LOGD("tpd_suspend is ok.");
 }
 
@@ -1642,6 +1643,8 @@ static void tpd_resume(struct device *h)
 	tpd_gpio_output(GTP_RST_PORT, 1);
 	msleep(20);
 
+	reset_chip(i2c_client);
+	startup_chip(i2c_client);
 /*
 * check_mem_data(i2c_client);
 * #ifdef GREEN_MODE
