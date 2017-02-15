@@ -1177,6 +1177,10 @@ static int mt8167_afe_mrg_bt_hw_params(struct snd_pcm_substream *substream,
 	if (ret)
 		return ret;
 
+	regmap_update_bits(afe->regmap, AFE_CONN1,
+			   AFE_CONN1_I06_O02_R | AFE_CONN1_I05_O02_R,
+			   AFE_CONN1_I06_O02_R | AFE_CONN1_I05_O02_R);
+
 	return 0;
 }
 
@@ -1237,6 +1241,10 @@ static int mt8167_afe_pcm0_hw_params(struct snd_pcm_substream *substream,
 	ret = mt8167_afe_set_pcm0(afe, params_rate(params));
 	if (ret)
 		return ret;
+
+	regmap_update_bits(afe->regmap, AFE_CONN1,
+			   AFE_CONN1_I06_O02_R | AFE_CONN1_I05_O02_R,
+			   AFE_CONN1_I06_O02_R | AFE_CONN1_I05_O02_R);
 
 	return 0;
 }
