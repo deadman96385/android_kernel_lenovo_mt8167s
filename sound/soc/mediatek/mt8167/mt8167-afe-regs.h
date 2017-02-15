@@ -155,6 +155,8 @@
 
 /* AFE_CONN1 (0x0024) */
 #define AFE_CONN1_I03_O03_S		BIT(19)
+#define AFE_CONN1_I06_O02_R		BIT(13)
+#define AFE_CONN1_I05_O02_R		BIT(12)
 
 /* AFE_CONN2 (0x0028) */
 #define AFE_CONN2_I04_O04_S		BIT(4)
