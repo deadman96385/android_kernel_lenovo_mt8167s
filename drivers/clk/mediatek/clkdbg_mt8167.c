@@ -519,6 +519,10 @@ static const char * const *get_all_clk_names(void)
 		"uart2",
 		"bsi",
 		"gcpu_b",
+		"msdc0_infra",
+		"msdc1_infra",
+		"msdc2_infra",
+		"usb_78m",
 		/* TOP3 */
 		"rg_spinor",
 		"rg_msdc2",
