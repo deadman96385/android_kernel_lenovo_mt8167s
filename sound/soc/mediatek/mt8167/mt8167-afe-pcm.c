@@ -2384,12 +2384,14 @@ static const struct snd_kcontrol_new mt8167_afe_o04_mix[] = {
 
 static const struct snd_kcontrol_new mt8167_afe_o05_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I00 Switch", AFE_CONN2, 16, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I03 Switch", AFE_CONN2, 18, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I05 Switch", AFE_CONN2, 19, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I07 Switch", AFE_CONN2, 20, 1, 0),
 };
 
 static const struct snd_kcontrol_new mt8167_afe_o06_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I01 Switch", AFE_CONN2, 22, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I04 Switch", AFE_CONN2, 23, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I06 Switch", AFE_CONN2, 24, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I08 Switch", AFE_CONN2, 25, 1, 0),
 };
@@ -2636,6 +2638,8 @@ static const struct snd_soc_dapm_route mt8167_afe_pcm_routes[] = {
 	{"O06", "I08 Switch", "I08L"},
 	{"O05", "I00 Switch", "I00"},
 	{"O06", "I01 Switch", "I01"},
+	{"O05", "I03 Switch", "I03"},
+	{"O06", "I04 Switch", "I04"},
 	{"AWB", NULL, "O05"},
 	{"AWB", NULL, "O06"},
 
