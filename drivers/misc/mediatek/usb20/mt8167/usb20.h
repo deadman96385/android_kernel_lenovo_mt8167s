@@ -76,7 +76,6 @@ struct mt_usb_glue {
 	struct platform_device	*musb;
 };
 
-extern void wake_up_bat(void);
 extern enum CHARGER_TYPE mt_charger_type_detection(void);
 extern bool upmu_is_chr_det(void);
 extern kal_uint32 upmu_get_rgs_chrdet(void);
