@@ -854,6 +854,9 @@ static int mt8167_codec_sdm_tone_gen_event(struct snd_soc_dapm_widget *w,
 		/* tri_mute_sw (Mute trigen) */
 		snd_soc_update_bits(codec, ABB_AFE_SDM_TEST,
 				BIT(1), BIT(1));
+		/* abb_sdm_src_sel_ctl (Normal path) */
+		snd_soc_update_bits(codec, ABB_AFE_SDM_TEST,
+				BIT(2), 0x0);
 		/* tri_dac_en (Disable trigen) */
 		snd_soc_update_bits(codec, ABB_AFE_SDM_TEST,
 				BIT(0), 0x0);
