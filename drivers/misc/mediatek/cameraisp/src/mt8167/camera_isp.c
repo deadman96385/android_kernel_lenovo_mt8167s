@@ -4176,11 +4176,22 @@ static __tcmfunc irqreturn_t ISP_Irq(MINT32 Irq, MVOID *DeviceId)
 					ErrMask[i] & IrqStatus[i] &
 					(~ISP_IRQ_INTX_STATUS_IMGO_ERR_ST))) {
 					if (i != ISP_IRQ_TYPE_INTX) {	/* to reduce isp log */
-						LOG_DBG("Error IRQ, Type(%d), Status(0x%08X)", i,
-							g_IspInfo.IrqInfo.
-							ErrMask[i] & IrqStatus[i]);
+						LOG_DBG("Error IRQ, Type(%d), Status(0x%08X),m:%x, irq:%x",
+							i, g_IspInfo.IrqInfo.
+							ErrMask[i] & IrqStatus[i],
+							g_IspInfo.IrqInfo.ErrMask[i], IrqStatus[i]);
 					}
 					/* TODO: Add error handler... */
+				}
+
+				if (i != ISP_IRQ_TYPE_INTX
+					&& (g_IspInfo.IrqInfo.ErrMask[i]
+						& IrqStatus[i]) == 0x00200000) {	/* AAO error */
+					ISP_WR32((void *)ISP_REG_ADDR_DMA_INTX,
+					ISP_RD32((void *)ISP_REG_ADDR_DMA_INTX)
+							& (~0x00200000));
+					LOG_INF("set new DMA INTX:%x",
+							ISP_RD32((void *)ISP_REG_ADDR_DMA_INTX));
 				}
 			}
 
