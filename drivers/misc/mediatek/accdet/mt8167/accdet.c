@@ -280,33 +280,29 @@ static irqreturn_t accdet_eint_func(int irq, void *data)
 	ACCDET_INFO("[Accdet]cur_eint_state = %d\n", cur_eint_state);
 	ACCDET_INFO("[Accdet]current accdet_eint_type = %d\n", accdet_eint_type);
 
-	cur_eint_state = !cur_eint_state;
-
-	if (gpio_get_value(gpiopin)) {
-		ACCDET_INFO("%s: gpio_get_value %d = %d\n", __func__, gpiopin, gpio_get_value(gpiopin));
-		accdet_eint_type = IRQ_TYPE_LEVEL_LOW;
-	} else {
-		ACCDET_INFO("%s: gpio_get_value %d = %d\n", __func__, gpiopin, gpio_get_value(gpiopin));
-		accdet_eint_type = IRQ_TYPE_LEVEL_HIGH;
-	}
-
-	irq_set_irq_type(accdet_irq, accdet_eint_type);
-
 	if (cur_eint_state == EINT_PIN_PLUG_IN) {
-		gpio_set_debounce(gpiopin, accdet_dts_data.accdet_plugout_debounce * 1000);
-		ACCDET_INFO("[Accdet][After] cur_eint_state = %d\n", cur_eint_state);
-	} else{
+		if (accdet_eint_type == IRQ_TYPE_LEVEL_HIGH)
+			irq_set_irq_type(accdet_irq, IRQ_TYPE_LEVEL_HIGH);
+		else
+			irq_set_irq_type(accdet_irq, IRQ_TYPE_LEVEL_LOW);
 		gpio_set_debounce(gpiopin, headsetdebounce);
+		cur_eint_state = EINT_PIN_PLUG_OUT;
+	} else {
+		if (accdet_eint_type == IRQ_TYPE_LEVEL_HIGH)
+			irq_set_irq_type(accdet_irq, IRQ_TYPE_LEVEL_LOW);
+		else
+			irq_set_irq_type(accdet_irq, IRQ_TYPE_LEVEL_HIGH);
+
+		gpio_set_debounce(gpiopin, accdet_dts_data.accdet_plugout_debounce * 1000);
+		cur_eint_state = EINT_PIN_PLUG_IN;
+
 	}
-
-	ACCDET_INFO("[Accdet][After] cur_eint_state = %d\n", cur_eint_state);
-	ACCDET_INFO("[Accdet][After] accdet_eint_type = %d\n", accdet_eint_type);
-
 	disable_irq_nosync(accdet_irq);
+	ACCDET_DEBUG("[Accdet]accdet_eint_func after cur_eint_state=%d\n", cur_eint_state);
 
 	queue_work(accdet_eint_workqueue, &accdet_eint_work);
-
 	return IRQ_HANDLED;
+
 }
 
 
@@ -348,7 +344,6 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 		if (gpiopin < 0)
 			ACCDET_ERROR("[Accdet] not find accdet-gpio\n");
 		headsetdebounce = accdet_dts_data.eint_debounce;
-
 		ret = gpio_request(gpiopin, "accdet-gpio");
 		if (ret)
 			ACCDET_ERROR("gpio_request fail, ret(%d)\n", ret);
@@ -363,6 +358,10 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 		else
 			ACCDET_ERROR("[Accdet]accdet set EINT finished, accdet_irq=%d, headsetdebounce=%d\n",
 				accdet_irq, headsetdebounce);
+		if (gpio_get_value(gpiopin))
+			accdet_eint_type = IRQ_TYPE_LEVEL_HIGH;
+		else
+			accdet_eint_type = IRQ_TYPE_LEVEL_LOW;
 	} else {
 		ACCDET_ERROR("[Accdet]%s can't find compatible node\n", __func__);
 	}
