@@ -83,6 +83,16 @@ static struct snd_pcm_hw_constraint_list constraints_channels_tdm_in = {
 	.mask = 0,
 };
 
+static unsigned int mt8167_afe_tdm_ch_fixup(unsigned int channels)
+{
+	if (channels > 4)
+		return 8;
+	else if (channels > 2)
+		return 4;
+	else
+		return 2;
+}
+
 static snd_pcm_uframes_t mt8167_afe_pcm_pointer
 			 (struct snd_pcm_substream *substream)
 {
@@ -1358,7 +1368,7 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 			      afe->clocks[MT8167_CLK_APLL12_DIV4],
 			      rate * MT8167_TDM_OUT_MCLK_MULTIPLIER,
 			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
-			      rate * channels * bit_width);
+			      rate * mt8167_afe_tdm_ch_fixup(channels) * bit_width);
 
 	val = AFE_TDM_CON1_MSB_ALIGNED;
 
@@ -1590,7 +1600,7 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 		clk_set_parent(afe->clocks[MT8167_CLK_I2S5_M_SEL], afe->clocks[MT8167_CLK_AUD2]);
 	}
 
-	bck = ((channels == 6) ? 8 : channels) * rate * bit_width;
+	bck = mt8167_afe_tdm_ch_fixup(channels) * rate * bit_width;
 
 	mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV5],
 		rate * MT8167_TDM_IN_MCLK_MULTIPLIER,
@@ -2174,7 +2184,7 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 		.resume = mt8167_afe_dai_resume,
 		.playback = {
 			.stream_name = "HDMI",
-			.channels_min = 2,
+			.channels_min = 1,
 			.channels_max = 8,
 			.rates = SNDRV_PCM_RATE_8000_192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
@@ -2328,7 +2338,7 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 		.id = MT8167_AFE_IO_HDMI,
 		.playback = {
 			.stream_name = "HDMIO Playback",
-			.channels_min = 2,
+			.channels_min = 1,
 			.channels_max = 8,
 			.rates = SNDRV_PCM_RATE_8000_192000,
 			.formats = SNDRV_PCM_FMTBIT_S16_LE |
