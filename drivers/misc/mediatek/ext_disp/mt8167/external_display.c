@@ -1129,6 +1129,13 @@ int ext_disp_deinit(unsigned int session)
 
 	pgc->state = EXTD_DEINIT;
 
+	usleep_range(16000, 17000);
+	if (dpmgr_path_is_busy(pgc->dpmgr_handle))
+		dpmgr_wait_event_timeout(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_DONE, HZ);
+
+	if (ext_disp_use_cmdq == CMDQ_ENABLE && DISP_SESSION_DEV(session) != DEV_EINK + 1)
+		_cmdq_stop_trigger_loop();
+
 	dpmgr_path_deinit(pgc->dpmgr_handle, CMDQ_DISABLE);
 	dpmgr_destroy_path(pgc->dpmgr_handle, NULL);
 	cmdqRecDestroy(pgc->cmdq_handle_config);
@@ -1530,6 +1537,7 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 	if (pgc->state != EXTD_INIT && pgc->state != EXTD_RESUME && pgc->suspend_config != 1) {
 		EXT_DISP_LOG("config ext disp is already slept, state:%d\n", pgc->state);
 		mmprofile_log_ex(ddp_mmp_get_events()->Extd_ErrorInfo, MMPROFILE_FLAG_PULSE, Config, idx);
+		mtkfb_release_session_fence(pgc->session);
 		_ext_disp_path_unlock();
 		return -2;
 	}
