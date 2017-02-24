@@ -50,7 +50,7 @@
 #define BYPASS_GPIO		0
 
 #ifndef DEMO_BOARD_SUPPORT
-#define DEMO_BOARD_SUPPORT	0
+#define DEMO_BOARD_SUPPORT	1
 #endif
 
 /* GPIO Pin control*/
