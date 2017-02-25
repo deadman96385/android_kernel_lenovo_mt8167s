@@ -273,6 +273,10 @@ enum DAL_STATUS DAL_Clean(void)
 			dal_clean_cnt++);
 		isAEEEnabled = 0;
 		DAL_Dynamic_Change_FB_Layer(isAEEEnabled);	/* restore UI layer to DEFAULT_UI_LAYER */
+
+		mutex_lock(&disp_trigger_lock);
+		primary_display_trigger(0, NULL, 0);
+		mutex_unlock(&disp_trigger_lock);
 	}
 
 	up(&dal_sem);
@@ -391,10 +395,7 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 		dal_shown = true;
 
 	mutex_lock(&disp_trigger_lock);
-	/* Since the output buffer may not exsit, so skip frame trigger update. */
-	if (primary_display_get_session_mode() != DISP_SESSION_DECOUPLE_MIRROR_MODE
-		&& primary_display_get_session_mode() != DISP_SESSION_DECOUPLE_MODE)
-		ret = primary_display_trigger(0, NULL, 0);
+	ret = primary_display_trigger(0, NULL, 0);
 	mutex_unlock(&disp_trigger_lock);
 
 	up(&dal_sem);

@@ -76,6 +76,7 @@
 #include "disp_dts_gpio.h" /* set gpio via DTS */
 #endif
 #include "disp_helper.h"
+#include "mtk_disp_mgr.h"
 
 #define ALIGN_TO(x, n)	(((x) + ((n) - 1)) & ~((n) - 1))
 
@@ -509,7 +510,7 @@ static int mtkfb_pan_display_impl(struct fb_var_screeninfo *var, struct fb_info 
 	int ret = 0;
 	unsigned int src_pitch = 0;
 	static unsigned int pan_display_cnt;
-	struct disp_session_input_config *session_input;
+	struct disp_session_input_config *session_input = captured_session_input;
 	struct disp_input_config *input;
 
 	DISPFUNC();
@@ -529,13 +530,6 @@ static int mtkfb_pan_display_impl(struct fb_var_screeninfo *var, struct fb_info 
 	paStart = fb_pa + offset;
 	vaStart = info->screen_base + offset;
 	vaEnd = vaStart + info->var.yres * info->fix.line_length;
-
-	session_input = kzalloc(sizeof(*session_input), GFP_KERNEL);
-	if (!session_input) {
-		DISPERR("session input allocat fail\n");
-		ASSERT(0);
-		return -1;
-	}
 
 	/* pan display use layer 0 */
 	input = &session_input->config[0];
@@ -565,7 +559,6 @@ static int mtkfb_pan_display_impl(struct fb_var_screeninfo *var, struct fb_info 
 		break;
 	default:
 		DISPERR("Invalid color format bpp: %d\n", var->bits_per_pixel);
-		kfree(session_input);
 		return -1;
 	}
 	input->alpha_enable = false;
@@ -575,14 +568,14 @@ static int mtkfb_pan_display_impl(struct fb_var_screeninfo *var, struct fb_info 
 	src_pitch = ALIGN_TO(var->xres, MTK_FB_ALIGNMENT);
 	input->src_pitch = src_pitch;
 
-	session_input->config_layer_num++;
+	session_input->config_layer_num = 1;
 
 	if (!is_DAL_Enabled()) {
 		/* disable font layer(layer3) drawed in lk */
 		session_input->config[1].layer_id = primary_display_get_option("ASSERT_LAYER");
 		session_input->config[1].next_buff_idx = -1;
 		session_input->config[1].layer_enable = 0;
-		session_input->config_layer_num++;
+		session_input->config_layer_num = 2;
 	}
 
 	ret = primary_display_config_input_multiple(session_input);
@@ -594,7 +587,6 @@ static int mtkfb_pan_display_impl(struct fb_var_screeninfo *var, struct fb_info 
 #error "aee dynamic switch, set overlay race condition protection"
 #endif
 
-	kfree(session_input);
 	return ret;
 }
 
