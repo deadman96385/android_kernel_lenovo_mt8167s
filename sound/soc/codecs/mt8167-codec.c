@@ -33,7 +33,9 @@
 enum regmap_module_id {
 	REGMAP_AFE = 0,
 	REGMAP_APMIXEDSYS,
+#ifdef CONFIG_MTK_SPEAKER
 	REGMAP_PWRAP,
+#endif
 	REGMAP_NUMS,
 };
 
@@ -1784,7 +1786,9 @@ static struct regmap *mt8167_codec_get_regmap_from_dt(const char *phandle_name,
 static const char * const modules_dt_regmap_str[REGMAP_NUMS] = {
 	"mediatek,afe-regmap",
 	"mediatek,apmixedsys-regmap",
+#ifdef CONFIG_MTK_SPEAKER
 	"mediatek,pwrap-regmap",
+#endif
 };
 
 static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
