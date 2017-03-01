@@ -155,6 +155,7 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 			for (--i; i >= 0; i--)
 				clk_disable_unprepare(scpd->clk[i]);
 
+			dev_err(scp->dev, "%s: clk failed\n", genpd->name);
 			goto err_clk;
 		}
 	}
@@ -179,6 +180,7 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 
 		if (expired) {
 			ret = -ETIMEDOUT;
+			dev_err(scp->dev, "%s: PWR_ACK timeout\n", genpd->name);
 			goto err_pwr_ack;
 		}
 
@@ -207,6 +209,8 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 
 		if (expired) {
 			ret = -ETIMEDOUT;
+			dev_err(scp->dev, "%s: SRAM_PDN_ACK timeout\n",
+					genpd->name);
 			goto err_pwr_ack;
 		}
 
@@ -219,8 +223,11 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
 	if (scpd->data->bus_prot_mask) {
 		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
 				scpd->data->bus_prot_mask);
-		if (ret)
+		if (ret) {
+			dev_err(scp->dev, "%s: bus protection failed\n",
+					genpd->name);
 			goto err_pwr_ack;
+		}
 	}
 
 	return 0;
@@ -258,8 +265,11 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
 	if (scpd->data->bus_prot_mask) {
 		ret = mtk_infracfg_set_bus_protection(scp->infracfg,
 				scpd->data->bus_prot_mask);
-		if (ret)
+		if (ret) {
+			dev_err(scp->dev, "%s: bus protection failed\n",
+					genpd->name);
 			goto out;
+		}
 	}
 
 	val = readl(ctl_addr);
@@ -272,6 +282,8 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
 	while (pdn_ack && (readl(ctl_addr) & pdn_ack) != pdn_ack) {
 		if (expired) {
 			ret = -ETIMEDOUT;
+			dev_err(scp->dev, "%s: SRAM_PDN_ACK timeout\n",
+					genpd->name);
 			goto out;
 		}
 
@@ -306,6 +318,7 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
 
 		if (expired) {
 			ret = -ETIMEDOUT;
+			dev_err(scp->dev, "%s: PWR_ACK timeout\n", genpd->name);
 			goto out;
 		}
 
