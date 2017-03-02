@@ -61,7 +61,7 @@ void get_hw_chip_diff_trim_value(void)
 
 	chip_diff_trim_value_4_0 = reg_val_1 | (reg_val_2 << 3);
 
-	pr_debug("[Chip_Trim] Reg[0x%x]=0x%x, Reg[0x%x]=0x%x, chip_diff_trim_value_4_0=%d\n",
+	bm_print(BM_LOG_FULL, "[Chip_Trim] Reg[0x%x]=0x%x, Reg[0x%x]=0x%x, chip_diff_trim_value_4_0=%d\n",
 		0x01C4, upmu_get_reg_value(0x01C4), 0x01C6, upmu_get_reg_value(0x01C6), chip_diff_trim_value_4_0);
 
 #else
@@ -71,7 +71,7 @@ void get_hw_chip_diff_trim_value(void)
 	switch (chip_diff_trim_value_4_0) {
 	case 0:
 		chip_diff_trim_value = 1000;
-		pr_debug("[Chip_Trim] chip_diff_trim_value = 1000\n");
+		bm_print(BM_LOG_FULL, "[Chip_Trim] chip_diff_trim_value = 1000\n");
 		break;
 	case 1:
 		chip_diff_trim_value = 1005;
@@ -164,10 +164,10 @@ void get_hw_chip_diff_trim_value(void)
 		chip_diff_trim_value = 925;
 		break;
 	default:
-		pr_debug("[Chip_Trim] Invalid value(%d)\n", chip_diff_trim_value_4_0);
+		bm_print(BM_LOG_FULL, "[Chip_Trim] Invalid value(%d)\n", chip_diff_trim_value_4_0);
 		break;
 	}
-	pr_debug("[Chip_Trim] %d,%d\n", chip_diff_trim_value_4_0, chip_diff_trim_value);
+	bm_print(BM_LOG_FULL, "[Chip_Trim] %d,%d\n", chip_diff_trim_value_4_0, chip_diff_trim_value);
 #endif
 }
 
@@ -180,7 +180,7 @@ signed int use_chip_trim_value(signed int not_trim_val)
 
 	ret_val = ((not_trim_val*chip_diff_trim_value)/1000);
 
-	pr_debug("[use_chip_trim_value] %d -> %d\n", not_trim_val, ret_val);
+	bm_print(BM_LOG_FULL, "[use_chip_trim_value] %d -> %d\n", not_trim_val, ret_val);
 
 	return ret_val;
 #endif
@@ -198,12 +198,12 @@ int get_hw_ocv(void)
 	#if defined(SWCHR_POWER_PATH)
 	adc_result_reg = upmu_get_auxadc_adc_out_wakeup_swchr();
 	adc_result = (adc_result_reg*r_val_temp*VOLTAGE_FULL_RANGE)/ADC_PRECISE;
-	pr_debug("[oam] get_hw_ocv (swchr) : adc_result_reg=%d, adc_result=%d\n",
+	bm_print(BM_LOG_FULL, "[oam] get_hw_ocv (swchr) : adc_result_reg=%d, adc_result=%d\n",
 		adc_result_reg, adc_result);
 	#else
 	adc_result_reg = upmu_get_auxadc_adc_out_wakeup_pchr();
 	adc_result = (adc_result_reg*r_val_temp*VOLTAGE_FULL_RANGE)/ADC_PRECISE;
-	pr_debug("[oam] get_hw_ocv (pchr) : adc_result_reg=%d, adc_result=%d\n",
+	bm_print(BM_LOG_FULL, "[oam] get_hw_ocv (pchr) : adc_result_reg=%d, adc_result=%d\n",
 		adc_result_reg, adc_result);
 	#endif
 
@@ -270,7 +270,7 @@ static signed int read_adc_v_bat_temp(void *data)
 		int Channel = 1;
 
 		if (IMM_IsAdcInitReady() == 0) {
-			pr_debug("[get_tbat_volt] AUXADC is not ready");
+			bm_print(BM_LOG_FULL, "[get_tbat_volt] AUXADC is not ready");
 			return 0;
 		}
 
@@ -278,12 +278,12 @@ static signed int read_adc_v_bat_temp(void *data)
 		while (i--) {
 			ret_value = IMM_GetOneChannelValue(Channel, data, &ret_temp);
 			ret += ret_temp;
-			pr_debug("[get_tbat_volt] ret_temp=%d\n", ret_temp);
+			bm_print(BM_LOG_FULL, "[get_tbat_volt] ret_temp=%d\n", ret_temp);
 		}
 
 		ret = ret*1500/4096;
 		ret = ret/times;
-		pr_debug("[get_tbat_volt] Battery output mV = %d\n", ret);
+		bm_print(BM_LOG_FULL, "[get_tbat_volt] Battery output mV = %d\n", ret);
 
 		*(signed int *)(data) = ret;
 
