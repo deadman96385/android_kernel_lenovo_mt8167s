@@ -466,11 +466,15 @@ kal_bool charging_type_detection_done(void)
 static unsigned int charging_get_charger_type(void *data)
 {
 	unsigned int status = STATUS_OK;
+	unsigned int chr_type;
 
 #if defined(CONFIG_POWER_EXT) || defined(CONFIG_MTK_FPGA)
 	*(CHARGER_TYPE *) (data) = STANDARD_HOST;
 #else
-	*(CHARGER_TYPE *) (data) = hw_charging_get_charger_type();
+	chr_type = hw_charging_get_charger_type();
+	if (chr_type == NONSTANDARD_CHARGER)
+		chr_type = hw_charging_get_charger_type();
+	*(CHARGER_TYPE *) (data) = chr_type;
 #endif
 	return status;
 }
