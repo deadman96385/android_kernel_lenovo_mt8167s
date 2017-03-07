@@ -946,6 +946,12 @@ static int mt8167_codec_get_gain_enum_id(const char *name)
 		return UL_L_PGA_GAIN;
 	if (!strcmp(name, "Audio_PGA2_Setting"))
 		return UL_R_PGA_GAIN;
+	if (!strcmp(name, "Audio Amp Playback Volume"))
+		return HP_L_PGA_GAIN;
+	if (!strcmp(name, "Voice Amp Playback Volume"))
+		return LOUT_PGA_GAIN;
+	if (!strcmp(name, "PGA Capture Volume"))
+		return UL_L_PGA_GAIN;
 	return -EINVAL;
 }
 
@@ -1017,6 +1023,29 @@ static int mt8167_codec_pga_gain_put(struct snd_kcontrol *kcontrol,
 	}
 
 	codec_data->pga_gain[id] = value;
+
+	return 0;
+}
+
+static int mt8167_codec_pga_put_volsw(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int ret = 0;
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+	int id = mt8167_codec_get_gain_enum_id(kcontrol->id.name);
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+
+	ret = snd_soc_put_volsw(kcontrol, ucontrol);
+	if (ret < 0)
+		return ret;
+
+	codec_data->pga_gain[id] = ucontrol->value.integer.value[0];
+
+	if (snd_soc_volsw_is_stereo(mc) && (id+1 < PGA_GAIN_MAX))
+		codec_data->pga_gain[id+1] = ucontrol->value.integer.value[1];
 
 	return 0;
 }
@@ -1171,16 +1200,22 @@ static int mt8167_codec_hp_dc_offsets_put(struct snd_kcontrol *kcontrol,
 
 static const struct snd_kcontrol_new mt8167_codec_controls[] = {
 	/* DL Audio amplifier gain adjustment */
-	SOC_DOUBLE_TLV("Audio Amp Playback Volume",
+	SOC_DOUBLE_EXT_TLV("Audio Amp Playback Volume",
 		AUDIO_CODEC_CON01, 0, 3, 7, 0,
+		snd_soc_get_volsw,
+		mt8167_codec_pga_put_volsw,
 		dl_audio_amp_gain_tlv),
 	/* DL Voice amplifier gain adjustment */
-	SOC_SINGLE_TLV("Voice Amp Playback Volume",
+	SOC_SINGLE_EXT_TLV("Voice Amp Playback Volume",
 		AUDIO_CODEC_CON02, 9, 15, 0,
+		snd_soc_get_volsw,
+		mt8167_codec_pga_put_volsw,
 		dl_voice_amp_gain_tlv),
 	/* UL PGA gain adjustment */
-	SOC_DOUBLE_TLV("PGA Capture Volume",
+	SOC_DOUBLE_EXT_TLV("PGA Capture Volume",
 		AUDIO_CODEC_CON00, 25, 7, 5, 0,
+		snd_soc_get_volsw,
+		mt8167_codec_pga_put_volsw,
 		ul_pga_gain_tlv),
 	/* Headset_PGAL_GAIN */
 	SOC_ENUM_EXT("Headset_PGAL_GAIN",
