@@ -163,7 +163,7 @@ static unsigned int charging_get_csdac_value(void)
 
 	sum =  (((tempC & 0x6) >> 1)<<8) | (tempA << 4) | tempB;
 
-	pr_debug("tempC=%d,tempA=%d,tempB=%d, csdac=%d\n", tempC, tempA, tempB, sum);
+	battery_log(BAT_LOG_FULL, "tempC=%d,tempA=%d,tempB=%d, csdac=%d\n", tempC, tempA, tempB, sum);
 
 	return sum;
 }
@@ -171,7 +171,7 @@ unsigned int charging_value_to_parameter(const unsigned int *parameter, const un
 const unsigned int val)
 {
 	if (val >= array_size) {
-		pr_debug("Can't find the parameter\r\n");
+		battery_log(BAT_LOG_FULL, "Can't find the parameter\r\n");
 		return parameter[0];
 	}
 	return parameter[val];
@@ -181,14 +181,14 @@ const unsigned int val)
 {
 	unsigned int i;
 
-	pr_debug("array_size = %d\r\n", array_size);
+	battery_log(BAT_LOG_FULL, "array_size = %d\r\n", array_size);
 
 	for (i = 0; i < array_size; i++) {
 		if (val == *(parameter + i))
 			return i;
 	}
 
-	pr_debug("NO register value match. val=%d\r\n", val);
+	battery_log(BAT_LOG_FULL, "NO register value match. val=%d\r\n", val);
 	/*TODO: ASSERT(0);*/
 	return 0;
 }
@@ -210,7 +210,7 @@ static unsigned int bmt_find_closest_level(const unsigned int *pList, unsigned i
 				return pList[i];
 		}
 
-		pr_debug("Can't find closest level, small value first \r\n");
+		battery_log(BAT_LOG_FULL, "Can't find closest level, small value first \r\n");
 		return pList[0];
 		/*return CHARGE_CURRENT_0_00_MA;*/
 	} else {
@@ -220,7 +220,7 @@ static unsigned int bmt_find_closest_level(const unsigned int *pList, unsigned i
 				return pList[i];
 		}
 
-		pr_debug("Can't find closest level, large value first\r\n");
+		battery_log(BAT_LOG_FULL, "Can't find closest level, large value first\r\n");
 		return pList[number - 1];
 		/*return CHARGE_CURRENT_0_00_MA;*/
 	}
@@ -295,7 +295,7 @@ static unsigned int charging_dump_register(void *data)
 
 	for (i = reg_num; i <= MT6392_CHR_CON29; i += 2) {
 		reg_val = upmu_get_reg_value(i);
-		pr_debug("Chr Reg[0x%x]=0x%x \r\n", i, reg_val);
+		battery_log(BAT_LOG_FULL, "Chr Reg[0x%x]=0x%x \r\n", i, reg_val);
 	}
 	return status;
 }
@@ -448,10 +448,10 @@ static unsigned int charging_get_charger_det_status(void *data)
 	vchr_val = (((330+39)*100*vchr_val)/39)/100;
 
 	if (vchr_val > 4300) {
-		pr_debug("[CHRDET_SW_WORKAROUND_EN] upmu_is_chr_det=Y (%d)\n", vchr_val);
+		battery_log(BAT_LOG_FULL, "[CHRDET_SW_WORKAROUND_EN] upmu_is_chr_det=Y (%d)\n", vchr_val);
 		*(unsigned int *)data = KAL_TRUE;
 	} else {
-		pr_debug("[CHRDET_SW_WORKAROUND_EN] upmu_is_chr_det=N (%d)\n", vchr_val);
+		battery_log(BAT_LOG_FULL, "[CHRDET_SW_WORKAROUND_EN] upmu_is_chr_det=N (%d)\n", vchr_val);
 		*(unsigned int *)data = KAL_FALSE;
 	}
 #else
@@ -481,14 +481,14 @@ static unsigned int charging_get_charger_type(void *data)
 	wireless_state = mt_get_gpio_in(wireless_charger_gpio_number);
 	if (wireless_state == WIRELESS_CHARGER_EXIST_STATE) {
 		*(CHARGER_TYPE *)(data) = WIRELESS_CHARGER;
-		pr_debug("WIRELESS_CHARGER!\r\n");
+		battery_log(BAT_LOG_FULL, "WIRELESS_CHARGER!\r\n");
 		return status;
 	}
 #endif
 
 	if (g_charger_type != CHARGER_UNKNOWN && g_charger_type != WIRELESS_CHARGER) {
 		*(CHARGER_TYPE *)(data) = g_charger_type;
-		pr_debug("return %d!\r\n", g_charger_type);
+		battery_log(BAT_LOG_FULL, "return %d!\r\n", g_charger_type);
 		return status;
 	}
 
@@ -496,7 +496,7 @@ static unsigned int charging_get_charger_type(void *data)
 	*(CHARGER_TYPE *)(data) = hw_charging_get_charger_type();
 	g_charger_type = *(CHARGER_TYPE *)(data);
 	charging_type_det_done = KAL_TRUE;
-	pr_debug("charging_get_charger_type = %d\r\n", g_charger_type);
+	battery_log(BAT_LOG_FULL, "charging_get_charger_type = %d\r\n", g_charger_type);
 #endif
 	return status;
 }
@@ -513,7 +513,7 @@ static unsigned int charging_get_is_pcm_timer_trigger(void *data)
 	else
 		*(kal_bool *)(data) = KAL_FALSE;
 
-	pr_debug("slp_get_wake_reason=%d\n", slp_get_wake_reason());
+	battery_log(BAT_LOG_FULL, "slp_get_wake_reason=%d\n", slp_get_wake_reason());
 #endif
 	return status;
 }
@@ -524,7 +524,7 @@ static unsigned int charging_set_platform_reset(void *data)
 
 #if defined(CONFIG_POWER_EXT) || defined(CONFIG_MTK_FPGA)
 #else
-	pr_debug("charging_set_platform_reset\n");
+	battery_log(BAT_LOG_FULL, "charging_set_platform_reset\n");
 
 	kernel_restart("battery service reboot system");
 #endif
@@ -539,7 +539,7 @@ static unsigned int charging_get_platform_boot_mode(void *data)
 #else
 	*(unsigned int *)(data) = get_boot_mode();
 
-	pr_debug("get_boot_mode=%d\n", get_boot_mode());
+	battery_log(BAT_LOG_FULL, "get_boot_mode=%d\n", get_boot_mode());
 #endif
 
 	return status;
@@ -551,7 +551,7 @@ static unsigned int charging_set_power_off(void *data)
 
 #if defined(CONFIG_POWER_EXT) || defined(CONFIG_MTK_FPGA)
 #else
-	pr_debug("charging_set_power_off\n");
+	battery_log(BAT_LOG_FULL, "charging_set_power_off\n");
 	kernel_power_off();
 #endif
 
@@ -603,109 +603,109 @@ static unsigned int charging_set_ta_current_pattern(void *data)
 	set_ta_off_current_reg_value = charging_parameter_to_value(CS_VTH, array_size, ta_off_current);
 
 	if (increase == KAL_TRUE) {
-		pr_debug("mtk_ta_increase() start\n");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() start\n");
 
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
 		msleep(50);
 
 		/*patent start*/
 		upmu_set_rg_cs_vth(set_ta_on_current_reg_value);
-		pr_debug("mtk_ta_increase() on 1");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() on 1");
 		msleep(100);
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
-		pr_debug("mtk_ta_increase() off 1");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() off 1");
 		msleep(100);
 
 		upmu_set_rg_cs_vth(set_ta_on_current_reg_value);
-		pr_debug("mtk_ta_increase() on 2");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() on 2");
 		msleep(100);
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
-		pr_debug("mtk_ta_increase() off 2");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() off 2");
 		msleep(100);
 
 		upmu_set_rg_cs_vth(set_ta_on_current_reg_value);
-		pr_debug("mtk_ta_increase() on 3");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() on 3");
 		msleep(300);
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
-		pr_debug("mtk_ta_increase() off 3");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() off 3");
 		msleep(100);
 
 		upmu_set_rg_cs_vth(set_ta_on_current_reg_value);
-		pr_debug("mtk_ta_increase() on 4");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() on 4");
 		msleep(300);
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
-		pr_debug("mtk_ta_increase() off 4");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() off 4");
 		msleep(100);
 
 		upmu_set_rg_cs_vth(set_ta_on_current_reg_value);
-		pr_debug("mtk_ta_increase() on 5");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() on 5");
 		msleep(300);
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
-		pr_debug("mtk_ta_increase() off 5");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() off 5");
 		msleep(100);
 
 		upmu_set_rg_cs_vth(set_ta_on_current_reg_value);
-		pr_debug("mtk_ta_increase() on 6");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() on 6");
 		msleep(500);
 
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
-		pr_debug("mtk_ta_increase() off 6");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() off 6");
 		msleep(50);
 		/*patent end*/
 
-		pr_debug("mtk_ta_increase() end\n");
+		battery_log(BAT_LOG_FULL, "mtk_ta_increase() end\n");
 	} else {
-		pr_debug("mtk_ta_decrease() start\n");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() start\n");
 
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
 		msleep(50);
 
 		/*patent start	*/
 		upmu_set_rg_cs_vth(set_ta_on_current_reg_value);
-		pr_debug("mtk_ta_decrease() on 1");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() on 1");
 		msleep(300);
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
-		pr_debug("mtk_ta_decrease() off 1");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() off 1");
 		msleep(100);
 
 		upmu_set_rg_cs_vth(set_ta_on_current_reg_value);
-		pr_debug("mtk_ta_decrease() on 2");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() on 2");
 		msleep(300);
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
-		pr_debug("mtk_ta_decrease() off 2");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() off 2");
 		msleep(100);
 
 		upmu_set_rg_cs_vth(set_ta_on_current_reg_value);
-		pr_debug("mtk_ta_decrease() on 3");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() on 3");
 		msleep(300);
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
-		pr_debug("mtk_ta_decrease() off 3");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() off 3");
 		msleep(100);
 
 		upmu_set_rg_cs_vth(set_ta_on_current_reg_value);
-		pr_debug("mtk_ta_decrease() on 4");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() on 4");
 		msleep(100);
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
-		pr_debug("mtk_ta_decrease() off 4");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() off 4");
 		msleep(100);
 
 		upmu_set_rg_cs_vth(set_ta_on_current_reg_value);
-		pr_debug("mtk_ta_decrease() on 5");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() on 5");
 		msleep(100);
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
-		pr_debug("mtk_ta_decrease() off 5");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() off 5");
 		msleep(100);
 
 		upmu_set_rg_cs_vth(set_ta_on_current_reg_value);
-		pr_debug("mtk_ta_decrease() on 6");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() on 6");
 		msleep(500);
 
 		upmu_set_rg_cs_vth(set_ta_off_current_reg_value);
-		pr_debug("mtk_ta_decrease() off 6");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() off 6");
 		msleep(50);
 		/*patent end*/
 
-		pr_debug("mtk_ta_decrease() end\n");
+		battery_log(BAT_LOG_FULL, "mtk_ta_decrease() end\n");
 	}
 
 	return status;
@@ -738,7 +738,7 @@ void set_vusb_auxadc_irq(bool enable, bool flag)
 		mt_auxadc_disableBackgroundDection(DISO_IRQ.vusb_measure_channel.number);
 	}
 #endif
-	pr_debug(" [%s] enable: %d, flag: %d!\n", __func__, enable, flag);
+	battery_log(BAT_LOG_FULL, " [%s] enable: %d, flag: %d!\n", __func__, enable, flag);
 }
 
 void set_vdc_auxadc_irq(bool enable, bool flag)
@@ -767,7 +767,7 @@ void set_vdc_auxadc_irq(bool enable, bool flag)
 		mt_auxadc_disableBackgroundDection(DISO_IRQ.vdc_measure_channel.number);
 	}
 #endif
-	pr_debug(" [%s] enable: %d, flag: %d!\n", __func__, enable, flag);
+	battery_log(BAT_LOG_FULL, " [%s] enable: %d, flag: %d!\n", __func__, enable, flag);
 }
 
 #if !defined(MTK_AUXADC_IRQ_SUPPORT)
@@ -781,11 +781,12 @@ static void diso_polling_handler(struct work_struct *work)
 	else if (DISO_Polling.vusb_polling_measure.notify_irq_en)
 		trigger_channel = AP_AUXADC_DISO_VUSB_CHANNEL;
 
-	pr_debug("[DISO]auxadc handler triggered\n");
+	battery_log(BAT_LOG_FULL, "[DISO]auxadc handler triggered\n");
 	switch (trigger_channel) {
 	case AP_AUXADC_DISO_VDC_CHANNEL:
 		trigger_flag = DISO_Polling.vdc_polling_measure.notify_irq;
-		pr_debug("[DISO]VDC IRQ triggered, channel ==%d, flag ==%d\n", trigger_channel, trigger_flag);
+		battery_log(BAT_LOG_FULL, "[DISO]VDC IRQ triggered, channel ==%d, flag ==%d\n",
+			trigger_channel, trigger_flag);
 #ifdef MTK_DISCRETE_SWITCH /*for DSC DC plugin handle */
 		set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
 		set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
@@ -797,7 +798,7 @@ static void diso_polling_handler(struct work_struct *work)
 			DISO_data.diso_state.cur_vusb_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_vdc_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_otg_state  = DISO_OFFLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[2]);
+			battery_log(BAT_LOG_FULL, " cur diso_state is %s!\n", DISO_state_s[2]);
 		}
 #else /*for load switch OTG leakage handle*/
 		set_vdc_auxadc_irq(DISO_IRQ_ENABLE, (~trigger_flag) & 0x1);
@@ -808,7 +809,7 @@ static void diso_polling_handler(struct work_struct *work)
 			DISO_data.diso_state.cur_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.cur_vdc_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_otg_state  = DISO_ONLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[5]);
+			battery_log(BAT_LOG_FULL, " cur diso_state is %s!\n", DISO_state_s[5]);
 		} else if (trigger_flag == DISO_IRQ_FALLING) {
 			DISO_data.diso_state.pre_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.pre_vdc_state  = DISO_ONLINE;
@@ -816,14 +817,15 @@ static void diso_polling_handler(struct work_struct *work)
 			DISO_data.diso_state.cur_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.cur_vdc_state  = DISO_OFFLINE;
 			DISO_data.diso_state.cur_otg_state  = DISO_ONLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[1]);
+			battery_log(BAT_LOG_FULL, " cur diso_state is %s!\n", DISO_state_s[1]);
 		} else
-			pr_debug("[%s] wrong trigger flag!\n", __func__);
+			battery_log(BAT_LOG_FULL, "[%s] wrong trigger flag!\n", __func__);
 #endif
 		break;
 	case AP_AUXADC_DISO_VUSB_CHANNEL:
 		trigger_flag = DISO_Polling.vusb_polling_measure.notify_irq;
-		pr_debug("[DISO]VUSB IRQ triggered, channel ==%d, flag ==%d\n", trigger_channel, trigger_flag);
+		battery_log(BAT_LOG_FULL, "[DISO]VUSB IRQ triggered, channel ==%d, flag ==%d\n",
+			trigger_channel, trigger_flag);
 		set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
 		set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
 		if (trigger_flag == DISO_IRQ_FALLING) {
@@ -833,7 +835,7 @@ static void diso_polling_handler(struct work_struct *work)
 			DISO_data.diso_state.cur_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.cur_vdc_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_otg_state  = DISO_OFFLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[4]);
+			battery_log(BAT_LOG_FULL, " cur diso_state is %s!\n", DISO_state_s[4]);
 		} else if (trigger_flag == DISO_IRQ_RISING) {
 			DISO_data.diso_state.pre_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.pre_vdc_state  = DISO_ONLINE;
@@ -841,20 +843,20 @@ static void diso_polling_handler(struct work_struct *work)
 			DISO_data.diso_state.cur_vusb_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_vdc_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_otg_state  = DISO_OFFLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[6]);
+			battery_log(BAT_LOG_FULL, " cur diso_state is %s!\n", DISO_state_s[6]);
 		} else
-			pr_debug("[%s] wrong trigger flag!\n", __func__);
+			battery_log(BAT_LOG_FULL, "[%s] wrong trigger flag!\n", __func__);
 			set_vusb_auxadc_irq(DISO_IRQ_ENABLE, (~trigger_flag)&0x1);
 		break;
 	default:
 		set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
 		set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
-		pr_debug("[DISO]VUSB auxadc IRQ triggered ERROR OR TEST\n");
+		battery_log(BAT_LOG_FULL, "[DISO]VUSB auxadc IRQ triggered ERROR OR TEST\n");
 		return; /* in error or unexecpt state just return */
 	}
 
 	g_diso_state = *(int *)&DISO_data.diso_state;
-	pr_debug("[DISO]g_diso_state: 0x%x\n", g_diso_state);
+	battery_log(BAT_LOG_FULL, "[DISO]g_diso_state: 0x%x\n", g_diso_state);
 	DISO_data.irq_callback_func(0, NULL);
 }
 #else
@@ -864,11 +866,12 @@ static irqreturn_t diso_auxadc_irq_handler(int irq, void *dev_id)
 	int trigger_flag = -1;
 
 	trigger_channel = mt_auxadc_getCurrentChannel();
-	pr_debug("[DISO]auxadc handler triggered\n");
+	battery_log(BAT_LOG_FULL, "[DISO]auxadc handler triggered\n");
 	switch (trigger_channel) {
 	case AP_AUXADC_DISO_VDC_CHANNEL:
 		trigger_flag = mt_auxadc_getCurrentTrigger();
-		pr_debug("[DISO]VDC IRQ triggered, channel ==%d, flag ==%d\n", trigger_channel, trigger_flag);
+		battery_log(BAT_LOG_FULL, "[DISO]VDC IRQ triggered, channel ==%d, flag ==%d\n",
+			trigger_channel, trigger_flag);
 #ifdef MTK_DISCRETE_SWITCH /*for DSC DC plugin handle */
 		set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
 		set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
@@ -880,7 +883,7 @@ static irqreturn_t diso_auxadc_irq_handler(int irq, void *dev_id)
 			DISO_data.diso_state.cur_vusb_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_vdc_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_otg_state  = DISO_OFFLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[2]);
+			battery_log(BAT_LOG_FULL, " cur diso_state is %s!\n", DISO_state_s[2]);
 		}
 #else /*for load switch OTG leakage handle*/
 		set_vdc_auxadc_irq(DISO_IRQ_ENABLE, (~trigger_flag) & 0x1);
@@ -891,7 +894,7 @@ static irqreturn_t diso_auxadc_irq_handler(int irq, void *dev_id)
 			DISO_data.diso_state.cur_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.cur_vdc_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_otg_state  = DISO_ONLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[5]);
+			battery_log(BAT_LOG_FULL, " cur diso_state is %s!\n", DISO_state_s[5]);
 			} else {
 			DISO_data.diso_state.pre_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.pre_vdc_state  = DISO_ONLINE;
@@ -899,13 +902,14 @@ static irqreturn_t diso_auxadc_irq_handler(int irq, void *dev_id)
 			DISO_data.diso_state.cur_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.cur_vdc_state  = DISO_OFFLINE;
 			DISO_data.diso_state.cur_otg_state  = DISO_ONLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[1]);
+			battery_log(BAT_LOG_FULL, " cur diso_state is %s!\n", DISO_state_s[1]);
 		}
 #endif
 		break;
 	case AP_AUXADC_DISO_VUSB_CHANNEL:
 		trigger_flag = mt_auxadc_getCurrentTrigger();
-		pr_debug("[DISO]VUSB IRQ triggered, channel ==%d, flag ==%d\n", trigger_channel, trigger_flag);
+		battery_log(BAT_LOG_FULL, "[DISO]VUSB IRQ triggered, channel ==%d, flag ==%d\n",
+			trigger_channel, trigger_flag);
 		set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
 		set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
 		if (trigger_flag == DISO_IRQ_FALLING) {
@@ -915,7 +919,7 @@ static irqreturn_t diso_auxadc_irq_handler(int irq, void *dev_id)
 			DISO_data.diso_state.cur_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.cur_vdc_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_otg_state  = DISO_OFFLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[4]);
+			battery_log(BAT_LOG_FULL, " cur diso_state is %s!\n", DISO_state_s[4]);
 		} else {
 			DISO_data.diso_state.pre_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.pre_vdc_state  = DISO_ONLINE;
@@ -923,14 +927,14 @@ static irqreturn_t diso_auxadc_irq_handler(int irq, void *dev_id)
 			DISO_data.diso_state.cur_vusb_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_vdc_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_otg_state  = DISO_OFFLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[6]);
+			battery_log(BAT_LOG_FULL, " cur diso_state is %s!\n", DISO_state_s[6]);
 		}
 		set_vusb_auxadc_irq(DISO_IRQ_ENABLE, (~trigger_flag)&0x1);
 		break;
 	default:
 		set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
 		set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
-		pr_debug("[DISO]VUSB auxadc IRQ triggered ERROR OR TEST\n");
+		battery_log(BAT_LOG_FULL, "[DISO]VUSB auxadc IRQ triggered ERROR OR TEST\n");
 		return IRQ_HANDLED; /* in error or unexecpt state just return */
 	}
 	g_diso_state = *(int *)&DISO_data.diso_state;
@@ -943,7 +947,7 @@ static unsigned int diso_get_current_voltage(int Channel)
 	int ret = 0, data[4], i, ret_value = 0, ret_temp = 0, times = 5;
 
 	if (IMM_IsAdcInitReady() == 0) {
-		pr_debug("[DISO] AUXADC is not ready");
+		battery_log(BAT_LOG_FULL, "[DISO] AUXADC is not ready");
 		return 0;
 	}
 
@@ -954,7 +958,7 @@ static unsigned int diso_get_current_voltage(int Channel)
 			ret += ret_temp;
 		} else {
 			times = times > 1 ? times - 1 : 1;
-			pr_debug("[diso_get_current_voltage] ret_value=%d, times=%d\n",
+			battery_log(BAT_LOG_FULL, "[diso_get_current_voltage] ret_value=%d, times=%d\n",
 			ret_value, times);
 		}
 	}
@@ -975,7 +979,7 @@ static void _get_diso_interrupt_state(void)
 
 	vol = diso_get_current_voltage(AP_AUXADC_DISO_VDC_CHANNEL);
 	vol = (R_DISO_DC_PULL_UP + R_DISO_DC_PULL_DOWN)*100*vol/(R_DISO_DC_PULL_DOWN)/100;
-	pr_debug("[DISO]	Current DC voltage mV = %d\n", vol);
+	battery_log(BAT_LOG_FULL, "[DISO]	Current DC voltage mV = %d\n", vol);
 
 	/* force delay for switching as no flag for check switching done */
 	mdelay(SWITCH_RISING_TIMING + LOAD_SWITCH_TIMING_MARGIN);
@@ -987,7 +991,7 @@ static void _get_diso_interrupt_state(void)
 
 	vol = diso_get_current_voltage(AP_AUXADC_DISO_VUSB_CHANNEL);
 	vol = (R_DISO_VBUS_PULL_UP + R_DISO_VBUS_PULL_DOWN)*100*vol/(R_DISO_VBUS_PULL_DOWN)/100;
-	pr_debug("[DISO]	Current VBUS voltage  mV = %d\n", vol);
+	battery_log(BAT_LOG_FULL, "[DISO]	Current VBUS voltage  mV = %d\n", vol);
 
 	if (vol > VBUS_MIN_VOLTAGE/1000 && vol < VBUS_MAX_VOLTAGE/1000) {
 		if (!mt_usb_is_device()) {
@@ -1001,7 +1005,7 @@ static void _get_diso_interrupt_state(void)
 	} else {
 		diso_state &= 0x4; /*SET OTG and VBUS bit as 0*/
 	}
-	pr_debug("[DISO] DISO_STATE==0x%x\n", diso_state);
+	battery_log(BAT_LOG_FULL, "[DISO] DISO_STATE==0x%x\n", diso_state);
 	g_diso_state = diso_state;
 }
 #if !defined(MTK_AUXADC_IRQ_SUPPORT)
@@ -1061,11 +1065,11 @@ static void _get_polling_state(void)
 	if (VDC_Polling->notify_irq_en &&
 	(vdc_vol_dir == VDC_Polling->notify_irq)) {
 		schedule_delayed_work(&diso_polling_work, 10*HZ/1000); /*10ms*/
-		pr_debug("[%s] ready to trig VDC irq, irq: %d\n",
+		battery_log(BAT_LOG_FULL, "[%s] ready to trig VDC irq, irq: %d\n",
 		__func__, VDC_Polling->notify_irq);
 	} else if (VUSB_Polling->notify_irq_en && (vusb_vol_dir == VUSB_Polling->notify_irq)) {
 		schedule_delayed_work(&diso_polling_work, 10*HZ/1000);
-		pr_debug("[%s] ready to trig VUSB irq, irq: %d\n",
+		battery_log(BAT_LOG_FULL, "[%s] ready to trig VUSB irq, irq: %d\n",
 		__func__, VUSB_Polling->notify_irq);
 	} else if ((vdc_vol == 0) && (vusb_vol == 0)) {
 		VDC_Polling->notify_irq_en = 0;
@@ -1145,7 +1149,7 @@ static unsigned int charging_diso_init(void *data)
 	INIT_DELAYED_WORK(&diso_polling_work, diso_polling_handler);
 
 	kthread_run(diso_thread_kthread, NULL, "diso_thread_kthread");
-	pr_debug("[%s] done\n", __func__);
+	battery_log(BAT_LOG_FULL, "[%s] done\n", __func__);
 #else
 	struct device_node *node;
 	int ret;
@@ -1166,10 +1170,10 @@ static unsigned int charging_diso_init(void *data)
 
 	node = of_find_compatible_node(NULL, NULL, "mediatek,AUXADC");
 	if (!node) {
-		pr_debug("[diso_adc]: of_find_compatible_node failed!!\n");
+		battery_log(BAT_LOG_FULL, "[diso_adc]: of_find_compatible_node failed!!\n");
 	} else {
 		pDISO_data->irq_line_number = irq_of_parse_and_map(node, 0);
-		pr_debug("[diso_adc]: IRQ Number: 0x%x\n", pDISO_data->irq_line_number);
+		battery_log(BAT_LOG_FULL, "[diso_adc]: IRQ Number: 0x%x\n", pDISO_data->irq_line_number);
 	}
 
 	mt_irq_set_sens(pDISO_data->irq_line_number, MT_EDGE_SENSITIVE);
@@ -1179,11 +1183,11 @@ static unsigned int charging_diso_init(void *data)
 	pDISO_data->irq_callback_func, IRQF_ONESHOT, "DISO_ADC_IRQ", NULL);
 
 	if (ret) {
-		pr_debug("[diso_adc]: request_irq failed.\n");
+		battery_log(BAT_LOG_FULL, "[diso_adc]: request_irq failed.\n");
 	} else {
 		set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
 		set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
-		pr_debug("[diso_adc]: diso_init success.\n");
+		battery_log(BAT_LOG_FULL, "[diso_adc]: diso_init success.\n");
 	}
 #endif
 #endif
@@ -1201,7 +1205,7 @@ static unsigned int charging_get_diso_state(void *data)
 
 	_get_diso_interrupt_state();
 	diso_state = g_diso_state;
-	pr_debug("[do_chrdet_int_task] current diso state is %s!\n", DISO_state_s[diso_state]);
+	battery_log(BAT_LOG_FULL, "[do_chrdet_int_task] current diso state is %s!\n", DISO_state_s[diso_state]);
 	if (((diso_state >> 1) & 0x3) != 0x0) {
 		switch (diso_state) {
 		case USB_ONLY:
@@ -1241,7 +1245,7 @@ static unsigned int charging_get_diso_state(void *data)
 			pDISO_data->diso_state.cur_vusb_state = DISO_OFFLINE;
 			pDISO_data->diso_state.cur_vdc_state = DISO_OFFLINE;
 			pDISO_data->diso_state.cur_otg_state = DISO_ONLINE;
-			pr_debug(" switch load vcdt irq triggerd by OTG Boost!\n");
+			battery_log(BAT_LOG_FULL, " switch load vcdt irq triggerd by OTG Boost!\n");
 			break; /*OTG plugin no need battery sync action*/
 		}
 	}
