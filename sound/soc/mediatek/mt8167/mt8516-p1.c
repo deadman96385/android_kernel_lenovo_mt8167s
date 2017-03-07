@@ -516,6 +516,10 @@ static const struct snd_soc_dapm_widget mt8516_p1_dapm_widgets[] = {
 
 static const struct snd_soc_dapm_route mt8516_p1_audio_map[] = {
 	{"2ND I2S Capture", NULL, "External Line In"},
+
+	/* ADDA clock - Uplink */
+	{"AIF TX", NULL, "AFE_CLK"},
+	{"AIF TX", NULL, "AD_CLK"},
 };
 
 static int mt8516_p1_suspend_post(struct snd_soc_card *card)
