@@ -448,6 +448,19 @@ static struct snd_soc_dai_link mt8516_p1_dais[] = {
 		.dynamic = 1,
 		.dpcm_capture = 1,
 	},
+	{
+		.name = "DL1 Playback",
+		.stream_name = "MultiMedia1_PLayback",
+		.cpu_dai_name = "DL1",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.trigger = {
+			SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST
+		},
+		.dynamic = 1,
+		.dpcm_playback = 1,
+	},
 	/* Backend End DAI links */
 	{
 		.name = "HDMI BE",
@@ -485,6 +498,15 @@ static struct snd_soc_dai_link mt8516_p1_dais[] = {
 		.dai_fmt = SND_SOC_DAIFMT_LEFT_J | SND_SOC_DAIFMT_IB_IF |
 			   SND_SOC_DAIFMT_CBS_CFS,
 		.dpcm_capture = 1,
+	},
+	{
+		.name = "EXT DAC",
+		.cpu_dai_name = "I2S",
+		.no_pcm = 1,
+		.codec_dai_name = "cs4382a-i2s",
+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+			   SND_SOC_DAIFMT_CBS_CFS,
+		.dpcm_playback = 1,
 	},
 };
 
