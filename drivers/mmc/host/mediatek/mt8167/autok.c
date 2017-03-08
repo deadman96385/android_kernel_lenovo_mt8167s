@@ -31,7 +31,7 @@
 #define TUNE_DATA_TX_ADDR               (-33-32768)
 #define CMDQ
 #define AUTOK_LATCH_CK_EMMC_TUNE_TIMES  (10) /* 5.0IP eMMC 1KB fifo ZIZE */
-#define AUTOK_LATCH_CK_SDIO_TUNE_TIMES  (3)  /* 4.5IP SDIO 128fifo ZIZE */
+#define AUTOK_LATCH_CK_SDIO_TUNE_TIMES  (20)  /* 4.5IP SDIO 128fifo ZIZE */
 #define AUTOK_LATCH_CK_SD_TUNE_TIMES    (3)  /* 4.5IP SD 128fifo ZIZE */
 #define AUTOK_CMD_TIMES                 (20)
 #define AUTOK_TUNING_INACCURACY         (3)  /* scan result may find xxxxooxxx */
@@ -456,17 +456,10 @@ static int autok_send_tune_cmd(struct msdc_host *host, unsigned int opcode, enum
 		if (tune_type_value == TUNE_LATCH_CK) {
 			fifo_have = msdc_rxfifocnt();
 			if ((opcode == MMC_SEND_TUNING_BLOCK_HS200) || (opcode == MMC_READ_SINGLE_BLOCK)
-				|| (opcode == MMC_SEND_EXT_CSD)) {
+				|| (opcode == MMC_SEND_EXT_CSD) || (opcode == MMC_SEND_TUNING_BLOCK)) {
 				MSDC_SET_FIELD(MSDC_DBG_SEL, 0xffff << 0, 0x0b);
 				MSDC_GET_FIELD(MSDC_DBG_OUT, 0x7ff << 0, fifo_1k_cnt);
 				if ((fifo_1k_cnt >= MSDC_FIFO_THD_1K) && (fifo_have >= MSDC_FIFO_SZ)) {
-					value = MSDC_READ32(MSDC_RXDATA);
-					value = MSDC_READ32(MSDC_RXDATA);
-					value = MSDC_READ32(MSDC_RXDATA);
-					value = MSDC_READ32(MSDC_RXDATA);
-				}
-			} else if (opcode == MMC_SEND_TUNING_BLOCK) {
-				if (fifo_have >= MSDC_FIFO_SZ) {
 					value = MSDC_READ32(MSDC_RXDATA);
 					value = MSDC_READ32(MSDC_RXDATA);
 					value = MSDC_READ32(MSDC_RXDATA);

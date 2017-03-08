@@ -615,8 +615,7 @@ void msdc_set_smpl_all(struct msdc_host *host, u32 clock_mode)
 /*host doesn't need the clock on*/
 void msdc_gate_clock(struct msdc_host *host)
 {
-	clk_disable(host->bus_clk_ctrl);
-	clk_disable(host->src_clk_ctrl);
+	clk_disable(host->clock_control);
 }
 
 /* host does need the clock on */
@@ -624,8 +623,7 @@ void msdc_ungate_clock(struct msdc_host *host)
 {
 	void __iomem *base = host->base;
 
-	clk_enable(host->src_clk_ctrl);
-	clk_enable(host->bus_clk_ctrl);
+	clk_enable(host->clock_control);
 	while (!(MSDC_READ32(MSDC_CFG) & MSDC_CFG_CKSTB))
 		cpu_relax();
 }
@@ -816,7 +814,6 @@ void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
 		}
 	}
 
-	msdc_ungate_clock(host);
 	MSDC_SET_FIELD(MSDC_CFG, MSDC_CFG_CKMOD | MSDC_CFG_CKDIV, (mode << 12) | (div & 0xfff));
 	MSDC_SET_BIT32(MSDC_CFG, MSDC_CFG_CKPDN);
 	while (!(MSDC_READ32(MSDC_CFG) & MSDC_CFG_CKSTB))
@@ -1172,10 +1169,8 @@ end:
 			pr_err("msdc%d -> MSDC Device Request Suspend\n",
 				host->id);
 		}
-		msdc_gate_clock(host);
-	} else {
-		msdc_gate_clock(host);
 	}
+	msdc_gate_clock(host);
 
 	if (host->hw->host_function == MSDC_SDIO) {
 		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
@@ -2708,6 +2703,11 @@ void msdc_sdio_restore_after_resume(struct msdc_host *host)
 				host->saved_para.hz);
 			host->saved_para.suspend_flag = 0;
 			msdc_restore_timing_setting(host);
+			if (host->is_autok_done) {
+				ERR_MSG("msdc restore autok parameters\n");
+				autok_init_sdr104(host);
+				autok_tuning_parameter_init(host, sdio_autok_res[AUTOK_VCORE_HIGH]);
+			}
 		}
 	}
 }
@@ -5050,7 +5050,7 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
 		spin_lock(&host->sdio_irq_lock);
 
 	if (host->core_clkon == 0) {
-		msdc_gate_clock(host);
+		/* msdc_gate_clock(host); */
 		host->core_clkon = 1;
 		MSDC_SET_FIELD(MSDC_CFG, MSDC_CFG_MODE, MSDC_SDMMC);
 	}
@@ -5753,10 +5753,9 @@ static int msdc_drv_remove(struct platform_device *pdev)
 	ERR_MSG("msdc_drv_remove");
 #ifndef FPGA_PLATFORM
 	/* clock unprepare */
-	if (host->bus_clk_ctrl)
-		clk_unprepare(host->bus_clk_ctrl);
-	if (host->src_clk_ctrl)
-		clk_unprepare(host->src_clk_ctrl);
+	if (host->clock_control)
+		clk_disable_unprepare(host->clock_control);
+
 #endif
 	platform_set_drvdata(pdev, NULL);
 	mmc_remove_host(host->mmc);
@@ -5806,7 +5805,7 @@ static int msdc_drv_suspend(struct platform_device *pdev, pm_message_t state)
 			msdc_pm(state, (void *)host);
 		} else {
 			/* WIFI slot should be off when enter suspend */
-			msdc_gate_clock(host);
+			/* msdc_gate_clock(host); */
 			if (host->error == -EBUSY) {
 				ret = host->error;
 				host->error = 0;
@@ -5832,11 +5831,15 @@ static int msdc_drv_suspend(struct platform_device *pdev, pm_message_t state)
 					host->error = 0;
 				}
 			}
+			msdc_ungate_clock(host);
 			ERR_MSG("msdc suspend cur_cfg=%x, save_cfg=%x, cur_hz=%d",
 				MSDC_READ32(MSDC_CFG),
 				host->saved_para.msdc_cfg, host->mclk);
+			msdc_gate_clock(host);
 		}
 	}
+	if (host->clock_control)
+		clk_disable_unprepare(host->clock_control);
 	return ret;
 }
 
@@ -5846,6 +5849,8 @@ static int msdc_drv_resume(struct platform_device *pdev)
 	struct msdc_host *host = mmc_priv(mmc);
 	struct pm_message state;
 
+	if (host->clock_control)
+		clk_prepare_enable(host->clock_control);
 	if (host->hw->flags & MSDC_SDIO_IRQ)
 		pr_err("msdc msdc_drv_resume\n");
 	state.event = PM_EVENT_RESUME;

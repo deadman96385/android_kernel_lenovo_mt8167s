@@ -461,8 +461,7 @@ struct msdc_host {
 	void    (*power_switch)(struct msdc_host *host, u32 on);
 	u32                     vmc_cal_default;
 
-	struct clk *src_clk_ctrl;
-	struct clk *bus_clk_ctrl;
+	struct clk *clock_control;
 	struct delayed_work	work_init; /* for init mmc card */
 	struct platform_device  *pdev;
 	struct pinctrl *pinctrl;
