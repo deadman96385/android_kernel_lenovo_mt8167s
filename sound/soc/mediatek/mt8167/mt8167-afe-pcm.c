@@ -2386,6 +2386,44 @@ static struct snd_soc_dai_driver *mt8167_afe_get_dai_drv_by_id(unsigned int id)
 	return NULL;
 }
 
+static int mt8167_afe_set_memif_irq_by_mode(struct mt8167_afe_memif_data *data,
+			unsigned int mode)
+{
+	int ret = 0;
+
+	if (data == NULL)
+		return -EINVAL;
+	switch (mode) {
+	case MT8167_AFE_IRQ_1:
+		data->irq_reg_cnt = AFE_IRQ_CNT1;
+		data->irq_cnt_shift = 0;
+		data->irq_mode = MT8167_AFE_IRQ_1;
+		data->irq_fs_reg = AFE_IRQ_MCU_CON;
+		data->irq_fs_shift = 4;
+		data->irq_clr_shift = 0;
+		break;
+	case MT8167_AFE_IRQ_2:
+		data->irq_reg_cnt = AFE_IRQ_CNT2;
+		data->irq_cnt_shift = 0;
+		data->irq_mode = MT8167_AFE_IRQ_2;
+		data->irq_fs_reg = AFE_IRQ_MCU_CON;
+		data->irq_fs_shift = 8;
+		data->irq_clr_shift = 1;
+		break;
+	case MT8167_AFE_IRQ_7:
+		data->irq_reg_cnt = AFE_IRQ_CNT7;
+		data->irq_cnt_shift = 0;
+		data->irq_mode = MT8167_AFE_IRQ_7;
+		data->irq_fs_reg = AFE_IRQ_MCU_CON;
+		data->irq_fs_shift = 24;
+		data->irq_clr_shift = 6;
+		break;
+	default:
+		ret = -EINVAL;
+	}
+	return ret;
+}
+
 static const struct snd_kcontrol_new mt8167_afe_o00_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I05 Switch", AFE_CONN0, 5, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I07 Switch", AFE_CONN0, 7, 1, 0),
@@ -2719,7 +2757,7 @@ static const char *aud_clks[MT8167_CLK_NUM] = {
 };
 #endif
 
-static const struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
+static struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
 	{
 		.name = "DL1",
 		.id = MT8167_AFE_MEMIF_DL1,
@@ -3105,6 +3143,13 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 			drv->symmetric_samplebits = 1;
 		}
 	}
+
+	if (of_property_read_u32(np, "mediatek,awb-irq-mode", &afe->awb_irq_mode))
+		afe->awb_irq_mode = MT8167_AFE_IRQ_2;
+
+	if (afe->awb_irq_mode != memif_data[MT8167_AFE_MEMIF_AWB].irq_mode)
+		mt8167_afe_set_memif_irq_by_mode(&memif_data[MT8167_AFE_MEMIF_AWB],
+						 afe->awb_irq_mode);
 
 	ret = snd_soc_register_platform(&pdev->dev, &mt8167_afe_pcm_platform);
 	if (ret)
