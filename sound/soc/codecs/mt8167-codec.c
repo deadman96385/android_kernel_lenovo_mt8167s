@@ -77,6 +77,7 @@ struct mt8167_codec_priv {
 	uint32_t dmic_wire_mode;
 	uint32_t headphone_cap_sel;
 	uint32_t loopback_type;
+	uint32_t ul_lr_swap_en;
 	struct clk *clk;
 #ifdef TIMESTAMP_INFO
 	uint64_t latency_cali_ldac_to_op;
@@ -1190,6 +1191,35 @@ static int mt8167_codec_hp_dc_offsets_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+/* Uplink LR Swap */
+static int mt8167_codec_ul_lr_swap_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+
+	ucontrol->value.integer.value[0] = codec_data->ul_lr_swap_en;
+
+	return 0;
+}
+
+static int mt8167_codec_ul_lr_swap_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+
+	codec_data->ul_lr_swap_en = ucontrol->value.integer.value[0];
+
+	snd_soc_update_bits(codec_data->codec,
+		ABB_AFE_CON2, BIT(8), codec_data->ul_lr_swap_en << 8);
+
+	return 0;
+}
+
+
 #define MT8167_CODEC_CONTROL(xname, xhandler_info, xhandler_get, xhandler_put)\
 {\
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = (xname),\
@@ -1252,6 +1282,11 @@ static const struct snd_kcontrol_new mt8167_codec_controls[] = {
 		mt8167_codec_hp_dc_offsets_info,
 		mt8167_codec_hp_dc_offsets_get,
 		mt8167_codec_hp_dc_offsets_put),
+	/* Uplink LR Swap */
+	SOC_SINGLE_BOOL_EXT("Uplink LR Swap Switch",
+		0,
+		mt8167_codec_ul_lr_swap_get,
+		mt8167_codec_ul_lr_swap_put),
 };
 
 /* Left PGA Mux/Right PGA Mux */
