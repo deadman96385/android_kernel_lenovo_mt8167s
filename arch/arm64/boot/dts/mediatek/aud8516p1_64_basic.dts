@@ -158,7 +158,6 @@
 		compatible = "kd,kd070d5450nha6";
 		pinctrl-names = "default";
 		gpio_lcd_pwr = <&pio 50 0>;
-		gpio_lcd_rst = <&pio 70 0>;
 		reg-lcm-supply = <&mt6392_vgp2_reg>;
 		status = "okay";
 	};
