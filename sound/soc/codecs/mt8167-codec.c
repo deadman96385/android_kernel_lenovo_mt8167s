@@ -29,6 +29,7 @@
 #endif
 
 #define HP_CALI_ITEMS    (HP_CALI_NUMS * HP_PGA_GAIN_NUMS)
+#define DMIC_PHASE_NUM   (8)
 
 enum regmap_module_id {
 	REGMAP_AFE = 0,
@@ -42,6 +43,17 @@ enum regmap_module_id {
 enum dmic_wire_mode {
 	DMIC_ONE_WIRE = 0,
 	DMIC_TWO_WIRE,
+};
+
+enum dmic_rate_mode {
+	DMIC_RATE_D1P625M = 0,
+	DMIC_RATE_D3P25M,
+};
+
+enum dmic_ch_mode {
+	DMIC_L_CH = 0,
+	DMIC_R_CH,
+	DMIC_CH_NUM,
 };
 
 enum headphone_cap_sel {
@@ -75,6 +87,8 @@ struct mt8167_codec_priv {
 	bool is_rch_dc_calibrated;
 	uint32_t pga_gain[PGA_GAIN_MAX];
 	uint32_t dmic_wire_mode;
+	uint32_t dmic_ch_phase[DMIC_CH_NUM];
+	uint32_t dmic_rate_mode; /* 0: 1.625MHz, 1: 3.25MHz */
 	uint32_t headphone_cap_sel;
 	uint32_t loopback_type;
 	uint32_t ul_lr_swap_en;
@@ -251,9 +265,21 @@ static int mt8167_codec_dmic_event(struct snd_soc_dapm_widget *w,
 	uint32_t abb_afe_con9_val = 0;
 	uint32_t audio_codec_con03_val = 0;
 
+	/* wire mode */
 	if (codec_data->dmic_wire_mode == DMIC_TWO_WIRE)
 		abb_afe_con9_val |=
 			ABB_AFE_CON9_TWO_WIRE_EN;
+
+	/* clock rate */
+	if (codec_data->dmic_rate_mode == DMIC_RATE_D3P25M)
+		abb_afe_con9_val |=
+			ABB_AFE_CON9_D3P25M_SEL;
+
+	/* latch phase */
+	abb_afe_con9_val |=
+		(codec_data->dmic_ch_phase[DMIC_L_CH] << 13);
+	abb_afe_con9_val |=
+		(codec_data->dmic_ch_phase[DMIC_R_CH] << 10);
 
 	abb_afe_con9_val |=
 		ABB_AFE_CON9_DIG_MIC_EN;
@@ -1219,6 +1245,53 @@ static int mt8167_codec_ul_lr_swap_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+/* Dmic Ch Phase */
+static int mt8167_codec_dmic_ch_phase_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+
+	ucontrol->value.integer.value[0] = codec_data->dmic_ch_phase[DMIC_L_CH];
+	ucontrol->value.integer.value[1] = codec_data->dmic_ch_phase[DMIC_R_CH];
+	return 0;
+}
+
+static int mt8167_codec_dmic_ch_phase_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+
+	codec_data->dmic_ch_phase[DMIC_L_CH] = ucontrol->value.integer.value[0];
+	codec_data->dmic_ch_phase[DMIC_R_CH] = ucontrol->value.integer.value[1];
+	return 0;
+}
+
+/* Dmic Rate Mode */
+static int mt8167_codec_dmic_rate_mode_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+
+	ucontrol->value.integer.value[0] = codec_data->dmic_rate_mode;
+	return 0;
+}
+
+static int mt8167_codec_dmic_rate_mode_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct mt8167_codec_priv *codec_data =
+			snd_soc_component_get_drvdata(component);
+
+	codec_data->dmic_rate_mode = ucontrol->value.integer.value[0];
+	return 0;
+}
 
 #define MT8167_CODEC_CONTROL(xname, xhandler_info, xhandler_get, xhandler_put)\
 {\
@@ -1287,6 +1360,16 @@ static const struct snd_kcontrol_new mt8167_codec_controls[] = {
 		0,
 		mt8167_codec_ul_lr_swap_get,
 		mt8167_codec_ul_lr_swap_put),
+	/* for dmic phase debug */
+	SOC_DOUBLE_EXT("Dmic Ch Phase",
+		SND_SOC_NOPM, 0, 1, 7, 0,
+		mt8167_codec_dmic_ch_phase_get,
+		mt8167_codec_dmic_ch_phase_put),
+	/* for dmic rate mode debug */
+	SOC_SINGLE_EXT("Dmic Rate Mode",
+		SND_SOC_NOPM, 0, 1, 0,
+		mt8167_codec_dmic_rate_mode_get,
+		mt8167_codec_dmic_rate_mode_put),
 };
 
 /* Left PGA Mux/Right PGA Mux */
@@ -1890,6 +1973,24 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 		codec_data->dmic_wire_mode != DMIC_TWO_WIRE) {
 		codec_data->dmic_wire_mode = DMIC_ONE_WIRE;
 	}
+
+	if (of_property_read_u32_array(dev->of_node, "mediatek,dmic-ch-phase",
+		codec_data->dmic_ch_phase,
+		ARRAY_SIZE(codec_data->dmic_ch_phase))) {
+		for (i = 0; i < ARRAY_SIZE(codec_data->dmic_ch_phase); i++)
+			codec_data->dmic_ch_phase[i] = 0;
+	}
+	for (i = 0; i < ARRAY_SIZE(codec_data->dmic_ch_phase); i++) {
+		if (codec_data->dmic_ch_phase[i] >= DMIC_PHASE_NUM)
+			codec_data->dmic_ch_phase[i] = 0;
+	}
+
+	if (of_property_read_u32(dev->of_node, "mediatek,dmic-rate-mode",
+		&codec_data->dmic_rate_mode))
+		codec_data->dmic_rate_mode = DMIC_RATE_D1P625M;
+	else if ((codec_data->dmic_rate_mode != DMIC_RATE_D1P625M) &&
+		(codec_data->dmic_rate_mode != DMIC_RATE_D3P25M))
+		codec_data->dmic_rate_mode = DMIC_RATE_D1P625M;
 
 	ret = of_property_read_u32(dev->of_node, "mediatek,headphone-cap-sel",
 				&codec_data->headphone_cap_sel);
