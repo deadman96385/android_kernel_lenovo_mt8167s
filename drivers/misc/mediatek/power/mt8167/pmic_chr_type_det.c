@@ -57,8 +57,8 @@ static void hw_bc11_init(void)
 	upmu_set_rg_bc11_rst(0x1);
 	/*BC11_BB_CTRL=1*/
 	upmu_set_rg_bc11_bb_ctrl(0x1);
-	/*msleep(10);*/
-	mdelay(50);
+
+	msleep(50);
 }
 
 static unsigned int hw_bc11_DCD(void)
@@ -73,8 +73,8 @@ static unsigned int hw_bc11_DCD(void)
 	upmu_set_rg_bc11_vref_vth(0x1);
 	/*RG_BC11_CMP_EN[1.0] = 10*/
 	upmu_set_rg_bc11_cmp_en(0x2);
-	/*msleep(20);*/
-	mdelay(80);
+
+	msleep(80);
 
 	wChargerAvail = upmu_get_rgs_bc11_cmp_out();
 
@@ -120,8 +120,7 @@ static unsigned int hw_bc11_stepA2(void)
 	/*RG_BC11_CMP_EN[1.0] = 01*/
 	upmu_set_rg_bc11_cmp_en(0x1);
 
-	/*msleep(80);*/
-	mdelay(80);
+	msleep(80);
 
 	wChargerAvail = upmu_get_rgs_bc11_cmp_out();
 
@@ -146,8 +145,7 @@ static unsigned int hw_bc11_stepB2(void)
 	/*RG_BC11_CMP_EN[1.0] = 01*/
 	upmu_set_rg_bc11_cmp_en(0x1);
 
-	/*msleep(80);*/
-	mdelay(80);
+	msleep(80);
 
 	wChargerAvail = upmu_get_rgs_bc11_cmp_out();
 
