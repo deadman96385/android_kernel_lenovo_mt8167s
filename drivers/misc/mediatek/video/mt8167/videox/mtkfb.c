@@ -1005,11 +1005,6 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg
 			return -EFAULT;
 		}
 
-		if (displayid > MTKFB_MAX_DISPLAY_COUNT) {
-			DISPERR("[FB]: invalid display id:%d\n", displayid);
-			return -EFAULT;
-		}
-
 		if (displayid == 0) {
 			dispif_info[displayid].displayWidth = primary_display_get_width();
 			dispif_info[displayid].displayHeight = primary_display_get_height();
@@ -1023,6 +1018,7 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg
 		} else {
 			DISPERR("information for displayid: %d is not available now\n",
 				displayid);
+			return -EFAULT;
 		}
 
 		if (copy_to_user((void __user *)arg, &(dispif_info[displayid]), sizeof(struct mtk_dispif_info))) {
