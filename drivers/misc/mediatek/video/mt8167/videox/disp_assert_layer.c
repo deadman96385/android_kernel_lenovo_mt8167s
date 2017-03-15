@@ -228,6 +228,7 @@ enum DAL_STATUS DAL_Clean(void)
 	if (r != MFC_STATUS_OK) {
 		pr_debug("DISP/DAL: Warning: call MFC_XXX function failed in %s(), line: %d, ret: %x\n",
 			__func__, __LINE__, r);
+		up(&dal_sem);
 		return DAL_STATUS_FATAL_ERROR;
 	}
 
@@ -275,13 +276,13 @@ enum DAL_STATUS DAL_Clean(void)
 		DAL_Dynamic_Change_FB_Layer(isAEEEnabled);	/* restore UI layer to DEFAULT_UI_LAYER */
 
 		mutex_lock(&disp_trigger_lock);
-		primary_display_trigger(0, NULL, 0);
+		ret = primary_display_trigger(0, NULL, 0);
 		mutex_unlock(&disp_trigger_lock);
 	}
 
+	mmprofile_log_ex(ddp_mmp_get_events()->dal_clean, MMPROFILE_FLAG_END, 0, 0);
 	up(&dal_sem);
 
-	mmprofile_log_ex(ddp_mmp_get_events()->dal_clean, MMPROFILE_FLAG_END, 0, 0);
 	return ret;
 }
 EXPORT_SYMBOL(DAL_Clean);
@@ -290,14 +291,7 @@ int is_DAL_Enabled(void)
 {
 	int ret = 0;
 
-	if (down_interruptible(&dal_sem)) {
-		pr_debug("DISP/DAL Can't get semaphore in %s()\n", __func__);
-		return DAL_STATUS_LOCK_FAIL;
-	}
-
 	ret = isAEEEnabled;
-
-	up(&dal_sem);
 
 	return ret;
 }
@@ -386,21 +380,19 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 	if (r != MFC_STATUS_OK) {
 		pr_debug("DISP/DAL: Warning: call MFC_XXX function failed in %s(), line: %d, ret: %x\n",
 			__func__, __LINE__, r);
-		return DAL_STATUS_FATAL_ERROR;
+		ret = DAL_STATUS_FATAL_ERROR;
+	} else {
+		/*flush_cache_all();*/
+		if (!dal_shown)
+			dal_shown = true;
+
+		mutex_lock(&disp_trigger_lock);
+		ret = primary_display_trigger(0, NULL, 0);
+		mutex_unlock(&disp_trigger_lock);
 	}
 
-	/*flush_cache_all();*/
-
-	if (!dal_shown)
-		dal_shown = true;
-
-	mutex_lock(&disp_trigger_lock);
-	ret = primary_display_trigger(0, NULL, 0);
-	mutex_unlock(&disp_trigger_lock);
-
-	up(&dal_sem);
-
 	mmprofile_log_ex(ddp_mmp_get_events()->dal_printf, MMPROFILE_FLAG_END, 0, 0);
+	up(&dal_sem);
 
 	return ret;
 }
