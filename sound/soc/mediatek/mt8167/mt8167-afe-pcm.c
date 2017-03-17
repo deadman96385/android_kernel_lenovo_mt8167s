@@ -93,6 +93,25 @@ static unsigned int mt8167_afe_tdm_ch_fixup(unsigned int channels)
 		return 2;
 }
 
+static unsigned int mt8167_afe_tdm_out_ch_per_sdata(unsigned int mode,
+	unsigned int channels)
+{
+	if (mode == MT8167_AFE_TDM_OUT_TDM)
+		return mt8167_afe_tdm_ch_fixup(channels);
+	else
+		return 2;
+}
+
+static int mt8167_afe_tdm_out_bitwidth_fixup(unsigned int mode,
+	int bitwidth)
+{
+	if (mode == MT8167_AFE_TDM_OUT_HDMI ||
+	    mode == MT8167_AFE_TDM_OUT_I2S_32BITS)
+		return 32;
+	else
+		return bitwidth;
+}
+
 static snd_pcm_uframes_t mt8167_afe_pcm_pointer
 			 (struct snd_pcm_substream *substream)
 {
@@ -1331,9 +1350,13 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	struct snd_pcm_runtime * const runtime = substream->runtime;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
+	const unsigned int tdm_out_mode = afe->tdm_out_mode;
 	const unsigned int rate = runtime->rate;
 	const unsigned int channels = runtime->channels;
+	const unsigned int out_channels_per_sdata =
+		mt8167_afe_tdm_out_ch_per_sdata(tdm_out_mode, runtime->channels);
 	const int bit_width = snd_pcm_format_width(runtime->format);
+	const int out_bit_width = mt8167_afe_tdm_out_bitwidth_fixup(tdm_out_mode, bit_width);
 	const unsigned int stream = substream->stream;
 	unsigned int val;
 	unsigned int bck_inverse = 0;
@@ -1351,42 +1374,30 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 		clk_set_parent(afe->clocks[MT8167_CLK_I2S4_M_SEL], afe->clocks[MT8167_CLK_AUD2]);
 	}
 
-	if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI)
-		mt8167_afe_dais_set_clks(afe,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4],
-			      rate * MT8167_HDMI_OUT_MCLK_MULTIPLIER,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
-			      rate * 2 * 32);
-	else if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S)
-		mt8167_afe_dais_set_clks(afe,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4],
-			      rate * MT8167_TDM_OUT_MCLK_MULTIPLIER,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
-			      rate * 2 * bit_width);
-	else
-		mt8167_afe_dais_set_clks(afe,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4],
-			      rate * MT8167_TDM_OUT_MCLK_MULTIPLIER,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
-			      rate * mt8167_afe_tdm_ch_fixup(channels) * bit_width);
+	mt8167_afe_dais_set_clks(afe,
+		      afe->clocks[MT8167_CLK_APLL12_DIV4],
+		      rate * MT8167_TDM_OUT_MCLK_MULTIPLIER,
+		      afe->clocks[MT8167_CLK_APLL12_DIV4B],
+		      rate * out_channels_per_sdata * out_bit_width);
 
 	val = AFE_TDM_CON1_MSB_ALIGNED;
 
-	if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S &&
+	if ((tdm_out_mode == MT8167_AFE_TDM_OUT_I2S ||
+	     tdm_out_mode == MT8167_AFE_TDM_OUT_I2S_32BITS) &&
 	    (be->fmt_mode & SND_SOC_DAIFMT_FORMAT_MASK) == SND_SOC_DAIFMT_I2S) {
 		val |= AFE_TDM_CON1_1_BCK_DELAY |
 		       AFE_TDM_CON1_LRCK_INV;
 		bck_inverse = AUD_TCON3_HDMI_BCK_INV;
-	} else if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) {
+	} else if (tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) {
 		val |= AFE_TDM_CON1_1_BCK_DELAY |
 		       AFE_TDM_CON1_LRCK_INV;
-	} else if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) {
+	} else if (tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) {
 		val |= AFE_TDM_CON1_1_BCK_DELAY;
 		bck_inverse = AUD_TCON3_HDMI_BCK_INV;
 	}
 
 	/* bit width related */
-	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) || (bit_width > 16)) {
+	if (out_bit_width > 16) {
 		val |= AFE_TDM_CON1_WLEN_32BIT |
 		       AFE_TDM_CON1_32_BCK_CYCLES |
 		       AFE_TDM_CON1_LRCK_WIDTH(32);
@@ -1397,9 +1408,9 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	}
 
 	/* channel per sdata */
-	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) && (channels > 4))
+	if (out_channels_per_sdata > 4)
 		val |= AFE_TDM_CON1_8CH_PER_SDATA;
-	else if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) && (channels > 2))
+	else if (out_channels_per_sdata > 2)
 		val |= AFE_TDM_CON1_4CH_PER_SDATA;
 	else
 		val |= AFE_TDM_CON1_2CH_PER_SDATA;
@@ -1407,8 +1418,7 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	regmap_update_bits(afe->regmap, AFE_TDM_CON1, ~(u32)AFE_TDM_CON1_EN, val);
 
 	/* set tdm2 config */
-	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) ||
-	    (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S)) {
+	if (out_channels_per_sdata == 2) {
 		switch (channels) {
 		case 1:
 		case 2:
@@ -1442,7 +1452,6 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 			val = 0;
 		}
 	} else {
-		/* MT8167_AFE_TDM_OUT_TDM */
 		val = AFE_TDM_CH_START_O28_O29;
 		val |= (AFE_TDM_CH_ZERO << 4);
 		val |= (AFE_TDM_CH_ZERO << 8);
@@ -1458,8 +1467,7 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	regmap_update_bits(afe->regmap, AFE_HDMI_OUT_CON0,
 			   AFE_HDMI_OUT_CON0_CH_MASK, channels << 4);
 
-	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S) ||
-	    (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM))
+	if (tdm_out_mode != MT8167_AFE_TDM_OUT_HDMI)
 		regmap_update_bits(afe->regmap, AFE_I2S_CON1,
 			   AFE_I2S_CON1_TDMOUT_MUX_MASK, AFE_I2S_CON1_TDMOUT_TO_PAD);
 
