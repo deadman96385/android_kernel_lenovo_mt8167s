@@ -228,6 +228,7 @@ static int dsi_force_config;
 static bool dsi_glitch_enable;
 LCM_DSI_PARAMS dsi_lcm_params;
 struct cmdqRecStruct *cmdq_forcb;
+static bool g_dsi_init;
 
 static void _DSI_INTERNAL_IRQ_Handler(enum DISP_MODULE_ENUM module, unsigned int param)
 {
@@ -2362,6 +2363,8 @@ int ddp_dsi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 	}
 #endif
 
+	g_dsi_init = true;
+
 	return DSI_STATUS_OK;
 }
 
@@ -3470,6 +3473,9 @@ int32_t DSI_ssc_enable(uint32_t dsi_index, uint32_t en)
 
 uint32_t PanelMaster_get_TE_status(uint32_t dsi_idx)
 {
+	if (!g_dsi_init)
+		return 0;
+
 	if (dsi_idx == 0)
 		return dsi0_te_enable ? 1 : 0;
 	return 0;
@@ -3479,12 +3485,18 @@ uint32_t PanelMaster_get_CC(uint32_t dsi_idx)
 {
 	struct DSI_TXRX_CTRL_REG tmp_reg;
 
+	if (!g_dsi_init)
+		return 0;
+
 	DSI_READREG32((struct DSI_TXRX_CTRL_REG *), &tmp_reg, &DSI_REG[dsi_idx]->DSI_TXRX_CTRL);
 	return tmp_reg.HSTX_CKLP_EN ? 1 : 0;
 }
 
 void PanelMaster_set_CC(uint32_t dsi_index, uint32_t enable)
 {
+	if (!g_dsi_init)
+		return;
+
 	DDPMSG("dsi_index:%d set_cc :%d\n", dsi_index, enable);
 	if (dsi_index == PM_DSI0) {
 		DSI_OUTREGBIT(NULL, struct DSI_TXRX_CTRL_REG, DSI_REG[0]->DSI_TXRX_CTRL,
@@ -3497,6 +3509,9 @@ void PanelMaster_DSI_set_timing(uint32_t dsi_index, struct MIPI_TIMING timing)
 	uint32_t hbp_byte;
 	LCM_DSI_PARAMS *dsi_params;
 	int fbconfig_dsiTmpBufBpp = 0;
+
+	if (!g_dsi_init)
+		return;
 
 	if (_dsi_context[dsi_index].dsi_params.data_format.format == LCM_DSI_FORMAT_RGB565)
 		fbconfig_dsiTmpBufBpp = 2;
@@ -3682,6 +3697,9 @@ uint32_t PanelMaster_get_dsi_timing(uint32_t dsi_index, enum MIPI_SETTING_TYPE t
 	struct DSI_REGS *dsi_reg;
 	int fbconfig_dsiTmpBufBpp = 0;
 
+	if (!g_dsi_init)
+		return 0;
+
 	if (_dsi_context[dsi_index].dsi_params.data_format.format == LCM_DSI_FORMAT_RGB565)
 		fbconfig_dsiTmpBufBpp = 2;
 	else
@@ -3801,6 +3819,9 @@ uint32_t PanelMaster_get_dsi_timing(uint32_t dsi_index, enum MIPI_SETTING_TYPE t
 
 unsigned int PanelMaster_set_PM_enable(unsigned int value)
 {
+	if (!g_dsi_init)
+		return 0;
+
 	atomic_set(&PMaster_enable, value);
 	return 0;
 }
