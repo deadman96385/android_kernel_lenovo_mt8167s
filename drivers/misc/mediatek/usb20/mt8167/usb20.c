@@ -356,10 +356,11 @@ void do_connection_work(struct work_struct *data)
 				mtk_musb->power);
 		queue_delayed_work(mtk_musb->st_wq, &connection_work, msecs_to_jiffies(CONN_WORK_DELAY));
 		return;
-	} else
-		DBG(0, "is_host<%d>, power<%d>\n",
-				mtk_musb->is_host,
-				mtk_musb->power);
+	}
+
+	DBG(0, "is_host<%d>, power<%d>\n",
+			mtk_musb->is_host,
+			mtk_musb->power);
 
 	/* be aware this could not be used in non-sleep context */
 	usb_in = usb_cable_connected();
@@ -394,8 +395,7 @@ void do_connection_work(struct work_struct *data)
 		/* note this already put SOFTCON */
 		musb_start(mtk_musb);
 
-	}
-	else if (mtk_musb->power && (usb_in == false)) {
+	} else if (mtk_musb->power && (usb_in == false)) {
 		/* disable usb */
 		musb_stop(mtk_musb);
 		#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
