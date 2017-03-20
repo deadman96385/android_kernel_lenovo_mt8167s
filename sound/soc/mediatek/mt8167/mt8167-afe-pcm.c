@@ -970,11 +970,11 @@ static int mt8167_afe_2nd_i2s_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 	unsigned int width_val = params_width(params) > 16 ?
-		(AFE_CONN_24BIT_O01 | AFE_CONN_24BIT_O02) : 0;
+		(AFE_CONN_24BIT_O00 | AFE_CONN_24BIT_O01) : 0;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		regmap_update_bits(afe->regmap, AFE_CONN_24BIT,
-			   AFE_CONN_24BIT_O01 | AFE_CONN_24BIT_O02, width_val);
+			   AFE_CONN_24BIT_O00 | AFE_CONN_24BIT_O01, width_val);
 
 	return 0;
 }
