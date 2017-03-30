@@ -1476,7 +1476,7 @@ int kdSetDriver(unsigned int *pDrvIndex)
 			       sizeof(pSensorList[drvIdx[i]].drvname));
 			/* return sensor ID */
 			/* pDrvIndex[0] = (unsigned int)pSensorList[drvIdx].SensorId; */
-			PK_INFO("[kdSetDriver] :[%d][%d][%d][%s][%lu]\n", i,
+			PK_INFO("[kdSetDriver] :[%d][%d][%d][%s][%zu]\n", i,
 				g_bEnableDriver[i], g_invokeSocketIdx[i],
 				g_invokeSensorNameStr[i], sizeof(pSensorList[drvIdx[i]].drvname));
 		}

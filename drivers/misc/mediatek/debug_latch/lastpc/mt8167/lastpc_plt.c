@@ -36,8 +36,8 @@ static int lastpc_plt_dump(struct lastpc_plt *plt, char *ptr, int len)
 	unsigned int fp_value_32;
 	unsigned int sp_value_32;
 	unsigned long pc_value;
-	unsigned long fp_value;
-	unsigned long sp_value;
+	unsigned long fp_value = 0;
+	unsigned long sp_value = 0;
 	unsigned long size = 0;
 	unsigned long offset = 0;
 	char str[KSYM_SYMBOL_LEN];
@@ -45,11 +45,14 @@ static int lastpc_plt_dump(struct lastpc_plt *plt, char *ptr, int len)
 
 	/* Get PC, FP, SP and save to buf */
 	for (i = 0; i < 4; i++) {
-		pc_value = (unsigned long)lastpc[i][1] << 32 | lastpc[i][0];
+		pc_value = lastpc[i][0];
 		fp_value_32 = lastpc[i][2];
 		sp_value_32 = lastpc[i][3];
+#ifdef CONFIG_ARM64
+		pc_value |= (unsigned long)lastpc[i][1] << 32;
 		fp_value = (unsigned long)lastpc[i][5] << 32 | lastpc[i][4];
 		sp_value = (unsigned long)lastpc[i][7] << 32 | lastpc[i][6];
+#endif
 
 		kallsyms_lookup(pc_value, &size, &offset, NULL, str);
 		ptr +=

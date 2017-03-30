@@ -311,8 +311,8 @@ static void fh_sync_ncpo_to_fhctl_dds(enum FH_PLL_ID pll_id)
 
 	VALIDATE_PLLID(pll_id);
 
-	reg_src = g_reg_pll_con1[pll_id];
-	reg_dst = g_reg_dds[pll_id];
+	reg_src = g_reg_pll_con1[(int)pll_id];
+	reg_dst = g_reg_dds[(int)pll_id];
 
 	if (pll_id == FH_MEM_PLLID)
 		fh_write32(reg_dst, ((fh_read32(reg_src) >> 10) & MASK21b)|BIT32);

@@ -254,11 +254,21 @@ extern unsigned long pagetable_pa;
 extern unsigned long mtk_iommu_pgt_base;
 
 #ifndef dmac_map_area
+#ifdef CONFIG_ARM64
 #define dmac_map_area __dma_map_area
+#else
+#define dmac_map_area v7_dma_map_area
+extern void dmac_map_area(const void *, size_t, int);
+#endif
 #endif
 
 #ifndef dmac_unmap_area
+#ifdef CONFIG_ARM64
 #define dmac_unmap_area __dma_unmap_area
+#else
+#define dmac_unmap_area v7_dma_unmap_area
+extern void dmac_unmap_area(const void *, size_t, int);
+#endif
 #endif
 
 #ifndef dmac_flush_range

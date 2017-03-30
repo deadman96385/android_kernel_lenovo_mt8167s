@@ -30,6 +30,7 @@
 #define mt_secure_call_udi	mt_secure_call
 #else
 /* This is workaround for idvfs use */
+#ifdef CONFIG_ARM64
 static noinline int mt_secure_call_udi(u64 function_id, u64 arg0, u64 arg1, u64 arg2)
 {
 	register u64 reg0 __asm__("x0") = function_id;
@@ -44,6 +45,21 @@ static noinline int mt_secure_call_udi(u64 function_id, u64 arg0, u64 arg1, u64 
 	ret = (int)reg0;
 	return ret;
 }
+#else
+static noinline int mt_secure_call_udi(u32 function_id, u32 arg0, u32 arg1, u32 arg2)
+{
+	register u32 reg0 __asm__("r0") = function_id;
+	register u32 reg1 __asm__("r1") = arg0;
+	register u32 reg2 __asm__("r2") = arg1;
+	register u32 reg3 __asm__("r3") = arg2;
+
+	asm volatile (".arch_extension sec\n");
+	asm volatile ("smc	#0\n" : "+r" (reg0) :
+		"r"(reg1), "r"(reg2), "r"(reg3));
+
+	return reg0;
+}
+#endif
 #endif
 #endif
 #endif

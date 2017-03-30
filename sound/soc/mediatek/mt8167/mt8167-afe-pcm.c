@@ -1804,7 +1804,7 @@ static int mt8167_afe_dais_hw_params(struct snd_pcm_substream *substream,
 	int ret;
 
 	dev_dbg(afe->dev,
-		"%s %s period = %u rate = %u channels = %u size = %lu\n",
+		"%s %s period = %u rate = %u channels = %u size = %zu\n",
 		__func__, data->name, params_period_size(params),
 		params_rate(params), params_channels(params), request_size);
 
