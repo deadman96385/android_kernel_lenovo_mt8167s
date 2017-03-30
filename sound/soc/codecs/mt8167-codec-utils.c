@@ -708,7 +708,8 @@ static int32_t mt8167_codec_query_avg_voltage(struct snd_soc_codec *codec,
 	int64_t auxadc_val_sum = 0;
 	int32_t auxadc_val_avg = 0;
 	int32_t count = 0;
-	const int32_t countlimit = 22;
+	const int32_t count_shift = 4;
+	const int32_t countlimit = (1 << count_shift) + 2;
 
 	for (count = 0; count < countlimit; count++) {
 #ifdef CONFIG_MTK_AUXADC
@@ -729,10 +730,11 @@ static int32_t mt8167_codec_query_avg_voltage(struct snd_soc_codec *codec,
 			__func__, auxadc_val_cur, auxadc_val_sum);
 	}
 
+	/* discard min and max */
 	auxadc_val_sum -= auxadc_val_max;
 	auxadc_val_sum -= auxadc_val_min;
 
-	auxadc_val_avg = auxadc_val_sum / (countlimit - 2);
+	auxadc_val_avg = auxadc_val_sum >> count_shift;
 
 	return auxadc_val_avg;
 }
