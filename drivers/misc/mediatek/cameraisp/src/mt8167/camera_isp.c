@@ -56,7 +56,12 @@
 #include "inc/camera_isp_FrmB.h"
 #include "camera_isp_FrmB.c"
 
+#ifdef CONFIG_MTK_PSEUDO_M4U
+#include <mach/pseudo_m4u.h>
+#else
 #include <m4u.h>
+#endif
+
 #include <cmdq_core.h>
 
 #ifdef CONFIG_COMPAT
@@ -6816,7 +6821,7 @@ int32_t ISP_MDPClockOffCallback(uint64_t engineFlag)
 
 	return 0;
 }
-
+#ifndef CONFIG_MTK_IOMMU
 m4u_callback_ret_t ISP_M4U_TranslationFault_callback(int port, unsigned int mva, void *data)
 {
 	LOG_DBG("[ISP_M4U]fault call port=%d, mva=0x%x", port, mva);
@@ -6947,7 +6952,7 @@ m4u_callback_ret_t ISP_M4U_TranslationFault_callback(int port, unsigned int mva,
 
 	return M4U_CALLBACK_HANDLED;
 }
-
+#endif
 /*******************************************************************************
 *
 ********************************************************************************/

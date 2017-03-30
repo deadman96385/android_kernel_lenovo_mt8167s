@@ -31,7 +31,12 @@
 /* #include <mach/mt_reg_base.h> */
 /*#include <mach/mt_spm_idle.h>*/	/* For spm_enable_sodi()/spm_disable_sodi(). */
 
+#ifdef CONFIG_MTK_PSEUDO_M4U
+#include <mach/pseudo_m4u.h>
+#else
 #include <m4u.h>
+#endif
+
 
 #ifdef CONFIG_COMPAT
 /* 64 bit */

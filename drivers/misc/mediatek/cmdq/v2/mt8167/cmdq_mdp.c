@@ -18,7 +18,12 @@
 #ifdef CMDQ_MET_READY
 #include <linux/met_drv.h>
 #endif
+#ifdef CONFIG_MTK_PSEUDO_M4U
+#include <mach/pseudo_m4u.h>
+#else
 #include "m4u.h"
+#endif
+
 #include <linux/slab.h>
 
 #include "cmdq_device.h"
@@ -160,7 +165,7 @@ int32_t cmdq_mdp_reset_with_mmsys(const uint64_t engineToResetAgain)
 
 	return 0;
 }
-
+#ifndef CONFIG_MTK_IOMMU
 m4u_callback_ret_t cmdq_M4U_TranslationFault_callback(int port, unsigned	int	mva, void *data)
 {
 	char dispatchModel[MDP_DISPATCH_KEY_STR_LEN] = "MDP";
@@ -194,7 +199,7 @@ m4u_callback_ret_t cmdq_M4U_TranslationFault_callback(int port, unsigned	int	mva
 
 	return M4U_CALLBACK_HANDLED;
 }
-
+#endif
 int32_t cmdqVEncDumpInfo(uint64_t engineFlag, int logLevel)
 {
 	if (engineFlag & (1LL << CMDQ_ENG_VIDEO_ENC))
@@ -617,12 +622,14 @@ int32_t cmdqMdpClockOff(uint64_t engineFlag)
 void cmdqMdpInitialSetting(void)
 {
 #ifdef CONFIG_MTK_M4U
+#ifndef CONFIG_MTK_IOMMU
 	char *data = kzalloc(MDP_DISPATCH_KEY_STR_LEN, GFP_KERNEL);
 
 	/* Register M4U Translation Fault function */
 	m4u_register_fault_callback(M4U_PORT_MDP_RDMA, cmdq_M4U_TranslationFault_callback, (void *)data);
 	m4u_register_fault_callback(M4U_PORT_MDP_WDMA, cmdq_M4U_TranslationFault_callback, (void *)data);
 	m4u_register_fault_callback(M4U_PORT_MDP_WROT, cmdq_M4U_TranslationFault_callback, (void *)data);
+#endif
 #endif
 }
 
