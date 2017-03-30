@@ -23,7 +23,7 @@
 
 #include "cmdq_device.h"
 
-typedef struct CmdqMdpModuleBaseVA {
+struct CmdqMdpModuleBaseVA {
 	long MDP_RDMA;
 	long MDP_RSZ0;
 	long MDP_RSZ1;
@@ -31,10 +31,10 @@ typedef struct CmdqMdpModuleBaseVA {
 	long MDP_WROT;
 	long MDP_TDSHP;
 	long VENC;
-} CmdqMdpModuleBaseVA;
-static CmdqMdpModuleBaseVA gCmdqMdpModuleBaseVA;
+};
+static struct CmdqMdpModuleBaseVA gCmdqMdpModuleBaseVA;
 
-typedef struct CmdqMdpModuleClock {
+struct CmdqMdpModuleClock {
 	struct clk *clk_CAM_MDP;
 	struct clk *clk_MDP_RDMA;
 	struct clk *clk_MDP_RSZ0;
@@ -42,9 +42,9 @@ typedef struct CmdqMdpModuleClock {
 	struct clk *clk_MDP_WDMA;
 	struct clk *clk_MDP_WROT;
 	struct clk *clk_MDP_TDSHP;
-} CmdqMdpModuleClock;
+};
 
-static CmdqMdpModuleClock gCmdqMdpModuleClock;
+static struct CmdqMdpModuleClock gCmdqMdpModuleClock;
 
 #define IMP_ENABLE_MDP_HW_CLOCK(FN_NAME, HW_NAME)	\
 uint32_t cmdq_mdp_enable_clock_##FN_NAME(bool enable)	\
@@ -205,7 +205,7 @@ int32_t cmdqVEncDumpInfo(uint64_t engineFlag, int logLevel)
 
 void cmdq_mdp_init_module_base_VA(void)
 {
-	memset(&gCmdqMdpModuleBaseVA, 0, sizeof(CmdqMdpModuleBaseVA));
+	memset(&gCmdqMdpModuleBaseVA, 0, sizeof(struct CmdqMdpModuleBaseVA));
 
 #ifdef CMDQ_OF_SUPPORT
 	cmdq_dev_set_module_base_VA_MMSYS_CONFIG(
@@ -232,7 +232,7 @@ void cmdq_mdp_deinit_module_base_VA(void)
 	cmdq_dev_free_module_base_VA(cmdq_mdp_get_module_base_VA_MDP_TDSHP());
 	cmdq_dev_free_module_base_VA(cmdq_mdp_get_module_base_VA_VENC());
 
-	memset(&gCmdqMdpModuleBaseVA, 0, sizeof(CmdqMdpModuleBaseVA));
+	memset(&gCmdqMdpModuleBaseVA, 0, sizeof(struct CmdqMdpModuleBaseVA));
 #else
 	/* do nothing, registers' IOMAP will be destroyed by platform */
 #endif
@@ -247,7 +247,7 @@ void cmdq_mdp_get_module_PA(long *startPA, long *endPA)
 }
 #endif
 
-bool cmdq_mdp_clock_is_on(CMDQ_ENG_ENUM engine)
+bool cmdq_mdp_clock_is_on(enum CMDQ_ENG_ENUM engine)
 {
 	switch (engine) {
 	case CMDQ_ENG_MDP_CAMIN:
@@ -270,7 +270,7 @@ bool cmdq_mdp_clock_is_on(CMDQ_ENG_ENUM engine)
 	}
 }
 
-void cmdq_mdp_enable_clock(bool enable, CMDQ_ENG_ENUM engine)
+void cmdq_mdp_enable_clock(bool enable, enum CMDQ_ENG_ENUM engine)
 {
 	switch (engine) {
 	case CMDQ_ENG_MDP_CAMIN:
@@ -355,11 +355,11 @@ int32_t cmdqMdpClockOn(uint64_t engineFlag)
 	return 0;
 }
 
-typedef struct MODULE_BASE {
+struct MODULE_BASE {
 	uint64_t engine;
 	long base;		/* considering 64 bit kernel, use long type to store base addr */
 	const char *name;
-} MODULE_BASE;
+};
 
 #define DEFINE_MODULE(eng, base) {eng, base, #eng}
 
@@ -388,7 +388,7 @@ int32_t cmdqMdpDumpInfo(uint64_t engineFlag, int logLevel)
 	if (logLevel >= 1) {
 		int inner = 0;
 
-		const MODULE_BASE bases[] = {
+		const struct MODULE_BASE bases[] = {
 			DEFINE_MODULE(CMDQ_ENG_MDP_RDMA0, MDP_RDMA_BASE),
 
 			DEFINE_MODULE(CMDQ_ENG_MDP_RSZ0, MDP_RSZ0_BASE),
@@ -414,13 +414,13 @@ int32_t cmdqMdpDumpInfo(uint64_t engineFlag, int logLevel)
 	return 0;
 }
 
-typedef enum MOUT_BITS {
+enum MOUT_BITS {
 	MOUT_BITS_ISP_MDP = 0,	/* bit  0: ISP_MDP multiple outupt reset */
 	MOUT_BITS_MDP_RDMA0 = 1,	/* bit  1: MDP_RDMA0 multiple outupt reset */
 	MOUT_BITS_MDP_PRZ0 = 2,	/* bit  2: MDP_PRZ0 multiple outupt reset */
 	MOUT_BITS_MDP_PRZ1 = 3,	/* bit  3: MDP_PRZ1 multiple outupt reset */
 	MOUT_BITS_MDP_TDSHP0 = 4,	/* bit  4: MDP_TDSHP0 multiple outupt reset */
-} MOUT_BITS;
+};
 
 int32_t cmdqMdpResetEng(uint64_t engineFlag)
 {
