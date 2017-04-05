@@ -241,14 +241,14 @@ static struct snd_soc_dai_driver mt8167_codec_dai = {
 	.name = "mt8167-codec-dai",
 	.ops = &mt8167_codec_aif_dai_ops,
 	.playback = {
-		.stream_name = "Playback",
+		.stream_name = "MT8167 Playback",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = MT8167_CODEC_DL_RATES,
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
 	},
 	.capture = {
-		.stream_name = "Capture",
+		.stream_name = "MT8167 Capture",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = MT8167_CODEC_UL_RATES,
@@ -1442,10 +1442,12 @@ static const struct snd_kcontrol_new mt8167_codec_sdm_tone_gen_ctrl =
 
 static const struct snd_soc_dapm_widget mt8167_codec_dapm_widgets[] = {
 	/* stream domain */
-	SND_SOC_DAPM_AIF_OUT_E("AIF TX", "Capture", 0, SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_AIF_OUT_E("AIF TX", "MT8167 Capture", 0,
+			SND_SOC_NOPM, 0, 0,
 			mt8167_codec_aif_tx_event,
 			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
-	SND_SOC_DAPM_AIF_IN_E("AIF RX", "Playback", 0, SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_AIF_IN_E("AIF RX", "MT8167 Playback", 0,
+			SND_SOC_NOPM, 0, 0,
 			mt8167_codec_aif_rx_event,
 			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
 	SND_SOC_DAPM_ADC("Left ADC", NULL, AUDIO_CODEC_CON00, 23, 0),
