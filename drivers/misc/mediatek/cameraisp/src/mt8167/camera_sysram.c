@@ -94,6 +94,7 @@ static void SYSRAM_CheckClock(void)
 }
 
 /* ------------------------------------------------------------------------------ */
+#if 0
 static void SYSRAM_DumpResMgr(void)
 {
 	unsigned int u4Idx = 0;
@@ -115,6 +116,7 @@ static void SYSRAM_DumpResMgr(void)
 	}
 	LOG_MSG("End");
 }
+#endif
 
 /* ------------------------------------------------------------------------------ */
 static inline MBOOL SYSRAM_IsBadOwner(SYSRAM_USER_ENUM const User)
@@ -241,6 +243,9 @@ static void SYSRAM_UnlockUser(SYSRAM_USER_ENUM const User)
 /* ------------------------------------------------------------------------------ */
 static void SYSRAM_DumpLayout(void)
 {
+#if 1
+		/* No dump layout  */
+#else
 	MUINT32 Index = 0;
 	SYSRAM_MEM_NODE_STRUCT *pCurrNode = NULL;
 	/*  */
@@ -286,6 +291,7 @@ static void SYSRAM_DumpLayout(void)
 	}
 	LOG_DMP("\n");
 	SYSRAM_DumpResMgr();
+#endif
 }
 
 /* ------------------------------------------------------------------------------ */
@@ -1267,6 +1273,7 @@ static struct platform_driver SysramPlatformDriver = {
 		   }
 };
 
+#if 0
 /* ------------------------------------------------------------------------------ */
 static ssize_t SYSRAM_DumpLayoutToProc(struct file *pPage,
 				char __user *pBuffer, size_t Count, loff_t *Off)
@@ -1373,18 +1380,19 @@ static ssize_t SYSRAM_WriteFlag(struct file *pFile,
 	}
 	return (ssize_t)Count;
 }
+#endif
 
 /*******************************************************************************
 *
 ********************************************************************************/
 static const struct file_operations fsysram_proc_fops = {
-	.read = SYSRAM_DumpLayoutToProc,
+	.read = NULL,
 	.write = NULL,
 };
 
 static const struct file_operations fsysram_flag_proc_fops = {
-	.read = SYSRAM_ReadFlag,
-	.write = SYSRAM_WriteFlag,
+	.read = NULL,
+	.write = NULL,
 };
 
 /* ----------------------------------------------------------------------------- */

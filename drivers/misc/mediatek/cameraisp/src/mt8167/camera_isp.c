@@ -35,9 +35,9 @@
 /* #include <mach/mt6589_pll.h> */
 /* #include <mach/camera_isp.h> */
 /* #include <mach/mt_reg_base.h> */
-/* #include <mach/mt_clkmgr.h> */	/* For clock mgr APIS. enable_clock()/disable_clock(). */
+/* #include <mach/mt_clkmgr.h> *//* For clock mgr APIS. enable_clock()/disable_clock(). */
 #include <mt-plat/sync_write.h>
-/*#include <mach/mt_spm_idle.h>*/	/* For spm_enable_sodi()/spm_disable_sodi(). */
+/*#include <mach/mt_spm_idle.h>*//* For spm_enable_sodi()/spm_disable_sodi(). */
 
 /*#include <smi_common.h>*/
 
@@ -75,7 +75,7 @@
 #include <linux/of_platform.h>	/* for device tree */
 #include <linux/of_irq.h>	/* for device tree */
 #include <linux/of_address.h>	/* for device tree */
-#include <linux/irqchip/mtk-gic-extend.h> /* used to get actual IRQ #, which can be compared with dts */
+#include <linux/irqchip/mtk-gic-extend.h>	/* used to get actual IRQ #, which can be compared with dts */
 #endif
 
 /*******************************************************************************
@@ -129,7 +129,7 @@ typedef bool MBOOL;
 * defined marco
 ********************************************************************************/
 
-/* #define ISP_WR32(addr, data)    iowrite32(data, addr)	*/ /* For other projects. */
+/* #define ISP_WR32(addr, data)    iowrite32(data, addr)	*//* For other projects. */
 /* #define ISP_WR32(addr, data)    mt65xx_reg_sync_writel(data, addr)    // For 89 Only.NEED_TUNING_BY_PROJECT */
 /* #define ISP_RD32(addr)          ioread32(addr) */
 #define ISP_SET_BIT(reg, bit)   ((*(volatile MUINT32 *)(reg)) |= (MUINT32)(1 << (bit)))
@@ -153,9 +153,9 @@ typedef bool MBOOL;
 /* #define MMSYS_RANGE           (0x1000)   //0x100,the same with the value in seninf_drv.cpp and page-aligned */
 #define PLL_BASE_ADDR        0x10000000	/* the same with the value in seninf_drv.cpp(chip-dependent) */
 #define PLL_RANGE            (0x1000)	/* 0x200,the same with the value in seninf_drv.cpp and page-aligned */
-/*#define MIPIRX_CONFIG_ADDR   0x15008000*/	/*not used */
-/*#define MIPIRX_CONFIG_RANGE (0x100)*/	/* not used */
-#define MIPIRX_ANALOG_ADDR  (0x10011000)/* CODA: 0x10011800, 0x10011000: for PAGE aligned, otherwise mmap fail*/
+/*#define MIPIRX_CONFIG_ADDR   0x15008000*//*not used */
+/*#define MIPIRX_CONFIG_RANGE (0x100)*//* not used */
+#define MIPIRX_ANALOG_ADDR  (0x10011000)/* CODA: 0x10011800, 0x10011000: for PAGE aligned, otherwise mmap fail */
 #define MIPIRX_ANALOG_RANGE (0x1000)
 #define GPIO_BASE_ADDR       0x10005000	/* the same with the value in seninf_drv.cpp(chip-dependent) */
 #define GPIO_RANGE          (0x1000)
@@ -190,7 +190,6 @@ typedef bool MBOOL;
 
 #ifndef CONFIG_MTK_CLKMGR /*CCF*/
 #include <linux/clk.h>
-
 struct ISP_CLK_STRUCT {
 	char *clkname;
 	struct clk *clock;
@@ -199,7 +198,7 @@ struct ISP_CLK_STRUCT {
 struct ISP_CLK_STRUCT ispclk[] = {
 #if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU)
 	{"MM_SMI_COMMON", NULL},
-	{"IMG_LARB_SMI", NULL}, /* Change to generic clock name to avoid changing everytime */
+	{"IMG_LARB_SMI", NULL},	/* Change to generic clock name to avoid changing everytime */
 #endif
 	{"IMG_CAM_SMI", NULL},
 	{"IMG_CAM_CAM", NULL},
@@ -211,7 +210,7 @@ struct ISP_CLK_STRUCT ispclk[] = {
 unsigned long g_scpsys_baseaddr;
 unsigned long g_ddrphy_baseaddr;
 
-#if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU) /* Power Domain */
+#if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU)	/* Power Domain */
 
 #include <linux/pm_runtime.h>
 struct device *g_pmdev_isp;
@@ -463,7 +462,7 @@ static unsigned long gISPSYS_Reg[ISP_CAM_BASEADDR_NUM];
 ********************************************************************************/
 /* 0 means camera 1, and 1 for camera 3 */
 static bool CAM_HAL_VER_IS3;
-static spinlock_t SpinLockCamHaVer; /* remove volatile */
+static spinlock_t SpinLockCamHaVer;	/* remove volatile */
 
 
 /*******************************************************************************
@@ -740,6 +739,93 @@ static void ISP_GetTime(MUINT32 *pSec, MUINT32 *pUSec)
 		LOG_ERR("0x%08X %08X", (unsigned int)(ISP_TPIPE_ADDR + i), (unsigned int)ISP_RD32(ISP_ADDR + i));\
 	} \
 }
+
+static void ISP_DumpBasicRegisters(void)
+{
+	unsigned int value, value1, value2;
+	unsigned int sensor_width, sensor_height, tg_pxl_start, tg_pxl_end, tg_line_start,
+	    tg_line_end;
+	unsigned int tg_from_seninf_width, tg_from_seninf_height;
+	unsigned int sensor_type, is_yuv = 0;
+
+	LOG_INF("%s Start.", __func__);
+	/* Seninf status */
+	value = ISP_RD32(ISP_ADDR + 0x43B4);
+	if (value != 0x1004) {
+		LOG_ERR
+		    ("If MIPI sensor, 83B4 Should be 0x1004, but:%08X:  Please check Sensor MIPI signal!",
+		     value);
+	}
+
+	/* Sensor Type: Raw or YUV */
+	value = ISP_RD32(ISP_ADDR + 0x010);
+	sensor_type = value1 = (value & 0x000F0000) >> 16;	/* Bit16~19 */
+
+	is_yuv = (value1 == 3) ? 1 : 0;
+	LOG_INF("4010: %08X, is %s Sensor.", value,
+		sensor_type == 1 ? "Raw" : (sensor_type == 3 ? "YUV" : "Unknown!"));
+	if (sensor_type != 1 && sensor_type != 3)
+		LOG_ERR("Sensor Type:%d(should be: 1: Raw, 3: YUV), Fatal Error!", sensor_type);
+
+	/* Sensor Output Size */
+	value = ISP_RD32(ISP_ADDR + 0x4134);
+
+	sensor_width = value >> 16;
+	if (is_yuv)
+		sensor_width >>= 1;	/* YUV width should be divided by 2 */
+	sensor_width &= 0xFFFF;
+
+	sensor_height = value & 0xFFFF;
+
+	LOG_INF("Sensor Output: width:%04X(%u), height:%04X(%u)", sensor_width, sensor_width,
+		sensor_height, sensor_height);
+
+	/*TG receive from seninf */
+	value1 = ISP_RD32(ISP_ADDR + 0x448);
+	tg_from_seninf_width = value1 >> 16;
+	tg_from_seninf_height = value1 & 0x00001FFF;
+
+	if (is_yuv)
+		tg_from_seninf_width >>= 1;
+	if (tg_from_seninf_height != 0)
+		--tg_from_seninf_height;	/* YUV height should minus 1 */
+
+	LOG_INF("TG receive from Seninf: %08X, width:%04X(%u), height:%04X(%u)",
+		value1, tg_from_seninf_width, tg_from_seninf_width, tg_from_seninf_height,
+		tg_from_seninf_height);
+
+	if (tg_from_seninf_width != sensor_width)
+		LOG_ERR("TG receive width(%u) from seninf != Sensor output width(%u)!",
+			tg_from_seninf_width, sensor_width);
+	if (tg_from_seninf_height != sensor_height)
+		LOG_ERR("TG receive height(%u) from seninf != Sensor output height(%u)!",
+			tg_from_seninf_height, sensor_height);
+
+	/* TG Config */
+	value1 = ISP_RD32(ISP_ADDR + 0x418);
+	value2 = ISP_RD32(ISP_ADDR + 0x41C);
+
+	tg_pxl_start = value1 & 0x00007FFF;
+	tg_pxl_end = value1 >> 16;
+	tg_line_start = value2 & 0x00001FFF;
+	tg_line_end = value2 >> 16;
+	LOG_INF("TG: pxl start:%04X(%u), pxl end:%04X(%u), line start:%04X(%u), line end:%04X(%u)",
+		tg_pxl_start, tg_pxl_start, tg_pxl_end, tg_pxl_end, tg_line_start, tg_line_start,
+		tg_line_end, tg_line_end);
+	if (sensor_width < tg_pxl_end || tg_pxl_end - tg_pxl_start > sensor_width) {
+		LOG_ERR
+		    ("Sensor Output W(%u) should > TG max W(%u) or TG grab window W(%d) should <= Sensor W(%u)",
+		     sensor_width, tg_pxl_end, tg_pxl_end - tg_pxl_start, sensor_width);
+	}
+	if (sensor_height < tg_line_end || tg_line_end - tg_line_start > sensor_height) {
+		LOG_ERR
+		    ("Sensor Output H(%u) should > TG max H(%u) or TG grab window H(%d) should <= Sensor H(%u)",
+		     sensor_height, tg_line_end, tg_line_end - tg_line_start, sensor_height);
+	}
+
+	LOG_INF("%s End.", __func__);
+}
+
 /*******************************************************************************
 *
 ********************************************************************************/
@@ -756,7 +842,7 @@ static MINT32 ISP_DumpReg(MVOID)
 	/* Joseph Hung (xa)#define ISP_ADDR_START  0x15004000 */
 	/* #define ISP_ADDR_END    0x15006000 */
 	/*  */
-
+	ISP_DumpBasicRegisters();
 
 	/* for tpipe main start */
 	LOG_ERR("start MT");
@@ -1770,12 +1856,12 @@ static inline void Prepare_Enable_ccf_clock(void)
 	/* must keep this clk open order: CG_SCP_SYS_DIS-> CG_DISP0_SMI_COMMON -> CG_SCP_SYS_ISP -> ISP clk */
 #if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU)
 	/*
-		pm_runtime_get_sync return val:
-		> 0 : already power on
-		==0 : do power on success
-		< 0 : do power on fail
-	*/
-	/*LOG_DBG("ISP power/clock on by PM ==>");*/
+	   pm_runtime_get_sync return val:
+	   > 0 : already power on
+	   ==0 : do power on success
+	   < 0 : do power on fail
+	 */
+	/*LOG_DBG("ISP power/clock on by PM ==>"); */
 	ret = pm_runtime_get_sync(g_pmdev_disp);
 	if (ret < 0)
 		LOG_ERR("cannot pm_runtime_get_sync(DISP)\n");
@@ -1784,10 +1870,10 @@ static inline void Prepare_Enable_ccf_clock(void)
 	if (ret < 0)
 		LOG_ERR("cannot pm_runtime_get_sync(ISP)\n");
 
-#else /* SMI controls power & clock */
+#else				/* SMI controls power & clock */
 	/* Through this API, it opens power & clock of Larb#2 & its parents */
-	/* Return : 0 is successful, Others is failed.*/
-	/*LOG_DBG("ISP power/clock on by SMI ==>");*/
+	/* Return : 0 is successful, Others is failed. */
+	/*LOG_DBG("ISP power/clock on by SMI ==>"); */
 #ifdef CONFIG_MTK_IOMMU
 	if (!g_dev_smilarb) {
 		LOG_ERR("camera smi larb device is null, can't turn on power\n");
@@ -1806,10 +1892,11 @@ static inline void Prepare_Enable_ccf_clock(void)
 
 	for (i = 0; i < ARRAY_SIZE(ispclk); i++) {
 		ret = clk_prepare_enable(ispclk[i].clock);
-	if (ret)
+		if (ret)
 			LOG_ERR("cannot prepare_enable %s clock\n", ispclk[i].clkname);
 	}
 }
+
 static inline void Disable_Unprepare_ccf_clock(void)
 {
 	/* must keep this clk close order: ISP clk -> CG_SCP_SYS_ISP -> CG_DISP0_SMI_COMMON -> CG_SCP_SYS_DIS */
@@ -1820,24 +1907,24 @@ static inline void Disable_Unprepare_ccf_clock(void)
 	return;
 #endif
 
-	for (i = ARRAY_SIZE(ispclk) - 1 ; i >= 0 ; i--)
+	for (i = ARRAY_SIZE(ispclk) - 1; i >= 0; i--)
 		clk_disable_unprepare(ispclk[i].clock);
 
 #if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU)
-	/*LOG_DBG("ISP power/clock off by PM <==");*/
+	/*LOG_DBG("ISP power/clock off by PM <=="); */
 	pm_runtime_put_sync(g_pmdev_isp);
 	pm_runtime_put_sync(g_pmdev_disp);
 
 #else
-	/*LOG_DBG("ISP power/clock off by SMI <==");*/
+	/*LOG_DBG("ISP power/clock off by SMI <=="); */
 #ifdef CONFIG_MTK_IOMMU
 	if (!g_dev_smilarb) {
 		LOG_ERR("camera smi larb device is null, can't turn off power\n");
 		return;
 	}
-	mtk_smi_larb_put(g_dev_smilarb); /* 8167 change to controlled by iommu */
+	mtk_smi_larb_put(g_dev_smilarb);	/* 8167 change to controlled by iommu */
 #else
-	mtk_smi_larb_clock_off(1, true); /* 8167 clock system is from ranier, change to LARB1 */
+	mtk_smi_larb_clock_off(1, true);	/* 8167 clock system is from ranier, change to LARB1 */
 #endif
 
 #endif
@@ -1860,32 +1947,34 @@ static MVOID ISP_EnableClock(MBOOL En, MUINT32 LogLevel)
 		enable_clock(MT_CG_IMAGE_SEN_CAM, "CAMERA");
 		enable_clock(MT_CG_IMAGE_LARB2_SMI, "CAMERA");
 		g_EnableClkCnt++;
-		/*LOG_DBG("Camera clock enbled. g_EnableClkCnt(%d)", g_EnableClkCnt);*/
-#else	/* Camera CCF & PM */
+		/*LOG_DBG("Camera clock enbled. g_EnableClkCnt(%d)", g_EnableClkCnt); */
+#else				/* Camera CCF & PM */
 		g_EnableClkCnt++;
 		Prepare_Enable_ccf_clock();
 #endif
 
 		/* MTCMOS/Clock status checking */
 		/*
-		LOG_DBG("[MTCMOS CHECK]===> [0x1000660c]=0x%x , [0x10006610]=0x%x ",
-		ISP_RD32(g_scpsys_baseaddr+0x60c), ISP_RD32(g_scpsys_baseaddr+0x610));
+		   LOG_DBG("[MTCMOS CHECK]===> [0x1000660c]=0x%x , [0x10006610]=0x%x ",
+		   ISP_RD32(g_scpsys_baseaddr+0x60c), ISP_RD32(g_scpsys_baseaddr+0x610));
 
-		if ((ISP_RD32(g_scpsys_baseaddr+0x60c)&0x28) != 0x28)
-			LOG_ERR("MTCMOS: DISP-Bit3(%d), ISP-Bit5(%d) is not opened !!",
-				(ISP_RD32(g_scpsys_baseaddr+0x60c)&0x08), (ISP_RD32(g_scpsys_baseaddr+0x60c)&0x20));
+		   if ((ISP_RD32(g_scpsys_baseaddr+0x60c)&0x28) != 0x28)
+		   LOG_ERR("MTCMOS: DISP-Bit3(%d), ISP-Bit5(%d) is not opened !!",
+		   (ISP_RD32(g_scpsys_baseaddr+0x60c)&0x08), (ISP_RD32(g_scpsys_baseaddr+0x60c)&0x20));
 
-		LOG_DBG("[VENCPLL CHECK]===> [0x1000F800]=0x%x , [0x1000F80c]=0x%x ",
-		ISP_RD32(g_ddrphy_baseaddr+0x800), ISP_RD32(g_ddrphy_baseaddr+0x80c));
-		LOG_DBG("[IMG_CG_CON CHECK]===> [0x%lx]=0x%x", ISP_IMGSYS_BASE, ISP_RD32(ISP_IMGSYS_BASE));
-		*/
+		   LOG_DBG("[VENCPLL CHECK]===> [0x1000F800]=0x%x , [0x1000F80c]=0x%x ",
+		   ISP_RD32(g_ddrphy_baseaddr+0x800), ISP_RD32(g_ddrphy_baseaddr+0x80c));
+		   LOG_DBG("[IMG_CG_CON CHECK]===> [0x%lx]=0x%x", ISP_IMGSYS_BASE, ISP_RD32(ISP_IMGSYS_BASE));
+		 */
 		/*LOG_DBG("(0x%08x 0x%08x)", ISP_RD32((void *)ISP_REG_ADDR_CTL_DBG_SET),
-			ISP_RD32((void *)ISP_REG_ADDR_CTL_DBG_PORT));*/
+		  * ISP_RD32((void *)ISP_REG_ADDR_CTL_DBG_PORT));
+		  */
 		if (ISP_RD32((void *)ISP_REG_ADDR_CTL_DBG_SET) != ISP_REG_ADDR_CTL_DBG_SET_CQ_STS) {
 /* LOG_DBG("CQ STATUS RETURN:>"); */
 			ISP_WR32((void *)ISP_REG_ADDR_CTL_DBG_SET, ISP_REG_ADDR_CTL_DBG_SET_CQ_STS);
 			if (LogLevel > 0) {
-				LOG_DBG("(0x%08x 0x%08x)", ISP_RD32((void *)ISP_REG_ADDR_CTL_DBG_SET),
+				LOG_DBG("(0x%08x 0x%08x)",
+					ISP_RD32((void *)ISP_REG_ADDR_CTL_DBG_SET),
 					ISP_RD32((void *)ISP_REG_ADDR_CTL_DBG_PORT));
 			}
 /* LOG_DBG(" <"); */
@@ -1899,16 +1988,22 @@ static MVOID ISP_EnableClock(MBOOL En, MUINT32 LogLevel)
 		disable_clock(MT_CG_IMAGE_LARB2_SMI, "CAMERA");
 		disable_clock(MT_CG_DISP0_SMI_COMMON, "CAMERA");
 		g_EnableClkCnt--;
-		/*LOG_DBG("Camera clock disabled. g_EnableClkCnt(%d)", g_EnableClkCnt);*/
-#else	/* Camera CCF & PM */
+		/*LOG_DBG("Camera clock disabled. g_EnableClkCnt(%d)", g_EnableClkCnt); */
+#else				/* Camera CCF & PM */
+		if (g_EnableClkCnt == 0) {
+			LOG_INF("Now: EnableClkCnt=0, just return!");
+			return;
+		}
+
 		g_EnableClkCnt--;
 		Disable_Unprepare_ccf_clock();
 #endif
 	}
 
 	/*if (LogLevel > 0) {
-		LOG_DBG("-");
-	}*/
+	  * LOG_DBG("-");
+	  *  }
+	 */
 }
 
 /*******************************************************************************
@@ -1957,7 +2052,7 @@ static inline MVOID ISP_Reset(MVOID)
 /* remove temp solution    ISP_WR32((void *)(ISP_ADDR + i), 0x00 ); */
 /* } */
 
-	/*LOG_DBG("remove 0x0~0x54 = 0x0");*/	/* remove temp solution */
+	/*LOG_DBG("remove 0x0~0x54 = 0x0"); *//* remove temp solution */
 
 	/* bandwidth limitor for TG */
 #if 0
@@ -2014,7 +2109,7 @@ static MINT32 ISP_ReadReg(ISP_REG_IO_STRUCT *pRegIo)
 	/* ====== Read Register ====== */
 
 	for (i = 0; i < pRegIo->Count; i++) {
-		if (0 != get_user(reg.Addr, &(pData->Addr))) {
+		if (get_user(reg.Addr, &(pData->Addr)) != 0) {
 			LOG_ERR("get_user failed");
 			Ret = -EFAULT;
 			goto EXIT;
@@ -2027,7 +2122,7 @@ static MINT32 ISP_ReadReg(ISP_REG_IO_STRUCT *pRegIo)
 			LOG_ERR("Wrong address(0x%x)", (unsigned int)(ISP_ADDR_CAMINF + reg.Addr));
 			reg.Val = 0;
 		}
-		if (0 != put_user(reg.Val, &(pData->Val))) {
+		if (put_user(reg.Val, &(pData->Val)) != 0) {
 			LOG_ERR("put_user failed");
 			Ret = -EFAULT;
 			goto EXIT;
@@ -2285,7 +2380,7 @@ static MVOID ISP_BufWrite_SetReady(MVOID)
 /*******************************************************************************
 *
 ********************************************************************************/
-static MBOOL ISP_BufWrite_Get(MUINT32 * pIndex, MUINT32 *pSize, MUINT8 **ppData)
+static MBOOL ISP_BufWrite_Get(MUINT32 *pIndex, MUINT32 *pSize, MUINT8 **ppData)
 {
 	MUINT32 i;
 
@@ -2601,8 +2696,7 @@ static MINT32 ISP_EnableHoldReg(MBOOL En)
 		Timeout = wait_event_interruptible_timeout(g_IspInfo.WaitQueueHead,
 							   (IsLock =
 							    spin_trylock_bh(&
-									    (g_IspInfo.
-									     SpinLockHold))),
+									    (g_IspInfo.SpinLockHold))),
 							   ISP_MsToJiffies(500));
 
 		if (g_IspInfo.DebugMask & ISP_DBG_TASKLET) {
@@ -2669,7 +2763,7 @@ static long ISP_REF_CNT_CTRL_FUNC(unsigned long Param)
 			LOG_DBG("ctrl(%d),id(%d)", ref_cnt_ctrl.ctrl, ref_cnt_ctrl.id);
 		}
 
-		if (ISP_REF_CNT_ID_MAX > ref_cnt_ctrl.id) {
+		if (ref_cnt_ctrl.id < ISP_REF_CNT_ID_MAX) {
 			/* lock here */
 			spin_lock(&(g_IspInfo.SpinLockIspRef));
 
@@ -2729,7 +2823,7 @@ static long ISP_REF_CNT_CTRL_FUNC(unsigned long Param)
 	/* add unlock here */
 	/* spin_unlock_irqrestore(&(g_IspInfo.SpinLock), flags); */
 
-	/*LOG_DBG("Ret(%d)", Ret);*/
+	/*LOG_DBG("Ret(%d)", Ret); */
 	return Ret;
 }
 
@@ -2749,7 +2843,7 @@ static MINT32 ISP_RTBC_ENQUE(MINT32 dma)
 	}
 
 	/* check max */
-	if (ISP_RT_BUF_SIZE == g_pstRTBuf->ring_buf[rt_dma].total_count) {
+	if (g_pstRTBuf->ring_buf[rt_dma].total_count == ISP_RT_BUF_SIZE) {
 		LOG_ERR("[rtbc][ENQUE]:real time buffer number FULL:rt_dma(%d)", rt_dma);
 		Ret = -EFAULT;
 	}
@@ -2771,7 +2865,7 @@ static MINT32 ISP_RTBC_ENQUE(MINT32 dma)
 #endif
 
 	if (buffer_exist) {
-		if (ISP_RTBC_BUF_EMPTY != g_pstRTBuf->ring_buf[rt_dma].data[i].bFilled) {
+		if (g_pstRTBuf->ring_buf[rt_dma].data[i].bFilled != ISP_RTBC_BUF_EMPTY) {
 			g_pstRTBuf->ring_buf[rt_dma].data[i].bFilled = ISP_RTBC_BUF_EMPTY;
 			g_pstRTBuf->ring_buf[rt_dma].empty_count++;
 			index = i;
@@ -2816,7 +2910,7 @@ static MINT32 ISP_RTBC_ENQUE(MINT32 dma)
 	}
 
 	/* count ==1 means DMA stalled already or NOT start yet */
-	if (1 == g_pstRTBuf->ring_buf[rt_dma].empty_count) {
+	if (g_pstRTBuf->ring_buf[rt_dma].empty_count == 1) {
 		if (_imgo_ == rt_dma) {
 			/* set base_addr at beginning before VF_EN */
 			ISP_WR32((void *)ISP_REG_ADDR_IMGO_BASE_ADDR,
@@ -2899,14 +2993,14 @@ static MINT32 ISP_RTBC_DEQUE(MINT32 dma)
 		    (g_pstRTBuf->ring_buf[rt_dma].start +
 		     i) % g_pstRTBuf->ring_buf[rt_dma].total_count;
 
-		if (ISP_RTBC_BUF_FILLED == g_pstRTBuf->ring_buf[rt_dma].data[index].bFilled) {
+		if (g_pstRTBuf->ring_buf[rt_dma].data[index].bFilled == ISP_RTBC_BUF_FILLED) {
 			g_pstRTBuf->ring_buf[rt_dma].data[index].bFilled = ISP_RTBC_BUF_LOCKED;
 			g_deque_buf.count = 1;
 			break;
 		}
 	}
 
-	if (0 == g_deque_buf.count) {
+	if (g_deque_buf.count == 0) {
 		/* queue buffer status */
 		LOG_DBG
 		    ("[rtbc][DEQUE]:dma(%d),start(%d),total(%d),empty(%d), g_deque_buf.count(%d)",
@@ -2959,9 +3053,8 @@ static MINT32 ISP_RTBC_DEQUE(MINT32 dma)
 
 		}
 
-		if (g_IspInfo.DebugMask & ISP_DBG_BUF_CTRL) {
+		if (g_IspInfo.DebugMask & ISP_DBG_BUF_CTRL)
 			LOG_DBG("[rtbc][DEQUE]-");
-		}
 
 		/* spin_unlock_irqrestore(&(g_IspInfo.SpinLockRTBC),g_Flash_SpinLock); */
 	} else {
@@ -3003,7 +3096,7 @@ static long ISP_Buf_CTRL_FUNC(unsigned long Param)
 #endif
 
 
-	if (NULL == g_pstRTBuf) {
+	if (g_pstRTBuf == NULL) {
 		LOG_ERR("[rtbc]NULL g_pstRTBuf");
 		return -EFAULT;
 	}
@@ -3023,10 +3116,10 @@ static long ISP_Buf_CTRL_FUNC(unsigned long Param)
 		}
 #if defined(_rtbc_use_cq0c_)
 
-		if ((ISP_RT_BUF_CTRL_ENQUE == rt_buf_ctrl.ctrl) ||
-		    (ISP_RT_BUF_CTRL_EXCHANGE_ENQUE == rt_buf_ctrl.ctrl) ||
-		    (ISP_RT_BUF_CTRL_DEQUE == rt_buf_ctrl.ctrl) ||
-		    (ISP_RT_BUF_CTRL_IS_RDY == rt_buf_ctrl.ctrl)) {
+		if ((rt_buf_ctrl.ctrl == ISP_RT_BUF_CTRL_ENQUE) ||
+		    (rt_buf_ctrl.ctrl == ISP_RT_BUF_CTRL_EXCHANGE_ENQUE) ||
+		    (rt_buf_ctrl.ctrl == ISP_RT_BUF_CTRL_DEQUE) ||
+		    (rt_buf_ctrl.ctrl == ISP_RT_BUF_CTRL_IS_RDY)) {
 			imgo_fbc.Reg_val = ISP_RD32((void *)ISP_REG_ADDR_IMGO_FBC);
 			img2o_fbc.Reg_val = ISP_RD32((void *)ISP_REG_ADDR_IMG2O_FBC);
 
@@ -3056,175 +3149,158 @@ static long ISP_Buf_CTRL_FUNC(unsigned long Param)
 							rt_buf_ctrl.ex_data_ptr);
 					}
 
-					if (0 != rt_buf_ctrl.ex_data_ptr) {
-					/**/	if (copy_from_user
-						    (&g_ex_rt_buf_info,
-						     (void __user *)rt_buf_ctrl.ex_data_ptr,
-						     sizeof(ISP_RT_BUF_INFO_STRUCT)) == 0) {
-					/**/		for (i = 0; i < ISP_RT_BUF_SIZE; i++) {
-					/**/			if (g_pstRTBuf->ring_buf[rt_dma].
-								    data[i].base_pAddr ==
-								    g_rt_buf_info.base_pAddr) {
-									g_oldImgoAddr =
-									    g_rt_buf_info.
-									    base_pAddr;
-									LOG_DBG
-									    ("[rtbc]dma(%d),old(%d),PA(0x%x),VA(0x%llx)",
-									     rt_dma, i,
-									     g_pstRTBuf->
-									     ring_buf[rt_dma].
-									     data[i].base_pAddr,
-									     g_pstRTBuf->
-									     ring_buf[rt_dma].
-									     data[i].base_vAddr);
+					if (rt_buf_ctrl.ex_data_ptr != 0) {
+					if (copy_from_user
+					 (&g_ex_rt_buf_info,
+					 (void __user *)rt_buf_ctrl.ex_data_ptr,
+					 sizeof(ISP_RT_BUF_INFO_STRUCT)) == 0) {
+					for (i = 0; i < ISP_RT_BUF_SIZE; i++) {
+					if (g_pstRTBuf->
+						  ring_buf[rt_dma].data[i].
+						  base_pAddr ==
+						  g_rt_buf_info.
+						  base_pAddr) {
+						g_oldImgoAddr =
+						    g_rt_buf_info.base_pAddr;
+						LOG_DBG
+						    ("[rtbc]dma(%d),old(%d),PA(0x%x),VA(0x%llx)",
+						     rt_dma, i,
+						     g_pstRTBuf->ring_buf
+						     [rt_dma].data[i].
+						     base_pAddr,
+						     g_pstRTBuf->ring_buf
+						     [rt_dma].data[i].
+						     base_vAddr);
 
-									g_newImgoAddr =
-									    g_ex_rt_buf_info.
-									    base_pAddr;
-									g_pstRTBuf->
-									    ring_buf[rt_dma].
-									    data[i].memID =
-									    g_ex_rt_buf_info.memID;
-									g_pstRTBuf->
-									    ring_buf[rt_dma].
-									    data[i].size =
-									    g_ex_rt_buf_info.size;
-									g_pstRTBuf->
-									    ring_buf[rt_dma].
-									    data[i].base_pAddr =
-									    g_ex_rt_buf_info.
-									    base_pAddr;
-									g_pstRTBuf->
-									    ring_buf[rt_dma].
-									    data[i].base_vAddr =
-									    g_ex_rt_buf_info.
-									    base_vAddr;
+						g_newImgoAddr =
+						    g_ex_rt_buf_info.base_pAddr;
+						g_pstRTBuf->ring_buf
+						    [rt_dma].data[i].memID =
+						    g_ex_rt_buf_info.memID;
+						g_pstRTBuf->ring_buf
+						    [rt_dma].data[i].size =
+						    g_ex_rt_buf_info.size;
+						g_pstRTBuf->ring_buf
+						    [rt_dma].data[i].
+						    base_pAddr =
+						    g_ex_rt_buf_info.base_pAddr;
+						g_pstRTBuf->ring_buf
+						    [rt_dma].data[i].
+						    base_vAddr =
+						    g_ex_rt_buf_info.base_vAddr;
 
-									LOG_DBG
-									    ("[rtbc]dma(%d),new(%d),PA(0x%x),VA(0x%llx)",
-									     rt_dma, i,
-									     g_pstRTBuf->
-									     ring_buf[rt_dma].
-									     data[i].base_pAddr,
-									     g_pstRTBuf->
-									     ring_buf[rt_dma].
-									     data[i].base_vAddr);
+						LOG_DBG
+						    ("[rtbc]dma(%d),new(%d),PA(0x%x),VA(0x%llx)",
+						     rt_dma, i,
+						     g_pstRTBuf->ring_buf
+						     [rt_dma].data[i].
+						     base_pAddr,
+						     g_pstRTBuf->ring_buf
+						     [rt_dma].data[i].
+						     base_vAddr);
 
-									/* set imgo exchange buffer address to HW */
-					/**/				if (rt_dma == _imgo_) {
-										curr_pa =
-										    ISP_RD32((void
-											      *)
-											     ISP_REG_ADDR_IMGO_BASE_ADDR);
-										LOG_DBG
-										    ("[rtbc][EXG]o,curr_pa(0x%x),old(0x%x)",
-										     curr_pa,
-										     g_rt_buf_info.
-										     base_pAddr);
-										LOG_DBG
-										    ("[rtbc][EXG]o,NUM(0x%x),CNT(0x%x)",
-										     imgo_fbc.Bits.
-										     FB_NUM,
-										     imgo_fbc.Bits.
-										     FBC_CNT);
+					/* set imgo exchange buffer address to HW */
+					if (rt_dma == _imgo_) {
+						curr_pa =
+						    ISP_RD32((void
+							      *)
+							     ISP_REG_ADDR_IMGO_BASE_ADDR);
+						LOG_DBG
+						    ("[rtbc][EXG]o,curr_pa(0x%x),old(0x%x)",
+						     curr_pa,
+						     g_rt_buf_info.base_pAddr);
+						LOG_DBG
+						    ("[rtbc][EXG]o,NUM(0x%x),CNT(0x%x)",
+						     imgo_fbc.
+						     Bits.FB_NUM,
+						     imgo_fbc.
+						     Bits.FBC_CNT);
 
-					/**/					if ((curr_pa ==
-										     g_rt_buf_info.
-										     base_pAddr)
-										    && (imgo_fbc.
-											Bits.
-											FB_NUM != 0)
-										    &&
-										    ((imgo_fbc.Bits.
-										      FB_NUM ==
-										      imgo_fbc.Bits.
-										      FBC_CNT)
-										     || (imgo_fbc.
-											 Bits.
-											 FBC_CNT ==
-											 (imgo_fbc.
-											  Bits.
-											  FB_NUM -
-											  1)))) {
-											ISP_WR32((void *)ISP_REG_ADDR_IMGO_BASE_ADDR, g_pstRTBuf->ring_buf[rt_dma].data[i].base_pAddr);
-					/**/					} else {	/* timing issue */
+					if ((curr_pa ==
+						 g_rt_buf_info.base_pAddr)
+						&&
+						(imgo_fbc.Bits.FB_NUM
+						 != 0)
+						&&
+						((imgo_fbc.
+						  Bits.FB_NUM
+						  ==
+						  imgo_fbc.
+						  Bits.FBC_CNT)
+						 ||
+						 (imgo_fbc.Bits.FBC_CNT
+						  ==
+						  (imgo_fbc.Bits.FB_NUM
+						   - 1)))) {
+						ISP_WR32((void *)ISP_REG_ADDR_IMGO_BASE_ADDR,
+							g_pstRTBuf->ring_buf[rt_dma].data[i].base_pAddr);
+					} else {	/* timing issue */
 
-											g_oldImgoAddr
-											    =
-											    g_rt_buf_info.
-											    base_pAddr;
-											g_newImgoAddr
-											    =
-											    g_pstRTBuf->
-											    ring_buf
-											    [rt_dma].
-											    data[i].
-											    base_pAddr;
-											LOG_DBG
-											    ("[rtbc][EXG]o,g_old(0x%x),g_new(0x%x)",
-											     g_oldImgoAddr,
-											     g_newImgoAddr);
-										}
-					/**/				} else if (rt_dma ==
-										   _img2o_) {
-										curr_pa =
-										    ISP_RD32((void
-											      *)
-											     ISP_REG_ADDR_IMG2O_BASE_ADDR);
-										LOG_DBG
-										    ("[rtbc][EXG]2o,curr_pa(0x%x),old(0x%x)",
-										     curr_pa,
-										     g_rt_buf_info.
-										     base_pAddr);
-										LOG_DBG
-										    ("[rtbc][EXG]2o,NUM(0x%x),CNT(0x%x)",
-										     img2o_fbc.Bits.
-										     FB_NUM,
-										     img2o_fbc.Bits.
-										     FBC_CNT);
+						g_oldImgoAddr
+						    =
+						    g_rt_buf_info.base_pAddr;
+						g_newImgoAddr
+						    =
+						    g_pstRTBuf->ring_buf
+						    [rt_dma].data
+						    [i].base_pAddr;
+						LOG_DBG
+						    ("[rtbc][EXG]o,g_old(0x%x),g_new(0x%x)",
+						     g_oldImgoAddr,
+						     g_newImgoAddr);
+					}
+					} else if (rt_dma ==
+							_img2o_) {
+						curr_pa =
+						    ISP_RD32((void
+							      *)
+							     ISP_REG_ADDR_IMG2O_BASE_ADDR);
+						LOG_DBG
+						    ("[rtbc][EXG]2o,curr_pa(0x%x),old(0x%x)",
+						     curr_pa,
+						     g_rt_buf_info.base_pAddr);
+						LOG_DBG
+						    ("[rtbc][EXG]2o,NUM(0x%x),CNT(0x%x)",
+						     img2o_fbc.
+						     Bits.FB_NUM,
+						     img2o_fbc.
+						     Bits.FBC_CNT);
 
-					/**/					if ((curr_pa ==
-										     g_rt_buf_info.
-										     base_pAddr)
-										    && (img2o_fbc.
-											Bits.
-											FB_NUM != 0)
-										    &&
-										    ((img2o_fbc.
-										      Bits.FB_NUM ==
-										      img2o_fbc.
-										      Bits.FBC_CNT)
-										     || (img2o_fbc.
-											 Bits.
-											 FBC_CNT ==
-											 (img2o_fbc.
-											  Bits.
-											  FB_NUM -
-											  1)))) {
-											ISP_WR32((void *)ISP_REG_ADDR_IMG2O_BASE_ADDR, g_pstRTBuf->ring_buf[rt_dma].data[i].base_pAddr);
-					/**/					} else {	/* timing issue */
+					if ((curr_pa ==
+						 g_rt_buf_info.base_pAddr)
+						&&
+						(img2o_fbc.Bits.FB_NUM
+						 != 0)
+						&&
+						((img2o_fbc.Bits.FB_NUM ==
+						img2o_fbc.Bits.FBC_CNT)
+						 ||
+						 (img2o_fbc.Bits.FBC_CNT
+						  ==
+						  (img2o_fbc.Bits.FB_NUM
+						   - 1)))) {
+						ISP_WR32((void *)ISP_REG_ADDR_IMG2O_BASE_ADDR,
+							g_pstRTBuf->ring_buf[rt_dma].data[i].base_pAddr);
+					} else {	/* timing issue */
 
-											g_oldImg2oAddr
-											    =
-											    g_rt_buf_info.
-											    base_pAddr;
-											g_newImg2oAddr
-											    =
-											    g_pstRTBuf->
-											    ring_buf
-											    [rt_dma].
-											    data[i].
-											    base_pAddr;
-											LOG_DBG
-											    ("[rtbc][EXG]2o,g_old(0x%x),g_new(0x%x)",
-											     g_oldImg2oAddr,
-											     g_newImg2oAddr);
-										}
-									}
+						g_oldImg2oAddr
+						    =
+						    g_rt_buf_info.base_pAddr;
+						g_newImg2oAddr
+						    =
+						    g_pstRTBuf->ring_buf
+						    [rt_dma].data
+						    [i].base_pAddr;
+						LOG_DBG
+						    ("[rtbc][EXG]2o,g_old(0x%x),g_new(0x%x)",
+						     g_oldImg2oAddr,
+						     g_newImg2oAddr);
+					}
+					}
 
-									break;
-								}
-							}
+						break;
+					}
+						}
 						}
 					}
 
@@ -3243,11 +3319,11 @@ static long ISP_Buf_CTRL_FUNC(unsigned long Param)
 
 					if (g_IspInfo.DebugMask & ISP_DBG_BUF_CTRL) {
 						LOG_DBG
-					    ("[rtbc][ENQ]:dma(%d),P(0x%x),O(0x%x),2O(0x%x),fps(%d)us",
-					     rt_dma, g_rt_buf_info.base_pAddr,
-					     ISP_RD32((void *)ISP_REG_ADDR_IMGO_BASE_ADDR),
-					     ISP_RD32((void *)ISP_REG_ADDR_IMG2O_BASE_ADDR),
-					     g_avg_frame_time);
+						    ("[rtbc][ENQ]:dma(%d),P(0x%x),O(0x%x),2O(0x%x),fps(%d)us",
+						     rt_dma, g_rt_buf_info.base_pAddr,
+						     ISP_RD32((void *)ISP_REG_ADDR_IMGO_BASE_ADDR),
+						     ISP_RD32((void *)ISP_REG_ADDR_IMG2O_BASE_ADDR),
+						     g_avg_frame_time);
 					}
 #else
 
@@ -3263,11 +3339,9 @@ static long ISP_Buf_CTRL_FUNC(unsigned long Param)
 					g_EnqBuf = 1;
 
 					Timeout =
-					    wait_event_interruptible_timeout(g_IspInfo.
-									     WaitQueueHead,
-									     (0 == g_EnqBuf),
-									     ISP_MsToJiffies
-									     (Timeout));
+					    wait_event_interruptible_timeout
+					    (g_IspInfo.WaitQueueHead, (g_EnqBuf == 0),
+					     ISP_MsToJiffies(Timeout));
 
 					if (Timeout == 0) {
 						LOG_ERR("[rtbc][ENQUE]:timeout(%d)", g_EnqBuf);
@@ -3317,11 +3391,11 @@ static long ISP_Buf_CTRL_FUNC(unsigned long Param)
 
 					if (g_IspInfo.DebugMask & ISP_DBG_BUF_CTRL) {
 						LOG_DBG
-					    ("[rtbc][DEQ]:T\"%d.%06d\",co(0x%08lx),c2o(0x%08lx),i(%d),iBuf+i(%d),V(0x%llx),P(0x%x),O(0x%x),2O(0x%x)",
+			("[rtbc][DEQ]:T\"%d.%06d\",co(%08lx),c2o(%08lx),i(%d),iBuf+i(%d),V(%llx),P(%x),O(%x),2O(%x)",
 					     g_deque_buf.data[i].timeStampS,
-					     g_deque_buf.data[i].timeStampUs, imgo_fbc.Reg_val,
-					     img2o_fbc.Reg_val, i, iBuf + i,
-					     g_deque_buf.data[i].base_vAddr,
+					     g_deque_buf.data[i].timeStampUs,
+					     imgo_fbc.Reg_val, img2o_fbc.Reg_val, i,
+					     iBuf + i, g_deque_buf.data[i].base_vAddr,
 					     g_deque_buf.data[i].base_pAddr,
 					     ISP_RD32((void *)ISP_REG_ADDR_IMGO_BASE_ADDR),
 					     ISP_RD32((void *)ISP_REG_ADDR_IMG2O_BASE_ADDR));
@@ -3330,14 +3404,14 @@ static long ISP_Buf_CTRL_FUNC(unsigned long Param)
 					/* tstamp = g_deque_buf.data[i].timeStampS*1000000+g_deque_buf.data[i].timeStampUs; */
 					/* if ( (0 != prv_tstamp) && (prv_tstamp >= tstamp) ) */
 					/* { */
-					if (0 != g_prv_tstamp_s) {
+					if (g_prv_tstamp_s != 0) {
 					/**/	if ((g_prv_tstamp_s >
-						     g_deque_buf.data[i].timeStampS)
-						    ||
-						    ((g_prv_tstamp_s ==
-						      g_deque_buf.data[i].timeStampS)
-						     && (g_prv_tstamp_us >=
-							 g_deque_buf.data[i].timeStampUs))) {
+						  g_deque_buf.data[i].timeStampS)
+						  ||
+						  ((g_prv_tstamp_s ==
+						    g_deque_buf.data[i].timeStampS)
+						   && (g_prv_tstamp_us >=
+						       g_deque_buf.data[i].timeStampUs))) {
 							LOG_ERR
 							    ("[rtbc]TS rollback,prv\"%d.%06d\",cur\"%d.%06d\"",
 							     g_prv_tstamp_s, g_prv_tstamp_us,
@@ -3374,7 +3448,7 @@ static long ISP_Buf_CTRL_FUNC(unsigned long Param)
 				g_DeqBuf = 1;
 
 				Timeout = wait_event_interruptible_timeout(g_IspInfo.WaitQueueHead,
-									   (0 == g_DeqBuf),
+									   (g_DeqBuf == 0),
 									   ISP_MsToJiffies
 									   (Timeout));
 
@@ -3543,7 +3617,7 @@ static MINT32 ISP_SOF_Buf_Get(unsigned long long sec, unsigned long usec)
 	}
 
 	/* No drop */
-	if (0 == g_pstRTBuf->dropCnt) {
+	if (g_pstRTBuf->dropCnt == 0) {
 		/* verify write buffer */
 		curr_pa = ISP_RD32((void *)ISP_REG_ADDR_IMGO_BASE_ADDR);
 		if (g_TempAddr == curr_pa) {
@@ -3562,7 +3636,7 @@ static MINT32 ISP_SOF_Buf_Get(unsigned long long sec, unsigned long usec)
 #if 1
 
 		/* verify write buffer,once pass1_done lost, WCNT is untrustful. */
-		if (ISP_RT_CQ0C_BUF_SIZE < g_pstRTBuf->ring_buf[_imgo_].total_count) {
+		if (g_pstRTBuf->ring_buf[_imgo_].total_count > ISP_RT_CQ0C_BUF_SIZE) {
 			LOG_ERR("[rtbc]buf cnt(%d)", g_pstRTBuf->ring_buf[_imgo_].total_count);
 			g_pstRTBuf->ring_buf[_imgo_].total_count = ISP_RT_CQ0C_BUF_SIZE;
 		}
@@ -3602,13 +3676,13 @@ static MINT32 ISP_SOF_Buf_Get(unsigned long long sec, unsigned long usec)
 	}
 
 	/* frame time profile */
-	if (0 == g_sof_count) {
+	if (g_sof_count == 0) {
 		g_start_time = sec * 1000000 + usec;
 	}
 
 	/* calc once per senond */
 	if (1000000 < ((sec * 1000000 + usec) - g_start_time)) {
-		if (0 != g_sof_count) {
+		if (g_sof_count != 0) {
 			g_avg_frame_time = (sec * 1000000 + usec) - g_start_time;
 			g_avg_frame_time = (MUINT32) (g_avg_frame_time / g_sof_count);
 		}
@@ -3637,7 +3711,7 @@ static MINT32 ISP_SOF_Buf_Get(unsigned long long sec, unsigned long usec)
 	}
 
 	for (i = 0; i <= 1; i++) {
-		i_dma = (0 == i) ? _imgo_ : _img2o_;
+		i_dma = (i == 0) ? _imgo_ : _img2o_;
 		dma_base_addr =
 		    (_imgo_ == i_dma) ? ISP_REG_ADDR_IMGO_BASE_ADDR : ISP_REG_ADDR_IMG2O_BASE_ADDR;
 
@@ -3661,7 +3735,7 @@ static MINT32 ISP_SOF_Buf_Get(unsigned long long sec, unsigned long usec)
 		}
 
 		/* ring buffer get next buffer */
-		if (0 == g_pstRTBuf->ring_buf[i_dma].empty_count) {
+		if (g_pstRTBuf->ring_buf[i_dma].empty_count == 0) {
 			/* once if buffer put into queue between SOF and ISP_DONE. */
 			g_pstRTBuf->ring_buf[i_dma].active = MFALSE;
 
@@ -3671,7 +3745,7 @@ static MINT32 ISP_SOF_Buf_Get(unsigned long long sec, unsigned long usec)
 				     i_dma, g_pstRTBuf->ring_buf[i_dma].start);
 			}
 		} else {
-			if (2 <= g_pstRTBuf->ring_buf[i_dma].empty_count) {
+			if (g_pstRTBuf->ring_buf[i_dma].empty_count >= 2) {
 				/* next buffer */
 				next =
 				    (g_pstRTBuf->ring_buf[i_dma].start +
@@ -3757,10 +3831,10 @@ static MINT32 ISP_DONE_Buf_Time(unsigned long long sec, unsigned long usec)
 	}
 
 	for (i = 0; i <= 1; i++) {
-		i_dma = (0 == i) ? _imgo_ : _img2o_;
+		i_dma = (i == 0) ? _imgo_ : _img2o_;
 		reg_fbc = (_imgo_ == i_dma) ? ISP_REG_ADDR_IMGO_FBC : ISP_REG_ADDR_IMG2O_FBC;
 
-		if (0 == g_pstRTBuf->ring_buf[i_dma].empty_count) {
+		if (g_pstRTBuf->ring_buf[i_dma].empty_count == 0) {
 			if (g_IspInfo.DebugMask & ISP_DBG_INT) {
 				LOG_DBG
 				    ("[rtbc][DONE]:dma(%d)real time buffer number empty,start(%d)",
@@ -3771,7 +3845,7 @@ static MINT32 ISP_DONE_Buf_Time(unsigned long long sec, unsigned long usec)
 		}
 
 		/* once if buffer put into queue between SOF and ISP_DONE. */
-		if (MFALSE == g_pstRTBuf->ring_buf[i_dma].active) {
+		if (g_pstRTBuf->ring_buf[i_dma].active == MFALSE) {
 			if (g_IspInfo.DebugMask & ISP_DBG_INT) {
 				LOG_DBG("[rtbc][DONE] ERROR: missing SOF");
 			}
@@ -3820,7 +3894,7 @@ static MINT32 ISP_DONE_Buf_Time(unsigned long long sec, unsigned long usec)
 		}
 
 		/* enable fbc to stall DMA */
-		if (0 == g_pstRTBuf->ring_buf[i_dma].empty_count) {
+		if (g_pstRTBuf->ring_buf[i_dma].empty_count == 0) {
 			if (_imgo_ == i_dma) {
 				reg_val = ISP_RD32((void *)ISP_REG_ADDR_IMGO_FBC);
 				reg_val |= 0x4000;
@@ -3885,18 +3959,18 @@ static MINT32 ISP_WaitIrq(ISP_WAIT_IRQ_STRUCT WaitIrq)
 		spin_lock_irqsave(&(g_IspInfo.SpinLockIrq), flags);
 		if (g_IspInfo.IrqInfo.Status[WaitIrq.Type] & WaitIrq.Status) {
 			/*  LOG_DBG("WARNING: Clear(%d), Type(%d): IrqStatus(0x%08X) has been cleared",
-			 *	WaitIrq.Clear, WaitIrq.Type,
-			 *	g_IspInfo.IrqInfo.Status[WaitIrq.Type] & WaitIrq.Status);
-			*/
+			 *      WaitIrq.Clear, WaitIrq.Type,
+			 *      g_IspInfo.IrqInfo.Status[WaitIrq.Type] & WaitIrq.Status);
+			 */
 			g_IspInfo.IrqInfo.Status[WaitIrq.Type] &= (~WaitIrq.Status);
 		}
 		spin_unlock_irqrestore(&(g_IspInfo.SpinLockIrq), flags);
 	} else if (WaitIrq.Clear == ISP_IRQ_CLEAR_ALL) {
 		spin_lock_irqsave(&(g_IspInfo.SpinLockIrq), flags);
 		/*
-		*  LOG_DBG("WARNING: Clear(%d), Type(%d): IrqStatus(0x%08X) has been cleared",
-		*	WaitIrq.Clear, WaitIrq.Type, g_IspInfo.IrqInfo.Status[WaitIrq.Type]);
-		*/
+		 *  LOG_DBG("WARNING: Clear(%d), Type(%d): IrqStatus(0x%08X) has been cleared",
+		 *      WaitIrq.Clear, WaitIrq.Type, g_IspInfo.IrqInfo.Status[WaitIrq.Type]);
+		 */
 		g_IspInfo.IrqInfo.Status[WaitIrq.Type] = 0;
 		spin_unlock_irqrestore(&(g_IspInfo.SpinLockIrq), flags);
 	}
@@ -3907,36 +3981,36 @@ static MINT32 ISP_WaitIrq(ISP_WAIT_IRQ_STRUCT WaitIrq)
 	while (1) {
 		IrqStatus[ISP_IRQ_TYPE_INT] =
 		    (ISP_RD32((void *)ISP_REG_ADDR_INT_STATUS) &
-		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INT] | g_IspInfo.IrqInfo.
-		      ErrMask[ISP_IRQ_TYPE_INT]));
+		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INT] | g_IspInfo.
+		      IrqInfo.ErrMask[ISP_IRQ_TYPE_INT]));
 		IrqStatus[ISP_IRQ_TYPE_DMA] =
 		    (ISP_RD32((void *)ISP_REG_ADDR_DMA_INT) &
-		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMA] | g_IspInfo.IrqInfo.
-		      ErrMask[ISP_IRQ_TYPE_DMA]));
+		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMA] | g_IspInfo.
+		      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMA]));
 		IrqStatus[ISP_IRQ_TYPE_INTB] =
 		    (ISP_RD32((void *)ISP_REG_ADDR_INTB_STATUS) &
-		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTB] | g_IspInfo.IrqInfo.
-		      ErrMask[ISP_IRQ_TYPE_INTB]));
+		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTB] | g_IspInfo.
+		      IrqInfo.ErrMask[ISP_IRQ_TYPE_INTB]));
 		IrqStatus[ISP_IRQ_TYPE_DMAB] =
 		    (ISP_RD32((void *)ISP_REG_ADDR_DMAB_INT) &
-		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAB] | g_IspInfo.IrqInfo.
-		      ErrMask[ISP_IRQ_TYPE_DMAB]));
+		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAB] | g_IspInfo.
+		      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMAB]));
 		IrqStatus[ISP_IRQ_TYPE_INTC] =
 		    (ISP_RD32((void *)ISP_REG_ADDR_INTC_STATUS) &
-		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTC] | g_IspInfo.IrqInfo.
-		      ErrMask[ISP_IRQ_TYPE_INTC]));
+		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTC] | g_IspInfo.
+		      IrqInfo.ErrMask[ISP_IRQ_TYPE_INTC]));
 		IrqStatus[ISP_IRQ_TYPE_DMAC] =
 		    (ISP_RD32((void *)ISP_REG_ADDR_DMAC_INT) &
-		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAC] | g_IspInfo.IrqInfo.
-		      ErrMask[ISP_IRQ_TYPE_DMAC]));
+		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAC] | g_IspInfo.
+		      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMAC]));
 		IrqStatus[ISP_IRQ_TYPE_INTX] =
 		    (ISP_RD32((void *)ISP_REG_ADDR_INT_STATUSX) &
-		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTX] | g_IspInfo.IrqInfo.
-		      ErrMask[ISP_IRQ_TYPE_INTX]));
+		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTX] | g_IspInfo.
+		      IrqInfo.ErrMask[ISP_IRQ_TYPE_INTX]));
 		IrqStatus[ISP_IRQ_TYPE_DMAX] =
 		    (ISP_RD32((void *)ISP_REG_ADDR_DMA_INTX) &
-		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAX] | g_IspInfo.IrqInfo.
-		      ErrMask[ISP_IRQ_TYPE_DMAX]));
+		     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAX] | g_IspInfo.
+		      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMAX]));
 
 		for (i = 0; i < ISP_IRQ_TYPE_AMOUNT; i++) {
 			if (g_IspInfo.IrqInfo.ErrMask[i] & IrqStatus[i]) {
@@ -4078,8 +4152,9 @@ static void DMAErrHandler(void)
 		if (err_ctrl & (*pErr)) {
 			ISP_WR32(0xF5004160, pErr[2]);
 			addr = pErr[1];
-			LOG_DBG("(0x%08x,0x%08x),dbg(0x%08x, 0x%08x)", addr, ISP_RD32((unsigned long)addr),
-				ISP_RD32(0xF5004160), ISP_RD32(0xF5004164));
+			LOG_DBG("(0x%08x,0x%08x),dbg(0x%08x, 0x%08x)", addr,
+				ISP_RD32((unsigned long)addr), ISP_RD32(0xF5004160),
+				ISP_RD32(0xF5004164));
 		}
 #else
 		addr = pErr[1];
@@ -4108,6 +4183,7 @@ static __tcmfunc irqreturn_t ISP_Irq(MINT32 Irq, MVOID *DeviceId)
 	MUINT32 IrqStatus[ISP_IRQ_TYPE_AMOUNT];
 	MUINT32 IrqStatus_fbc_int;
 	MUINT32 IrqStatus_FBC;
+
 	volatile MUINT32 tg_pa = 0;
 	volatile MUINT32 sof_pa = 0;
 	MUINT32 senifIntStA = 0, regVal = 0;
@@ -4131,38 +4207,38 @@ static __tcmfunc irqreturn_t ISP_Irq(MINT32 Irq, MVOID *DeviceId)
 	/* Read irq status */
 	IrqStatus[ISP_IRQ_TYPE_INT] =
 	    (ISP_RD32((void *)ISP_REG_ADDR_INT_STATUS) &
-	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INT] | g_IspInfo.IrqInfo.
-	      ErrMask[ISP_IRQ_TYPE_INT]));
+	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INT] | g_IspInfo.
+	      IrqInfo.ErrMask[ISP_IRQ_TYPE_INT]));
 	IrqStatus[ISP_IRQ_TYPE_DMA] =
 	    (ISP_RD32((void *)ISP_REG_ADDR_DMA_INT) &
-	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMA] | g_IspInfo.IrqInfo.
-	      ErrMask[ISP_IRQ_TYPE_DMA]));
+	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMA] | g_IspInfo.
+	      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMA]));
 	IrqStatus[ISP_IRQ_TYPE_INTB] =
 	    (ISP_RD32((void *)ISP_REG_ADDR_INTB_STATUS) &
-	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTB] | g_IspInfo.IrqInfo.
-	      ErrMask[ISP_IRQ_TYPE_INTB]));
+	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTB] | g_IspInfo.
+	      IrqInfo.ErrMask[ISP_IRQ_TYPE_INTB]));
 	IrqStatus[ISP_IRQ_TYPE_DMAB] =
 	    (ISP_RD32((void *)ISP_REG_ADDR_DMAB_INT) &
-	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAB] | g_IspInfo.IrqInfo.
-	      ErrMask[ISP_IRQ_TYPE_DMAB]));
+	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAB] | g_IspInfo.
+	      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMAB]));
 	IrqStatus[ISP_IRQ_TYPE_INTC] =
 	    (ISP_RD32((void *)ISP_REG_ADDR_INTC_STATUS) &
-	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTC] | g_IspInfo.IrqInfo.
-	      ErrMask[ISP_IRQ_TYPE_INTC]));
+	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTC] | g_IspInfo.
+	      IrqInfo.ErrMask[ISP_IRQ_TYPE_INTC]));
 	IrqStatus[ISP_IRQ_TYPE_DMAC] =
 	    (ISP_RD32((void *)ISP_REG_ADDR_DMAC_INT) &
-	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAC] | g_IspInfo.IrqInfo.
-	      ErrMask[ISP_IRQ_TYPE_DMAC]));
+	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAC] | g_IspInfo.
+	      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMAC]));
 
 	/* below may need to read elsewhere */
 	IrqStatus[ISP_IRQ_TYPE_INTX] =
 	    (ISP_RD32((void *)ISP_REG_ADDR_INT_STATUSX) &
-	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTX] | g_IspInfo.IrqInfo.
-	      ErrMask[ISP_IRQ_TYPE_INTX]));
+	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTX] | g_IspInfo.
+	      IrqInfo.ErrMask[ISP_IRQ_TYPE_INTX]));
 	IrqStatus[ISP_IRQ_TYPE_DMAX] =
 	    (ISP_RD32((void *)ISP_REG_ADDR_DMA_INTX) &
-	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAX] | g_IspInfo.IrqInfo.
-	      ErrMask[ISP_IRQ_TYPE_DMAX]));
+	     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAX] | g_IspInfo.
+	      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMAX]));
 
 	/* FBC drop frame status */
 	IrqStatus_FBC = ISP_RD32((void *)ISP_REG_ADDR_FBC_INT);
@@ -4177,26 +4253,24 @@ static __tcmfunc irqreturn_t ISP_Irq(MINT32 Irq, MVOID *DeviceId)
 			if (g_IspInfo.IrqInfo.ErrMask[i] & IrqStatus[i]) {
 				/* ISP_IRQ_INTX_STATUS_IMGO_ERR_ST: on-the-fly imgo error, not really overrun */
 				if (i != ISP_IRQ_TYPE_INTX
-				    || (g_IspInfo.IrqInfo.
-					ErrMask[i] & IrqStatus[i] &
+				    || (g_IspInfo.IrqInfo.ErrMask[i] & IrqStatus[i] &
 					(~ISP_IRQ_INTX_STATUS_IMGO_ERR_ST))) {
 					if (i != ISP_IRQ_TYPE_INTX) {	/* to reduce isp log */
-						LOG_DBG("Error IRQ, Type(%d), Status(0x%08X),m:%x, irq:%x",
-							i, g_IspInfo.IrqInfo.
-							ErrMask[i] & IrqStatus[i],
-							g_IspInfo.IrqInfo.ErrMask[i], IrqStatus[i]);
+						LOG_DBG
+						    ("Error IRQ, Type(%d), Status(0x%08X),m:%x, irq:%x",
+						     i, g_IspInfo.IrqInfo.ErrMask[i] & IrqStatus[i],
+						     g_IspInfo.IrqInfo.ErrMask[i], IrqStatus[i]);
 					}
 					/* TODO: Add error handler... */
 				}
 
-				if (i != ISP_IRQ_TYPE_INTX
-					&& (g_IspInfo.IrqInfo.ErrMask[i]
-						& IrqStatus[i]) == 0x00200000) {	/* AAO error */
+				if (i != ISP_IRQ_TYPE_INTX && (g_IspInfo.IrqInfo.ErrMask[i]
+							       & IrqStatus[i]) == 0x00200000) {	/* AAO error */
 					ISP_WR32((void *)ISP_REG_ADDR_DMA_INTX,
-					ISP_RD32((void *)ISP_REG_ADDR_DMA_INTX)
-							& (~0x00200000));
+						 ISP_RD32((void *)ISP_REG_ADDR_DMA_INTX)
+						 & (~0x00200000));
 					LOG_INF("set new DMA INTX:%x",
-							ISP_RD32((void *)ISP_REG_ADDR_DMA_INTX));
+						ISP_RD32((void *)ISP_REG_ADDR_DMA_INTX));
 				}
 			}
 
@@ -4237,7 +4311,7 @@ static __tcmfunc irqreturn_t ISP_Irq(MINT32 Irq, MVOID *DeviceId)
 
 					schedule_work(&g_IspInfo.ScheduleWorkSENINF);
 					tasklet_schedule(&IspTaskletSENIF);
-#if 0 /* TODO, temp remove, need to be added after aee is ok */
+#if 0				/* TODO, temp remove, need to be added after aee is ok */
 					aee_kernel_warning_api(__FILE__, __LINE__, DB_OPT_DEFAULT,
 							       "CAMERA",
 							       "SENIF FIFO overrun/underrun");
@@ -4405,7 +4479,7 @@ static __tcmfunc irqreturn_t ISP_Irq(MINT32 Irq, MVOID *DeviceId)
 
 			if (g_sof_pass1done == 1) {
 				LOG_DBG("P1_SOF_%d: Lost pass1 done",
-				((ISP_RD32(ISP_REG_ADDR_TG_INTER_ST) & 0x00FF0000) >> 16));
+					((ISP_RD32(ISP_REG_ADDR_TG_INTER_ST) & 0x00FF0000) >> 16));
 			}
 			g_sof_pass1done = 1;
 		}
@@ -4424,21 +4498,21 @@ static __tcmfunc irqreturn_t ISP_Irq(MINT32 Irq, MVOID *DeviceId)
 				    (IrqStatus[j] & IspInfo_FrmB.IrqInfo.Mask[j]);
 
 				/* 2. update signal occuring time and passed by signal count */
-				if (IspInfo_FrmB.IrqInfo.MarkedFlag[i][j] & IspInfo_FrmB.IrqInfo.
-				    Mask[j]) {
+				if (IspInfo_FrmB.IrqInfo.MarkedFlag[i][j] & IspInfo_FrmB.
+				    IrqInfo.Mask[j]) {
 					for (k = 0; k < 32; k++) {
-					/**/	if ((IrqStatus[j] & IspInfo_FrmB.IrqInfo.
-						     Mask[j]) & (1 << k)) {
-							idx = my_get_pow_idx(1 << k);
-							IspInfo_FrmB.IrqInfo.
-							    LastestSigTime_usec[j][idx] =
-							    (unsigned int)(time_frmb_usec);
-							IspInfo_FrmB.IrqInfo.
-							    LastestSigTime_sec[j][idx] =
-							    (unsigned int)(time_frmb_sec);
-							IspInfo_FrmB.IrqInfo.
-							    PassedBySigCnt[i][j][k]++;
-						}
+					if ((IrqStatus[j] & IspInfo_FrmB.
+					 IrqInfo.Mask[j]) & (1 << k)) {
+						idx = my_get_pow_idx(1 << k);
+						IspInfo_FrmB.
+						    IrqInfo.LastestSigTime_usec[j][idx] =
+						    (unsigned int)(time_frmb_usec);
+						IspInfo_FrmB.
+						    IrqInfo.LastestSigTime_sec[j][idx] =
+						    (unsigned int)(time_frmb_sec);
+						IspInfo_FrmB.
+						    IrqInfo.PassedBySigCnt[i][j][k]++;
+					}
 					}
 				} else {	/* no any interrupt is not marked and  in read mask in this irq type */
 				}
@@ -4505,7 +4579,8 @@ static long ISP_ioctl(struct file *pFile, MUINT32 Cmd, unsigned long Param)
 	switch (Cmd) {
 	case ISP_USER_PRINT_CTRL:
 		{
-			if (copy_from_user(&UserLog, (void __user *)Param, sizeof(ISP_DEBUG_PRINT_STRUCT)) == 0) {
+			if (copy_from_user
+			    (&UserLog, (void __user *)Param, sizeof(ISP_DEBUG_PRINT_STRUCT)) == 0) {
 				LOG_INF("[IMem_Drv] %s", UserLog.logbuf);
 			} else {
 				LOG_ERR("copy_from_user failed");
@@ -4641,36 +4716,36 @@ static long ISP_ioctl(struct file *pFile, MUINT32 Cmd, unsigned long Param)
 
 				IrqStatus[ISP_IRQ_TYPE_INT] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_INT_STATUS) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INT] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_INT]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INT] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_INT]));
 				IrqStatus[ISP_IRQ_TYPE_DMA] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_DMA_INT) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMA] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_DMA]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMA] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMA]));
 				IrqStatus[ISP_IRQ_TYPE_INTB] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_INTB_STATUS) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTB] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_INTB]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTB] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_INTB]));
 				IrqStatus[ISP_IRQ_TYPE_DMAB] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_DMAB_INT) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAB] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_DMAB]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAB] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMAB]));
 				IrqStatus[ISP_IRQ_TYPE_INTC] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_INTC_STATUS) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTC] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_INTC]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTC] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_INTC]));
 				IrqStatus[ISP_IRQ_TYPE_DMAC] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_DMAC_INT) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAC] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_DMAC]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAC] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMAC]));
 				IrqStatus[ISP_IRQ_TYPE_INTX] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_INT_STATUSX) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTX] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_INTX]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTX] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_INTX]));
 				IrqStatus[ISP_IRQ_TYPE_DMAX] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_DMA_INTX) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAX] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_DMAX]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAX] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMAX]));
 
 				for (i = 0; i < ISP_IRQ_TYPE_AMOUNT; i++) {
 					g_IspInfo.IrqInfo.Status[i] |=
@@ -4714,36 +4789,36 @@ static long ISP_ioctl(struct file *pFile, MUINT32 Cmd, unsigned long Param)
 
 				IrqStatus[ISP_IRQ_TYPE_INT] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_INT_STATUS) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INT] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_INT]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INT] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_INT]));
 				IrqStatus[ISP_IRQ_TYPE_DMA] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_DMA_INT) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMA] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_DMA]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMA] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMA]));
 				IrqStatus[ISP_IRQ_TYPE_INTB] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_INTB_STATUS) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTB] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_INTB]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTB] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_INTB]));
 				IrqStatus[ISP_IRQ_TYPE_DMAB] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_DMAB_INT) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAB] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_DMAB]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAB] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMAB]));
 				IrqStatus[ISP_IRQ_TYPE_INTC] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_INTC_STATUS) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTC] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_INTC]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTC] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_INTC]));
 				IrqStatus[ISP_IRQ_TYPE_DMAC] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_DMAC_INT) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAC] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_DMAC]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAC] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMAC]));
 				IrqStatus[ISP_IRQ_TYPE_INTX] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_INT_STATUSX) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTX] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_INTX]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_INTX] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_INTX]));
 				IrqStatus[ISP_IRQ_TYPE_DMAX] =
 				    (ISP_RD32((void *)ISP_REG_ADDR_DMA_INTX) &
-				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAX] | g_IspInfo.IrqInfo.
-				      ErrMask[ISP_IRQ_TYPE_DMAX]));
+				     (g_IspInfo.IrqInfo.Mask[ISP_IRQ_TYPE_DMAX] | g_IspInfo.
+				      IrqInfo.ErrMask[ISP_IRQ_TYPE_DMAX]));
 
 				for (i = 0; i < ISP_IRQ_TYPE_AMOUNT; i++) {
 					g_IspInfo.IrqInfo.Status[i] |=
@@ -4788,6 +4863,7 @@ static long ISP_ioctl(struct file *pFile, MUINT32 Cmd, unsigned long Param)
 			if (copy_from_user(DebugFlag, (void __user *)Param, sizeof(MUINT32) * 2) ==
 			    0) {
 				MUINT32 lock_key = _IRQ_MAX;
+
 				if (DebugFlag[1] >= _IRQ_MAX) {
 					LOG_ERR("unsupported module:0x%x\n", DebugFlag[1]);
 					Ret = -EFAULT;
@@ -4810,7 +4886,7 @@ static long ISP_ioctl(struct file *pFile, MUINT32 Cmd, unsigned long Param)
 		}
 	case ISP_SENSOR_FREQ_CTRL:
 		{
-#if 0 /* Old method, already move setting pclk to seninf->kd_sensorlist.c: setMCLK() */
+#if 0				/* Old method, already move setting pclk to seninf->kd_sensorlist.c: setMCLK() */
 			MUINT32 senFreq = 0;
 
 			if (copy_from_user(&senFreq, (void __user *)Param, sizeof(MUINT32)) == 0) {
@@ -5209,11 +5285,11 @@ static int compat_get_isp_buf_ctrl_struct_data(compat_ISP_BUFFER_CTRL_STRUCT __u
 	err |= put_user(tmp, &data->buf_id);
 
 	err |= get_user(uptr, &data32->data_ptr);
-	err |= put_user(uptr,  (unsigned long __user *)&data->data_ptr);
+	err |= put_user(uptr, (unsigned long __user *)&data->data_ptr);
 	err |= get_user(uptr, &data32->ex_data_ptr);
-	err |= put_user(uptr,  (unsigned long __user *)&data->ex_data_ptr);
+	err |= put_user(uptr, (unsigned long __user *)&data->ex_data_ptr);
 	err |= get_user(uptr, &data32->pExtend);
-	err |= put_user(uptr,  (unsigned long __user *)&data->pExtend);
+	err |= put_user(uptr, (unsigned long __user *)&data->pExtend);
 
 	return err;
 }
@@ -5281,7 +5357,7 @@ static int compat_get_isp_register_irq_user_key_data(compat_ISP_REGISTER_USERKEY
 	err = get_user(tmp, &data32->userKey);
 	err |= put_user(tmp, &data->userKey);
 	err = get_user(uptr, &data32->userName);
-	err |= put_user(uptr,  (unsigned long __user *)&data->userName);
+	err |= put_user(uptr, (unsigned long __user *)&data->userName);
 
 	return err;
 }
@@ -5296,7 +5372,7 @@ static int compat_put_isp_register_irq_user_key_data(compat_ISP_REGISTER_USERKEY
 
 	err = get_user(tmp, &data->userKey);
 	err |= put_user(tmp, &data32->userKey);
-	err = get_user(uptr,  (unsigned long __user *)&data->userName);
+	err = get_user(uptr, (unsigned long __user *)&data->userName);
 	err |= put_user(uptr, &data32->userName);
 
 	return err;
@@ -5318,12 +5394,12 @@ static long ISP_ioctl_compat(struct file *filp, unsigned int cmd, unsigned long 
 	switch (cmd) {
 
 	case COMPAT_ISP_USER_PRINT_CTRL:
-	{
-		ret =
-			filp->f_op->unlocked_ioctl(filp, ISP_USER_PRINT_CTRL,
-						   (unsigned long)compat_ptr(arg));
-		return ret;
-	}
+		{
+			ret =
+			    filp->f_op->unlocked_ioctl(filp, ISP_USER_PRINT_CTRL,
+						       (unsigned long)compat_ptr(arg));
+			return ret;
+		}
 
 	case COMPAT_ISP_READ_REGISTER:
 		{
@@ -5587,11 +5663,10 @@ static MINT32 ISP_open(struct inode *pInode, struct file *pFile)
 			g_IspInfo.UserCount, current->comm, current->pid, current->tgid);
 		goto EXIT;
 	}
-
-	#if (LOG_CONSTRAINT_ADJ == 1)
+#if (LOG_CONSTRAINT_ADJ == 1)
 	g_log_def_constraint = detect_count;
 	detect_count = 200;
-	#endif
+#endif
 
 	/* default cam 1 */
 	spin_lock_irqsave(&SpinLockCamHaVer, flags);
@@ -5654,7 +5729,7 @@ EXIT:
 
 		if (g_IspInfo.UserCount == 1)
 			LOG_INF("Curr UserCount(%d), (process, pid, tgid)=(%s, %d, %d), first user",
-			g_IspInfo.UserCount, current->comm, current->pid, current->tgid);
+				g_IspInfo.UserCount, current->comm, current->pid, current->tgid);
 
 		ISP_EnableClock(MTRUE, 1);
 		LOG_DBG("isp open g_EnableClkCnt:	%d", g_EnableClkCnt);
@@ -5676,7 +5751,7 @@ static MINT32 ISP_release(struct inode *pInode, struct file *pFile)
 {
 	ISP_USER_INFO_STRUCT *pUserInfo;
 
-	/*LOG_DBG("+,UserCount(%d)", g_IspInfo.UserCount);*/
+	/*LOG_DBG("+,UserCount(%d)", g_IspInfo.UserCount); */
 
 	spin_lock(&(g_IspInfo.SpinLockIspRef));
 
@@ -5692,22 +5767,24 @@ static MINT32 ISP_release(struct inode *pInode, struct file *pFile)
 	if (g_IspInfo.UserCount > 0) {
 		spin_unlock(&(g_IspInfo.SpinLockIspRef));
 		LOG_DBG("+ Curr UserCount(%d->%d), (process, pid, tgid)=(%s, %d, %d), users exist",
-			(g_IspInfo.UserCount+1), g_IspInfo.UserCount, current->comm, current->pid, current->tgid);
+			(g_IspInfo.UserCount + 1), g_IspInfo.UserCount, current->comm, current->pid,
+			current->tgid);
 		goto EXIT;
 	} else {
 		spin_unlock(&(g_IspInfo.SpinLockIspRef));
 	}
 
 
-	#if (LOG_CONSTRAINT_ADJ == 1)
+#if (LOG_CONSTRAINT_ADJ == 1)
 	detect_count = g_log_def_constraint;
-	#endif
+#endif
 
 	LOG_INF("+ Curr UserCount(%d->%d), (process, pid, tgid)=(%s, %d, %d), last user",
-		(g_IspInfo.UserCount+1), g_IspInfo.UserCount, current->comm, current->pid, current->tgid);
+		(g_IspInfo.UserCount + 1), g_IspInfo.UserCount, current->comm, current->pid,
+		current->tgid);
 
 	/* Disable clock. */
-	/*ISP_EnableClock(MFALSE, 1);*/
+	/*ISP_EnableClock(MFALSE, 1); */
 	if (g_bWaitLock == 1) {
 #ifdef CONFIG_PM_WAKELOCKS
 		__pm_relax(&isp_wake_lock);
@@ -5769,9 +5846,9 @@ static MINT32 mmap_kmem(struct file *filp, struct vm_area_struct *vma)
 		return -EAGAIN;
 	}
 	ret = remap_pfn_range(vma,
-				   vma->vm_start,
-				   virt_to_phys((void *)g_pTbl_RTBuf) >> PAGE_SHIFT,
-				   length, vma->vm_page_prot);
+			      vma->vm_start,
+			      virt_to_phys((void *)g_pTbl_RTBuf) >> PAGE_SHIFT,
+			      length, vma->vm_page_prot);
 	if (ret < 0) {
 		return ret;
 	}
@@ -5795,12 +5872,12 @@ static MINT32 ISP_mmap(struct file *pFile, struct vm_area_struct *pVma)
 	} else {
 		pVma->vm_page_prot = pgprot_noncached(pVma->vm_page_prot);
 		/*
-		LOG_DBG
-		    ("pVma->vm_pgoff(0x%x),phy(0x%x),pVmapVma->vm_start(0x%x),pVma->vm_end(0x%x),length(0x%x)",
-		     (unsigned int)(pVma->vm_pgoff), (unsigned int)(pVma->vm_pgoff << PAGE_SHIFT),
-		     (unsigned int)(pVma->vm_start), (unsigned int)(pVma->vm_end),
-		     (unsigned int)(length));
-		*/
+		   LOG_DBG
+		   ("pVma->vm_pgoff(0x%x),phy(0x%x),pVmapVma->vm_start(0x%x),pVma->vm_end(0x%x),length(0x%x)",
+		   (unsigned int)(pVma->vm_pgoff), (unsigned int)(pVma->vm_pgoff << PAGE_SHIFT),
+		   (unsigned int)(pVma->vm_start), (unsigned int)(pVma->vm_end),
+		   (unsigned int)(length));
+		 */
 		pfn = pVma->vm_pgoff << PAGE_SHIFT;
 		switch (pfn) {
 		case IMGSYS_BASE_ADDR:	/* imgsys */
@@ -5894,7 +5971,9 @@ static const struct file_operations g_IspFileOper = {
 #ifdef CONFIG_COMPAT
 	.compat_ioctl = ISP_ioctl_compat,
 #endif
-	.unlocked_ioctl = ISP_ioctl
+	.unlocked_ioctl = ISP_ioctl,
+	.read    =  NULL,
+	.write   =  NULL
 };
 
 /*******************************************************************************
@@ -5966,8 +6045,8 @@ EXIT:
 static MINT32 ISP_probe_FrmB(void)
 {
 	MINT32 Ret = 0;
-	/*struct resource *pRes = NULL;*/
-	/*MINT32 i = 0;*/
+	/*struct resource *pRes = NULL; */
+	/*MINT32 i = 0; */
 	MUINT8 n;
 	/*  */
 	init_waitqueue_head(&IspInfo_FrmB.WaitQueueHead);
@@ -6054,7 +6133,7 @@ static unsigned long of_get_nodeVA(const char *comp_str)
 
 	dev_node = of_find_compatible_node(NULL, NULL, comp_str);
 
-	if (NULL == dev_node) {
+	if (dev_node == NULL) {
 		LOG_ERR("of_find_compatible_node(%s) fail", comp_str);
 	} else {
 		LOG_DBG("of_find_compatible_node(%s) success !!", comp_str);
@@ -6067,7 +6146,7 @@ static unsigned long of_get_nodeVA(const char *comp_str)
 
 		ret_baseaddr = (unsigned long)of_iomap(plat_dev->dev.of_node, 0);
 		LOG_DBG("(%s)ret_baseaddr PA=0x%lx, VA = 0x%lx",
-				comp_str, of_getISPPA(plat_dev->dev.of_node, 0), ret_baseaddr);
+			comp_str, of_getISPPA(plat_dev->dev.of_node, 0), ret_baseaddr);
 	}
 	return ret_baseaddr;
 }
@@ -6075,7 +6154,7 @@ static unsigned long of_get_nodeVA(const char *comp_str)
 static MINT32 ISP_probe(struct platform_device *pDev)
 {
 	MINT32 Ret = 0;
-	/*struct resource *pRes = NULL;*/ /* replaced by of_iomap */
+	/*struct resource *pRes = NULL; *//* replaced by of_iomap */
 	MINT32 i;
 #ifdef CONFIG_OF
 	int new_count;
@@ -6093,7 +6172,6 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 		dev_err(&pDev->dev, "pDev is NULL");
 		return -ENXIO;
 	}
-
 #ifdef CONFIG_MTK_IOMMU
 	larb_node = of_parse_phandle(pDev->dev.of_node, "mediatek,smilarb", 0);
 	if (!larb_node)
@@ -6135,7 +6213,8 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 		gISPSYS_Reg[i] = (unsigned long)(cam_isp_dev->regs[i]);
 		gISPSYS_Reg_FrmB[i] = (unsigned long)(cam_isp_dev->regs[i]);
 		/*LOG_INF("DT, i=%d, name=%s, map_addr=0x%lx/0x%lx\n",
-		i, pDev->dev.of_node->name, gISPSYS_Reg[i], gISPSYS_Reg_FrmB[i]);*/
+		 *   i, pDev->dev.of_node->name, gISPSYS_Reg[i], gISPSYS_Reg_FrmB[i]);
+		  */
 		LOG_INF("DT, i=%d, PA(0x%lx), map_VA=0x%lx/0x%lx\n",
 			i, of_getISPPA(pDev->dev.of_node, i), gISPSYS_Reg[i], gISPSYS_Reg_FrmB[i]);
 	}
@@ -6149,7 +6228,7 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 		cam_isp_dev->irq[i] = irq_of_parse_and_map(pDev->dev.of_node, i);
 		gISPSYS_Irq[i] = cam_isp_dev->irq[i];
 		gISPSYS_Irq_FrmB[i] = cam_isp_dev->irq[i];
-		if (ISP_CAM0_IRQ_IDX == i) {
+		if (i == ISP_CAM0_IRQ_IDX) {
 			Ret = request_irq(cam_isp_dev->irq[i], (irq_handler_t) ISP_Irq, IRQF_TRIGGER_NONE, "ISP", NULL);	/* IRQF_TRIGGER_NONE dose not take effect here, real trigger mode set in dts file */
 		}
 		if (Ret) {
@@ -6158,8 +6237,9 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 				cam_isp_dev->irq[i]);
 			return Ret;
 		}
-		LOG_INF("DT, i=%d, name=%s, map_irq=%d , get_hardware_irq(%d)\n", i, pDev->dev.of_node->name,
-			cam_isp_dev->irq[i], get_hardware_irq(cam_isp_dev->irq[i]));
+		LOG_INF("DT, i=%d, name=%s, map_irq=%d , get_hardware_irq(%d)\n", i,
+			pDev->dev.of_node->name, cam_isp_dev->irq[i],
+			get_hardware_irq(cam_isp_dev->irq[i]));
 
 	}
 	nr_camisp_devs = new_count;
@@ -6205,8 +6285,10 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 	LOG_INF("[Houston] pm_runtime_enable(ISP)");
 	/* Save isp power domain handle */
 	g_pmdev_isp = &pDev->dev;
-	BUG_ON(IS_ERR(g_pmdev_isp)); pm_runtime_enable(g_pmdev_isp);
-	pm_runtime_get_sync(g_pmdev_isp);	LOG_INF("[Houston] pm_runtime_get_sync(ISP)");
+	WARN_ON(IS_ERR(g_pmdev_isp));
+	pm_runtime_enable(g_pmdev_isp);
+	pm_runtime_get_sync(g_pmdev_isp);
+	LOG_INF("[Houston] pm_runtime_get_sync(ISP)");
 /* [Houston] --- */
 #endif
 
@@ -6312,7 +6394,8 @@ static MINT32 ISP_remove(struct platform_device *pDev)
 	LOG_DBG("+");
 #if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU)
 	LOG_INF("[Houston] pm_runtime_disable(ISP)");
-	BUG_ON(IS_ERR(g_pmdev_isp)); pm_runtime_disable(g_pmdev_isp);
+	WARN_ON(IS_ERR(g_pmdev_isp));
+	pm_runtime_disable(g_pmdev_isp);
 #endif
 	/* unregister char driver. */
 	ISP_UnregCharDev();
@@ -6362,6 +6445,16 @@ static MINT32 ISP_suspend(struct platform_device *pDev, pm_message_t Mesg)
 		ISP_WR32((void *)(ISP_ADDR + 0x414), (regTG1Val & (~0x01)));
 		/* ISP_Reset(); */
 	}
+
+#if 1
+	/*	fix enable count mismatch with disable count*/
+	if (g_EnableClkCnt > 0) {
+		int i;
+		/* disable clock for g_EnableClkCnt times */
+		for (i = 0; i < g_EnableClkCnt; ++i)
+			ISP_EnableClock(MFALSE, 0);
+	}
+#endif
 
 	return 0;
 }
@@ -6485,72 +6578,73 @@ static struct platform_driver IspDriver = {
 static int ISP_DumpRegToProc(struct seq_file *s, void *v)
 {
 	MUINT32 i = 0;
+
 	seq_puts(s, " MT8163 ISP Register\n");
 	seq_puts(s, "====== top ====\n");
 	for (i = 0x0; i <= 0x1AC; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	seq_puts(s, "====== dma ====\n");
 	for (i = 0x200; i <= 0x3D8; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n\r", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	seq_puts(s, "====== tg ====\n");
 	for (i = 0x400; i <= 0x4EC; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	seq_puts(s, "====== cdp (including EIS) ====\n");
 	for (i = 0xB00; i <= 0xDE0; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	seq_puts(s, "====== seninf ====\n");
 	for (i = 0x4000; i <= 0x40C0; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	for (i = 0x4100; i <= 0x41BC; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	for (i = 0x4200; i <= 0x4208; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	for (i = 0x4300; i <= 0x4310; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	for (i = 0x43A0; i <= 0x43B0; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	for (i = 0x4400; i <= 0x4424; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	for (i = 0x4500; i <= 0x4520; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	for (i = 0x4600; i <= 0x4608; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	for (i = 0x4A00; i <= 0x4A08; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 
 	seq_puts(s, "====== 3DNR ====\n");
 	for (i = 0x4F00; i <= 0x4F38; i += 4)
 		seq_printf(s, "+0x%08x 0x%08x\n", (unsigned int)(ISP_ADDR + i),
-			(unsigned int)(ISP_RD32(ISP_ADDR + i)));
+			   (unsigned int)(ISP_RD32(ISP_ADDR + i)));
 
 	return 0;
-	}
+}
 
 static int ISP_DumpRegOpen(struct inode *inode, struct file *file)
 {
@@ -6560,14 +6654,9 @@ static int ISP_DumpRegOpen(struct inode *inode, struct file *file)
 /*******************************************************************************
 *
 ********************************************************************************/
-static ssize_t ISP_RegDebug(
-	struct file *pFile,
-	const char *pBuffer,
-	size_t Count,
-	loff_t *pData)
-
+static ssize_t ISP_RegDebug(struct file *pFile, const char *pBuffer, size_t Count, loff_t *pData)
 {
-	char RegBuf[64] = {'\0'};
+	char RegBuf[64] = { '\0' };
 	MUINT32 CopyBufSize = (Count < (sizeof(RegBuf) - 1)) ? (Count) : (sizeof(RegBuf) - 1);
 	MUINT32 Addr = 0;
 	MUINT32 Data = 0;
@@ -6581,17 +6670,17 @@ static ssize_t ISP_RegDebug(
 
 	if (sscanf(RegBuf, "debugmask=%x", &Addr) == 1) {
 		/*
-		* #define ISP_DBG_INT                 (0x00000001)
-		* #define ISP_DBG_HOLD_REG            (0x00000002)
-		* #define ISP_DBG_READ_REG            (0x00000004)
-		* #define ISP_DBG_WRITE_REG           (0x00000008)
-		* #define ISP_DBG_CLK                 (0x00000010)
-		* #define ISP_DBG_TASKLET             (0x00000020)
-		* #define ISP_DBG_SCHEDULE_WORK       (0x00000040)
-		* #define ISP_DBG_BUF_WRITE           (0x00000080)
-		* #define ISP_DBG_BUF_CTRL            (0x00000100)
-		* #define ISP_DBG_REF_CNT_CTRL        (0x00000200)
-		*/
+		 * #define ISP_DBG_INT                 (0x00000001)
+		 * #define ISP_DBG_HOLD_REG            (0x00000002)
+		 * #define ISP_DBG_READ_REG            (0x00000004)
+		 * #define ISP_DBG_WRITE_REG           (0x00000008)
+		 * #define ISP_DBG_CLK                 (0x00000010)
+		 * #define ISP_DBG_TASKLET             (0x00000020)
+		 * #define ISP_DBG_SCHEDULE_WORK       (0x00000040)
+		 * #define ISP_DBG_BUF_WRITE           (0x00000080)
+		 * #define ISP_DBG_BUF_CTRL            (0x00000100)
+		 * #define ISP_DBG_REF_CNT_CTRL        (0x00000200)
+		 */
 		if ((Addr >= 0) && (Addr <= 0xFFFF)) {
 			LOG_INF("Enable isp debug mask:%x", Addr);
 			g_IspInfo.DebugMask = Addr;
@@ -6600,27 +6689,32 @@ static ssize_t ISP_RegDebug(
 		}
 	} else if (sscanf(RegBuf, "%x %x", &Addr, &Data) == 2) {
 		if ((ISP_ADDR_CAMINF + Addr >= ISP_ADDR) &&
-			(ISP_ADDR_CAMINF + Addr < (ISP_ADDR_CAMINF+ISP_REG_RANGE))) {
+		    (ISP_ADDR_CAMINF + Addr < (ISP_ADDR_CAMINF + ISP_REG_RANGE))) {
 			ISP_WR32(ISP_ADDR_CAMINF + Addr, Data);
 			LOG_INF("Write => Addr: 0x%08X, Write Data: 0x%08X. Read Data: 0x%08X.",
-			(unsigned int)(ISP_ADDR_CAMINF + Addr), Data, (unsigned int)ISP_RD32(ISP_ADDR_CAMINF + Addr));
+				(unsigned int)(ISP_ADDR_CAMINF + Addr), Data,
+				(unsigned int)ISP_RD32(ISP_ADDR_CAMINF + Addr));
 		} else {
-			LOG_ERR("Wrong address out of range (0x%x)", (unsigned int)(ISP_ADDR_CAMINF + Addr));
+			LOG_ERR("Wrong address out of range (0x%x)",
+				(unsigned int)(ISP_ADDR_CAMINF + Addr));
 		}
 	} else if (sscanf(RegBuf, "%x", &Addr) == 1) {
 		if ((ISP_ADDR_CAMINF + Addr >= ISP_ADDR) &&
-			(ISP_ADDR_CAMINF + Addr < (ISP_ADDR_CAMINF+ISP_REG_RANGE))) {
-			LOG_INF("Read => Addr: 0x%08X, Read Data: 0x%08X.", (unsigned int)(ISP_ADDR_CAMINF + Addr),
-			(unsigned int)ISP_RD32(ISP_ADDR_CAMINF + Addr));
+		    (ISP_ADDR_CAMINF + Addr < (ISP_ADDR_CAMINF + ISP_REG_RANGE))) {
+			LOG_INF("Read => Addr: 0x%08X, Read Data: 0x%08X.",
+				(unsigned int)(ISP_ADDR_CAMINF + Addr),
+				(unsigned int)ISP_RD32(ISP_ADDR_CAMINF + Addr));
 		} else {
-			LOG_ERR("Wrong address out of range (0x%x)", (unsigned int)(ISP_ADDR_CAMINF + Addr));
+			LOG_ERR("Wrong address out of range (0x%x)",
+				(unsigned int)(ISP_ADDR_CAMINF + Addr));
+		}
 	}
-}
 
 	LOG_DBG("- X. Count: %d.", (int)Count);
 	return Count;
 
 }
+
 #if 0
 static MUINT32 proc_regOfst;
 #endif
@@ -6628,12 +6722,12 @@ static int CAMIO_DumpRegToProc(struct seq_file *s, void *v)
 {
 #if 0
 	seq_printf(s, "reg_0x%08X = 0x%X\n", (unsigned int)(ISP_GPIO_ADDR + proc_regOfst),
-			 ISP_RD32(ISP_GPIO_ADDR + proc_regOfst));
+		   ISP_RD32(ISP_GPIO_ADDR + proc_regOfst));
 #else
 	LOG_WRN("Not support");
 #endif
 	return 0;
-	}
+}
 
 static int CAMIO_DumpRegOpen(struct inode *inode, struct file *file)
 {
@@ -6644,13 +6738,14 @@ static int CAMIO_DumpRegOpen(struct inode *inode, struct file *file)
 *
 ********************************************************************************/
 static ssize_t CAMIO_RegDebug(struct file *pFile, const char __user *pBuffer, size_t Count,
-				  loff_t *ppos)
+			      loff_t *ppos)
 {
 #if 0
 	char RegBuf[64];
 	MUINT32 CopyBufSize = (Count < (sizeof(RegBuf) - 1)) ? (Count) : (sizeof(RegBuf) - 1);
 	MUINT32 Addr = 0;
 	MUINT32 Data = 0;
+
 	LOG_DBG("- E. pFile: 0x%08x. pBuffer: 0x%08x. Count: %d.", (unsigned int)pFile,
 		(unsigned int)pBuffer, (int)Count);
 
@@ -6662,21 +6757,25 @@ static ssize_t CAMIO_RegDebug(struct file *pFile, const char __user *pBuffer, si
 	if (sscanf(RegBuf, "%x %x", &Addr, &Data) == 2) {
 		proc_regOfst = Addr;
 		if ((ISP_GPIO_ADDR + Addr >= ISP_GPIO_ADDR) &&
-			(ISP_GPIO_ADDR + Addr < (ISP_GPIO_ADDR + GPIO_RANGE))) {
+		    (ISP_GPIO_ADDR + Addr < (ISP_GPIO_ADDR + GPIO_RANGE))) {
 			ISP_WR32(ISP_GPIO_ADDR + Addr, Data);
 			LOG_INF("Write => Addr: 0x%08X, Write Data: 0x%08X. Read Data: 0x%08X.",
-				(unsigned int)(ISP_GPIO_ADDR + Addr), Data, ISP_RD32(ISP_GPIO_ADDR + Addr));
+				(unsigned int)(ISP_GPIO_ADDR + Addr), Data,
+				ISP_RD32(ISP_GPIO_ADDR + Addr));
 		} else {
-			LOG_ERR("Wrong address out of range (0x%x)", (unsigned int)(ISP_GPIO_ADDR + Addr));
+			LOG_ERR("Wrong address out of range (0x%x)",
+				(unsigned int)(ISP_GPIO_ADDR + Addr));
 		}
 	} else if (sscanf(RegBuf, "%x", &Addr) == 1) {
 		proc_regOfst = Addr;
 		if ((ISP_GPIO_ADDR + Addr >= ISP_GPIO_ADDR) &&
-			(ISP_GPIO_ADDR + Addr < (ISP_GPIO_ADDR + GPIO_RANGE))) {
-			LOG_INF("Read => Addr: 0x%08X, Read Data: 0x%08X.", (unsigned int)(ISP_GPIO_ADDR + Addr),
+		    (ISP_GPIO_ADDR + Addr < (ISP_GPIO_ADDR + GPIO_RANGE))) {
+			LOG_INF("Read => Addr: 0x%08X, Read Data: 0x%08X.",
+				(unsigned int)(ISP_GPIO_ADDR + Addr),
 				ISP_RD32(ISP_GPIO_ADDR + Addr));
-		 } else {
-			LOG_ERR("Wrong address out of range (0x%x)", (unsigned int)(ISP_GPIO_ADDR + Addr));
+		} else {
+			LOG_ERR("Wrong address out of range (0x%x)",
+				(unsigned int)(ISP_GPIO_ADDR + Addr));
 		}
 	}
 	LOG_DBG("- X. Count: %d.", (int)Count);
@@ -6821,6 +6920,7 @@ int32_t ISP_MDPClockOffCallback(uint64_t engineFlag)
 
 	return 0;
 }
+
 #ifndef CONFIG_MTK_IOMMU
 m4u_callback_ret_t ISP_M4U_TranslationFault_callback(int port, unsigned int mva, void *data)
 {
@@ -6953,6 +7053,7 @@ m4u_callback_ret_t ISP_M4U_TranslationFault_callback(int port, unsigned int mva,
 	return M4U_CALLBACK_HANDLED;
 }
 #endif
+
 /*******************************************************************************
 *
 ********************************************************************************/
@@ -7055,6 +7156,7 @@ static MVOID __exit ISP_Exit(MVOID)
 
 	LOG_DBG("-");
 }
+
 /* One more driver for DISP power domain */
 
 #if !defined(CONFIG_MTK_SMI_VARIANT) && !defined(CONFIG_MTK_IOMMU)
@@ -7086,22 +7188,23 @@ static int disp_pm_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id disp_pm_id_table[] = {
-	{ .compatible = "mediatek,mt8167-isp_display",},
-	{ },
+	{.compatible = "mediatek,mt8167-isp_display",},
+	{},
 };
 
 MODULE_DEVICE_TABLE(of, disp_pm_id_table);
 
 static struct platform_driver disp_pm_driver = {
-	.probe		= disp_pm_probe,
-	.remove		= disp_pm_remove,
-	.driver		= {
-		.name	= "disp_pm_driver",
-		.owner	= THIS_MODULE,
-		.of_match_table = disp_pm_id_table,
-	}
+	.probe = disp_pm_probe,
+	.remove = disp_pm_remove,
+	.driver = {
+		   .name = "disp_pm_driver",
+		   .owner = THIS_MODULE,
+		   .of_match_table = disp_pm_id_table,
+		   }
 	,
 };
+
 module_platform_driver(disp_pm_driver);
 
 
@@ -7132,4 +7235,3 @@ module_exit(ISP_Exit);
 MODULE_DESCRIPTION("Camera ISP driver");
 MODULE_AUTHOR("ME3");
 MODULE_LICENSE("GPL");
-

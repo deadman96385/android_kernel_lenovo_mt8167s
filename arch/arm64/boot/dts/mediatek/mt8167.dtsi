@@ -1616,8 +1616,8 @@
 		};
 
 		/* flashlight  */
-		flashlight: flashlight@ {
-			compatible = "mediatek,camera_flashlight";
+		flashlight_core: flashlight_core {
+			compatible = "mediatek,flashlight_core";
 		};
 
 		ice: ice_debug {

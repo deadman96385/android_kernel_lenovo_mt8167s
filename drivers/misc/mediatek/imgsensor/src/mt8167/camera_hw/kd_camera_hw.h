@@ -19,7 +19,7 @@
 #include "kd_camera_typedef.h"
 
 
-#if 0/*defined CONFIG_MTK_LEGACY*/
+#if 0				/*defined CONFIG_MTK_LEGACY */
 #include <mach/mt_gpio.h>
 #include <mach/mt_pm_ldo.h>
 #include "pmic_drv.h"
@@ -103,7 +103,11 @@ extern bool _hwPowerOn(int PinIdx, KD_REGULATOR_TYPE_T PwrType, int Voltage);
 extern void ISP_MCLK1_EN(BOOL En);
 
 /* use GPIO API instead of pinctl*/
-extern unsigned int GPIO_CAM_RST;
+extern int CamUseSameRst;
+
+extern unsigned int GPIO_CAM0_RST;
+extern unsigned int GPIO_CAM1_RST;
+
 extern unsigned int GPIO_CAM0_PDN;
 extern unsigned int GPIO_CAM1_PDN;
 

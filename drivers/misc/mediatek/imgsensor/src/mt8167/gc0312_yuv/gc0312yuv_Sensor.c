@@ -544,7 +544,7 @@ void GC0312_Sensor_Init(void)
 	GC0312_write_cmos_sensor(0x0f, 0x02);
 	GC0312_write_cmos_sensor(0x10, 0x88);
 	GC0312_write_cmos_sensor(0x16, 0x00);
-	GC0312_write_cmos_sensor(0x17, 0x14);
+	GC0312_write_cmos_sensor(0x17, 0x17);
 	GC0312_write_cmos_sensor(0x18, 0x1a);
 	GC0312_write_cmos_sensor(0x19, 0x14);
 	GC0312_write_cmos_sensor(0x1b, 0x48);

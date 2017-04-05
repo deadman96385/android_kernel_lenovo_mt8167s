@@ -30,6 +30,13 @@ ccflags-y += -DSUPPORT_I2C_BUS_NUM2=2
 ccflags-y += -DDEMO_BOARD_SUPPORT=1
 #$(info "ARCH_MTK_PROJECT:$(ARCH_MTK_PROJECT), set I2C Bus num:2")
 else
+	# 8167 evb
+	ifneq (,$(findstring tb8167m,$(ARCH_MTK_PROJECT)))
+		ccflags-y += -DDEMO_BOARD_SUPPORT=0
+	# customer projects... use DEMO_BOARD_SUPPORT for using GPIO instead of pinctrl
+	else
+		ccflags-y += -DDEMO_BOARD_SUPPORT=1
+	endif
 #$(info "ARCH_MTK_PROJECT:$(ARCH_MTK_PROJECT)")
 endif
 
