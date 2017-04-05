@@ -18,9 +18,6 @@
 #include <linux/dma-mapping.h>
 #include "mt8167-codec.h"
 #include "mt8167-codec-utils.h"
-#ifdef CONFIG_MTK_SPEAKER
-#include "mt6392-codec.h"
-#endif
 #ifdef CONFIG_MTK_AUXADC
 #include "mtk_auxadc.h"
 #endif
@@ -1710,24 +1707,18 @@ static void mt8167_codec_turn_on_dl_path(struct snd_soc_codec *codec,
 	uint32_t lpbk_type)
 {
 	mt8167_codec_setup_dl_rate(codec, lpbk_type);
-	if (dl_is_spk(lpbk_type)) {
+	if (dl_is_spk(lpbk_type))
 		mt8167_codec_turn_on_dl_spk_path(codec);
-#ifdef CONFIG_MTK_SPEAKER
-		mt6392_int_spk_turn_on(codec);
-#endif
-	} else if (dl_is_hp(lpbk_type))
+	else if (dl_is_hp(lpbk_type))
 		mt8167_codec_turn_on_dl_hp_path(codec);
 }
 
 static void mt8167_codec_turn_off_dl_path(struct snd_soc_codec *codec,
 	uint32_t lpbk_type)
 {
-	if (dl_is_spk(lpbk_type)) {
-#ifdef CONFIG_MTK_SPEAKER
-		mt6392_int_spk_turn_off(codec);
-#endif
+	if (dl_is_spk(lpbk_type))
 		mt8167_codec_turn_off_dl_spk_path(codec);
-	} else if (dl_is_hp(lpbk_type))
+	else if (dl_is_hp(lpbk_type))
 		mt8167_codec_turn_off_dl_hp_path(codec);
 }
 

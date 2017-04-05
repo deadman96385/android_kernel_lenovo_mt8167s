@@ -24,19 +24,12 @@
 #include "mt8167-codec.h"
 #include "mt8167-codec-utils.h"
 
-#ifdef CONFIG_MTK_SPEAKER
-#include "mt6392-codec.h"
-#endif
-
 #define HP_CALI_ITEMS    (HP_CALI_NUMS * HP_PGA_GAIN_NUMS)
 #define DMIC_PHASE_NUM   (8)
 
 enum regmap_module_id {
 	REGMAP_AFE = 0,
 	REGMAP_APMIXEDSYS,
-#ifdef CONFIG_MTK_SPEAKER
-	REGMAP_PWRAP,
-#endif
 	REGMAP_NUMS,
 };
 
@@ -73,9 +66,6 @@ enum codec_pga_gain_enum_id {
 };
 
 struct mt8167_codec_priv {
-#ifdef CONFIG_MTK_SPEAKER
-	struct mt6392_codec_priv mt6392_data;
-#endif
 	struct snd_soc_codec *codec;
 	struct regmap *regmap;
 	struct regmap *regmap_modules[REGMAP_NUMS];
@@ -1709,16 +1699,6 @@ static bool reg_is_in_apmixedsys(unsigned int reg)
 		return false;
 }
 
-#ifdef CONFIG_MTK_SPEAKER
-static bool reg_is_in_pmic(unsigned int reg)
-{
-	if (reg & PMIC_OFFSET)
-		return true;
-	else
-		return false;
-}
-#endif
-
 /* regmap functions */
 static int codec_reg_read(void *context,
 		unsigned int reg, unsigned int *val)
@@ -1732,14 +1712,7 @@ static int codec_reg_read(void *context,
 	} else if (reg_is_in_apmixedsys(reg)) {
 		id = REGMAP_APMIXEDSYS;
 		offset = APMIXED_OFFSET;
-	}
-#ifdef CONFIG_MTK_SPEAKER
-	else if (reg_is_in_pmic(reg)) {
-		id = REGMAP_PWRAP;
-		offset = PMIC_OFFSET;
-	}
-#endif
-	else
+	} else
 		return -1;
 
 	return module_reg_read(context, reg, val,
@@ -1758,14 +1731,7 @@ static int codec_reg_write(void *context,
 	} else if (reg_is_in_apmixedsys(reg)) {
 		id = REGMAP_APMIXEDSYS;
 		offset = APMIXED_OFFSET;
-	}
-#ifdef CONFIG_MTK_SPEAKER
-	else if (reg_is_in_pmic(reg)) {
-		id = REGMAP_PWRAP;
-		offset = PMIC_OFFSET;
-	}
-#endif
-	else
+	} else
 		return -1;
 
 	return module_reg_write(context, reg, val,
@@ -1941,9 +1907,6 @@ static struct regmap *mt8167_codec_get_regmap_from_dt(const char *phandle_name,
 static const char * const modules_dt_regmap_str[REGMAP_NUMS] = {
 	"mediatek,afe-regmap",
 	"mediatek,apmixedsys-regmap",
-#ifdef CONFIG_MTK_SPEAKER
-	"mediatek,pwrap-regmap",
-#endif
 };
 
 static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
@@ -2040,11 +2003,6 @@ static int mt8167_codec_probe(struct snd_soc_codec *codec)
 			S_IFREG | S_IRUGO,
 			NULL, codec_data, &mt8167_codec_debug_ops);
 #endif
-#ifdef CONFIG_MTK_SPEAKER
-	ret = mt6392_codec_probe(codec);
-	if (ret < 0)
-		clk_disable_unprepare(codec_data->clk);
-#endif
 	return ret;
 }
 
@@ -2055,9 +2013,6 @@ static int mt8167_codec_remove(struct snd_soc_codec *codec)
 	clk_disable_unprepare(codec_data->clk);
 #ifdef CONFIG_DEBUG_FS
 	debugfs_remove(codec_data->debugfs);
-#endif
-#ifdef CONFIG_MTK_SPEAKER
-	mt6392_codec_remove(codec);
 #endif
 	return 0;
 }

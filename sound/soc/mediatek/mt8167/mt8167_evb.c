@@ -331,7 +331,7 @@ static const struct snd_soc_dapm_route mt8167_evb_audio_map[] = {
 
 #ifdef CONFIG_MTK_SPEAKER
 	/* use internal spk amp of MT6392 */
-	{"Int Spk Amp", NULL, "AU_LOL"},
+	{"MT6392 AIF RX", NULL, "AU_LOL"},
 #endif
 
 	/* use external spk amp via AU_LOL */
@@ -537,6 +537,17 @@ static struct snd_soc_dai_link mt8167_evb_dais[] = {
 			   SND_SOC_DAIFMT_CBS_CFS,
 		.dpcm_capture = 1,
 	},
+#ifdef CONFIG_MTK_SPEAKER
+	{ /* mt8167 -> mt6392 intercodec link */
+		.name = "mt8167_mt6392 intercodec",
+		.stream_name = "mt8167_mt6392 intercodec",
+		.cpu_dai_name = "snd-soc-dummy-dai",
+		.platform_name = "snd-soc-dummy",
+		.no_pcm = 1,
+		.codec_name = "mt6392-codec",
+		.codec_dai_name = "mt6392-codec-dai",
+	},
+#endif
 };
 
 static struct snd_soc_card mt8167_evb_card = {
