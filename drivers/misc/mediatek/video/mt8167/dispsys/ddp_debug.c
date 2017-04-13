@@ -244,7 +244,7 @@ static void process_dbg_opt(const char *opt)
 		p = (char *)opt + 7;
 		tmp = strsep(&p, ",");
 		ret = kstrtoul(tmp, 0, &reg_pa);
-		if (reg_pa == 0) {
+		if (reg_pa < 0x10000000 || reg_pa > 0x20000000) {
 			sprintf(buf, "g_regr, invalid pa=0x%lx\n", reg_pa);
 		} else {
 			reg_va = (unsigned long)ioremap_nocache(reg_pa, sizeof(unsigned long));
@@ -266,7 +266,7 @@ static void process_dbg_opt(const char *opt)
 		p = (char *)opt + 7;
 		tmp = strsep(&p, ",");
 		ret = kstrtoul(tmp, 0, &reg_pa);
-		if (reg_pa == 0) {
+		if (reg_pa < 0x10000000 || reg_pa > 0x20000000) {
 			sprintf(buf, "g_regw, invalid pa=0x%lx\n", reg_pa);
 		} else {
 			tmp = strsep(&p, ",");

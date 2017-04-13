@@ -727,32 +727,6 @@ static void process_dbg_opt(const char *opt)
 			pr_err("DISP/%s: errno %d\n", __func__, ret);
 
 		DISPMSG("DDP: gTriggerDispMode=%d\n", gTriggerDispMode);
-	} else if (strncmp(opt, "regw:", 5) == 0) {
-		char *p = (char *)opt + 5;
-		unsigned long addr = 0;
-		unsigned long val = 0;
-
-		tmp = strsep(&p, ",");
-		ret = kstrtoul(tmp, 0, &addr);
-		tmp = strsep(&p, ",");
-		ret = kstrtoul(tmp, 0, &val);
-
-		if (addr)
-			OUTREG32(addr, val);
-		else
-			return;
-
-	} else if (strncmp(opt, "regr:", 5) == 0) {
-		char *p = (char *)opt + 5;
-		unsigned long addr = 0;
-
-		tmp = strsep(&p, ",");
-		ret = kstrtoul(tmp, 0, &addr);
-		if (addr)
-			pr_debug("Read register 0x%lx: 0x%08x\n", addr, INREG32(addr));
-		else
-			return;
-
 	} else if (strncmp(opt, "cmmva_dprec", 11) == 0) {
 		dprec_handle_option(0x7);
 	} else if (strncmp(opt, "cmmpa_dprec", 11) == 0) {
