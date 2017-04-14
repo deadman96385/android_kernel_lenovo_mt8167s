@@ -18,24 +18,24 @@
 #define HDMI_LOG(fmt, arg...) \
 do { \
 	if (hdmi_log_on) {\
-		pr_err("[hdmi]#%d ", __LINE__); pr_err(fmt, ##arg); } \
+		pr_debug("[hdmi]#%d ", __LINE__); pr_debug(fmt, ##arg); } \
 } while (0)
 
 #define HDMI_FUNC()    \
 do { \
 	if (hdmi_log_on) \
-		pr_err("[hdmi] %s\n", __func__); \
+		pr_debug("[hdmi] %s\n", __func__); \
 } while (0)
 
 #define HDMI_LINE()\
 do { \
 	if (hdmi_log_on) {\
-		pr_err("[hdmi]%s, %d ", __func__, __LINE__); pr_err(fmt, ##arg); } \
+		pr_debug("[hdmi]%s, %d ", __func__, __LINE__); pr_debug(fmt, ##arg); } \
 } while (0)
 
 #define HDMI_MSG(fmt, arg...) \
 do { \
-	{pr_err("[hdmi]#%d ", __LINE__); pr_err(fmt, ##arg); } \
+	{pr_debug("[hdmi]#%d ", __LINE__); pr_debug(fmt, ##arg); } \
 } while (0)
 
 static char *_hdmi_ioctl_spy(unsigned int cmd)
