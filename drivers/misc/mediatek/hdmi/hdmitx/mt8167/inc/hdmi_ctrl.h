@@ -81,107 +81,138 @@ extern size_t hdmidrv_log_on;
 #define HDMI_PLL_LOG(fmt, arg...) \
 do { \
 	if (hdmidrv_log_on&hdmiplllog) { \
-		pr_err("[hdmi_pll]%s,%d ", __func__, __LINE__); pr_err(fmt, ##arg); } } while (0)
+		pr_debug("[hdmi_pll]%s,%d ", __func__, __LINE__); pr_debug(fmt, ##arg); } \
+} while (0)
 
 #define HDMI_PLL_FUNC()	\
 do { \
-	if (hdmidrv_log_on&hdmiplllog) pr_err("[hdmi_pll] %s\n", __func__); } while (0)
+	if (hdmidrv_log_on&hdmiplllog) \
+		pr_debug("[hdmi_pll] %s\n", __func__); \
+} while (0)
 
 /* ////////////////////////////////////////////DGI////////////////////////////////////////////////////// */
 #define HDMI_PLUG_LOG(fmt, arg...) \
 do { \
-	if (hdmidrv_log_on&hdmitxhotpluglog) pr_err(fmt, ##arg); } while (0)
+	if (hdmidrv_log_on&hdmitxhotpluglog) \
+		pr_debug(fmt, ##arg); \
+} while (0)
 
 #define HDMI_PLUG_FUNC()	\
 do { \
-	if (hdmidrv_log_on&hdmitxhotpluglog) pr_err("[hdmi_plug] %s\n", __func__); } while (0)
+	if (hdmidrv_log_on&hdmitxhotpluglog) \
+		pr_debug("[hdmi_plug] %s\n", __func__); \
+} while (0)
 
 /* ////////////////////////////////////////////PLUG////////////////////////////////////////////////////// */
 #define HDMI_REG_LOG(fmt, arg...) \
 do { \
-	if (hdmidrv_log_on&hdmireglog) pr_err(fmt, ##arg); } while (0)
+	if (hdmidrv_log_on&hdmireglog) \
+		pr_debug(fmt, ##arg); \
+} while (0)
 
 #define HDMI_REG_FUNC()	\
 do { \
-	if (hdmidrv_log_on&hdmireglog) pr_err("[hdmi_plug] %s\n", __func__); } while (0)
+	if (hdmidrv_log_on&hdmireglog) \
+		pr_debug("[hdmi_plug] %s\n", __func__); \
+} while (0)
 
 /* //////////////////////////////////////////////VIDEO//////////////////////////////////////////////////// */
 
 #define HDMI_VIDEO_LOG(fmt, arg...) \
 do { \
 	if (hdmidrv_log_on&hdmitxvideolog) { \
-		pr_err("[hdmi_video]%s,%d ", __func__, __LINE__); pr_err(fmt, ##arg); } } while (0)
+		pr_debug("[hdmi_video]%s,%d ", __func__, __LINE__); pr_debug(fmt, ##arg); } \
+} while (0)
 
 #define HDMI_VIDEO_FUNC()	\
 do { \
-	if (hdmidrv_log_on&hdmitxvideolog) pr_err("[hdmi_video] %s\n", __func__); } while (0)
+	if (hdmidrv_log_on&hdmitxvideolog) \
+		pr_debug("[hdmi_video] %s\n", __func__); \
+} while (0)
 
 /* //////////////////////////////////////////////AUDIO//////////////////////////////////////////////////// */
 
 #define HDMI_AUDIO_LOG(fmt, arg...) \
 do { \
 	if (hdmidrv_log_on&hdmitxaudiolog) { \
-		pr_err("[hdmi_audio]%s,%d ", __func__, __LINE__); pr_err(fmt, ##arg); } } while (0)
+		pr_debug("[hdmi_audio]%s,%d ", __func__, __LINE__); pr_debug(fmt, ##arg); } \
+} while (0)
 
 #define HDMI_AUDIO_FUNC()	\
 do { \
-	if (hdmidrv_log_on&hdmitxaudiolog) pr_err("[hdmi_audio] %s\n", __func__); } while (0)
+	if (hdmidrv_log_on&hdmitxaudiolog) \
+		pr_debug("[hdmi_audio] %s\n", __func__); \
+} while (0)
 
 #define HDMI_HDCP_LOG(fmt, arg...) \
 do { \
 	if (hdmidrv_log_on&hdmihdcplog) { \
-		pr_err("[hdmi_hdcp]%s,%d ", __func__, __LINE__); pr_err(fmt, ##arg); } } while (0)
+		pr_debug("[hdmi_hdcp]%s,%d ", __func__, __LINE__); pr_debug(fmt, ##arg); } \
+} while (0)
 
 #define HDMI_HDCP_FUNC()	\
 do { \
-	if (hdmidrv_log_on&hdmihdcplog) pr_err("[hdmi_hdcp] %s\n", __func__); } while (0)
+	if (hdmidrv_log_on&hdmihdcplog) \
+		pr_debug("[hdmi_hdcp] %s\n", __func__); \
+} while (0)
 
 /* ///////////////////////////////////////////////CEC/////////////////////////////////////////////////// */
 
 #define HDMI_CEC_LOG(fmt, arg...) \
 do { \
 	if (hdmidrv_log_on&hdmiceclog) {\
-		pr_err("[hdmi_cec]%s,%d ", __func__, __LINE__); pr_err(fmt, ##arg); } } while (0)
+		pr_debug("[hdmi_cec]%s,%d ", __func__, __LINE__); pr_debug(fmt, ##arg); } \
+} while (0)
 
 #define HDMI_CEC_FUNC()	\
 do { \
-	if (hdmidrv_log_on&hdmiceclog) pr_err("[hdmi_cec] %s\n", __func__); } while (0)
+	if (hdmidrv_log_on&hdmiceclog) \
+		pr_debug("[hdmi_cec] %s\n", __func__); \
+} while (0)
 
 #define HDMI_CEC_COMMAND_LOG(fmt, arg...) \
 do { \
-	if (hdmidrv_log_on&hdmiceclog)pr_err(fmt, ##arg); } while (0)
+	if (hdmidrv_log_on&hdmiceclog) \
+		pr_debug(fmt, ##arg); \
+} while (0)
 
 /* ///////////////////////////////////////////////DDC////////////////////////////////////////////////// */
 #define HDMI_DDC_LOG(fmt, arg...) \
 do { \
 	if (hdmidrv_log_on&hdmiddclog) { \
-		pr_err("[hdmi_ddc]%s,%d ", __func__, __LINE__); pr_err(fmt, ##arg); } \
-	} while (0)
+		pr_debug("[hdmi_ddc]%s,%d ", __func__, __LINE__); pr_debug(fmt, ##arg); } \
+} while (0)
 
 #define HDMI_DDC_FUNC()	\
 do { \
-	if (hdmidrv_log_on&hdmiddclog) pr_err("[hdmi_ddc] %s\n", __func__); } while (0)
+	if (hdmidrv_log_on&hdmiddclog) \
+		pr_debug("[hdmi_ddc] %s\n", __func__); \
+} while (0)
 /* ///////////////////////////////////////////////EDID////////////////////////////////////////////////// */
 #define HDMI_EDID_LOG(fmt, arg...) \
 do { \
 	if (hdmidrv_log_on&hdmiedidlog) { \
-		pr_err("[hdmi_edid]%s,%d ", __func__, __LINE__); pr_err(fmt, ##arg); } \
-	} while (0)
+		pr_debug("[hdmi_edid]%s,%d ", __func__, __LINE__); pr_debug(fmt, ##arg); } \
+} while (0)
 
 #define HDMI_EDID_FUNC()	\
 do { \
-	if (hdmidrv_log_on&hdmiedidlog) pr_err("[hdmi_edid] %s\n", __func__); } while (0)
+	if (hdmidrv_log_on&hdmiedidlog) \
+		pr_debug("[hdmi_edid] %s\n", __func__); \
+} while (0)
 /* ////////////////////////////////////////////////DRV///////////////////////////////////////////////// */
 
 #define HDMI_DRV_LOG(fmt, arg...)	\
 do { \
 	if (hdmidrv_log_on&hdmidrvlog) { \
-		pr_err("[hdmi_drv]%s,%d ", __func__, __LINE__); pr_err(fmt, ##arg); } \
-	} while (0)
+		pr_debug("[hdmi_drv]%s,%d ", __func__, __LINE__); pr_debug(fmt, ##arg); } \
+} while (0)
 
 #define HDMI_DRV_FUNC()	\
 do { \
-	if (hdmidrv_log_on&hdmidrvlog) pr_err("[hdmi_drv] %s\n", __func__); } while (0)
+	if (hdmidrv_log_on&hdmidrvlog) \
+		pr_debug("[hdmi_drv] %s\n", __func__); \
+} while (0)
 /* ///////////////////////////////////////////////////////////////////////////////////////////////// */
 
 /* #define RETNULL(cond)       {if ((cond)) {HDMI_DRV_LOG("return in %d\n", __LINE__); return; } } */
