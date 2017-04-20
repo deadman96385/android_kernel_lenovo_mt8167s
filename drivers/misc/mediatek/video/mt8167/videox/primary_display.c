@@ -2493,7 +2493,7 @@ const char *session_mode_spy(unsigned int mode)
 static int config_display_m4u_port(void)
 {
 	int ret = 0;
-	M4U_PORT_STRUCT sPort;
+	struct M4U_PORT_STRUCT sPort;
 
 	sPort.ePortID = M4U_PORT_DISP_OVL0;
 	sPort.Virtuality = primary_display_use_m4u;
@@ -2915,7 +2915,7 @@ static int __build_path_decouple(void)
 	 */
 #ifdef CONFIG_MTK_M4U
 	{
-		M4U_PORT_STRUCT sPort;
+		struct M4U_PORT_STRUCT sPort;
 
 		sPort.ePortID = M4U_PORT_DISP_RDMA0;
 		sPort.Virtuality = primary_display_use_m4u;
@@ -2991,7 +2991,7 @@ static int __build_path_debug_rdma1_dsi0(void)
 	{
 #ifdef MTK_FB_RDMA1_SUPPORT
 #ifdef CONFIG_MTK_M4U
-		M4U_PORT_STRUCT sPort;
+		struct M4U_PORT_STRUCT sPort;
 
 		sPort.ePortID = M4U_PORT_DISP_RDMA1;
 		sPort.Virtuality = primary_display_use_m4u;
@@ -5021,7 +5021,7 @@ int primary_display_capture_framebuffer_wdma(void *data)
 	int ret = 0;
 	struct cmdqRecStruct *cmdq_handle = NULL;
 	struct disp_ddp_path_config *pconfig = NULL;
-	m4u_client_t *m4uClient = NULL;
+	struct m4u_client_t *m4uClient = NULL;
 	unsigned int w_xres = primary_display_get_width();
 	unsigned int h_yres = primary_display_get_height();
 	unsigned int pixel_byte = primary_display_get_dc_bpp() / 8; /* bpp is either 32 or 16, can not be other value */
@@ -5574,7 +5574,7 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 #ifndef MTKFB_NO_M4U
 #ifdef CONFIG_MTK_M4U
 	{
-		M4U_PORT_STRUCT sPort;
+		struct M4U_PORT_STRUCT sPort;
 
 		sPort.ePortID = M4U_PORT_DISP_WDMA0;
 		sPort.Virtuality = primary_display_use_m4u;
@@ -8222,7 +8222,7 @@ int primary_display_capture_framebuffer_decouple(unsigned long pbuf, unsigned in
 	unsigned int i = 0;
 	int ret = 0;
 	struct disp_ddp_path_config *pconfig = NULL;
-	m4u_client_t *m4uClient = NULL;
+	struct m4u_client_t *m4uClient = NULL;
 	unsigned int mva = 0;
 	unsigned long va = 0;
 	unsigned int mapped_size = 0;
@@ -8306,7 +8306,7 @@ int primary_display_capture_framebuffer_ovl(unsigned long pbuf, unsigned int for
 	struct cmdqRecStruct *cmdq_handle = NULL;
 	struct cmdqRecStruct *cmdq_wait_handle = NULL;
 	struct disp_ddp_path_config *pconfig = NULL;
-	m4u_client_t *m4uClient = NULL;
+	struct m4u_client_t *m4uClient = NULL;
 	unsigned int mva = 0;
 	unsigned int w_xres = primary_display_get_width();
 	unsigned int h_yres = primary_display_get_height();
@@ -8634,7 +8634,7 @@ int disp_hal_allocate_framebuffer(phys_addr_t pa_start, phys_addr_t pa_end, unsi
 		&pa_start, *va, (unsigned int)(pa_end - pa_start + 1));
 
 	if (1) {
-		m4u_client_t *client;
+		struct m4u_client_t *client;
 
 		struct sg_table *sg_table = &table;
 

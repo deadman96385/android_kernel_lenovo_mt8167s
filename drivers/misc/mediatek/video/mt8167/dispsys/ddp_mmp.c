@@ -357,7 +357,7 @@ void *ddp_map_mva_to_va(unsigned long mva, unsigned int size)
 {
 	void *va = NULL;
 #ifdef CONFIG_MTK_IOMMU
-	m4u_buf_info_t *pMvaInfo;
+	struct m4u_buf_info_t *pMvaInfo;
 	struct sg_table *table;
 	struct scatterlist *sg;
 	int i, j, k, ret = 0;
