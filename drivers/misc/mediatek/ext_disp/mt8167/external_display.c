@@ -1290,6 +1290,7 @@ static int _ovl_fence_release_callback(uint32_t block)
 {
 	int secure = 0;
 	unsigned int addr = 0;
+	int i, fence_idx;
 
 	if (!block)
 		_ext_disp_path_lock();
@@ -1321,7 +1322,15 @@ static int _ovl_fence_release_callback(uint32_t block)
 	pgc->dc_buf_id++;
 	pgc->dc_buf_id %= DISP_INTERNAL_BUFFER_COUNT;
 
+#if 1
+	for (i = 0; i < 4; i++) {
+		cmdqBackupReadSlot(pgc->ovl_address, i, &fence_idx);
+		mtkfb_release_fence(pgc->session, i, fence_idx);
+	}
+#else
 	mtkfb_release_session_fence(pgc->session);
+#endif
+
 	if (!block)
 		_ext_disp_path_unlock();
 
@@ -1575,8 +1584,7 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 			data_config->ovl_dirty = 1;
 			pgc->need_trigger_overlay = 1;
 
-			cmdqRecBackupUpdateSlot(cmdq_handle, pgc->ovl_address,
-					config_layer_id, data_config->ovl_config[config_layer_id].addr);
+			cmdqRecBackupUpdateSlot(cmdq_handle, pgc->ovl_address, i, idx);
 		}
 		EXT_DISP_LOG("set dest w:%d, h:%d\n",
 						extd_lcm_params.dpi.width, extd_lcm_params.dpi.height);
