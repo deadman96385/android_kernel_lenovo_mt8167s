@@ -2464,9 +2464,9 @@ cleanup:
 }
 
 /* Called when the device is being detached from the driver */
-static int mtkfb_remove(struct device *dev)
+static int mtkfb_remove(struct platform_device *pdev)
 {
-	struct mtkfb_device *fbdev = dev_get_drvdata(dev);
+	struct mtkfb_device *fbdev = dev_get_drvdata(&pdev->dev);
 	enum mtkfb_state saved_state = fbdev->state;
 
 	MSG_FUNC_ENTER();
@@ -2480,7 +2480,7 @@ static int mtkfb_remove(struct device *dev)
 }
 
 /* PM suspend */
-static int mtkfb_suspend(struct device *pdev, pm_message_t mesg)
+static int mtkfb_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
 	/* NOT_REFERENCED(pdev); */
 	MSG_FUNC_ENTER();
@@ -2521,7 +2521,7 @@ int mtkfb_ipo_init(void)
 	return 0;
 }
 
-static void mtkfb_shutdown(struct device *pdev)
+static void mtkfb_shutdown(struct platform_device *pdev)
 {
 	MTKFB_LOG("[FB Driver] mtkfb_shutdown()\n");
 	/* mt65xx_leds_brightness_set(MT65XX_LED_TYPE_LCD, LED_OFF); */
@@ -2602,7 +2602,7 @@ static void mtkfb_blank_suspend(void)
 }
 #endif
 /* PM resume */
-static int mtkfb_resume(struct device *pdev)
+static int mtkfb_resume(struct platform_device *pdev)
 {
 	/* NOT_REFERENCED(pdev); */
 	MSG_FUNC_ENTER();
@@ -2648,7 +2648,7 @@ int mtkfb_pm_suspend(struct device *device)
 
 	WARN_ON(pdev == NULL);
 
-	return mtkfb_suspend((struct device *)pdev, PMSG_SUSPEND);
+	return mtkfb_suspend(pdev, PMSG_SUSPEND);
 }
 
 int mtkfb_pm_resume(struct device *device)
@@ -2658,7 +2658,7 @@ int mtkfb_pm_resume(struct device *device)
 
 	WARN_ON(pdev == NULL);
 
-	return mtkfb_resume((struct device *)pdev);
+	return mtkfb_resume(pdev);
 }
 
 int mtkfb_pm_freeze(struct device *device)
@@ -2705,16 +2705,16 @@ const struct dev_pm_ops mtkfb_pm_ops = {
 
 static struct platform_driver mtkfb_driver = {
 	.probe = mtkfb_probe,
+	.remove = mtkfb_remove,
+	.shutdown = mtkfb_shutdown,
+	.suspend = mtkfb_suspend,
+	.resume = mtkfb_resume,
 	.driver = {
 		.name = MTKFB_DRIVER,
 #ifdef CONFIG_PM
 		.pm = &mtkfb_pm_ops,
 #endif
 		.bus = &platform_bus_type,
-		.remove = mtkfb_remove,
-		.suspend = mtkfb_suspend,
-		.resume = mtkfb_resume,
-		.shutdown = mtkfb_shutdown,
 		.of_match_table = mtkfb_of_ids,
 	},
 };
