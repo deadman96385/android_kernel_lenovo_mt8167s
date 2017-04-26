@@ -110,6 +110,8 @@ UINT8 GC0312PixelClockDivider;
 
 MSDK_SENSOR_CONFIG_STRUCT GC0312SensorConfigData;
 
+static DEFINE_SPINLOCK(imgsensor_drv_lock);
+
 #define GC0312_SET_PAGE0	GC0312_write_cmos_sensor(0xfe, 0x00)
 #define GC0312_SET_PAGE1	GC0312_write_cmos_sensor(0xfe, 0x01)
 
@@ -1084,12 +1086,14 @@ UINT32 GC0312Capture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 
 UINT32 GC0312GetResolution(MSDK_SENSOR_RESOLUTION_INFO_STRUCT *pSensorResolution)
 {
+	spin_lock(&imgsensor_drv_lock);
 	pSensorResolution->SensorFullWidth = IMAGE_SENSOR_FULL_WIDTH;
 	pSensorResolution->SensorFullHeight = IMAGE_SENSOR_FULL_HEIGHT;
 	pSensorResolution->SensorPreviewWidth = IMAGE_SENSOR_PV_WIDTH;
 	pSensorResolution->SensorPreviewHeight = IMAGE_SENSOR_PV_HEIGHT;
 	pSensorResolution->SensorVideoWidth = IMAGE_SENSOR_PV_WIDTH;
 	pSensorResolution->SensorVideoHeight = IMAGE_SENSOR_PV_HEIGHT;
+	spin_unlock(&imgsensor_drv_lock);
 	return ERROR_NONE;
 }				/* GC0312GetResolution() */
 
@@ -1098,6 +1102,7 @@ UINT32 GC0312GetInfo(MSDK_SCENARIO_ID_ENUM ScenarioId,
 		     MSDK_SENSOR_INFO_STRUCT *pSensorInfo,
 		     MSDK_SENSOR_CONFIG_STRUCT *pSensorConfigData)
 {
+	spin_lock(&imgsensor_drv_lock);
 	pSensorInfo->SensorPreviewResolutionX = IMAGE_SENSOR_PV_WIDTH;
 	pSensorInfo->SensorPreviewResolutionY = IMAGE_SENSOR_PV_HEIGHT;
 	pSensorInfo->SensorFullResolutionX = IMAGE_SENSOR_FULL_WIDTH;
@@ -1139,6 +1144,8 @@ UINT32 GC0312GetInfo(MSDK_SCENARIO_ID_ENUM ScenarioId,
 	}
 	GC0312PixelClockDivider = pSensorInfo->SensorPixelClockCount;
 	memcpy(pSensorConfigData, &GC0312SensorConfigData, sizeof(MSDK_SENSOR_CONFIG_STRUCT));
+	spin_unlock(&imgsensor_drv_lock);
+
 	return ERROR_NONE;
 }				/* GC0312GetInfo() */
 

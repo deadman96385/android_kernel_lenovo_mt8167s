@@ -960,6 +960,8 @@ static kal_uint32 slim_video(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 static kal_uint32 get_resolution(MSDK_SENSOR_RESOLUTION_INFO_STRUCT *sensor_resolution)
 {
 	LOG_INF("E\n");
+
+	spin_lock(&imgsensor_drv_lock);
 	sensor_resolution->SensorFullWidth = imgsensor_info.cap.grabwindow_width;
 	sensor_resolution->SensorFullHeight = imgsensor_info.cap.grabwindow_height;
 
@@ -975,6 +977,8 @@ static kal_uint32 get_resolution(MSDK_SENSOR_RESOLUTION_INFO_STRUCT *sensor_reso
 
 	sensor_resolution->SensorSlimVideoWidth = imgsensor_info.slim_video.grabwindow_width;
 	sensor_resolution->SensorSlimVideoHeight = imgsensor_info.slim_video.grabwindow_height;
+	spin_unlock(&imgsensor_drv_lock);
+
 	return ERROR_NONE;
 }				/*    get_resolution    */
 
@@ -984,6 +988,7 @@ static kal_uint32 get_info(MSDK_SCENARIO_ID_ENUM scenario_id,
 {
 	LOG_INF("scenario_id = %d\n", scenario_id);
 
+	spin_lock(&imgsensor_drv_lock);
 
 	/* sensor_info->SensorVideoFrameRate = imgsensor_info.normal_video.max_framerate/10; *//* not use */
 	/* sensor_info->SensorStillCaptureFrameRate= imgsensor_info.cap.max_framerate/10; *//* not use */
@@ -1083,6 +1088,7 @@ static kal_uint32 get_info(MSDK_SCENARIO_ID_ENUM scenario_id,
 		    imgsensor_info.pre.mipi_data_lp2hs_settle_dc;
 		break;
 	}
+	spin_unlock(&imgsensor_drv_lock);
 
 	return ERROR_NONE;
 }				/*    get_info  */
@@ -1284,6 +1290,7 @@ static kal_uint32 get_default_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenar
 {
 	LOG_INF("scenario_id = %d\n", scenario_id);
 
+	spin_lock(&imgsensor_drv_lock);
 	switch (scenario_id) {
 	case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
 		*framerate = imgsensor_info.pre.max_framerate;
@@ -1303,6 +1310,7 @@ static kal_uint32 get_default_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenar
 	default:
 		break;
 	}
+	spin_unlock(&imgsensor_drv_lock);
 
 	return ERROR_NONE;
 }
