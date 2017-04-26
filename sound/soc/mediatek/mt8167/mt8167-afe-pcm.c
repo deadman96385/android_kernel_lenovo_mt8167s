@@ -3151,6 +3151,13 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 		mt8167_afe_set_memif_irq_by_mode(&memif_data[MT8167_AFE_MEMIF_AWB],
 						 afe->awb_irq_mode);
 
+	if (of_property_read_u32(np, "mediatek,dai-irq-mode", &afe->dai_irq_mode))
+		afe->dai_irq_mode = MT8167_AFE_IRQ_2;
+
+	if (afe->dai_irq_mode != memif_data[MT8167_AFE_MEMIF_DAI].irq_mode)
+		mt8167_afe_set_memif_irq_by_mode(&memif_data[MT8167_AFE_MEMIF_DAI],
+						 afe->dai_irq_mode);
+
 	ret = snd_soc_register_platform(&pdev->dev, &mt8167_afe_pcm_platform);
 	if (ret)
 		goto err_platform;
