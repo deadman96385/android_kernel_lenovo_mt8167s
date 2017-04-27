@@ -1355,8 +1355,8 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	const unsigned int channels = runtime->channels;
 	const unsigned int out_channels_per_sdata =
 		mt8167_afe_tdm_out_ch_per_sdata(tdm_out_mode, runtime->channels);
-	const int bit_width = snd_pcm_format_width(runtime->format);
-	const int out_bit_width = mt8167_afe_tdm_out_bitwidth_fixup(tdm_out_mode, bit_width);
+	const int phy_width = snd_pcm_format_physical_width(runtime->format);
+	const int out_bit_width = mt8167_afe_tdm_out_bitwidth_fixup(tdm_out_mode, phy_width);
 	const unsigned int stream = substream->stream;
 	unsigned int val;
 	unsigned int bck_inverse = 0;
@@ -1590,7 +1590,7 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = runtime->rate;
 	const unsigned int channels = runtime->channels;
-	const int bit_width = snd_pcm_format_width(runtime->format);
+	const int phy_width = snd_pcm_format_physical_width(runtime->format);
 	const unsigned int stream = substream->stream;
 	unsigned int val;
 	unsigned int bck;
@@ -1608,7 +1608,7 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 		clk_set_parent(afe->clocks[MT8167_CLK_I2S5_M_SEL], afe->clocks[MT8167_CLK_AUD2]);
 	}
 
-	bck = mt8167_afe_tdm_ch_fixup(channels) * rate * bit_width;
+	bck = mt8167_afe_tdm_ch_fixup(channels) * rate * phy_width;
 
 	mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV5],
 		rate * MT8167_TDM_IN_MCLK_MULTIPLIER,
@@ -1636,7 +1636,7 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 	}
 
 	/* bit width related */
-	if (bit_width > 16) {
+	if (phy_width > 16) {
 		val |= AFE_TDM_IN_CON1_WLEN_32BIT |
 		       AFE_TDM_IN_CON1_FAST_LRCK_CYCLE_32BCK |
 		       AFE_TDM_IN_CON1_LRCK_WIDTH(32);
