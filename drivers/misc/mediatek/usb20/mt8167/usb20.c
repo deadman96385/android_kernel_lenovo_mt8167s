@@ -1361,7 +1361,7 @@ static int mt_usb_probe(struct platform_device *pdev)
 	}
 
 #ifdef CONFIG_OF
-	dts_np = pdev->dev.of_node;
+	/*dts_np = pdev->dev.of_node;*/
 
 	/*usb_irq_number1 = irq_of_parse_and_map(pdev->dev.of_node, 0);*/
 	/*usb_mac = (unsigned long)of_iomap(pdev->dev.of_node, 0);*/
