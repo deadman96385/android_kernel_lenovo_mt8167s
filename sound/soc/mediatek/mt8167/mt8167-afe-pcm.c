@@ -1616,20 +1616,26 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 
 	val = 0;
 
-	if ((be->fmt_mode & SND_SOC_DAIFMT_FORMAT_MASK) == SND_SOC_DAIFMT_I2S)
-		val |= AFE_TDM_IN_CON1_I2S;
+	switch (be->fmt_mode & SND_SOC_DAIFMT_FORMAT_MASK) {
+	case SND_SOC_DAIFMT_I2S:
+		val |= AFE_TDM_IN_CON1_I2S |
+		       AFE_TDM_IN_CON1_LRCK_INV;
+		break;
+	default:
+		break;
+	}
 
 	/* bck&lrck phase */
 	switch (be->fmt_mode & SND_SOC_DAIFMT_INV_MASK) {
 	case SND_SOC_DAIFMT_IB_IF:
-		val |= AFE_TDM_IN_CON1_LRCK_INV |
-		       AFE_TDM_IN_CON1_BCK_INV;
+		val ^= AFE_TDM_IN_CON1_LRCK_INV;
+		val ^= AFE_TDM_IN_CON1_BCK_INV;
 		break;
 	case SND_SOC_DAIFMT_NB_IF:
-		val |= AFE_TDM_IN_CON1_LRCK_INV;
+		val ^= AFE_TDM_IN_CON1_LRCK_INV;
 		break;
 	case SND_SOC_DAIFMT_IB_NF:
-		val |= AFE_TDM_IN_CON1_BCK_INV;
+		val ^= AFE_TDM_IN_CON1_BCK_INV;
 		break;
 	default:
 		break;
