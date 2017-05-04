@@ -109,12 +109,12 @@ typedef int (*DCM_FUNC) (int);
  * only topckgen_dcm_dbc_cnt[0] is using as ARMPLL DCM mode 1 switch.
  **/
 
-typedef enum {
+enum ENUM_ARMCORE_DCM {
 	ARMCORE_DCM_OFF = DCM_OFF,
 	ARMCORE_DCM_MODE1 = DCM_ON,
-} ENUM_ARMCORE_DCM;
+};
 
-int dcm_armcore(ENUM_ARMCORE_DCM mode)
+int dcm_armcore(enum ENUM_ARMCORE_DCM mode)
 {
 	if (mode == ARMCORE_DCM_OFF) {
 		/* disable mode 1 */
@@ -133,10 +133,10 @@ int dcm_armcore(ENUM_ARMCORE_DCM mode)
 /**************************
  * MCUSYS DCM
  **************************/
-typedef enum {
+enum ENUM_MCUSYS_DCM {
 	MCUSYS_DCM_OFF = DCM_OFF,
 	MCUSYS_DCM_ON = DCM_ON,
-} ENUM_MCUSYS_DCM;
+};
 
 /* Lyra MCUCFG DCM setting */
 #define DBGPWRDUP				0x0F
@@ -148,7 +148,7 @@ typedef enum {
 #define MP_CCI_ADB400_DCM_CONFIG_SETTING	0x45
 #define CCI_BW_MON_DCM_DIS			0x100
 
-int dcm_mcusys(ENUM_MCUSYS_DCM on)
+int dcm_mcusys(enum ENUM_MCUSYS_DCM on)
 {
 	if (on == MCUSYS_DCM_OFF) {
 		reg_write(CCI_ADB400_DCM_CONFIG, and(reg_read(CCI_ADB400_DCM_CONFIG),
@@ -188,7 +188,7 @@ int dcm_mcusys(ENUM_MCUSYS_DCM on)
  **/
 #define ASSERT_INFRA_DCMCTL() \
 	do {      \
-		volatile unsigned int dcmctl;                           \
+		unsigned int dcmctl;                           \
 		dcmctl = reg_read(INFRA_TOPCKGEN_DCMCTL);               \
 		WARN_ON(!(dcmctl & 1));                                  \
 	} while (0)
@@ -271,20 +271,20 @@ int dcm_mcusys(ENUM_MCUSYS_DCM on)
 #define USB_DCM_EN_OFF (0<<0)
 
 
-typedef enum {
+enum ENUM_INFRA_DCM {
 	INFRA_DCM_OFF = DCM_OFF,
 	INFRA_DCM_ON = DCM_ON,
-} ENUM_INFRA_DCM;
+};
 
 
-typedef enum {
+enum ENUM_INFRA_DCM_DBC {
 	INFRA_DCM_DBC_OFF = DCM_OFF,
 	INFRA_DCM_DBC_ON = DCM_ON,
-} ENUM_INFRA_DCM_DBC;
+};
 
 
 /* cnt : 0~0x1f */
-int dcm_infra_dbc(ENUM_INFRA_DCM_DBC on, int cnt)
+int dcm_infra_dbc(enum ENUM_INFRA_DCM_DBC on, int cnt)
 {
 	int value;
 
@@ -306,14 +306,14 @@ int dcm_infra_dbc(ENUM_INFRA_DCM_DBC on, int cnt)
  * 5'b00001: /16
  * 5'b00000: /32
  */
-typedef enum {
+enum ENUM_INFRA_SFSEL {
 	INFRA_DCM_SFSEL_DIV_1 = 0x10,
 	INFRA_DCM_SFSEL_DIV_2 = 0x08,
 	INFRA_DCM_SFSEL_DIV_4 = 0x04,
 	INFRA_DCM_SFSEL_DIV_8 = 0x02,
 	INFRA_DCM_SFSEL_DIV_16 = 0x01,
 	INFRA_DCM_SFSEL_DIV_32 = 0x00,
-} ENUM_INFRA_SFSEL;
+};
 
 int dcm_infra_sfsel(int cnt)
 {
@@ -353,7 +353,7 @@ int dcm_infra_rate(unsigned full, unsigned int sfel)
 #define TOPBUS_DCMCTL_SETTING		0x17
 #define BUSDCM_APB_TOG			0x01
 
-int dcm_infra(ENUM_INFRA_DCM on)
+int dcm_infra(enum ENUM_INFRA_DCM on)
 {
 
 	/* ASSERT_INFRA_DCMCTL(); */
@@ -388,10 +388,10 @@ int dcm_infra(ENUM_INFRA_DCM on)
 	return 0;
 }
 
-typedef enum {
+enum ENUM_PERI_DCM {
 	PERI_DCM_OFF = DCM_OFF,
 	PERI_DCM_ON = DCM_ON,
-} ENUM_PERI_DCM;
+};
 
 
 /* cnt: 0~0x1f */
@@ -419,14 +419,14 @@ int dcm_peri_dbc(int on, int cnt)
  * 5'b00001: /16
  * 5'b00000: /32
  */
-typedef enum {
+enum ENUM_PERI_SFSEL {
 	PERI_DCM_SFSEL_DIV_1 = 0x10,
 	PERI_DCM_SFSEL_DIV_2 = 0x08,
 	PERI_DCM_SFSEL_DIV_4 = 0x04,
 	PERI_DCM_SFSEL_DIV_8 = 0x02,
 	PERI_DCM_SFSEL_DIV_16 = 0x01,
 	PERI_DCM_SFSEL_DIV_32 = 0x00,
-} ENUM_PERI_SFSEL;
+};
 
 int dcm_peri_sfsel(int cnt)
 {
@@ -464,7 +464,7 @@ int dcm_peri_rate(unsigned int full, unsigned int sfel)
 }
 
 
-int dcm_peri(ENUM_PERI_DCM on)
+int dcm_peri(enum ENUM_PERI_DCM on)
 {
 
 	if (on) {
@@ -487,10 +487,10 @@ int dcm_peri(ENUM_PERI_DCM on)
 
 
 
-typedef enum {
+enum ENUM_PMIC_DCM {
 	PMIC_DCM_OFF = DCM_OFF,
 	PMIC_DCM_ON = DCM_ON,
-} ENUM_PMIC_DCM;
+};
 
 /** input argument
  * 0: 1/1
@@ -510,7 +510,7 @@ int dcm_pmic_rate(unsigned int sfel)
 	return 0;
 }
 
-int dcm_pmic(ENUM_PMIC_DCM on)
+int dcm_pmic(enum ENUM_PMIC_DCM on)
 {
 	if (on) {
 		reg_write(INFRABUS_DCMCTL1,
@@ -525,12 +525,12 @@ int dcm_pmic(ENUM_PMIC_DCM on)
 	return 0;
 }
 
-typedef enum {
+enum ENUM_USB_DCM {
 	USB_DCM_OFF = DCM_OFF,
 	USB_DCM_ON = DCM_ON,
-} ENUM_USB_DCM;
+};
 
-int dcm_usb(ENUM_USB_DCM on)
+int dcm_usb(enum ENUM_USB_DCM on)
 {
 	if (on) {
 		reg_write(INFRABUS_DCMCTL1,
@@ -570,10 +570,10 @@ int dcm_usb(ENUM_USB_DCM on)
 #define EMIDCM_APB_SEL_FSEL		 (1<<4)
 #define EMIDCM_APB_SEL_IDLE_FSEL (1<<5)
 
-typedef enum {
+enum ENUM_EMI_DCM {
 	EMI_DCM_OFF = DCM_OFF,
 	EMI_DCM_ON = DCM_ON,
-} ENUM_EMI_DCM;
+};
 
 
 /** 0x10205038	EMI_CONH
@@ -582,14 +582,14 @@ typedef enum {
 
 #define EMIDCM_RATIO_MASK (0x3<<0)
 
-typedef enum {
+enum ENUM_EMI_DCM_SLOW_DOWN_RATIO {
 	EMI_DCM_SLOW_DOWN_RATIO_NON = 0x0,
 	EMI_DCM_SLOW_DOWN_RATIO_DIV_8 = 0x1,
 	EMI_DCM_SLOW_DOWN_RATIO_DIV_16 = 0x2,
 	EMI_DCM_SLOW_DOWN_RATIO_DIV_32 = 0x3,
-} ENUM_EMI_DCM_SLOW_DOWN_RATIO;
+};
 
-int dcm_emi_slow_down_ratio(ENUM_EMI_DCM_SLOW_DOWN_RATIO ratio)
+int dcm_emi_slow_down_ratio(enum ENUM_EMI_DCM_SLOW_DOWN_RATIO ratio)
 {
 
 	int value;
@@ -621,7 +621,7 @@ int dcm_emi_dbc(int on, int cnt)
 
 #define EMI_DCM_DIS	0xFF000000
 
-int dcm_emi(ENUM_EMI_DCM on)
+int dcm_emi(enum ENUM_EMI_DCM on)
 {
 	if (on) {
 		dcm_emi_dbc(1, 0xf);
@@ -661,7 +661,7 @@ enum {
 #define ALL_DCM_TYPE  (ARMCORE_DCM_TYPE | MCUSYS_DCM_TYPE | INFRA_DCM_TYPE | PERI_DCM_TYPE |  \
 						EMI_DCM_TYPE | PMIC_DCM_TYPE | USB_DCM_TYPE)
 
-typedef struct _dcm {
+struct _dcm {
 	int current_state;
 	int saved_state;
 	int disable_refcnt;
@@ -669,9 +669,9 @@ typedef struct _dcm {
 	DCM_FUNC func;
 	int typeid;
 	char *name;
-} DCM;
+};
 
-static DCM dcm_array[NR_DCM_TYPE] = {
+static struct _dcm dcm_array[NR_DCM_TYPE] = {
 	{
 	 .typeid = ARMCORE_DCM_TYPE,
 	 .name = "ARMCORE_DCM",
@@ -748,7 +748,7 @@ static DCM dcm_array[NR_DCM_TYPE] = {
 void dcm_set_default(unsigned int type)
 {
 	int i;
-	DCM *dcm;
+	struct _dcm *dcm;
 
 	if (dcm_initiated == 0) {
 		dcm_err("DCM driver is not initialized\n");
@@ -777,7 +777,7 @@ void dcm_set_default(unsigned int type)
 void dcm_set_state(unsigned int type, int state)
 {
 	int i;
-	DCM *dcm;
+	struct _dcm *dcm;
 
 	if (dcm_initiated == 0) {
 		dcm_err("DCM driver is not initialized\n");
@@ -811,7 +811,7 @@ void dcm_set_state(unsigned int type, int state)
 void dcm_disable(unsigned int type)
 {
 	int i;
-	DCM *dcm;
+	struct _dcm *dcm;
 
 	if (dcm_initiated == 0) {
 		dcm_err("DCM driver is not initialized\n");
@@ -843,7 +843,7 @@ void dcm_disable(unsigned int type)
 void dcm_restore(unsigned int type)
 {
 	int i;
-	DCM *dcm;
+	struct _dcm *dcm;
 
 	if (dcm_initiated == 0) {
 		dcm_err("DCM driver is not initialized\n");
@@ -878,7 +878,7 @@ void dcm_restore(unsigned int type)
 void dcm_dump_state(int type)
 {
 	int i;
-	DCM *dcm;
+	struct _dcm *dcm;
 
 	if (dcm_initiated == 0) {
 		dcm_err("DCM driver is not initialized\n");
@@ -937,7 +937,7 @@ static ssize_t dcm_state_show(struct kobject *kobj, struct kobj_attribute *attr,
 {
 	int len = 0;
 	int i;
-	DCM *dcm;
+	struct _dcm *dcm;
 
 	/* dcm_dump_state(ALL_DCM_TYPE); */
 	len = snprintf(buf, PAGE_SIZE, "\n******** dcm dump state *********\n");
