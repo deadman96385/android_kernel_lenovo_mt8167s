@@ -1293,6 +1293,7 @@ static int get_volt_gpu(struct ptp_det *det)
 static int set_volt_gpu(struct ptp_det *det)
 {
 	int i;
+
 	FUNC_ENTER(FUNC_LV_HELP);
 	FUNC_EXIT(FUNC_LV_HELP);
 #if 1
@@ -1604,7 +1605,6 @@ static int ptp_init_det(struct ptp_det *det, struct ptp_devinfo *devinfo)
 		ptp_error("[%s]: Unknown det_id %d\n", __func__, det_id);
 		WARN_ON(1);
 		return -EINVAL;
-		break;
 	}
 
 	FUNC_EXIT(FUNC_LV_HELP);
@@ -1708,18 +1708,18 @@ static void mt_ptp_reg_dump_locked(void)
 	unsigned int addr;
 
 	for (addr = (unsigned int)PTP_DESCHAR; addr <= (unsigned int)PTP_SMSTATE1; addr += 4)
-		ptp_isr_info("%08X = %08X\n", addr, *(volatile unsigned int *)addr);
+		ptp_isr_info("%08X = %08X\n", addr, *(unsigned int *)addr);
 
 	addr = (unsigned int)PTP_PTPCORESEL;
-	ptp_isr_info("%08X = %08X\n", addr, *(volatile unsigned int *)addr);
+	ptp_isr_info("%08X = %08X\n", addr, *(unsigned int *)addr);
 #else
 	unsigned long addr;
 
 	for (addr = (unsigned long)PTP_DESCHAR; addr <= (unsigned long)PTP_SMSTATE1; addr += 4)
-		ptp_isr_info("%lu = %lu\n", addr, *(volatile unsigned long *)addr);
+		ptp_isr_info("%lu = %lu\n", addr, *(unsigned long *)addr);
 
 	addr = (unsigned long)PTP_PTPCORESEL;
-	ptp_isr_info("%lu = %lu\n", addr, *(volatile unsigned long *)addr);
+	ptp_isr_info("%lu = %lu\n", addr, *(unsigned long *)addr);
 #endif
 #endif
 }
