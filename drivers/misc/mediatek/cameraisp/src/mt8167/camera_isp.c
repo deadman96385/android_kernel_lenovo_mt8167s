@@ -6449,10 +6449,13 @@ static MINT32 ISP_suspend(struct platform_device *pDev, pm_message_t Mesg)
 #if 1
 	/*	fix enable count mismatch with disable count*/
 	if (g_EnableClkCnt > 0) {
+		MUINT32 clkCnt = g_EnableClkCnt;
 		int i;
+
 		/* disable clock for g_EnableClkCnt times */
-		for (i = 0; i < g_EnableClkCnt; ++i)
+		for (i = 0; i < clkCnt; ++i)
 			ISP_EnableClock(MFALSE, 0);
+		LOG_INF("current isp g_EnableClkCnt:%d", g_EnableClkCnt);
 	}
 #endif
 
