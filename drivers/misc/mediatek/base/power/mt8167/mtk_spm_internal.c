@@ -347,12 +347,12 @@ do {						\
 		spm_crit2(fmt, ##args);		\
 } while (0)
 
-wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
+unsigned int __spm_output_wake_reason(const struct wake_status *wakesta,
 				       const struct pcm_desc *pcmdesc, bool suspend)
 {
 	int i;
 	char buf[LOG_BUF_SIZE] = { 0 };
-	wake_reason_t wr = WR_UNKNOWN;
+	unsigned int wr = WR_UNKNOWN;
 
 	if (wakesta->assert_pc != 0) {
 		spm_print(suspend, "PCM ASSERT AT %u (%s), r13 = 0x%x, debug_flag = 0x%x\n",
@@ -617,11 +617,10 @@ void __spm_set_pmic_phase(enum pmic_wrap_phase_id phase)
 	ret = regmap_read(pmic_regmap, PMIC_ADDR_VPROC_VOSEL_ON, &rdata);
 	BUG_ON(ret);
 
-	if (phase == PMIC_WRAP_PHASE_SODI) {
+	if (phase == PMIC_WRAP_PHASE_SODI)
 		pw.set[phase]._[IDX_SO_VSRAM_CA15L_NORMAL].cmd_wdata = rdata;
-	} else if (phase == PMIC_WRAP_PHASE_DEEPIDLE) {
+	else if (phase == PMIC_WRAP_PHASE_DEEPIDLE)
 		pw.set[phase]._[IDX_DI_VPROC_CA7_NORMAL].cmd_wdata = rdata;
-	}
 
 	for (i = 0; i < pw.set[phase].nr_idx; i++) {
 		spm_write(pw.addr[i].cmd_addr, pw.set[phase]._[i].cmd_addr);

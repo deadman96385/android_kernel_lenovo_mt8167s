@@ -315,14 +315,14 @@ enum SPM_WAKE_SRC {
 
 /* enum SPM_WAKE_SRC_LIST; */
 
-typedef enum {
+enum {
 	WR_NONE = 0,
 	WR_UART_BUSY = 1,
 	WR_PCM_ASSERT = 2,
 	WR_PCM_TIMER = 3,
 	WR_WAKE_SRC = 4,
 	WR_UNKNOWN = 5,
-} wake_reason_t;
+};
 
 struct twam_sig {
 	u32 sig0;		/* signal 0: config or status */

@@ -101,7 +101,7 @@ int __attribute__ ((weak)) spm_set_dpidle_wakesrc(u32 wakesrc, bool enable, bool
 {
 	return 0;
 }
-__weak wake_reason_t spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data)
+__weak unsigned int spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data)
 {
 	return 0;
 }
@@ -109,7 +109,7 @@ __weak wake_reason_t spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data)
 
 static DEFINE_SPINLOCK(slp_lock);
 
-static wake_reason_t slp_wake_reason = WR_NONE;
+static unsigned int slp_wake_reason = WR_NONE;
 
 static bool slp_ck26m_on;
 static bool slp_pars_dpd = 1;
@@ -370,7 +370,7 @@ int slp_set_wakesrc(u32 wakesrc, bool enable, bool ck26m_on)
 	return r;
 }
 
-wake_reason_t slp_get_wake_reason(void)
+unsigned int slp_get_wake_reason(void)
 {
 	return slp_wake_reason;
 }

@@ -116,26 +116,26 @@ void start_generic_timer(void)
 }
 
 struct set_and_clear_regs {
-	volatile unsigned int set[32], clear[32];
+	unsigned int set[32], clear[32];
 };
 
 struct interrupt_distributor {
-	volatile unsigned int control;			/* 0x000 */
+	unsigned int control;			/* 0x000 */
 	const unsigned int controller_type;
 	const unsigned int implementer;
 	const char padding1[116];
-	volatile unsigned int security[32];		/* 0x080 */
+	unsigned int security[32];		/* 0x080 */
 	struct set_and_clear_regs enable;		/* 0x100 */
 	struct set_and_clear_regs pending;		/* 0x200 */
 	struct set_and_clear_regs active;		/* 0x300 */
-	volatile unsigned int priority[256];		/* 0x400 */
-	volatile unsigned int target[256];		/* 0x800 */
-	volatile unsigned int configuration[64];	/* 0xC00 */
+	unsigned int priority[256];		/* 0x400 */
+	unsigned int target[256];		/* 0x800 */
+	unsigned int configuration[64];	/* 0xC00 */
 	const char padding3[256];			/* 0xD00 */
-	volatile unsigned int non_security_access_control[64]; /* 0xE00 */
-	volatile unsigned int software_interrupt;	/* 0xF00 */
-	volatile unsigned int sgi_clr_pending[4];	/* 0xF10 */
-	volatile unsigned int sgi_set_pending[4];	/* 0xF20 */
+	unsigned int non_security_access_control[64]; /* 0xE00 */
+	unsigned int software_interrupt;	/* 0xF00 */
+	unsigned int sgi_clr_pending[4];	/* 0xF10 */
+	unsigned int sgi_set_pending[4];	/* 0xF20 */
 	const char padding4[176];
 
 	unsigned const int peripheral_id[4];		/* 0xFE0 */

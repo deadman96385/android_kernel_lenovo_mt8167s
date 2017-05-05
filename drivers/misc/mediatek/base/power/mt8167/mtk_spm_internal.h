@@ -278,7 +278,7 @@ extern void __spm_kick_pcm_to_run(const struct pwr_ctrl *pwrctrl);
 
 extern void __spm_get_wakeup_status(struct wake_status *wakesta);
 extern void __spm_clean_after_wakeup(void);
-extern wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
+extern unsigned int __spm_output_wake_reason(const struct wake_status *wakesta,
 						   const struct pcm_desc *pcmdesc, bool suspend);
 
 #if CONFIG_SUPPORT_PCM_ALLINONE
