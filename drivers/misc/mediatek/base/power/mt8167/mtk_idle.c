@@ -1676,7 +1676,7 @@ int rgidle_enter(int cpu)
 }
 EXPORT_SYMBOL(rgidle_enter);
 
-static int __init get_base_from_node(
+static int get_base_from_node(
 	const char *cmp, void __iomem **pbase, int idx)
 {
 	struct device_node *node;
@@ -1693,7 +1693,7 @@ static int __init get_base_from_node(
 	return 0;
 }
 
-static void __init iomap_init(void)
+static void iomap_init(void)
 {
 	get_base_from_node("mediatek,mt8167-topckgen", &topckgen_base, 0);
 	get_base_from_node("mediatek,mt8167-scpsys", &scpsys_base, 0);
