@@ -730,6 +730,10 @@ static int mtk_iommu_probe(struct platform_device *pdev)
 
 static int mtk_iommu_remove(struct platform_device *pdev)
 {
+	return 0;
+}
+static void mtk_iommu_shutdown(struct platform_device *pdev)
+{
 	struct mtk_iommu_data *data = platform_get_drvdata(pdev);
 
 	if (iommu_present(&platform_bus_type))
@@ -739,7 +743,6 @@ static int mtk_iommu_remove(struct platform_device *pdev)
 	/* clk_disable_unprepare(data->bclk); */
 	devm_free_irq(&pdev->dev, data->irq, data);
 	component_master_del(&pdev->dev, &mtk_iommu_com_ops);
-	return 0;
 }
 
 static int mtk_iommu_suspend(struct device *dev)
@@ -790,6 +793,7 @@ static const struct of_device_id mtk_iommu_of_ids[] = {
 static struct platform_driver mtk_iommu_driver = {
 	.probe	= mtk_iommu_probe,
 	.remove	= mtk_iommu_remove,
+	.shutdown = mtk_iommu_shutdown,
 	.driver	= {
 		.name = "mtk-iommu",
 		.of_match_table = mtk_iommu_of_ids,
