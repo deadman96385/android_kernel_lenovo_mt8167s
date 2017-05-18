@@ -1333,7 +1333,7 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = runtime->rate;
 	const unsigned int channels = runtime->channels;
-	const int bit_width = snd_pcm_format_width(runtime->format);
+	const int bit_width = dai->sample_bits;
 	const unsigned int stream = substream->stream;
 	unsigned int val;
 	unsigned int bck_inverse = 0;

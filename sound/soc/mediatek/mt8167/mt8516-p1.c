@@ -18,6 +18,7 @@
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #include <linux/regulator/consumer.h>
+#include <sound/pcm_params.h>
 
 #define ENUM_TO_STR(enum) #enum
 
@@ -391,6 +392,18 @@ static struct snd_soc_ops tdmin_capture_ops = {
 	.shutdown = tdmin_capture_shutdown,
 };
 
+static int mt8516_8ch_i2s_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
+		struct snd_pcm_hw_params *params)
+{
+	struct snd_mask *mask;
+
+	mask = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
+
+	snd_mask_none(mask);
+	snd_mask_set(mask, SNDRV_PCM_FORMAT_S32_LE);
+	return 0;
+}
+
 /* Digital audio interface glue - connects codec <---> CPU */
 static struct snd_soc_dai_link mt8516_p1_dais[] = {
 	/* Front End DAI links */
@@ -466,9 +479,11 @@ static struct snd_soc_dai_link mt8516_p1_dais[] = {
 		.name = "HDMI BE",
 		.cpu_dai_name = "HDMIO",
 		.no_pcm = 1,
-		.codec_dai_name = "cs4382a-i2s",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
 			   SND_SOC_DAIFMT_CBS_CFS,
+		.be_hw_params_fixup = mt8516_8ch_i2s_hw_params_fixup,
 		.dpcm_playback = 1,
 	},
 	{
@@ -503,7 +518,8 @@ static struct snd_soc_dai_link mt8516_p1_dais[] = {
 		.name = "EXT DAC",
 		.cpu_dai_name = "I2S",
 		.no_pcm = 1,
-		.codec_dai_name = "cs4382a-i2s",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
 			   SND_SOC_DAIFMT_CBS_CFS,
 		.dpcm_playback = 1,
@@ -512,10 +528,12 @@ static struct snd_soc_dai_link mt8516_p1_dais[] = {
 
 static const struct snd_soc_dapm_widget mt8516_p1_dapm_widgets[] = {
 	SND_SOC_DAPM_INPUT("External Line In"),
+	SND_SOC_DAPM_OUTPUT("Virtual SPK Out"),
 };
 
 static const struct snd_soc_dapm_route mt8516_p1_audio_map[] = {
 	{"2ND I2S Capture", NULL, "External Line In"},
+	{"Virtual SPK Out", NULL, "HDMIO Playback"},
 
 	/* ADDA clock - Uplink */
 	{"AIF TX", NULL, "AFE_CLK"},
