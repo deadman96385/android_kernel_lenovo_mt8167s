@@ -92,7 +92,7 @@
 		pinctrl-0 = <&ethernet_pins_default>;
 		mac-address = [00 00 00 00 00 00];
 		/*local-mac-address = [00 0C E7 06 00 00];*/
-		status = "okay";
+		status = "disabled";
 	};
 
 	irrx: irrx@0x10019000 {
@@ -401,7 +401,7 @@
 	pinctrl-names = "default", "state_uhs";
 	pinctrl-0 = <&mmc1_pins_default>;
 	pinctrl-1 = <&mmc1_pins_uhs>;
-	status = "okay";
+	status = "disabled";
 	clk_src = <2>;  /*<MSDC30_CLKSRC_200MHZ>*/
 	host_function = <2>;
 	bus-width = <4>;
@@ -430,22 +430,17 @@ pwm_goio_def_cfg: pwmdefault {
 
 	aud_pins_default: audiodefault {
 		pins_cmd_dat {
-			pinmux = <MT8167_PIN_25_EINT25__FUNC_I2S_8CH_MCK>,
-				 <MT8167_PIN_68_MSDC2_CMD__FUNC_I2S_8CH_DO4>,
-				 <MT8167_PIN_69_MSDC2_CLK__FUNC_I2S_8CH_DO3>,
-				 <MT8167_PIN_70_MSDC2_DAT0__FUNC_I2S_8CH_DO2>,
-				 <MT8167_PIN_71_MSDC2_DAT1__FUNC_I2S_8CH_DO1>,
-				 <MT8167_PIN_72_MSDC2_DAT2__FUNC_I2S_8CH_LRCK>,
-				 <MT8167_PIN_73_MSDC2_DAT3__FUNC_I2S_8CH_BCK>,
-				 <MT8167_PIN_100_CMDAT0__FUNC_TDM_RX_MCK>,
-				 <MT8167_PIN_101_CMDAT1__FUNC_TDM_RX_BCK>,
-				 <MT8167_PIN_102_CMMCLK__FUNC_TDM_RX_LRCK>,
-				 <MT8167_PIN_103_CMPCLK__FUNC_TDM_RX_DI>,
-				 <MT8167_PIN_55_I2S_DATA_IN__FUNC_I2S0_DI>,
-				 <MT8167_PIN_56_I2S_LRCK__FUNC_I2S0_LRCK>,
-				 <MT8167_PIN_57_I2S_BCK__FUNC_I2S0_BCK>,
-				 <MT8167_PIN_66_LCM_RST__FUNC_I2S0_MCK>;
-				 drive-strength = <MTK_DRIVE_4mA>;
+			pinmux = <MT8167_PIN_36_MRG_CLK__FUNC_I2S0_BCK>,
+				<MT8167_PIN_37_MRG_SYNC__FUNC_I2S0_LRCK>,
+				<MT8167_PIN_38_MRG_DI__FUNC_I2S0_DI>,
+				<MT8167_PIN_14_EINT14__FUNC_I2S_8CH_DO1>,
+				<MT8167_PIN_15_EINT15__FUNC_I2S_8CH_LRCK>,
+				<MT8167_PIN_16_EINT16__FUNC_I2S_8CH_BCK>,
+				<MT8167_PIN_100_CMDAT0__FUNC_TDM_RX_MCK>,
+				<MT8167_PIN_101_CMDAT1__FUNC_TDM_RX_BCK>,
+				<MT8167_PIN_102_CMMCLK__FUNC_TDM_RX_LRCK>,
+				<MT8167_PIN_103_CMPCLK__FUNC_TDM_RX_DI>;
+			drive-strength = <MTK_DRIVE_4mA>;
 		};
 	};
 
