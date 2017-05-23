@@ -546,10 +546,9 @@ static const struct scp_domain_data scp_domain_data_mt8167[] = {
 		.ctl_offs = SPM_MFG_ASYNC_PWR_CON,
 		.sram_pdn_bits = 0,
 		.sram_pdn_ack_bits = 0,
-		.bus_prot_mask = BIT(2) | BIT(5),
 		.axi_si1_way_en = BIT(7),
 		.clk_id = {CLK_MFG, CLK_AXI_MFG},
-		.active_wakeup = true,
+		.active_wakeup = false,
 	},
 	[MT8167_POWER_DOMAIN_MFG_2D] = {
 		.name = "mfg_2d",
@@ -557,8 +556,9 @@ static const struct scp_domain_data scp_domain_data_mt8167[] = {
 		.ctl_offs = SPM_MFG_2D_PWR_CON,
 		.sram_pdn_bits = GENMASK(11, 8),
 		.sram_pdn_ack_bits = GENMASK(15, 12),
+		.bus_prot_mask = BIT(2) | BIT(5),
 		.clk_id = {CLK_NONE},
-		.active_wakeup = true,
+		.active_wakeup = false,
 	},
 	[MT8167_POWER_DOMAIN_MFG] = {
 		.name = "mfg",
@@ -567,7 +567,7 @@ static const struct scp_domain_data scp_domain_data_mt8167[] = {
 		.sram_pdn_bits = GENMASK(11, 8),
 		.sram_pdn_ack_bits = GENMASK(15, 12),
 		.clk_id = {CLK_NONE},
-		.active_wakeup = true,
+		.active_wakeup = false,
 	},
 	[MT8167_POWER_DOMAIN_CONN] = {
 		.name = "conn",

@@ -19,7 +19,7 @@
 #include "ged_dvfs.h"
 #include <linux/regulator/consumer.h>
 
-/* control APM is enabled or not  */
+/* Control SW APM is enabled or not  */
 #define MTK_PM_SUPPORT 1
 
 struct mtk_mfg_base {
@@ -38,14 +38,11 @@ struct mtk_mfg_base {
 	struct notifier_block mfg_notifier;
 };
 
-
-
 /* extern to be used by PVRCore_Init in RGX DDK module.c */
 PVRSRV_ERROR MTKMFGSystemInit(void);
 
 void MTKMFGSystemDeInit(void);
-
-void MTKMFGEnableDVFSTimer(bool bEnable);
+void MTKDisablePowerDomain(void);
 
 /* below register interface in RGX sysconfig.c */
 PVRSRV_ERROR MTKDevPrePowerState(IMG_HANDLE hSysData, PVRSRV_DEV_POWER_STATE eNewPowerState,
@@ -62,27 +59,10 @@ PVRSRV_ERROR MTKSystemPostPowerState(PVRSRV_SYS_POWER_STATE eNewPowerState);
 
 int MTKRGXDeviceInit(void *pvOSDevice);
 
-
 #ifdef CONFIG_MTK_HIBERNATION
 extern void mt_irq_set_sens(unsigned int irq, unsigned int sens);
 extern void mt_irq_set_polarity(unsigned int irq, unsigned int polarity);
 #endif
-
-/* from gpu/hal/mtk_gpu_utility.c */
-extern unsigned int (*mtk_get_gpu_loading_fp)(void);
-extern unsigned int (*mtk_get_gpu_block_fp)(void);
-extern unsigned int (*mtk_get_gpu_idle_fp)(void);
-extern unsigned int (*mtk_get_gpu_power_loading_fp)(void);
-extern void (*mtk_enable_gpu_dvfs_timer_fp)(bool bEnable);
-extern void (*mtk_boost_gpu_freq_fp)(void);
-extern void (*mtk_set_bottom_gpu_freq_fp)(unsigned int);
-
-extern unsigned int (*mtk_custom_get_gpu_freq_level_count_fp)(void);
-extern void (*mtk_custom_boost_gpu_freq_fp)(unsigned int ui32FreqLevel);
-extern void (*mtk_custom_upbound_gpu_freq_fp)(unsigned int ui32FreqLevel);
-extern unsigned int (*mtk_get_custom_boost_gpu_freq_fp)(void);
-extern unsigned int (*mtk_get_custom_upbound_gpu_freq_fp)(void);
-/*****/
 
 /* from gpu/ged/src/ged_dvfs.c */
 extern void (*ged_dvfs_cal_gpu_utilization_fp)(unsigned int *pui32Loading,
@@ -97,7 +77,6 @@ extern void (*ged_dvfs_gpu_freq_commit_fp)(unsigned long ui32NewFreqID,
 extern int (*ged_dvfs_vsync_trigger_fp)(int idx);
 extern unsigned int mt_gpufreq_get_volt_by_idx(unsigned int idx);
 #endif
-
 
 #endif
 

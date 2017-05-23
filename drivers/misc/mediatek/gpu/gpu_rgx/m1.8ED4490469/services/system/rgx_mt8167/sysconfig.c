@@ -48,34 +48,32 @@
 #include "syscommon.h"
 #include "sysconfig.h"
 #include "physheap.h"
+#include "mtk_mfgsys.h"
+
 #if defined(SUPPORT_ION)
 #include "ion_support.h"
 #endif
-#include "mtk_mfgsys.h"
-
 
 #if defined(MTK_CONFIG_OF) && defined(CONFIG_OF)
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
-
 #include <linux/platform_device.h>
+
 struct platform_device *gpsPVRLDMDev;
 #endif
 
-#define RGX_CR_ISP_GRIDOFFSET	(0x0FA0U)
 
+#define RGX_CR_ISP_GRIDOFFSET	(0x0FA0U)
 
 static RGX_TIMING_INFORMATION	gsRGXTimingInfo;
 static RGX_DATA			gsRGXData;
 static PVRSRV_DEVICE_CONFIG	gsDevices[1];
 
-
 static PHYS_HEAP_FUNCTIONS	gsPhysHeapFuncs;
 static PHYS_HEAP_CONFIG		gsPhysHeapConfig;
 
 #if  defined(SUPPORT_PDVFS)
-
 /* Dummy DVFS configuration used purely for testing purposes */
 
 static const IMG_OPP asOPPTable[] = {
@@ -98,8 +96,6 @@ static const IMG_OPP asOPPTable[] = {
 };
 
 #define LEVEL_COUNT (sizeof(asOPPTable) / sizeof(IMG_OPP))
-
-
 #endif
 
 
@@ -155,7 +151,6 @@ static PHYS_HEAP_REGION gsHeapRegionsLocal[] = {
 	{ { 0 }, { 0 }, 0, },
 };
 
-
 PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 {
 	PVRSRV_ERROR err = PVRSRV_OK;
@@ -175,16 +170,9 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	gsDevices[0].pasPhysHeaps = &gsPhysHeapConfig;
 	gsDevices[0].ui32PhysHeapCount = sizeof(gsPhysHeapConfig) / sizeof(PHYS_HEAP_CONFIG);
 
-
 	gsDevices[0].eBIFTilingMode = RGXFWIF_BIFTILINGMODE_256x16;
 	gsDevices[0].pui32BIFTilingHeapConfigs = gauiBIFTilingHeapXStrides;
 	gsDevices[0].ui32BIFTilingHeapCount = IMG_ARR_NUM_ELEMS(gauiBIFTilingHeapXStrides);
-
-
-	/*
-	 * add for new DDK 1.1.2550513
-	 */
-
 
 	/*
 	 * Setup RGX specific timing data
@@ -198,13 +186,12 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	gsRGXTimingInfo.bEnableActivePM           = false;
 #endif
 
-	/*  define HW APM */
+	/* define HW APM */
 #if defined(MTK_USE_HW_APM)
 	gsRGXTimingInfo.bEnableRDPowIsland        = true;
 #else
 	gsRGXTimingInfo.bEnableRDPowIsland        = false;
 #endif
-
 
 	/*
 	 * Setup RGX specific data
@@ -223,7 +210,7 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	{
 		struct resource *irq_res;
 		struct resource *reg_res;
-dump_stack();
+
 		gpsPVRLDMDev = to_platform_device((struct device *)pvOSDevice);
 		irq_res = platform_get_resource(gpsPVRLDMDev, IORESOURCE_IRQ, 0);
 
@@ -232,7 +219,7 @@ dump_stack();
 
 			g32SysIrq = irq_res->start;
 
-			PVR_DPF((PVR_DBG_ERROR, "irq_res = 0x%x", (int)irq_res->start));
+			PVR_LOG(("irq_res = 0x%x", (int)irq_res->start));
 		} else {
 			PVR_DPF((PVR_DBG_ERROR, "irq_res = NULL!"));
 err_out:
@@ -245,7 +232,7 @@ err_out:
 			gsDevices[0].sRegsCpuPBase.uiAddr	= reg_res->start;
 			gsDevices[0].ui32RegsSize			= resource_size(reg_res);
 
-			PVR_DPF((PVR_DBG_ERROR, "reg_res = 0x%x, 0x%x", (int)reg_res->start,
+			PVR_LOG(("reg_res = 0x%x, 0x%x", (int)reg_res->start,
 									(int)resource_size(reg_res)));
 		} else {
 			PVR_DPF((PVR_DBG_ERROR, "reg_res = NULL!"));
@@ -253,49 +240,35 @@ err_out:
 		}
 	}
 #else
-dump_stack();
 	gsDevices[0].sRegsCpuPBase.uiAddr   = SYS_MTK_RGX_REGS_SYS_PHYS_BASE;
 	gsDevices[0].ui32RegsSize           = SYS_MTK_RGX_REGS_SIZE;
 	gsDevices[0].ui32IRQ                = SYS_MTK_RGX_IRQ;
 #endif
 
-	/*  power management on  HW system */
-#if MTK_PM_SUPPORT
+	/* power management on HW system */
 	gsDevices[0].pfnPrePowerState       = MTKDevPrePowerState;
 	gsDevices[0].pfnPostPowerState      = MTKDevPostPowerState;
-#else
-	gsDevices[0].pfnPrePowerState       = NULL;
-	gsDevices[0].pfnPostPowerState      = NULL;
-#endif
 
-	/*  clock frequency  */
+	/* clock frequency */
 	gsDevices[0].pfnClockFreqGet        = NULL;
-
 
 	gsDevices[0].hDevData               = &gsRGXData;
 
-
 	gsDevices[0].eCacheSnoopingMode = PVRSRV_DEVICE_SNOOP_NONE;
-
 
 #if defined(SUPPORT_PDVFS)
 	/* Dummy DVFS configuration used purely for testing purposes */
 	gsDevices[0].sDVFS.sDVFSDeviceCfg.pasOPPTable = asOPPTable;
 	gsDevices[0].sDVFS.sDVFSDeviceCfg.ui32OPPTableSize = LEVEL_COUNT;
-
 #endif
-
-
 
 	/*
 	 * Setup system config
 	 */
-	/*gsSysConfig.uiDeviceCount = sizeof(gsDevices)/sizeof(gsDevices[0]); */
-	/*gsSysConfig.pasDevices = &gsDevices[0]; */
+	/* gsSysConfig.uiDeviceCount = sizeof(gsDevices)/sizeof(gsDevices[0]); */
+	/* gsSysConfig.pasDevices = &gsDevices[0]; */
 
-	/*  power management on  HW system */
-
-
+	/* power management on HW system */
 
 	/* Setup other system specific stuff */
 #if defined(SUPPORT_ION)
@@ -306,7 +279,6 @@ dump_stack();
 	*ppsDevConfig = &gsDevices[0];
 
 	err = (PVRSRV_ERROR)(MTKRGXDeviceInit(gsDevices[0].pvOSDevice));
-
 	return err;
 }
 
@@ -342,7 +314,6 @@ PVRSRV_ERROR SysUninstallDeviceLISR(IMG_HANDLE hLISRData)
 	return OSUninstallSystemLISR(hLISRData);
 }
 
-
 PVRSRV_ERROR SysDebugInfo(PVRSRV_DEVICE_CONFIG *psDevConfig, DUMPDEBUG_PRINTF_FUNC *pfnDumpDebugPrintf,
 			  void *pvDumpDebugFile)
 {
@@ -350,7 +321,6 @@ PVRSRV_ERROR SysDebugInfo(PVRSRV_DEVICE_CONFIG *psDevConfig, DUMPDEBUG_PRINTF_FU
 	PVR_UNREFERENCED_PARAMETER(pfnDumpDebugPrintf);
 	return PVRSRV_OK;
 }
-
 
 
 /******************************************************************************
