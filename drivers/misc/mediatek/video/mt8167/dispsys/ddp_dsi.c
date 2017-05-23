@@ -1656,6 +1656,7 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 	struct DSI_RX_DATA_REG read_data3;
 	int i = 0;
 	struct DSI_T0_INS t0;
+	int timeout = 0;
 
 #if ENABLE_DSI_INTERRUPT
 	static const long WAIT_TIMEOUT = HZ / 2;
@@ -1676,6 +1677,11 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 
 		DSI_WaitForNotBusy(module, cmdq);
 
+		DSI_OUTREGBIT(cmdq, struct DSI_INT_STATUS_REG, DSI_REG[i]->DSI_INTSTA, RD_RDY, 0);
+		DSI_OUTREGBIT(cmdq, struct DSI_INT_STATUS_REG, DSI_REG[i]->DSI_INTSTA, CMD_DONE, 0);
+		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[i]->DSI_INTEN, RD_RDY, 1);
+		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[i]->DSI_INTEN, CMD_DONE, 1);
+
 		t0.CONFG = 0x04;	/* BTA */
 		t0.Data0 = cmd;
 		if (buffer_size < 0x3)
@@ -1687,20 +1693,31 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 		DSI_OUTREG32(cmdq, &DSI_CMDQ_REG[i]->data[0], AS_UINT32(&t0));
 		DSI_OUTREG32(cmdq, &DSI_REG[i]->DSI_CMDQ_SIZE, 1);
 
-		DSI_OUTREGBIT(cmdq, struct DSI_RACK_REG, DSI_REG[i]->DSI_RACK, DSI_RACK, 1);
-		DSI_OUTREGBIT(cmdq, struct DSI_INT_STATUS_REG, DSI_REG[i]->DSI_INTSTA, RD_RDY, 1);
-		DSI_OUTREGBIT(cmdq, struct DSI_INT_STATUS_REG, DSI_REG[i]->DSI_INTSTA, CMD_DONE, 1);
-		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[i]->DSI_INTEN, RD_RDY, 1);
-		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[i]->DSI_INTEN, CMD_DONE, 1);
-
 		DSI_OUTREG32(cmdq, &DSI_REG[i]->DSI_START, 0);
 		DSI_OUTREG32(cmdq, &DSI_REG[i]->DSI_START, 1);
 #if ENABLE_DSI_INTERRUPT
 		ret = wait_event_interruptible_timeout(_dsi_dcs_read_wait_queue[i],
 						       waitRDDone, WAIT_TIMEOUT);
 		waitRDDone = false;
-		if (ret == 0) {
-			DDPMSG(" Wait for DSI engine read ready timeout!!!\n");
+		if (ret > 0) {
+			do {
+				timeout++;
+				udelay(1);
+				DSI_OUTREGBIT(cmdq, struct DSI_RACK_REG, DSI_REG[i]->DSI_RACK, DSI_RACK, 1);
+				} while (DSI_REG[i]->DSI_INTSTA.BUSY && (timeout < 1000));
+			if (timeout == 1000) {
+				/* wait cmd done timeout */
+				DISPERR("DSI Read Fail: dsi wait cmd done timeout\n");
+				DSI_DumpRegisters(module, 2);
+				/* /do necessary reset here */
+				DSI_OUTREGBIT(cmdq, struct DSI_RACK_REG, DSI_REG[i]->DSI_RACK, DSI_RACK, 1);
+				DSI_Reset(module, NULL);
+				/* clear rd rdy interrupt */
+				DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[i]->DSI_INTSTA, RD_RDY, 0);
+				return 0;
+			}
+		} else {
+			DDPMSG(" Wait for DSI engine read ready fail!!!\n");
 
 			DSI_DumpRegisters(module, 1);
 
@@ -1732,10 +1749,10 @@ uint32_t DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module, void *cmdq, uint8
 
 		DSI_OUTREGBIT(cmdq, struct DSI_INT_STATUS_REG, DSI_REG[i]->DSI_INTSTA, RD_RDY, 1);
 		DSI_OUTREG32(cmdq, &DSI_REG[i]->DSI_START, 0);
-
 #endif
 
-		DSI_OUTREGBIT(cmdq, struct DSI_INT_ENABLE_REG, DSI_REG[i]->DSI_INTEN, RD_RDY, 1);
+		DSI_OUTREGBIT(cmdq, struct DSI_INT_STATUS_REG, DSI_REG[i]->DSI_INTSTA, RD_RDY, 0);
+		DSI_OUTREGBIT(cmdq, struct DSI_INT_STATUS_REG, DSI_REG[i]->DSI_INTSTA, CMD_DONE, 0);
 
 		DSI_OUTREG32(cmdq, &read_data0, AS_UINT32(&DSI_REG[i]->DSI_RX_DATA0));
 		DSI_OUTREG32(cmdq, &read_data1, AS_UINT32(&DSI_REG[i]->DSI_RX_DATA1));
