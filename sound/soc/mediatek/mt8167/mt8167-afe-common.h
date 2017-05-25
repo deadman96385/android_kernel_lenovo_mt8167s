@@ -166,6 +166,7 @@ struct mt8167_afe_memif_data {
 	int format_shift;
 	int conn_format_mask;
 	int prealloc_size;
+	unsigned long buffer_align_bytes;
 };
 
 struct mt8167_afe_be_dai_data {

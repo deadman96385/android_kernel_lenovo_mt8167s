@@ -1740,6 +1740,9 @@ static int mt8167_afe_dais_startup(struct snd_pcm_substream *substream,
 
 	dev_dbg(afe->dev, "%s %s\n", __func__, memif->data->name);
 
+	snd_pcm_hw_constraint_step(substream->runtime, 0,
+		SNDRV_PCM_HW_PARAM_BUFFER_BYTES, memif->data->buffer_align_bytes);
+
 	snd_soc_set_runtime_hwparams(substream, &mt8167_afe_hardware);
 
 	ret = snd_pcm_hw_constraint_integer(runtime,
@@ -2771,6 +2774,7 @@ static struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
 		.format_shift = 16,
 		.conn_format_mask = -1,
 		.prealloc_size = 128 * 1024,
+		.buffer_align_bytes = 16,
 	}, {
 		.name = "DL2",
 		.id = MT8167_AFE_MEMIF_DL2,
@@ -2792,6 +2796,7 @@ static struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
 		.format_shift = 18,
 		.conn_format_mask = -1,
 		.prealloc_size = 128 * 1024,
+		.buffer_align_bytes = 16,
 	}, {
 		.name = "VUL",
 		.id = MT8167_AFE_MEMIF_VUL,
@@ -2813,6 +2818,7 @@ static struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
 		.format_shift = 22,
 		.conn_format_mask = AFE_CONN_24BIT_O09 | AFE_CONN_24BIT_O10,
 		.prealloc_size = 32 * 1024,
+		.buffer_align_bytes = 8,
 	}, {
 		.name = "DAI",
 		.id = MT8167_AFE_MEMIF_DAI,
@@ -2834,6 +2840,7 @@ static struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
 		.format_shift = 24,
 		.conn_format_mask = -1,
 		.prealloc_size = 16 * 1024,
+		.buffer_align_bytes = 8,
 	}, {
 		.name = "AWB",
 		.id = MT8167_AFE_MEMIF_AWB,
@@ -2855,6 +2862,7 @@ static struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
 		.format_shift = 20,
 		.conn_format_mask = AFE_CONN_24BIT_O05 | AFE_CONN_24BIT_O06,
 		.prealloc_size = 0,
+		.buffer_align_bytes = 8,
 	}, {
 		.name = "MOD_DAI",
 		.id = MT8167_AFE_MEMIF_MOD_DAI,
@@ -2876,6 +2884,7 @@ static struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
 		.format_shift = 26,
 		.conn_format_mask = -1,
 		.prealloc_size = 0,
+		.buffer_align_bytes = 8,
 	}, {
 		.name = "HDMI",
 		.id = MT8167_AFE_MEMIF_HDMI,
@@ -2897,6 +2906,7 @@ static struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
 		.format_shift = 28,
 		.conn_format_mask = -1,
 		.prealloc_size = 0,
+		.buffer_align_bytes = 16,
 	}, {
 		.name = "TDM_IN",
 		.id = MT8167_AFE_MEMIF_TDM_IN,
@@ -2918,6 +2928,7 @@ static struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
 		.format_shift = 4,
 		.conn_format_mask = -1,
 		.prealloc_size = 0,
+		.buffer_align_bytes = 8,
 	},
 };
 
