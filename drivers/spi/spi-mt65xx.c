@@ -627,8 +627,6 @@ static int mtk_spi_probe(struct platform_device *pdev)
 		goto err_put_master;
 	}
 
-	clk_disable_unprepare(mdata->spi_clk);
-
 	pm_runtime_enable(&pdev->dev);
 
 	ret = devm_spi_register_master(&pdev->dev, master);
