@@ -504,8 +504,8 @@ struct ptp_det {
 	unsigned long freq_base; /* maximum frequency used to calculate percentage */
 
 	/* Use this to limit bank frequency */
-	unsigned long dvfs_max_freq_khz;
-	unsigned long dvfs_min_freq_khz;
+	unsigned long ptp_dvfs_max_freq_khz;
+	unsigned long ptp_dvfs_min_freq_khz;
 
 	unsigned char freq_table_percent[NR_FREQ]; /* percentage to maximum freq */
 	unsigned long freq_table[NR_FREQ];     /* in KHz */
@@ -1489,22 +1489,28 @@ static int limit_mcusys_env(struct ptp_det *det)
 	int opp_index;
 	int u_vboot = PTP_PMIC_VAL_TO_VOLT(det->VBOOT + PTPOD_PMIC_OFFSET);
 
-	/*
-	 * we have to make sure all CPUs are on and working at VBOOT volt.
-	 * Add a pm_qos request to prevent CPUs from entering CPU off idle state.
-	 */
-	pm_qos_add_request(&qos_request, PM_QOS_CPU_DMA_LATENCY, 1);
+	if (ptp_log_en)
+		ptp_error("%s()\n", __func__);
+
+#ifndef CONFIG_REGULATOR_GPIO
+	/* configure regulator to PWM mode */
+	ret = regulator_set_mode(det->reg, REGULATOR_MODE_FAST);
+	if (ret) {
+		ptp_error("%s: Failed to set regulator in PWM mode, ret = %d\n", det->name, ret);
+		return ret;
+	}
+#endif
 
 	/* Backup current cpufreq policy */
 	ret = cpufreq_get_policy(&det->ptp_cpufreq_policy, det->dev_id);
 	if (ret) {
-		ptp_error("cpufreq is not ready.\n");
+		ptp_error("%s(): cpufreq is not ready, ret = %d\n", __func__, ret);
 		return ret;
 	}
 
 	if (ptp_log_en) {
-		ptp_error("ptp_cpufreq_policy.max = %d\n", det->ptp_cpufreq_policy.max);
-		ptp_error("ptp_cpufreq_policy.min = %d\n", det->ptp_cpufreq_policy.min);
+		ptp_error("%s: ptp_cpufreq_policy.max = %d\n", det->name, det->ptp_cpufreq_policy.max);
+		ptp_error("%s: ptp_cpufreq_policy.min = %d\n", det->name, det->ptp_cpufreq_policy.min);
 	}
 
 	/* Force CPUFreq to switch to OPP with VBOOT volt */
@@ -1516,14 +1522,17 @@ static int limit_mcusys_env(struct ptp_det *det)
 		 * PTPOD is done.
 		 */
 		if (det->volt_table[opp_index] <= u_vboot &&
-			(!det->dvfs_max_freq_khz || !det->dvfs_min_freq_khz)) {
+			(!det->ptp_dvfs_max_freq_khz || !det->ptp_dvfs_min_freq_khz)) {
 
 			/* seem no need ? det->volt_tbl_pmic[opp_index] = det->VBOOT; */
-			det->dvfs_max_freq_khz = det->freq_table[opp_index] / 1000;
-			det->dvfs_min_freq_khz = det->freq_table[opp_index] / 1000;
+			det->ptp_dvfs_max_freq_khz = det->freq_table[opp_index] / 1000;
+			det->ptp_dvfs_min_freq_khz = det->freq_table[opp_index] / 1000;
 			ret = dev_pm_opp_adjust_voltage(det->dev, det->freq_table[opp_index], u_vboot);
-			if (ret)
+			if (ret) {
 				ptp_error("Fail dev_pm_opp_adjust_voltage(), ret = %d\n", ret);
+				return ret;
+			}
+
 			break;
 		}
 	}
@@ -1531,12 +1540,7 @@ static int limit_mcusys_env(struct ptp_det *det)
 	/* call ptp_cpufreq_notifier(), try to fix dvfs freq */
 	cpufreq_update_policy(det->dev_id);
 
-	/* configure regulator to PWM mode */
-	ret = regulator_set_mode(det->reg, REGULATOR_MODE_FAST);
-	if (ret)
-		ptp_error("%s: Failed to set regulator in PWM mode\n", det->name);
-
-	return ret;
+	return 0;
 }
 
 static int ptp_init_det(struct ptp_det *det, struct ptp_devinfo *devinfo)
@@ -1612,33 +1616,43 @@ static int ptp_init_det(struct ptp_det *det, struct ptp_devinfo *devinfo)
 	return ret;
 }
 
-static int unlimit_mcusys_env(struct ptp_det *det)
+static void unlimit_mcusys_env(struct ptp_det *det)
 {
+#ifndef CONFIG_REGULATOR_GPIO
 	int ret;
+#endif
+	if (ptp_log_en)
+		ptp_error("%s()\n", __func__);
 
-	/* unlimit CPUFreq OPP range */
-	det->dvfs_max_freq_khz = det->ptp_cpufreq_policy.max;
-	det->dvfs_min_freq_khz = det->ptp_cpufreq_policy.min;
-	cpufreq_update_policy(det->dev_id);
-
+#ifndef CONFIG_REGULATOR_GPIO
 	/* configure regulator to normal mode */
 	ret = regulator_set_mode(det->reg, REGULATOR_MODE_NORMAL);
 	if (ret)
-		ptp_error("%s: Failed to set regulator in normal mode\n", det->name);
+		ptp_error("%s: Failed to set regulator in normal mode, ret = %d\n", det->name, ret);
+#endif
 
-	pm_qos_remove_request(&qos_request);
+	if (ptp_log_en) {
+		ptp_error("%s: ptp_cpufreq_policy.max = %d\n", det->name, det->ptp_cpufreq_policy.max);
+		ptp_error("%s: ptp_cpufreq_policy.min = %d\n", det->name, det->ptp_cpufreq_policy.min);
+	}
 
-	return ret;
+	/* unlimit CPUFreq OPP range */
+	if (det->ptp_cpufreq_policy.max && det->ptp_cpufreq_policy.min) {
+		det->ptp_dvfs_max_freq_khz = det->ptp_cpufreq_policy.max;
+		det->ptp_dvfs_min_freq_khz = det->ptp_cpufreq_policy.min;
+		cpufreq_update_policy(det->dev_id);
+	} else {
+		ptp_error("%s(): cpufreq is not ready.\n", __func__);
+	}
 }
 
-static int ptp_init_det_done(struct ptp_det *det)
+static void ptp_init_det_done(struct ptp_det *det)
 {
 	enum ptp_det_id det_id = det_to_id(det);
-	int ret;
 
 	switch (det_id) {
 	case PTP_DET_MCUSYS:
-		ret = unlimit_mcusys_env(det);
+		unlimit_mcusys_env(det);
 		break;
 #if SUPPORT_PTPOD_GPU
 	case PTP_DET_GPUSYS:
@@ -1650,8 +1664,6 @@ static int ptp_init_det_done(struct ptp_det *det)
 		WARN_ON(1);
 		break;
 	}
-
-	return 0;
 }
 
 
@@ -2268,45 +2280,49 @@ static void ptp_init01_finish(struct ptp_det *det)
 }
 #endif
 
-void ptp_init01(void)
+static int ptp_init01(struct ptp_det *det, struct ptp_ctrl *ctrl)
 {
-	struct ptp_det *det;
-	struct ptp_ctrl *ctrl;
+	unsigned int vboot;
+	int ret;
 
 	FUNC_ENTER(FUNC_LV_LOCAL);
 
-	for_each_det_ctrl(det, ctrl) {
-		{
-			unsigned int vboot;
-#if 1
-			vboot = PTP_VOLT_TO_PMIC_VAL(det->ops->get_volt(det)) - PTPOD_PMIC_OFFSET;
+	ret = ptp_init_det(det, &ptp_devinfo);
+	if (ret)
+		goto ptp_init_det_fail;
 
-			if (ptp_log_en)
-				ptp_info("@%s(), get_volt(%s) = 0x%08X, VBOOT = 0x%08X\n",
-								__func__, det->name, vboot, det->VBOOT);
-			if (vboot != det->VBOOT) {
-				ptp_error("@%s():%d, get_volt(%s) = 0x%08X, VBOOT = 0x%08X\n",
-					__func__, __LINE__, det->name, vboot, det->VBOOT);
-				aee_kernel_warning("mt_ptp", "@%s():%d, get_volt(%s) = 0x%08X, VBOOT = 0x%08X\n",
-					__func__, __LINE__, det->name, vboot, det->VBOOT);
-			}
-#else
-			WARN_ON(PTP_VOLT_TO_PMIC_VAL(det->ops->get_volt(det)) != det->VBOOT);
-#endif
-			det->ops->init01(det);
-		}
+	vboot = PTP_VOLT_TO_PMIC_VAL(det->ops->get_volt(det)) - PTPOD_PMIC_OFFSET;
 
-		/*
-		 * VCORE_AO and VCORE_PDN use the same controller.
-		 * Wait until VCORE_AO init01 and init02 done
-		 */
-		/* if (atomic_read(&ctrl->in_init)) { */
-			/* TODO: Use workqueue to avoid blocking */
-		wait_for_completion(&ctrl->init_done);
-		/*}*/
+	if (ptp_log_en)
+		ptp_info("@%s(), get_volt(%s) = 0x%08X, VBOOT = 0x%08X\n",
+			__func__, det->name, vboot, det->VBOOT);
+	if (vboot != det->VBOOT) {
+		ptp_error("@%s():%d, get_volt(%s) = 0x%08X, VBOOT = 0x%08X\n",
+			__func__, __LINE__, det->name, vboot, det->VBOOT);
+		aee_kernel_warning("mt_ptp", "@%s():%d, get_volt(%s) = 0x%08X, VBOOT = 0x%08X\n",
+			__func__, __LINE__, det->name, vboot, det->VBOOT);
+
+		WARN_ON(1);
+		ret = -EINVAL;
+		goto ptp_init_det_fail;
 	}
 
+	det->ops->init01(det);
+
+	/*
+	 * VCORE_AO and VCORE_PDN use the same controller.
+	 * Wait until VCORE_AO init01 and init02 done
+	 */
+	/* if (atomic_read(&ctrl->in_init)) { */
+		/* TODO: Use workqueue to avoid blocking */
+	wait_for_completion(&ctrl->init_done);
+	/*}*/
+
+ptp_init_det_fail:
+	ptp_init_det_done(det);
+
 	FUNC_EXIT(FUNC_LV_LOCAL);
+	return ret;
 }
 
 void ptp_init02(void)
@@ -2465,17 +2481,17 @@ static int ptp_cpufreq_notifier(struct notifier_block *nb, unsigned long event,	
 
 	switch (event) {
 	case CPUFREQ_ADJUST:
-		if (!ptp_mcusys.dvfs_min_freq_khz || !ptp_mcusys.dvfs_max_freq_khz)
+		if (!ptp_mcusys.ptp_dvfs_min_freq_khz || !ptp_mcusys.ptp_dvfs_max_freq_khz)
 			return NOTIFY_DONE;
 
 		if (ptp_log_en) {
 			ptp_error("start to run %s()\n", __func__);
-			ptp_error("mcusys: dvfs_min_freq = %ld\n", ptp_mcusys.dvfs_min_freq_khz);
-			ptp_error("mcusys: dvfs_max_freq = %ld\n", ptp_mcusys.dvfs_max_freq_khz);
+			ptp_error("mcusys: dvfs_max_freq = %ld\n", ptp_mcusys.ptp_dvfs_max_freq_khz);
+			ptp_error("mcusys: dvfs_min_freq = %ld\n", ptp_mcusys.ptp_dvfs_min_freq_khz);
 		}
 
-		cpufreq_verify_within_limits(policy, ptp_mcusys.dvfs_min_freq_khz,
-							ptp_mcusys.dvfs_max_freq_khz);
+		cpufreq_verify_within_limits(policy, ptp_mcusys.ptp_dvfs_min_freq_khz,
+							ptp_mcusys.ptp_dvfs_max_freq_khz);
 		break;
 	default:
 		return NOTIFY_DONE;
@@ -2487,6 +2503,24 @@ static int ptp_cpufreq_notifier(struct notifier_block *nb, unsigned long event,	
 static struct notifier_block ptp_cpufreq_notifier_block = {
 	.notifier_call = ptp_cpufreq_notifier,
 };
+
+static int ptp_cpufreq_notifier_registration(int registration)
+{
+	int ret;
+
+	if (registration)
+		ret = cpufreq_register_notifier(&ptp_cpufreq_notifier_block, CPUFREQ_POLICY_NOTIFIER);
+	else
+		ret = cpufreq_unregister_notifier(&ptp_cpufreq_notifier_block, CPUFREQ_POLICY_NOTIFIER);
+
+	if (ret) {
+		ptp_error("%s(): failed error number (%d)\n",
+			registration ? "cpufreq_register_notifier" : "cpufreq_unregister_notifier", ret);
+		WARN_ON(1);
+	}
+
+	return ret;
+}
 
 static int ptp_probe(struct platform_device *pdev)
 {
@@ -2521,12 +2555,15 @@ static int ptp_probe(struct platform_device *pdev)
 	if (ptp_log_en)
 		ptp_notice("Set PTP IRQ OK.\n");
 
-	ret = cpufreq_register_notifier(&ptp_cpufreq_notifier_block, CPUFREQ_POLICY_NOTIFIER);
-	if (ret) {
-		ptp_error("cpufreq_register_notifier (%d)\n", ret);
-		WARN_ON(1);
+	ret = ptp_cpufreq_notifier_registration(true);
+	if (ret)
 		return ret;
-	}
+
+	/*
+	 * we have to make sure all CPUs are on and working at VBOOT volt.
+	 * Add a pm_qos request to prevent CPUs from entering CPU off idle state.
+	 */
+	pm_qos_add_request(&qos_request, PM_QOS_CPU_DMA_LATENCY, 1);
 
 	/* ptp_level = mt_ptp_get_level(); */
 
@@ -2537,35 +2574,30 @@ static int ptp_probe(struct platform_device *pdev)
 
 	is_ptp_initializing = true;
 
-	for_each_det(det) {
-		ret = ptp_init_det(det, &ptp_devinfo);
-		if (ret)
-			return ret;
-	}
+	for_each_det_ctrl(det, ctrl) {
+		ret = ptp_init01(det, ctrl);
+		if (ret) {
+			/* If one of PTPOD det fails to init, disable all */
+			for_each_det(det) {
+				if (det->ops->disable_locked)
+					det->ops->disable_locked(det, BY_INIT_ERROR);
+			}
 
-	ptp_init01();
-
-	for_each_det(det) {
-		ret = ptp_init_det_done(det);
-		if (ret)
-			return ret;
+			break;
+		}
 	}
 
 	is_ptp_initializing = false;
 
+	ptp_cpufreq_notifier_registration(false);
+	pm_qos_remove_request(&qos_request);
+
 	if (ptp_log_en)
 		ptp_error("PTPOD init is done\n");
 
-	ret = cpufreq_unregister_notifier(&ptp_cpufreq_notifier_block, CPUFREQ_POLICY_NOTIFIER);
-	if (ret) {
-		ptp_error("cpufreq_unregister_notifier (%d)\n", ret);
-		WARN_ON(1);
-		return ret;
-	}
-
 	FUNC_EXIT(FUNC_LV_MODULE);
 
-	return 0;
+	return ret;
 }
 
 static int ptp_suspend(struct platform_device *pdev, pm_message_t state)
@@ -2947,6 +2979,8 @@ static int ptp_status_proc_show(struct seq_file *m, void *v)
 		   det->freq_table_percent[7]);
 
 	if (det->ctrl_id == PTP_CTRL_MCUSYS) {
+		seq_printf(m, "%s: ptp_dvfs_max_freq_khz = %lu\n", det->name, det->ptp_dvfs_max_freq_khz);
+		seq_printf(m, "%s: ptp_dvfs_min_freq_khz = %lu\n", det->name, det->ptp_dvfs_min_freq_khz);
 		seq_printf(m, "%s: ptp_cpufreq_policy.max = %d\n", det->name, det->ptp_cpufreq_policy.max);
 		seq_printf(m, "%s: ptp_cpufreq_policy.min = %d\n", det->name, det->ptp_cpufreq_policy.min);
 
