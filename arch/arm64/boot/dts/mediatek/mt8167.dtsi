@@ -167,13 +167,6 @@
 			compatible = "mediatek,minirdump";
 			reg = <0 0x444f0000 0 0x10000>;
 		};
-
-		consys-reserve-memory {
-			compatible = "mediatek,consys-reserve-memory";
-			no-map;
-			size = <0 0x200000>;
-			alignment = <0 0x200000>;
-		};
 	};
 
 	pmu {
