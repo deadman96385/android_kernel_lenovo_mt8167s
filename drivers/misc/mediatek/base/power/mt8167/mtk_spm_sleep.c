@@ -359,6 +359,15 @@ u32 spm_get_sleep_wakesrc(void)
 	return __spm_suspend.pwrctrl->wake_src;
 }
 
+void spm_set_sleep_26m_req(bool req)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&__spm_lock, flags);
+	__spm_suspend.pwrctrl->pcm_f26m_req = req;
+	spin_unlock_irqrestore(&__spm_lock, flags);
+}
+
 #if SPM_AEE_RR_REC
 void spm_suspend_aee_init(void)
 {
