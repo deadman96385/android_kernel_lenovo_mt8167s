@@ -376,14 +376,14 @@ typedef struct {
 /*  */
 typedef volatile union _CQ_RTBC_FBC_ {
 	volatile struct {
-		unsigned long FBC_CNT:4;
+		unsigned long fbc_cnt:4;
 		unsigned long DROP_INT_EN:1;
 		unsigned long rsv_5:6;
 		unsigned long RCNT_INC:1;
 		unsigned long rsv_12:2;
 		unsigned long FBC_EN:1;
 		unsigned long LOCK_EN:1;
-		unsigned long FB_NUM:4;
+		unsigned long fb_num:4;
 		unsigned long RCNT:4;
 		unsigned long WCNT:4;
 		unsigned long DROP_CNT:4;

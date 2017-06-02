@@ -1703,493 +1703,206 @@ static long ISP_Buf_CTRL_FUNC_FRMB(unsigned long Param)
 						}
 						/* set RCN_INC = 1; */
 						/* RCNT++ */
-						/* FBC_CNT-- */
+						/* fbc_cnt-- */
 
 
 						/* RCNT_INC++ */
-						{
+{
 #ifdef _rtbc_buf_que_2_0_
-							MUINT32 z;
+	MUINT32 z;
 
-					/**/		if (rt_buf_ctrl.ctrl ==
-							    ISP_RT_BUF_CTRL_ENQUE_FRMB) {
-					/**/			if ((_IRQ == irqT)
-								    || (_IRQ_D == irqT)) {
-					/**/				if ((MTRUE ==
-									     pstRTBuf_FrmB->
-									     ring_buf[ch_imgo].
-									     active)
-									    && (MTRUE ==
-										pstRTBuf_FrmB->
-										ring_buf[ch_img2o].
-										active)) {
-					/**/					if (0 !=
-										    rt_buf_ctrl.
-										    ex_data_ptr) {
-					/**/						if ((p1_fbc
-											     [rt_dma].
-											     Bits.
-											     FB_NUM
-											     ==
-											     p1_fbc
-											     [rt_dma].
-											     Bits.
-											     FBC_CNT)
-											    ||
-											    ((p1_fbc
-											      [rt_dma].
-											      Bits.
-											      FB_NUM
-											      -
-											      1) ==
-											     p1_fbc
-											     [rt_dma].
-											     Bits.
-											     FBC_CNT)) {
-												mFwRcnt.
-												    bLoadBaseAddr
-												    [irqT]
-												    =
-												    MTRUE;
-											}
-										}
-										dma_en_recorder
-										    [rt_dma]
-										    [mFwRcnt.
-										     DMA_IDX
-										     [rt_dma]] =
-										    MTRUE;
-										mFwRcnt.
-										    DMA_IDX[rt_dma]
-										    =
-										    (++mFwRcnt.
-										     DMA_IDX[rt_dma]
-										     >=
-										     ISP_RT_BUF_SIZE)
-										    ? (mFwRcnt.
-										       DMA_IDX
-										       [rt_dma] -
-										       ISP_RT_BUF_SIZE)
-										    : (mFwRcnt.
-										       DMA_IDX
-										       [rt_dma]);
-										/* LOG_INF("RTBC_DBG1:%d %d %d\n",rt_dma,dma_en_recorder[rt_dma][mFwRcnt.DMA_IDX[rt_dma]],mFwRcnt.DMA_IDX[rt_dma]); */
-					/**/					for (z = 0;
-										     z <
-										     ISP_RT_BUF_SIZE;
-										     z++) {
-					/**/						if (dma_en_recorder[ch_imgo][mFwRcnt.rdIdx[irqT]] && dma_en_recorder[ch_img2o][mFwRcnt.rdIdx[irqT]]) {
-												mFwRcnt.
-												    INC
-												    [irqT]
-												    [mFwRcnt.
-												     curIdx
-												     [irqT]++]
-												    =
-												    1;
-												dma_en_recorder
-												    [ch_imgo]
-												    [mFwRcnt.
-												     rdIdx
-												     [irqT]]
-												    =
-												    dma_en_recorder
-												    [ch_img2o]
-												    [mFwRcnt.
-												     rdIdx
-												     [irqT]]
-												    =
-												    MFALSE;
-												mFwRcnt.
-												    rdIdx
-												    [irqT]
-												    =
-												    (++mFwRcnt.
-												     rdIdx
-												     [irqT]
-												     >=
-												     ISP_RT_BUF_SIZE)
-												    ?
-												    (mFwRcnt.
-												     rdIdx
-												     [irqT]
-												     -
-												     ISP_RT_BUF_SIZE)
-												    :
-												    (mFwRcnt.
-												     rdIdx
-												     [irqT]);
-												/* LOG_INF("RTBC_DBG2:%d %d\n",mFwRcnt.rdIdx[irqT],mFwRcnt.curIdx[irqT]); */
-					/**/						} else {
-												break;
-											}
-										}
-					/**/				} else {
-										/* rcnt_sync only work when multi-dma ch enabled. but in order to support multi-enque, these mech. also to be */
-										/* worked under 1 dma ch enabled */
-					/**/					if (MTRUE ==
-										    pstRTBuf_FrmB->
-										    ring_buf
-										    [rt_dma].
-										    active) {
-					/**/						if (0 !=
-											    rt_buf_ctrl.
-											    ex_data_ptr) {
-					/**/							if ((p1_fbc[rt_dma].Bits.FB_NUM == p1_fbc[rt_dma].Bits.FBC_CNT) || ((p1_fbc[rt_dma].Bits.FB_NUM - 1) == p1_fbc[rt_dma].Bits.FBC_CNT)) {
-													mFwRcnt.
-													    bLoadBaseAddr
-													    [irqT]
-													    =
-													    MTRUE;
-												}
-											}
-											dma_en_recorder
-											    [rt_dma]
-											    [mFwRcnt.
-											     DMA_IDX
-											     [rt_dma]]
-											    = MTRUE;
-											mFwRcnt.
-											    DMA_IDX
-											    [rt_dma]
-											    =
-											    (++mFwRcnt.
-											     DMA_IDX
-											     [rt_dma]
-											     >=
-											     ISP_RT_BUF_SIZE)
-											    ?
-											    (mFwRcnt.
-											     DMA_IDX
-											     [rt_dma]
-											     -
-											     ISP_RT_BUF_SIZE)
-											    :
-											    (mFwRcnt.
-											     DMA_IDX
-											     [rt_dma]);
+	if (rt_buf_ctrl.ctrl == ISP_RT_BUF_CTRL_ENQUE_FRMB) {
+		if (irqT == _IRQ
+	    || irqT == _IRQ_D) {
+			if ((pstRTBuf_FrmB->ring_buf[ch_imgo].active == MTRUE)
+			  && (pstRTBuf_FrmB->ring_buf[ch_img2o].active == MTRUE)) {
+				if (rt_buf_ctrl.ex_data_ptr != 0) {
+					if ((p1_fbc[rt_dma].Bits.fb_num == p1_fbc[rt_dma].Bits.fbc_cnt)
+					|| ((p1_fbc[rt_dma].Bits.fb_num - 1) == p1_fbc[rt_dma].Bits.fbc_cnt)) {
+						mFwRcnt.bLoadBaseAddr[irqT] = MTRUE;
+					}
+				}
+				dma_en_recorder[rt_dma][mFwRcnt.DMA_IDX[rt_dma]] = MTRUE;
+				mFwRcnt.DMA_IDX[rt_dma] = (++mFwRcnt.DMA_IDX[rt_dma] >= ISP_RT_BUF_SIZE)
+				    ? (mFwRcnt.DMA_IDX[rt_dma] - ISP_RT_BUF_SIZE)
+				    : (mFwRcnt.DMA_IDX[rt_dma]);
+				/* LOG_INF("RTBC_DBG1:%d %d %d\n",rt_dma,
+				  * dma_en_recorder[rt_dma][mFwRcnt.DMA_IDX[rt_dma]],mFwRcnt.DMA_IDX[rt_dma]);
+				  */
+				for (z = 0; z < ISP_RT_BUF_SIZE; z++) {
+					if (dma_en_recorder[ch_imgo][mFwRcnt.rdIdx[irqT]]
+						 && dma_en_recorder[ch_img2o][mFwRcnt.rdIdx[irqT]]) {
+						mFwRcnt.INC[irqT][mFwRcnt.curIdx[irqT]++] = 1;
+						dma_en_recorder[ch_imgo][mFwRcnt.rdIdx[irqT]] =
+						    dma_en_recorder[ch_img2o][mFwRcnt.rdIdx[irqT]] = MFALSE;
+						mFwRcnt.rdIdx[irqT] = (++mFwRcnt.rdIdx[irqT] >= ISP_RT_BUF_SIZE)
+						 ? (mFwRcnt.rdIdx[irqT] - ISP_RT_BUF_SIZE)
+						 : (mFwRcnt.rdIdx[irqT]);
+						/* LOG_INF("RTBC_DBG2:%d %d\n",
+						  *mFwRcnt.rdIdx[irqT],mFwRcnt.curIdx[irqT]);
+						 */
+					} else {
+						break;
+					}
+				}
+			} else {
+				/* rcnt_sync only work when multi-dma ch enabled. */
+				/* but in order to support multi-enque, these mech. also to be */
+				/* worked under 1 dma ch enabled */
+				if (pstRTBuf_FrmB->ring_buf[rt_dma].active == MFALSE) {
+					spin_unlock_irqrestore
+					    (&
+					     (IspInfo_FrmB.
+					      SpinLockIrq
+					      [irqT_Lock]),
+					     flags);
+					LOG_ERR
+					    ("[rtbc]error:dma(%d) r not being activated(%d)",
+					     rt_dma,
+					     pstRTBuf_FrmB->
+					     ring_buf
+					     [rt_dma].
+					     active);
+					return -EFAULT;
+				}
+				if (rt_buf_ctrl.ex_data_ptr != 0) {
+					if ((p1_fbc[rt_dma].Bits.fb_num == p1_fbc[rt_dma].Bits.fbc_cnt)
+					 || ((p1_fbc[rt_dma].Bits.fb_num - 1) == p1_fbc[rt_dma].Bits.fbc_cnt)) {
+						mFwRcnt.bLoadBaseAddr[irqT] = MTRUE;
+					}
+				}
+				dma_en_recorder[rt_dma][mFwRcnt.DMA_IDX[rt_dma]] = MTRUE;
+				mFwRcnt.DMA_IDX[rt_dma] = (++mFwRcnt.DMA_IDX[rt_dma] >= ISP_RT_BUF_SIZE)
+				 ? (mFwRcnt.DMA_IDX[rt_dma] - ISP_RT_BUF_SIZE)
+				 : (mFwRcnt.DMA_IDX[rt_dma]);
 
-					/**/						for (z = 0;
-											     z <
-											     ISP_RT_BUF_SIZE;
-											     z++) {
-					/**/							if (dma_en_recorder[rt_dma][mFwRcnt.rdIdx[irqT]]) {
-													mFwRcnt.
-													    INC
-													    [irqT]
-													    [mFwRcnt.
-													     curIdx
-													     [irqT]++]
-													    =
-													    1;
-													dma_en_recorder
-													    [rt_dma]
-													    [mFwRcnt.
-													     rdIdx
-													     [irqT]]
-													    =
-													    MFALSE;
-													mFwRcnt.
-													    rdIdx
-													    [irqT]
-													    =
-													    (++mFwRcnt.
-													     rdIdx
-													     [irqT]
-													     >=
-													     ISP_RT_BUF_SIZE)
-													    ?
-													    (mFwRcnt.
-													     rdIdx
-													     [irqT]
-													     -
-													     ISP_RT_BUF_SIZE)
-													    :
-													    (mFwRcnt.
-													     rdIdx
-													     [irqT]);
-					/**/							} else {
-													break;
-												}
-											}
-					/**/					} else {
-											spin_unlock_irqrestore
-											    (&
-											     (IspInfo_FrmB.
-											      SpinLockIrq
-											      [irqT_Lock]),
-											     flags);
-											LOG_ERR
-											    ("[rtbc]error:dma(%d) r not being activated(%d)",
-											     rt_dma,
-											     pstRTBuf_FrmB->
-											     ring_buf
-											     [rt_dma].
-											     active);
-											return
-											    -EFAULT;
-										}
-									}
-					/**/			} else {	/* camsv case */
-					/**/				if (MTRUE ==
-									    pstRTBuf_FrmB->
-									    ring_buf[rt_dma].
-									    active) {
-					/**/					if (0 !=
-										    rt_buf_ctrl.
-										    ex_data_ptr) {
-					/**/						if ((p1_fbc
-											     [rt_dma].
-											     Bits.
-											     FB_NUM
-											     ==
-											     p1_fbc
-											     [rt_dma].
-											     Bits.
-											     FBC_CNT)
-											    ||
-											    ((p1_fbc
-											      [rt_dma].
-											      Bits.
-											      FB_NUM
-											      -
-											      1) ==
-											     p1_fbc
-											     [rt_dma].
-											     Bits.
-											     FBC_CNT)) {
-												mFwRcnt.
-												    bLoadBaseAddr
-												    [irqT]
-												    =
-												    MTRUE;
-											}
-										}
-										dma_en_recorder
-										    [rt_dma]
-										    [mFwRcnt.
-										     DMA_IDX
-										     [rt_dma]] =
-										    MTRUE;
-										mFwRcnt.
-										    DMA_IDX[rt_dma]
-										    =
-										    (++mFwRcnt.
-										     DMA_IDX[rt_dma]
-										     >=
-										     ISP_RT_BUF_SIZE)
-										    ? (mFwRcnt.
-										       DMA_IDX
-										       [rt_dma] -
-										       ISP_RT_BUF_SIZE)
-										    : (mFwRcnt.
-										       DMA_IDX
-										       [rt_dma]);
+				for (z = 0; z < ISP_RT_BUF_SIZE; z++) {
+					if (dma_en_recorder[rt_dma][mFwRcnt.rdIdx[irqT]] == 0)
+						break;
+					mFwRcnt.INC[irqT][mFwRcnt.curIdx[irqT]++] = 1;
+					dma_en_recorder[rt_dma][mFwRcnt.rdIdx[irqT]] = MFALSE;
+					mFwRcnt.rdIdx[irqT] = (++mFwRcnt.rdIdx[irqT] >= ISP_RT_BUF_SIZE)
+					 ? (mFwRcnt.rdIdx[irqT] - ISP_RT_BUF_SIZE)
+					 : (mFwRcnt.rdIdx[irqT]);
+				}
+			}
+		} else {	/* camsv case */
+			if (pstRTBuf_FrmB->ring_buf[rt_dma].active == MTRUE) {
+				if (rt_buf_ctrl.ex_data_ptr != 0) {
+					if ((p1_fbc[rt_dma].Bits.fb_num == p1_fbc[rt_dma].Bits.fbc_cnt)
+					 || ((p1_fbc[rt_dma].Bits.fb_num - 1) == p1_fbc[rt_dma].Bits.fbc_cnt)) {
+						mFwRcnt.bLoadBaseAddr[irqT] = MTRUE;
+					}
+				}
+				dma_en_recorder[rt_dma][mFwRcnt.DMA_IDX[rt_dma]] = MTRUE;
+				mFwRcnt.DMA_IDX[rt_dma] = (++mFwRcnt.DMA_IDX[rt_dma] >= ISP_RT_BUF_SIZE)
+				 ? (mFwRcnt.DMA_IDX[rt_dma] - ISP_RT_BUF_SIZE)
+				 : (mFwRcnt.DMA_IDX[rt_dma]);
 
-					/**/					for (z = 0;
-										     z <
-										     ISP_RT_BUF_SIZE;
-										     z++) {
-					/**/						if (dma_en_recorder[rt_dma][mFwRcnt.rdIdx[irqT]]) {
-												mFwRcnt.
-												    INC
-												    [irqT]
-												    [mFwRcnt.
-												     curIdx
-												     [irqT]++]
-												    =
-												    1;
-												dma_en_recorder
-												    [rt_dma]
-												    [mFwRcnt.
-												     rdIdx
-												     [irqT]]
-												    =
-												    MFALSE;
-												mFwRcnt.
-												    rdIdx
-												    [irqT]
-												    =
-												    (++mFwRcnt.
-												     rdIdx
-												     [irqT]
-												     >=
-												     ISP_RT_BUF_SIZE)
-												    ?
-												    (mFwRcnt.
-												     rdIdx
-												     [irqT]
-												     -
-												     ISP_RT_BUF_SIZE)
-												    :
-												    (mFwRcnt.
-												     rdIdx
-												     [irqT]);
-					/**/						} else {
-												break;
-											}
-										}
-					/**/				} else {
-										spin_unlock_irqrestore
-										    (&
-										     (IspInfo_FrmB.
-										      SpinLockIrq
-										      [irqT_Lock]),
-										     flags);
-										LOG_ERR
-										    ("[rtbc]error:dma(%d) r not being activated(%d)",
-										     rt_dma,
-										     pstRTBuf_FrmB->
-										     ring_buf
-										     [rt_dma].
-										     active);
-										return -EFAULT;
-									}
-								}
-					/**/		} else {	/* immediate enque mode */
-								MUINT32 _openedDma = 1;
-								MBOOL _bypass = MFALSE;
+				for (z = 0; z < ISP_RT_BUF_SIZE; z++) {
+					if (dma_en_recorder[rt_dma][mFwRcnt.rdIdx[irqT]]) {
+						mFwRcnt.INC[irqT][mFwRcnt.curIdx[irqT]++] = 1;
+						dma_en_recorder[rt_dma][mFwRcnt.rdIdx[irqT]] = MFALSE;
+						mFwRcnt.rdIdx[irqT] = (++mFwRcnt.rdIdx[irqT] >= ISP_RT_BUF_SIZE)
+						 ? (mFwRcnt.rdIdx[irqT] - ISP_RT_BUF_SIZE)
+						 : (mFwRcnt.rdIdx[irqT]);
+					} else {
+						break;
+					}
+				}
+			} else {
+				spin_unlock_irqrestore
+				    (&
+				     (IspInfo_FrmB.
+				      SpinLockIrq
+				      [irqT_Lock]),
+				     flags);
+				LOG_ERR
+				    ("[rtbc]error:dma(%d) r not being activated(%d)",
+				     rt_dma,
+				     pstRTBuf_FrmB->
+				     ring_buf
+				     [rt_dma].
+				     active);
+				return -EFAULT;
+			}
+		}
+	} else {	/* immediate enque mode */
+		MUINT32 _openedDma = 1;
+		MBOOL _bypass = MFALSE;
 
-					/**/			if ((MTRUE ==
-								     pstRTBuf_FrmB->
-								     ring_buf[ch_imgo].active)
-								    && (MTRUE ==
-									pstRTBuf_FrmB->
-									ring_buf[ch_img2o].
-									active)) {
-									/* record wheather all enabled dma r alredy enqued, */
-									/* rcnt_inc will only be pulled to high once all enabled dma r enqued. */
-									/* inorder to reduce the probability of crossing vsync. */
-									dma_en_recorder[rt_dma][0] = MTRUE;	/* this global par. r no use under immediate mode, borrow this to shirk memory */
-									_openedDma = 2;
-					/**/				if ((dma_en_recorder
-									     [ch_imgo][0] == MTRUE)
-									    &&
-									    (dma_en_recorder
-									     [ch_img2o][0] ==
-									     MTRUE)) {
-										dma_en_recorder
-										    [ch_imgo][0] =
-										    dma_en_recorder
-										    [ch_img2o][0] =
-										    MFALSE;
-					/**/				} else
-										_bypass = MTRUE;
-								}
-					/**/			if (_bypass == MFALSE) {
-					/**/				if ((p1_fbc[rt_dma].Bits.
-									     FB_NUM ==
-									     p1_fbc[rt_dma].Bits.
-									     FBC_CNT)
-									    ||
-									    ((p1_fbc[rt_dma].Bits.
-									      FB_NUM - 1) ==
-									     p1_fbc[rt_dma].Bits.
-									     FBC_CNT)) {
-										/* write to phy register */
-										/* LOG_INF("[rtbc_%d][ENQUE] write2Phy directly(%d,%d)",rt_dma,p1_fbc[rt_dma].Bits.FB_NUM,p1_fbc[rt_dma].Bits.FBC_CNT); */
-										IRQ_LOG_KEEPER(irqT,
-											       0,
-											       _LOG_DBG,
-											       "[rtbc_%d][ENQUE] write2Phy directly(%d,%d) ",
-											       rt_dma,
-											       p1_fbc
-											       [rt_dma].
-											       Bits.
-											       FB_NUM,
-											       p1_fbc
-											       [rt_dma].
-											       Bits.
-											       FBC_CNT);
-										ISP_WR32
-										    (p1_dma_addr_reg
-										     [rt_dma],
-										     pstRTBuf_FrmB->
-										     ring_buf
-										     [rt_dma].
-										     data[i].
-										     base_pAddr);
-									}
-					/**/				if (_openedDma == 1) {
-										p1_fbc[rt_dma].Bits.
-										    RCNT_INC = 1;
-										ISP_WR32(p1_fbc_reg
-											 [rt_dma],
-											 p1_fbc
-											 [rt_dma].
-											 Reg_val);
-										IRQ_LOG_KEEPER(irqT,
-											       0,
-											       _LOG_DBG,
-											       "  RCNT_INC(dma:0x%x)\n",
-											       rt_dma);
-					/**/				} else {
-										p1_fbc[ch_imgo].
-										    Bits.RCNT_INC =
-										    1;
-										ISP_WR32(p1_fbc_reg
-											 [ch_imgo],
-											 p1_fbc
-											 [ch_imgo].
-											 Reg_val);
-										p1_fbc[ch_img2o].
-										    Bits.RCNT_INC =
-										    1;
-										ISP_WR32(p1_fbc_reg
-											 [ch_img2o],
-											 p1_fbc
-											 [ch_img2o].
-											 Reg_val);
-										IRQ_LOG_KEEPER(irqT,
-											       0,
-											       _LOG_DBG,
-											       "  RCNT_INC(dma:0x%x)\n",
-											       ch_imgo);
-										IRQ_LOG_KEEPER(irqT,
-											       0,
-											       _LOG_DBG,
-											       "  RCNT_INC(dma:0x%x)\n",
-											       ch_img2o);
-									}
+		if ((pstRTBuf_FrmB->ring_buf[ch_imgo].active == MTRUE)
+		 && (pstRTBuf_FrmB->ring_buf[ch_img2o].active == MTRUE)) {
+			/* record wheather all enabled dma r alredy enqued, */
+			/* rcnt_inc will only be pulled to high once all enabled dma r enqued. */
+			/* inorder to reduce the probability of crossing vsync. */
+			/* this global par. r no use under immediate mode, borrow this to shirk memory */
+			dma_en_recorder[rt_dma][0] = MTRUE;
+			_openedDma = 2;
+			if ((dma_en_recorder[ch_imgo][0] == MTRUE)
+			 && (dma_en_recorder[ch_img2o][0] == MTRUE)) {
+				dma_en_recorder[ch_imgo][0] = dma_en_recorder[ch_img2o][0] = MFALSE;
+			} else
+				_bypass = MTRUE;
+		}
+		if (_bypass == MFALSE) {
+			if ((p1_fbc[rt_dma].Bits.fb_num == p1_fbc[rt_dma].Bits.fbc_cnt)
+			 || ((p1_fbc[rt_dma].Bits.fb_num - 1) == p1_fbc[rt_dma].Bits.fbc_cnt)) {
+				/* write to phy register */
+				IRQ_LOG_KEEPER(irqT, 0, _LOG_DBG,
+				       "[rtbc_%d][ENQUE] write2Phy directly(%d,%d) ",
+				       rt_dma, p1_fbc[rt_dma].Bits.fb_num,
+				       p1_fbc[rt_dma].Bits.fbc_cnt);
+				ISP_WR32(p1_dma_addr_reg[rt_dma], pstRTBuf_FrmB->ring_buf[rt_dma].data[i].base_pAddr);
+			}
+			if (_openedDma == 1) {
+				p1_fbc[rt_dma].Bits.RCNT_INC = 1;
+				ISP_WR32(p1_fbc_reg[rt_dma], p1_fbc[rt_dma].Reg_val);
+				IRQ_LOG_KEEPER(irqT, 0, _LOG_DBG, "  RCNT_INC(dma:0x%x)\n", rt_dma);
+			} else {
+				p1_fbc[ch_imgo].Bits.RCNT_INC = 1;
+				ISP_WR32(p1_fbc_reg[ch_imgo], p1_fbc[ch_imgo].Reg_val);
+				p1_fbc[ch_img2o].Bits.RCNT_INC = 1;
+				ISP_WR32(p1_fbc_reg[ch_img2o], p1_fbc[ch_img2o].Reg_val);
+				IRQ_LOG_KEEPER(irqT, 0, _LOG_DBG, "  RCNT_INC(dma:0x%x)\n", ch_imgo);
+				IRQ_LOG_KEEPER(irqT, 0, _LOG_DBG, "  RCNT_INC(dma:0x%x)\n", ch_img2o);
+			}
 #ifdef _89SERIAL_
-									++m_P1_RCNT_INC_CNT;
+		++m_P1_RCNT_INC_CNT;
 #endif
-								}
-							}
+		}
+	}
 #else
-							/* if ( FB_NUM==FBC_CNT ||  (FB_NUM-1)==FBC_CNT ) */
-					/**/		if ((p1_fbc[rt_dma].Bits.FB_NUM ==
-							     p1_fbc[rt_dma].Bits.FBC_CNT)
-							    || ((p1_fbc[rt_dma].Bits.FB_NUM - 1) ==
-								p1_fbc[rt_dma].Bits.FBC_CNT)) {
-								/* write to phy register */
-								/* LOG_INF("[rtbc_%d][ENQUE] write2Phy directly(%d,%d)",rt_dma,p1_fbc[rt_dma].Bits.FB_NUM,p1_fbc[rt_dma].Bits.FBC_CNT); */
-								IRQ_LOG_KEEPER(irqT, 0, _LOG_DBG,
-									       "[rtbc_%d][ENQUE] write2Phy directly(%d,%d)\n",
-									       rt_dma,
-									       p1_fbc[rt_dma].Bits.
-									       FB_NUM,
-									       p1_fbc[rt_dma].Bits.
-									       FBC_CNT);
-								ISP_WR32(p1_dma_addr_reg[rt_dma],
-									 pstRTBuf_FrmB->
-									 ring_buf[rt_dma].data[i].
-									 base_pAddr);
-							}
+/* if ( fb_num==fbc_cnt ||  (fb_num-1)==fbc_cnt ) */
+if ((p1_fbc[rt_dma].Bits.fb_num == p1_fbc[rt_dma].Bits.fbc_cnt)
+	 || ((p1_fbc[rt_dma].Bits.fb_num - 1) == p1_fbc[rt_dma].Bits.fbc_cnt)) {
+	/* write to phy register */
+	IRQ_LOG_KEEPER(irqT, 0, _LOG_DBG,
+		       "[rtbc_%d][ENQUE] write2Phy directly(%d,%d)\n",
+		       rt_dma,
+		       p1_fbc[rt_dma].Bits.
+		       fb_num,
+		       p1_fbc[rt_dma].Bits.
+		       fbc_cnt);
+	ISP_WR32(p1_dma_addr_reg[rt_dma],
+		 pstRTBuf_FrmB->
+		 ring_buf[rt_dma].data[i].
+		 base_pAddr);
+}
 
-							/* patch camsv hw bug */
-							/* if( (_camsv_imgo_ == rt_dma) ||(_camsv2_imgo_ == rt_dma) ){ */
-							/* p1_fbc[rt_dma].Bits.RCNT_INC = 1; */
-							/* ISP_WR32(p1_fbc_reg[rt_dma],p1_fbc[rt_dma].Reg_val); */
-							/* p1_fbc[rt_dma].Bits.RCNT_INC = 0; */
-							/* ISP_WR32(p1_fbc_reg[rt_dma],p1_fbc[rt_dma].Reg_val); */
-							/* } else{ */
-							p1_fbc[rt_dma].Bits.RCNT_INC = 1;
-							ISP_WR32(p1_fbc_reg[rt_dma],
-								 p1_fbc[rt_dma].Reg_val);
-							/* } */
+/* patch camsv hw bug */
+/* if( (_camsv_imgo_ == rt_dma) ||(_camsv2_imgo_ == rt_dma) ){ */
+/* p1_fbc[rt_dma].Bits.RCNT_INC = 1; */
+/* ISP_WR32(p1_fbc_reg[rt_dma],p1_fbc[rt_dma].Reg_val); */
+/* p1_fbc[rt_dma].Bits.RCNT_INC = 0; */
+/* ISP_WR32(p1_fbc_reg[rt_dma],p1_fbc[rt_dma].Reg_val); */
+/* } else{ */
+p1_fbc[rt_dma].Bits.RCNT_INC = 1;
+ISP_WR32(p1_fbc_reg[rt_dma],
+	 p1_fbc[rt_dma].Reg_val);
+/* } */
 #endif
-						}
+}
 						spin_unlock_irqrestore(&
 								       (IspInfo_FrmB.
 									SpinLockIrq[irqT_Lock]),
@@ -2602,7 +2315,7 @@ static long ISP_Buf_CTRL_FUNC_FRMB(unsigned long Param)
 			IRQ_LOG_PRINTER(irqT, 0, _LOG_DBG);
 #else
 #if defined(_rtbc_use_cq0c_)
-			bWaitBufRdy = p1_fbc[rt_dma].Bits.FBC_CNT ? 0 : 1;
+			bWaitBufRdy = p1_fbc[rt_dma].Bits.fbc_cnt ? 0 : 1;
 #else
 			bWaitBufRdy = MTRUE;
 #endif
@@ -2823,8 +2536,8 @@ static MINT32 ISP_SOF_Buf_Get_FrmB(eISPIrq irqT, unsigned long long sec, unsigne
 
 	CQ_RTBC_FBC imgo_fbc;
 	CQ_RTBC_FBC img2o_fbc;
-	MUINT32 imgo_idx = 0;	/* (imgo_fbc.Bits.WCNT+imgo_fbc.Bits.FB_NUM-1)%imgo_fbc.Bits.FB_NUM; //[0,1,2,...] */
-	MUINT32 img2o_idx = 0;	/* (img2o_fbc.Bits.WCNT+img2o_fbc.Bits.FB_NUM-1)%img2o_fbc.Bits.FB_NUM; //[0,1,2,...] */
+	MUINT32 imgo_idx = 0;	/* (imgo_fbc.Bits.WCNT+imgo_fbc.Bits.fb_num-1)%imgo_fbc.Bits.fb_num; //[0,1,2,...] */
+	MUINT32 img2o_idx = 0;	/* (img2o_fbc.Bits.WCNT+img2o_fbc.Bits.fb_num-1)%img2o_fbc.Bits.fb_num; //[0,1,2,...] */
 	MUINT32 curr_pa = 0;
 	MUINT32 ch_imgo, ch_img2o;
 	MUINT32 i = 0;
@@ -2848,9 +2561,9 @@ static MINT32 ISP_SOF_Buf_Get_FrmB(eISPIrq irqT, unsigned long long sec, unsigne
 	if (MTRUE == g1stSof[irqT]) {	/* 1st frame of streaming */
 #ifdef _89SERIAL_
 		pstRTBuf_FrmB->ring_buf[ch_imgo].start =
-		    ((imgo_fbc.Bits.FBC_CNT + m_P1_RCNT_INC_CNT) % 3 + 1) - 1;
+		    ((imgo_fbc.Bits.fbc_cnt + m_P1_RCNT_INC_CNT) % 3 + 1) - 1;
 		pstRTBuf_FrmB->ring_buf[ch_img2o].start =
-		    ((img2o_fbc.Bits.FBC_CNT + m_P1_RCNT_INC_CNT) % 3 + 1) - 1;
+		    ((img2o_fbc.Bits.fbc_cnt + m_P1_RCNT_INC_CNT) % 3 + 1) - 1;
 #else
 		pstRTBuf_FrmB->ring_buf[ch_imgo].start = imgo_fbc.Bits.WCNT - 1;
 		pstRTBuf_FrmB->ring_buf[ch_img2o].start = img2o_fbc.Bits.WCNT - 1;
@@ -2861,9 +2574,8 @@ static MINT32 ISP_SOF_Buf_Get_FrmB(eISPIrq irqT, unsigned long long sec, unsigne
 	/*  */
 #if 0				/* this can't be trusted , because rcnt_in is pull high at sof */
 	/* No drop */
-	if (imgo_fbc.Bits.FB_NUM != imgo_fbc.Bits.FBC_CNT) {
+	if (imgo_fbc.Bits.fb_num != imgo_fbc.Bits.fbc_cnt)
 		pstRTBuf_FrmB->dropCnt = 0;
-	}
 	/* dropped */
 	else {
 		pstRTBuf_FrmB->dropCnt = 1;
@@ -3138,7 +2850,7 @@ static MINT32 ISP_DONE_Buf_Time_FrmB(eISPIrq irqT, unsigned long long sec, unsig
 	}
 #ifdef _89SERIAL_
 	if (_dma_cur_fbc.Bits.WCNT > 0) {
-		MUINT32 _sw_wcnt = ((_dma_cur_fbc.Bits.FBC_CNT + m_P1_RCNT_INC_CNT) % 3 + 1);
+		MUINT32 _sw_wcnt = ((_dma_cur_fbc.Bits.fbc_cnt + m_P1_RCNT_INC_CNT) % 3 + 1);
 
 		if (_sw_wcnt > (pstRTBuf_FrmB->ring_buf[_working_dma].start + 2)) {
 			shiftT = _sw_wcnt - pstRTBuf_FrmB->ring_buf[_working_dma].start - 2;
@@ -3155,7 +2867,7 @@ static MINT32 ISP_DONE_Buf_Time_FrmB(eISPIrq irqT, unsigned long long sec, unsig
 					       _sw_wcnt);
 		} else if (_sw_wcnt < (pstRTBuf_FrmB->ring_buf[_working_dma].start + 2)) {
 			shiftT =
-			    _sw_wcnt + _dma_cur_fbc.Bits.FB_NUM -
+			    _sw_wcnt + _dma_cur_fbc.Bits.fb_num -
 			    (pstRTBuf_FrmB->ring_buf[_working_dma].start + 2);
 			if (IspInfo_FrmB.DebugMask & ISP_DBG_INT_2) {
 				IRQ_LOG_KEEPER(irqT, m_CurrentPPB, _LOG_INF,
@@ -3163,14 +2875,14 @@ static MINT32 ISP_DONE_Buf_Time_FrmB(eISPIrq irqT, unsigned long long sec, unsig
 					       pstRTBuf_FrmB->ring_buf[_working_dma].start + 2,
 					       shiftT);
 			}
-			if (shiftT >= _dma_cur_fbc.Bits.FB_NUM) {
+			if (shiftT >= _dma_cur_fbc.Bits.fb_num) {
 				LOG_ERR("err shiftT = (%d,%d ,%d)\n", _sw_wcnt,
-					_dma_cur_fbc.Bits.FB_NUM,
+					_dma_cur_fbc.Bits.fb_num,
 					pstRTBuf_FrmB->ring_buf[_working_dma].start);
 				shiftT =
 				    (_dma_cur_fbc.Bits.
-				     FB_NUM ? (_dma_cur_fbc.Bits.FB_NUM -
-					       1) : (_dma_cur_fbc.Bits.FB_NUM));
+				     fb_num ? (_dma_cur_fbc.Bits.fb_num -
+					       1) : (_dma_cur_fbc.Bits.fb_num));
 			}
 		} else {
 		}		/* _dma_cur_fbc.Bits.WCNT == (pstRTBuf_FrmB->ring_buf[_working_dma].start + 2) */
@@ -3197,7 +2909,7 @@ static MINT32 ISP_DONE_Buf_Time_FrmB(eISPIrq irqT, unsigned long long sec, unsig
 		} else if (_dma_cur_fbc.Bits.WCNT <
 			   (pstRTBuf_FrmB->ring_buf[_working_dma].start + 2)) {
 			shiftT =
-			    _dma_cur_fbc.Bits.WCNT + _dma_cur_fbc.Bits.FB_NUM -
+			    _dma_cur_fbc.Bits.WCNT + _dma_cur_fbc.Bits.fb_num -
 			    (pstRTBuf_FrmB->ring_buf[_working_dma].start + 2);
 			if (IspInfo_FrmB.DebugMask & ISP_DBG_INT_2) {
 				IRQ_LOG_KEEPER(irqT, m_CurrentPPB, _LOG_INF,
@@ -3206,14 +2918,14 @@ static MINT32 ISP_DONE_Buf_Time_FrmB(eISPIrq irqT, unsigned long long sec, unsig
 					       pstRTBuf_FrmB->ring_buf[_working_dma].start + 2,
 					       shiftT);
 			}
-			if (shiftT >= _dma_cur_fbc.Bits.FB_NUM) {
+			if (shiftT >= _dma_cur_fbc.Bits.fb_num) {
 				LOG_ERR("err shiftT = (%d,%d ,%d)\n", _dma_cur_fbc.Bits.WCNT,
-					_dma_cur_fbc.Bits.FB_NUM,
+					_dma_cur_fbc.Bits.fb_num,
 					pstRTBuf_FrmB->ring_buf[_working_dma].start);
 				shiftT =
 				    (_dma_cur_fbc.Bits.
-				     FB_NUM ? (_dma_cur_fbc.Bits.FB_NUM -
-					       1) : (_dma_cur_fbc.Bits.FB_NUM));
+				     fb_num ? (_dma_cur_fbc.Bits.fb_num -
+					       1) : (_dma_cur_fbc.Bits.fb_num));
 			}
 		} else {
 		}		/* _dma_cur_fbc.Bits.WCNT == (pstRTBuf_FrmB->ring_buf[_working_dma].start + 2) */
@@ -4750,7 +4462,7 @@ static void ISP_Irq_FrmB(MUINT32 *IrqStatus)
 		else
 			LOG_ERR("no main dma port opened at SOF\n");
 		/* chk this frame have EOF or not, dynimic dma port chk */
-		if (p1_fbc[_dmaport].Bits.FB_NUM == p1_fbc[_dmaport].Bits.FBC_CNT) {
+		if (p1_fbc[_dmaport].Bits.fb_num == p1_fbc[_dmaport].Bits.fbc_cnt) {
 			sof_pass1done[0] = 1;
 #ifdef _rtbc_buf_que_2_0_
 			/* ISP_LostP1Done_ErrHandle(_imgo_); */
@@ -4762,9 +4474,8 @@ static void ISP_Irq_FrmB(MUINT32 *IrqStatus)
 				       sof_count[_PASS1], cur_v_cnt);
 		} else {
 			sof_pass1done[0] = 0;
-			if (p1_fbc[_dmaport].Bits.FB_NUM == (p1_fbc[_dmaport].Bits.FBC_CNT + 1)) {
+			if (p1_fbc[_dmaport].Bits.fb_num == (p1_fbc[_dmaport].Bits.fbc_cnt + 1))
 				sof_pass1done[0] = 2;
-			}
 		}
 #ifdef _rtbc_buf_que_2_0_
 		{
