@@ -2362,7 +2362,7 @@ int ddp_dsi_init(enum DISP_MODULE_ENUM module, void *cmdq)
 #ifdef ENABLE_CLK_MGR
 		if (module == DISP_MODULE_DSI0) {
 #ifndef CONFIG_MTK_CLKMGR
-			ret += ddp_clk_prepare_enable(TOP_RG_MIPI_26M_DBG);
+			ret += ddp_clk_enable(TOP_RG_MIPI_26M_DBG);
 			ret += ddp_clk_enable(DISP1_DSI0_ENGINE);
 			ret += ddp_clk_enable(DISP1_DSI0_DIGITAL);
 #endif
@@ -2911,7 +2911,7 @@ int ddp_dsi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 		if (is_ipoh_bootup) {
 			if (module == DISP_MODULE_DSI0 || module == DISP_MODULE_DSIDUAL) {
 #ifndef CONFIG_MTK_CLKMGR
-				ret += ddp_clk_prepare_enable(TOP_RG_MIPI_26M_DBG);
+				ret += ddp_clk_enable(TOP_RG_MIPI_26M_DBG);
 				ret += ddp_clk_enable(DISP1_DSI0_ENGINE);
 				ret += ddp_clk_enable(DISP1_DSI0_DIGITAL);
 #endif
@@ -2927,13 +2927,16 @@ int ddp_dsi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 
 		if (module == DISP_MODULE_DSI0 || module == DISP_MODULE_DSIDUAL) {
 #ifndef CONFIG_MTK_CLKMGR
-			ret += ddp_clk_prepare_enable(TOP_RG_MIPI_26M_DBG);
+			ret += ddp_clk_enable(TOP_RG_MIPI_26M_DBG);
 			ret += ddp_clk_enable(DISP1_DSI0_ENGINE);
 			ret += ddp_clk_enable(DISP1_DSI0_DIGITAL);
 #endif
 			if (ret > 0)
 				DDPERR("DSI power manager API return false\n");
 		}
+
+		/* enable clock */
+		DSI_EnableClk(module, NULL);
 
 		/* restore dsi register */
 		DSI_RestoreRegisters(module, NULL);
@@ -2951,9 +2954,6 @@ int ddp_dsi_power_on(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 		}
 		/* enter wakeup */
 		DSI_Wakeup(module, NULL);
-
-		/* enable clock */
-		DSI_EnableClk(module, NULL);
 
 		DSI_Reset(module, NULL);
 #endif
@@ -3007,7 +3007,7 @@ int ddp_dsi_power_off(enum DISP_MODULE_ENUM module, void *cmdq_handle)
 #ifndef CONFIG_MTK_CLKMGR
 			ddp_clk_disable(DISP1_DSI0_ENGINE);
 			ddp_clk_disable(DISP1_DSI0_DIGITAL);
-			ddp_clk_disable_unprepare(TOP_RG_MIPI_26M_DBG);
+			ddp_clk_disable(TOP_RG_MIPI_26M_DBG);
 #endif
 			if (ret > 0)
 				DDPERR("DSI power manager API return false\n");
