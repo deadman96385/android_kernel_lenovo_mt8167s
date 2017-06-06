@@ -1656,13 +1656,17 @@
 			clocks = <&topckgen CLK_TOP_GCPU_B>,
 				 <&topckgen CLK_TOP_TRNG>,
 				 <&imgsys CLK_IMG_VENC>,
+				 <&mmsys CLK_MM_SMI_COMMON>,
 				 <&imgsys CLK_IMG_LARB1_SMI>;
 			clock-names = "GCPU",
 				      "TRNG",
 				      "IMG_CLK",
+				      "SMI_COMMON",
 				      "IMG_SMI";
-			pm-devs = <&larb1>;
-			pm-names = "isp";
+			pm-devs = <&larb1>,
+				  <&smi_common>;
+			pm-names = "isp",
+				   "disp";
 		};
 
 		mtgpufreq {
