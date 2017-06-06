@@ -2104,7 +2104,7 @@ static int fb_early_init_dt_get_chosen(unsigned long node, const char *uname, in
 }
 
 /* Retrun value: 0: success, 1: fail */
-int _parse_tag_videolfb(void)
+int __init _parse_tag_videolfb(void)
 {
 	struct tag_videolfb *videolfb_tag = NULL;
 	/* not necessary */
