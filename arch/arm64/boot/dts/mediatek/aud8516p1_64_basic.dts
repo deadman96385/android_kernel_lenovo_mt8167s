@@ -264,6 +264,8 @@
 &afe {
 	/* 0(HDMI) 1(I2S) 2(TDM) */
 	mediatek,tdm-out-mode = <1>;
+	/* 0(IRQ1) 1(IRQ2) 4(IRQ7) */
+	mediatek,awb-irq-mode = <4>;
 };
 
 &bat_comm {
