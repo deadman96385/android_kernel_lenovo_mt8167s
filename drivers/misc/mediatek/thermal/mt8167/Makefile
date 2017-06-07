@@ -28,7 +28,9 @@ endif
 obj-$(CONFIG_THERMAL) += mtk_thermal_platform.o
 obj-$(CONFIG_THERMAL) += mtk_thermal_timer.o
 
+ifeq ($(CONFIG_MTK_FB), y)
 obj-$(CONFIG_THERMAL) += mtk_cooler_fps.o
+endif
 
 ifneq ($(CONFIG_MTK_COMBO_WIFI),)
     obj-$(CONFIG_THERMAL) += mtk_ts_wmt.o
