@@ -401,7 +401,7 @@
 	pinctrl-names = "default", "state_uhs";
 	pinctrl-0 = <&mmc1_pins_default>;
 	pinctrl-1 = <&mmc1_pins_uhs>;
-	status = "disabled";
+	status = "okay";
 	clk_src = <2>;  /*<MSDC30_CLKSRC_200MHZ>*/
 	host_function = <2>;
 	bus-width = <4>;
@@ -646,11 +646,6 @@ pwm_goio_def_cfg: pwmdefault {
 			pinmux = <MT8167_PIN_105_MSDC1_CLK__FUNC_MSDC1_CLK>;
 			drive-strength = <MTK_DRIVE_6mA>;
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
-		};
-
-		pins_insert {
-			pinmux = <MT8167_PIN_14_EINT14__FUNC_GPIO14>;
-			bias-pull-up;
 		};
 	};
 
