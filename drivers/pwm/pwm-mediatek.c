@@ -146,6 +146,10 @@ static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	mtk_pwm_clk_enable(chip, pwm);
 
 	clksrc_rate = clk_get_rate(mt_pwm->clks[pwm->hwpwm]);
+	if (clksrc_rate == 0) {
+		dev_err(mt_pwm->dev, "clksrc_rate %d is invalid\n", clksrc_rate);
+		return -EINVAL;
+	}
 	resolution = 1000000000/clksrc_rate;
 
 	while (period_ns / resolution  > 8191) {
