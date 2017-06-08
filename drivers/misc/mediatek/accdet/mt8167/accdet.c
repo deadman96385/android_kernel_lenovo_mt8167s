@@ -894,7 +894,7 @@ void accdet_set_four_key_threshold(void)
 {
 	int GE, OE, Code7, Code6;
 	int mid_key_four_code, voice_key_four_code, up_key_four_code, down_key_four_code;
-	int ratio_tmp, ratio_tmp2;
+	double R1, ratio_mid, ratio_voice, ratio_up, ratio_down;
 
 	ACCDET_DEBUG("[ACCDET] 0x10009188 = 0x%x\n", get_devinfo_with_index(62));
 	GE = (get_devinfo_with_index(62) >> 11) & 0xFFF;
@@ -914,8 +914,7 @@ void accdet_set_four_key_threshold(void)
 	ACCDET_DEBUG("[ACCDET] Code7 0x%x = %d\n", Code7, Code7);
 	ACCDET_DEBUG("[ACCDET] Code6 0x%x = %d\n", Code6, Code6);
 
-	ratio_tmp = Code7 - (OE - 512);
-	ratio_tmp2 = Code6 - (OE - 512);
+	R1 = (double)((Code7 - (OE - 512)) / (Code6 - (OE - 512)));
 
 	/*
 	 *	Calculate four-key threshold for different MICBIAS1 voltage
@@ -928,38 +927,38 @@ void accdet_set_four_key_threshold(void)
 	switch (accdet_dts_data.mic_mode_vol) {
 	case 0:
 		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 2.5V!\n");
-		mid_key_four_code = 23 * (2048 + GE) * ratio_tmp / (152 * ratio_tmp2) + (OE - 512);
-		voice_key_four_code = 48 * (2048 + GE) * ratio_tmp / (152 * ratio_tmp2) + (OE - 512);
-		up_key_four_code = 55 * (2048 + GE) * ratio_tmp / (114 * ratio_tmp2) + (OE - 512);
-		down_key_four_code = 125 * (2048 + GE) * ratio_tmp / (114 * ratio_tmp2) + (OE - 512);
+		ratio_mid = 2.5 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
+		ratio_voice = 2.5 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
+		ratio_up = 2.5 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
+		ratio_down = 2.5 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
 		break;
 	case 1:
 		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 2.2V!\n");
-		mid_key_four_code = 253 * (2048 + GE) * ratio_tmp / (1900 * ratio_tmp2) + (OE - 512);
-		voice_key_four_code = 132 * (2048 + GE) * ratio_tmp / (475 * ratio_tmp2) + (OE - 512);
-		up_key_four_code = 121 * (2048 + GE) * ratio_tmp / (285 * ratio_tmp2) + (OE - 512);
-		down_key_four_code = 55 * (2048 + GE) * ratio_tmp / (57 * ratio_tmp2) + (OE - 512);
+		ratio_mid = 2.2 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
+		ratio_voice = 2.2 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
+		ratio_up = 2.2 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
+		ratio_down = 2.2 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
 		break;
 	case 2:
 		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 2.1V!\n");
-		mid_key_four_code = 7*69 * (2048 + GE) * ratio_tmp / (3800 * ratio_tmp2) + (OE - 512);
-		voice_key_four_code = 126 * (2048 + GE) * ratio_tmp / (475 * ratio_tmp2) + (OE - 512);
-		up_key_four_code = 154 * (2048 + GE) * ratio_tmp / (380 * ratio_tmp2) + (OE - 512);
-		down_key_four_code = 105 * (2048 + GE) * ratio_tmp / (114 * ratio_tmp2) + (OE - 512);
+		ratio_mid = 2.1 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
+		ratio_voice = 2.1 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
+		ratio_up = 2.1 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
+		ratio_down = 2.1 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
 		break;
 	case 3:
 		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 2.0V!\n");
-		mid_key_four_code = 23 * (2048 + GE) * ratio_tmp / (190 * ratio_tmp2) + (OE - 512);
-		voice_key_four_code = 24 * (2048 + GE) * ratio_tmp / (95 * ratio_tmp2) + (OE - 512);
-		up_key_four_code = 22 * (2048 + GE) * ratio_tmp / (57 * ratio_tmp2) + (OE - 512);
-		down_key_four_code = 50 * (2048 + GE) * ratio_tmp / (57 * ratio_tmp2) + (OE - 512);
+		ratio_mid = 2.0 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
+		ratio_voice = 2.0 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
+		ratio_up = 2.0 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
+		ratio_down = 2.0 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
 		break;
 	case 4:
 		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 1.9V!\n");
-		mid_key_four_code = 23 * (2048 + GE) * ratio_tmp / (200 * ratio_tmp2) + (OE - 512);
-		voice_key_four_code = 24 * (2048 + GE) * ratio_tmp / (100 * ratio_tmp2) + (OE - 512);
-		up_key_four_code = 11 * (2048 + GE) * ratio_tmp / (30 * ratio_tmp2) + (OE - 512);
-		down_key_four_code = 5 * (2048 + GE) * ratio_tmp / (6 * ratio_tmp2) + (OE - 512);
+		ratio_mid = 1.9 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
+		ratio_voice = 1.9 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
+		ratio_up = 1.9 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
+		ratio_down = 1.9 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
 		break;
 	default:
 		ACCDET_ERROR("[ACCDET] Unsupported MICBIAS1 voltage!!!\n");
@@ -972,18 +971,22 @@ void accdet_set_four_key_threshold(void)
 		OE = 512;
 	}
 
+	mid_key_four_code = ratio_mid * (4096 + GE - 2048) + (OE - 512);
 	mid_key_four = mid_key_four_code * 1500 / 4096;
 	ACCDET_INFO("[ACCDET] mid_key_four_code = %d\n", mid_key_four_code);
 	ACCDET_INFO("[ACCDET] mid_key_four = %d mV\n", mid_key_four);
 
+	voice_key_four_code = (ratio_voice * (4096 + GE - 2048) + (OE - 512));
 	voice_key_four  = voice_key_four_code * 1500 / 4096;
 	ACCDET_INFO("[ACCDET] voice_key_four_code = %d\n", voice_key_four_code);
 	ACCDET_INFO("[ACCDET] voice_key_four = %d mV\n", voice_key_four);
 
+	up_key_four_code = (ratio_up * (4096 + GE - 2048) + (OE - 512));
 	up_key_four  = up_key_four_code * 1500 / 4096;
 	ACCDET_INFO("[ACCDET] up_key_four_code = %d\n", up_key_four_code);
 	ACCDET_INFO("[ACCDET] up_key_four = %d mV\n", up_key_four);
 
+	down_key_four_code = (ratio_down * (4096 + GE - 2048) + (OE - 512));
 	down_key_four  = down_key_four_code * 1500 / 4096;
 	ACCDET_INFO("[ACCDET] down_key_four_code = %d\n", down_key_four_code);
 	ACCDET_INFO("[ACCDET] down_key_four = %d mV\n", down_key_four);
