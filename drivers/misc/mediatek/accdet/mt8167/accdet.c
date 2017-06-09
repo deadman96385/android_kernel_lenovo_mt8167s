@@ -325,6 +325,7 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 {
 	struct device_node *node = NULL;
 	int ret;
+	int trigger_type = 0;
 
 	ACCDET_INFO("[Accdet]accdet_setup_eint\n");
 
@@ -340,6 +341,10 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 
 		accdet_irq = irq_of_parse_and_map(node, 1);
 		ACCDET_DEBUG("[accdet]accdet_irq=%d\n", accdet_irq);
+
+		trigger_type = irq_get_trigger_type(accdet_irq);
+		ACCDET_ERROR("[Accdet]triger type = %d\n", trigger_type);
+		accdet_eint_type = trigger_type;
 
 		gpiopin = of_get_named_gpio(node, "accdet-gpio", 0);
 		if (gpiopin < 0)
@@ -359,10 +364,6 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 		else
 			ACCDET_ERROR("[Accdet]accdet set EINT finished, accdet_irq=%d, headsetdebounce=%d\n",
 				accdet_irq, headsetdebounce);
-		if (gpio_get_value(gpiopin))
-			accdet_eint_type = IRQ_TYPE_LEVEL_HIGH;
-		else
-			accdet_eint_type = IRQ_TYPE_LEVEL_LOW;
 	} else {
 		ACCDET_ERROR("[Accdet]%s can't find compatible node\n", __func__);
 	}
