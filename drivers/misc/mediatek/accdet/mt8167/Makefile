@@ -13,6 +13,4 @@
 
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/auxadc/
 
-KBUILD_CFLAGS   := $(filter-out -mgeneral-regs-only,$(KBUILD_CFLAGS))
-
 obj-$(CONFIG_MTK_ACCDET) := accdet.o
