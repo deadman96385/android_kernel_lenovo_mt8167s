@@ -64,6 +64,7 @@ struct pm_qos_request qos_request = { {0} };
 
 static void ptp_set_ptp_volt(struct ptp_det *det);
 static void ptp_restore_ptp_volt(struct ptp_det *det);
+static int create_procfs(void);
 /* static void ptp_init01_prepare(struct ptp_det *det); */
 /* static void ptp_init01_finish(struct ptp_det *det); */
 
@@ -83,7 +84,7 @@ static void ptp_restore_ptp_volt(struct ptp_det *det);
 /* DUMP_DATA_TO_DE is deprecated. Please use ptp_log_en=1,
  * if you want to dump each bank's register at ptp_isr_handler
  */
-#define DUMP_DATA_TO_DE		(0)
+#define DUMP_DATA_TO_DE		(1)
 #define LOG_INTERVAL		(2LL * NSEC_PER_SEC)
 #define NR_FREQ			(8)
 
@@ -587,7 +588,7 @@ struct ptp_devinfo {
 /*
  * lock
  */
-/* static DEFINE_SPINLOCK(ptp_spinlock); */
+static DEFINE_SPINLOCK(ptp_spinlock);
 
 /**
  * PTP controllers
@@ -723,6 +724,17 @@ static struct ptp_devinfo ptp_devinfo;
 
 static unsigned int ptp_level; /* debug info */
 
+void mt_ptp_lock(unsigned long *flags)
+{
+	spin_lock_irqsave(&ptp_spinlock, *flags);
+}
+
+void mt_ptp_unlock(unsigned long *flags)
+{
+	spin_unlock_irqrestore(&ptp_spinlock, *flags);
+}
+
+
 /**
  * timer for log
  */
@@ -809,10 +821,13 @@ static void base_ops_disable_locked(struct ptp_det *det, int reason)
 
 static void base_ops_disable(struct ptp_det *det, int reason)
 {
+	unsigned long flags;
 	FUNC_ENTER(FUNC_LV_HELP);
 
+	mt_ptp_lock(&flags);
 	det->ops->switch_bank(det);
 	det->ops->disable_locked(det, reason);
+	mt_ptp_unlock(&flags);
 
 	FUNC_EXIT(FUNC_LV_HELP);
 }
@@ -942,11 +957,14 @@ static int base_ops_mon_mode(struct ptp_det *det)
 static int base_ops_get_status(struct ptp_det *det)
 {
 	int status;
+	unsigned long flags;
 
 	FUNC_ENTER(FUNC_LV_HELP);
 
+	mt_ptp_lock(&flags);
 	det->ops->switch_bank(det);
 	status = (ptp_read(PTP_PTPEN) != 0) ? 1 : 0;
+	mt_ptp_unlock(&flags);
 
 	FUNC_EXIT(FUNC_LV_HELP);
 
@@ -1492,14 +1510,10 @@ static int limit_mcusys_env(struct ptp_det *det)
 	if (ptp_log_en)
 		ptp_error("%s()\n", __func__);
 
-#ifndef CONFIG_REGULATOR_GPIO
 	/* configure regulator to PWM mode */
 	ret = regulator_set_mode(det->reg, REGULATOR_MODE_FAST);
-	if (ret) {
+	if (ret)
 		ptp_error("%s: Failed to set regulator in PWM mode, ret = %d\n", det->name, ret);
-		return ret;
-	}
-#endif
 
 	/* Backup current cpufreq policy */
 	ret = cpufreq_get_policy(&det->ptp_cpufreq_policy, det->dev_id);
@@ -1618,18 +1632,15 @@ static int ptp_init_det(struct ptp_det *det, struct ptp_devinfo *devinfo)
 
 static void unlimit_mcusys_env(struct ptp_det *det)
 {
-#ifndef CONFIG_REGULATOR_GPIO
 	int ret;
-#endif
+
 	if (ptp_log_en)
 		ptp_error("%s()\n", __func__);
 
-#ifndef CONFIG_REGULATOR_GPIO
 	/* configure regulator to normal mode */
 	ret = regulator_set_mode(det->reg, REGULATOR_MODE_NORMAL);
 	if (ret)
 		ptp_error("%s: Failed to set regulator in normal mode, ret = %d\n", det->name, ret);
-#endif
 
 	if (ptp_log_en) {
 		ptp_error("%s: ptp_cpufreq_policy.max = %d\n", det->name, det->ptp_cpufreq_policy.max);
@@ -1713,29 +1724,7 @@ static void ptp_restore_ptp_volt(struct ptp_det *det)
 	FUNC_EXIT(FUNC_LV_HELP);
 }
 
-static void mt_ptp_reg_dump_locked(void)
-{
 #if 0
-#ifndef CONFIG_ARM64
-	unsigned int addr;
-
-	for (addr = (unsigned int)PTP_DESCHAR; addr <= (unsigned int)PTP_SMSTATE1; addr += 4)
-		ptp_isr_info("%08X = %08X\n", addr, *(unsigned int *)addr);
-
-	addr = (unsigned int)PTP_PTPCORESEL;
-	ptp_isr_info("%08X = %08X\n", addr, *(unsigned int *)addr);
-#else
-	unsigned long addr;
-
-	for (addr = (unsigned long)PTP_DESCHAR; addr <= (unsigned long)PTP_SMSTATE1; addr += 4)
-		ptp_isr_info("%lu = %lu\n", addr, *(unsigned long *)addr);
-
-	addr = (unsigned long)PTP_PTPCORESEL;
-	ptp_isr_info("%lu = %lu\n", addr, *(unsigned long *)addr);
-#endif
-#endif
-}
-
 static void mt_ptp_reg_dump(void)
 {
 	struct ptp_det *det;
@@ -1851,6 +1840,7 @@ static void mt_ptp_reg_dump(void)
 
 	FUNC_EXIT(FUNC_LV_HELP);
 }
+#endif
 
 static inline void handle_init01_isr(struct ptp_det *det)
 {
@@ -2144,9 +2134,12 @@ static inline void ptp_isr_handler(struct ptp_det *det)
 static irqreturn_t ptp_isr(int irq, void *dev_id)
 {
 	struct ptp_det *det = NULL;
+	unsigned long flags;
 	int i;
 
 	FUNC_ENTER(FUNC_LV_MODULE);
+
+	mt_ptp_lock(&flags);
 
 	if (ptp_log_en) {
 		ptp_isr_info("%s start.\n", __func__);
@@ -2155,36 +2148,12 @@ static irqreturn_t ptp_isr(int irq, void *dev_id)
 		ptp_isr_info("PTP_PTPCORESEL = 0x%X\n", ptp_read(PTP_PTPCORESEL));
 	}
 
-	/* mt_ptp_reg_dump(); */ /* TODO: FIXME, for temp reg dump <-XXX */
-
-#if 0
-	if (!(BIT(PTP_CTRL_VCORE) & ptp_read(PTP_PTPODINTST))) {
-		switch (ptp_read_field(PERI_VCORE_PTPOD_CON0, VCORE_PTPODSEL)) {
-		case SEL_VCORE_AO:
-			det = &ptp_detectors[PTP_DET_VCORE_AO];
-			break;
-
-		case SEL_VCORE_PDN:
-			det = &ptp_detectors[PTP_DET_VCORE_AO];
-			break;
-		}
-
-		if (likely(det)) {
-			det->ops->switch_bank(det);
-			ptp_isr_handler(det);
-		}
-	}
-#endif
 	for (i = 0; i < NR_PTP_CTRL; i++) {
 		if ((BIT(i) & ptp_read(PTP_PTPODINTST))) /* TODO: FIXME, it is better to link i @ struct ptp_det */
 			continue;
 
 		det = &ptp_detectors[i];
-
 		det->ops->switch_bank(det);
-
-		mt_ptp_reg_dump_locked(); /* TODO: FIXME, for temp reg dump <-XXX */
-
 		ptp_isr_handler(det);
 	}
 
@@ -2192,6 +2161,8 @@ static irqreturn_t ptp_isr(int irq, void *dev_id)
 
 	if (ptp_log_en)
 		ptp_isr_info("%s done.\n", __func__);
+
+	mt_ptp_unlock(&flags);
 
 	return IRQ_HANDLED;
 }
@@ -2283,6 +2254,7 @@ static void ptp_init01_finish(struct ptp_det *det)
 static int ptp_init01(struct ptp_det *det, struct ptp_ctrl *ctrl)
 {
 	unsigned int vboot;
+	unsigned long flag;
 	int ret;
 
 	FUNC_ENTER(FUNC_LV_LOCAL);
@@ -2307,7 +2279,9 @@ static int ptp_init01(struct ptp_det *det, struct ptp_ctrl *ctrl)
 		goto ptp_init_det_fail;
 	}
 
+	mt_ptp_lock(&flag);
 	det->ops->init01(det);
+	mt_ptp_unlock(&flag);
 
 	/*
 	 * VCORE_AO and VCORE_PDN use the same controller.
@@ -2329,12 +2303,16 @@ void ptp_init02(void)
 {
 	struct ptp_det *det;
 	struct ptp_ctrl *ctrl;
+	unsigned long flag;
 
 	FUNC_ENTER(FUNC_LV_LOCAL);
 
 	for_each_det_ctrl(det, ctrl) {
-		if (HAS_FEATURE(det, FEA_MON))
+		if (HAS_FEATURE(det, FEA_MON)) {
+			mt_ptp_lock(&flag);
 			det->ops->init02(det);
+			mt_ptp_unlock(&flag);
+		}
 	}
 
 	FUNC_EXIT(FUNC_LV_LOCAL);
@@ -2543,6 +2521,10 @@ static int ptp_probe(struct platform_device *pdev)
 		if (ret)
 			return ret;
 	}
+
+	ret = create_procfs();
+	if (ret)
+		return ret;
 
 	/* set PTP IRQ */
 	ret = request_irq(ptpod_irq_number, ptp_isr, IRQF_TRIGGER_LOW, "ptp", NULL);
@@ -2787,7 +2769,7 @@ static int ptp_dump_proc_show(struct seq_file *m, void *v)
 	/* ptp_detectors[PTP_DET_LITTLE].ops->dump_status(&ptp_detectors[PTP_DET_LITTLE]); */ /* <-XXX */
 	/* ptp_detectors[PTP_DET_BIG].ops->dump_status(&ptp_detectors[PTP_DET_BIG]); */ /* <-XXX */
 
-	mt_ptp_reg_dump();
+	/* mt_ptp_reg_dump(); */
 
 	for (i = 0; i < sizeof(struct ptp_devinfo)/sizeof(unsigned int); i++)
 		seq_printf(m, "PTPOD%d\t= 0x%08X\n", i, val[i]);
@@ -2808,39 +2790,22 @@ static int ptp_dump_proc_show(struct seq_file *m, void *v)
 
 	for_each_det(det) {
 		for (i = PTP_PHASE_INIT01; i < NR_PTP_PHASE; i++) {
+			if (i < PTP_PHASE_MON)
+				seq_printf(m, "init%d\n", i + 1);
+			else
+				seq_puts(m, "mon mode\n");
+#if 0
 			seq_printf(m, "dcvalues=0x%08X, ptp_freqpct30=0x%08X, ptp_26c=0x%08X,", det->dcvalues[i],
 					det->ptp_freqpct30[i], det->ptp_26c[i]);
 
 			seq_printf(m, "ptp_vop30=0x%08X, ptp_ptpen= 0x%08X\n", det->ptp_vop30[i], det->ptp_ptpen[i]);
-
-			if (det->ptp_ptpen[i] == 0x5) {
-				seq_printf(m, "PTP_LOG: PTPOD[%s] (%d) - (%d, %d, %d, %d, %d, %d, %d, %d) - ",
-				det->name, det->ops->get_temp(det),
-				PTP_PMIC_VAL_TO_VOLT(det->volt_tbl_pmic[0]),
-				PTP_PMIC_VAL_TO_VOLT(det->volt_tbl_pmic[1]),
-				PTP_PMIC_VAL_TO_VOLT(det->volt_tbl_pmic[2]),
-				PTP_PMIC_VAL_TO_VOLT(det->volt_tbl_pmic[3]),
-				PTP_PMIC_VAL_TO_VOLT(det->volt_tbl_pmic[4]),
-				PTP_PMIC_VAL_TO_VOLT(det->volt_tbl_pmic[5]),
-				PTP_PMIC_VAL_TO_VOLT(det->volt_tbl_pmic[6]),
-				PTP_PMIC_VAL_TO_VOLT(det->volt_tbl_pmic[7]));
-
-				seq_printf(m, "(%d, %d, %d, %d, %d, %d, %d, %d)\n",
-				det->freq_table_percent[0],
-				det->freq_table_percent[1],
-				det->freq_table_percent[2],
-				det->freq_table_percent[3],
-				det->freq_table_percent[4],
-				det->freq_table_percent[5],
-				det->freq_table_percent[6],
-				det->freq_table_percent[7]);
-			}
-#if 0
+#endif
+#if DUMP_DATA_TO_DE
 			{
 				int j;
 
 				for (j = 0; j < ARRAY_SIZE(reg_dump_addr_off); j++)
-					seq_printf(m, "0x%08X === 0x%08X\n",
+					seq_printf(m, "0x%lx === 0x%08X\n",
 						(unsigned long)PTP_BASEADDR + reg_dump_addr_off[j],
 						det->reg_dump_data[j][i]);
 			}
@@ -3292,8 +3257,6 @@ static int __init ptp_init(void)
 	 */
 	hrtimer_init(&ptp_log_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL); /* <-XXX */
 	ptp_log_timer.function = ptp_log_timer_func; /* <-XXX */
-
-	create_procfs();
 
 	/*
 	 * reg platform device driver
