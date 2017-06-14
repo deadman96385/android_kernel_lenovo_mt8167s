@@ -93,12 +93,11 @@ enum CABLE_MODE {
 };
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH
-typedef enum {
+enum USB_PORT_MODE {
 	PORT_MODE_USB = 0,
 	PORT_MODE_UART,
-
 	PORT_MODE_MAX
-} USB_PORT_MODE;
+};
 
 extern u32 usb_port_mode_temp;
 extern void mtk_uart_usb_rx_sel(unsigned int uart_port, unsigned int enable);

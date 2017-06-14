@@ -79,12 +79,12 @@ MODULE_LICENSE("GPL");
 #define OTG_STOP_CMD    0x10
 #define OTG_INIT_MSG    0x20
 
-typedef struct {
+struct otg_message {
 	spinlock_t lock;
 	unsigned int msg;
-} otg_message;
+};
 
-static otg_message g_otg_message;
+static struct otg_message g_otg_message;
 int g_exec;
 
 unsigned long usb_l1intm_store;

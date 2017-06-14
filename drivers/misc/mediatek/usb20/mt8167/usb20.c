@@ -1373,7 +1373,6 @@ static int mt_usb_probe(struct platform_device *pdev)
 
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
-		dev_err(&pdev->dev, "failed to allocate musb platform data\n");
 		DBG(0, "[U2]failed to allocate musb platform data\n");
 		goto err2;
 	}
