@@ -1340,18 +1340,6 @@ unsigned int mt_gpufreq_target(unsigned int idx)
 	}
 
 	/************************************************
-	 * If /proc command fix the frequency.
-	 *************************************************/
-	if (mt_gpufreq_fixed_freq_volt_state == true) {
-		target_freq = mt_gpufreq_fixed_frequency;
-		target_volt = mt_gpufreq_fixed_voltage;
-		target_idx = 0;
-		target_OPPidx = 0;
-		gpufreq_dbg("Fixed! fixed frequency %d, fixed voltage %d\n", target_freq,
-				target_volt);
-	}
-
-	/************************************************
 	 * If /proc command keep opp max frequency.
 	 *************************************************/
 	if (mt_gpufreq_opp_max_frequency_state == true) {
@@ -1412,6 +1400,18 @@ unsigned int mt_gpufreq_target(unsigned int idx)
 		target_OPPidx = mt_gpufreq_ptpod_disable_idx;
 		gpufreq_dbg("PTPOD disable dvfs, mt_gpufreq_ptpod_disable_idx = %d\n",
 				mt_gpufreq_ptpod_disable_idx);
+	}
+
+	/************************************************
+	 * If /proc command fix the frequency.
+	 *************************************************/
+	if (mt_gpufreq_fixed_freq_volt_state == true) {
+		target_freq = mt_gpufreq_fixed_frequency;
+		target_volt = mt_gpufreq_fixed_voltage;
+		target_idx = 0;
+		target_OPPidx = 0;
+		gpufreq_dbg("Fixed! fixed frequency %d, fixed voltage %d\n", target_freq,
+				target_volt);
 	}
 
 	/************************************************
