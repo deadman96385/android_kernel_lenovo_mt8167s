@@ -2808,7 +2808,7 @@ static void __exit mtkfb_cleanup(void)
 
 	MSG_FUNC_LEAVE();
 }
-module_init(mtkfb_init);
+late_initcall(mtkfb_init);
 module_exit(mtkfb_cleanup);
 MODULE_DESCRIPTION("MEDIATEK framebuffer driver");
 MODULE_AUTHOR("Xuecheng Zhang <Xuecheng.Zhang@mediatek.com>");
