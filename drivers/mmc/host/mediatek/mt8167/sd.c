@@ -742,7 +742,7 @@ static void msdc_eirq_sdio(void *data)
 #endif
 }
 
-volatile int sdio_autok_processed;
+int sdio_autok_processed;
 
 void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
 {

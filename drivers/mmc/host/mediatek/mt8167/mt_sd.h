@@ -94,7 +94,7 @@
 /*--------------------------------------------------------------------------*/
 /* Common Macro                                                             */
 /*--------------------------------------------------------------------------*/
-#define REG_ADDR(x)                     ((volatile u32 *)(base + OFFSET_##x))
+#define REG_ADDR(x)                     ((u32 *)(base + OFFSET_##x))
 
 /*--------------------------------------------------------------------------*/
 /* Common Definition                                                        */
@@ -547,18 +547,21 @@ static inline unsigned int uffs(unsigned int x)
 #define mt_reg_sync_writel(v, a) \
 	do {    \
 		__raw_writel((v), (void __force __iomem *)((a)));   \
+		/*mb memory ...*/ \
 		mb();  \
 	} while (0)
 
 #define mt_reg_sync_writew(v, a) \
 	do {    \
 		__raw_writew((v), (void __force __iomem *)((a)));   \
+		/*mb memory ...*/ \
 		mb();  \
 	} while (0)
 
 #define mt_reg_sync_writeb(v, a) \
 	do {    \
 		__raw_writeb((v), (void __force __iomem *)((a)));   \
+		/*mb memory ...*/ \
 		mb();  \
 	} while (0)
 
@@ -574,6 +577,7 @@ static inline unsigned int uffs(unsigned int x)
 #define mt_reg_sync_writew(v, a)        mt65xx_reg_sync_writew(v, a)
 #define mt_reg_sync_writeb(v, a)        mt65xx_reg_sync_writeb(v, a)
 
+/* define mb */
 #define mb()   \
 	{    \
 		__asm__ __volatile__ ("dsb" : : : "memory"); \
@@ -581,27 +585,30 @@ static inline unsigned int uffs(unsigned int x)
 
 #define mt65xx_reg_sync_writel(v, a) \
 	do {    \
-		*(volatile unsigned int *)(a) = (v);    \
+		*(unsigned int *)(a) = (v);    \
+		/*mb memory ...*/ \
 		mb(); \
 	} while (0)
 
 #define mt65xx_reg_sync_writew(v, a) \
 	do {    \
-		*(volatile unsigned short *)(a) = (v);    \
+		*(unsigned short *)(a) = (v);    \
+		/*mb memory ...*/ \
 		mb(); \
 	} while (0)
 
 #define mt65xx_reg_sync_writeb(v, a) \
 	do {    \
-		*(volatile unsigned char *)(a) = (v);    \
+		*(unsigned char *)(a) = (v);    \
+		/*mb memory ...*/ \
 		mb(); \
 	} while (0)
 
 #endif				/* __KERNEL__ */
 
-#define MSDC_READ8(reg)           __raw_readb((const volatile void *)reg)
-#define MSDC_READ16(reg)          __raw_readw((const volatile void *)reg)
-#define MSDC_READ32(reg)          __raw_readl((const volatile void *)reg)
+#define MSDC_READ8(reg)           __raw_readb((const void *)reg)
+#define MSDC_READ16(reg)          __raw_readw((const void *)reg)
+#define MSDC_READ32(reg)          __raw_readl((const void *)reg)
 #define MSDC_WRITE8(reg, val)     mt_reg_sync_writeb(val, reg)
 #define MSDC_WRITE16(reg, val)    mt_reg_sync_writew(val, reg)
 #define MSDC_WRITE32(reg, val)    mt_reg_sync_writel(val, reg)
@@ -621,21 +628,21 @@ static inline unsigned int uffs(unsigned int x)
 
 #define MSDC_SET_BIT32(reg, bs) \
 	do { \
-		volatile unsigned int tv = MSDC_READ32(reg);\
+		unsigned int tv = MSDC_READ32(reg);\
 		tv |= (u32)(bs); \
 		MSDC_WRITE32(reg, tv); \
 	} while (0)
 
 #define MSDC_CLR_BIT32(reg, bs) \
 	do { \
-		volatile unsigned int tv = MSDC_READ32(reg);\
+		unsigned int tv = MSDC_READ32(reg);\
 		tv &= ~((u32)(bs)); \
 		MSDC_WRITE32(reg, tv); \
 	} while (0)
 
 #define MSDC_SET_FIELD(reg, field, val) \
 	do { \
-		volatile unsigned int tv = MSDC_READ32(reg); \
+		unsigned int tv = MSDC_READ32(reg); \
 		tv &= ~(field); \
 		tv |= ((val) << (uffs((unsigned int)field) - 1)); \
 		MSDC_WRITE32(reg, tv); \
@@ -643,7 +650,7 @@ static inline unsigned int uffs(unsigned int x)
 
 #define MSDC_GET_FIELD(reg, field, val) \
 	do { \
-		volatile unsigned int tv = MSDC_READ32(reg); \
+		unsigned int tv = MSDC_READ32(reg); \
 		val = ((tv & (field)) >> (uffs((unsigned int)field) - 1)); \
 	} while (0)
 
@@ -694,7 +701,7 @@ static inline unsigned int uffs(unsigned int x)
 
 #define msdc_clr_int() \
 	do { \
-		volatile u32 val = MSDC_READ32(MSDC_INT); \
+		u32 val = MSDC_READ32(MSDC_INT); \
 		MSDC_WRITE32(MSDC_INT, val); \
 	} while (0)
 
