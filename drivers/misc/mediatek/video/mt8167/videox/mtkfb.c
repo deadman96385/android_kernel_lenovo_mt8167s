@@ -2092,21 +2092,12 @@ unsigned int islcmconnected;
 unsigned int vramsize;
 phys_addr_t fb_base;
 static int is_videofb_parse_done;
-static unsigned long video_node;
-
-static int fb_early_init_dt_get_chosen(unsigned long node, const char *uname, int depth, void *data)
-{
-	if (depth != 1 || (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen@0") != 0))
-		return 0;
-
-	video_node = node;
-	return 1;
-}
 
 /* Retrun value: 0: success, 1: fail */
-int __init _parse_tag_videolfb(void)
+int _parse_tag_videolfb(void)
 {
 	struct tag_videolfb *videolfb_tag = NULL;
+	struct device_node *chosen_node;
 	/* not necessary */
 	/* DISPCHECK("[DT][videolfb]isvideofb_parse_done = %d\n",is_videofb_parse_done); */
 
@@ -2117,14 +2108,19 @@ int __init _parse_tag_videolfb(void)
 	return 1;
 #endif
 
-	if (of_scan_flat_dt(fb_early_init_dt_get_chosen, NULL) > 0) {
-		videolfb_tag = (struct tag_videolfb *)of_get_flat_dt_prop(video_node, "atag,videolfb", NULL);
+	chosen_node = of_find_node_by_path("/chosen");
+	if (!chosen_node)
+		chosen_node = of_find_node_by_path("/chosen@0");
+
+	if (chosen_node) {
+		videolfb_tag = (struct tag_videolfb *)of_get_property(chosen_node, "atag,videolfb", NULL);
 		if (videolfb_tag) {
 			memset((void *)mtkfb_lcm_name, 0, sizeof(mtkfb_lcm_name));
 			strcpy((char *)mtkfb_lcm_name, videolfb_tag->lcmname);
 			mtkfb_lcm_name[strlen(videolfb_tag->lcmname)] = '\0';
 
 			lcd_fps = videolfb_tag->fps;
+			DISPPRINT("lcd_fps = %d\n", lcd_fps);
 			if (lcd_fps == 0)
 				lcd_fps = 6000;
 
