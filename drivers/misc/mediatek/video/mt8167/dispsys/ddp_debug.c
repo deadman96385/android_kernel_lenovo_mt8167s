@@ -344,7 +344,7 @@ static void process_dbg_opt(const char *opt)
 		tmp = strsep(&p, ",");
 		ret = kstrtoul(tmp, 0, &level);
 		if (level) {
-			disp_pwm_id_t pwm_id = DISP_PWM0;
+			enum disp_pwm_id_t pwm_id = DISP_PWM0;
 
 			if (opt[3] == '1')
 				pwm_id = DISP_PWM1;
