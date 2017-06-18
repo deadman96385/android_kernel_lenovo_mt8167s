@@ -53,7 +53,6 @@
 #include <linux/io.h>
 #include <linux/sizes.h>
 #include "val_types_private.h"
-#include "hal_types_private.h"
 #include "val_api_private.h"
 #include "val_log.h"
 #include "drv_api.h"
