@@ -78,6 +78,10 @@
 #include "disp_helper.h"
 #include "mtk_disp_mgr.h"
 
+#ifdef CONFIG_MTK_LEDS
+#include "mtk_leds_drv.h"
+#endif
+
 #define ALIGN_TO(x, n)	(((x) + ((n) - 1)) & ~((n) - 1))
 
 
@@ -1005,6 +1009,11 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg
 			return -EFAULT;
 		}
 
+		if (displayid > MTKFB_MAX_DISPLAY_COUNT) {
+			DISPERR("[FB]: invalid display id:%d\n", displayid);
+			return -EFAULT;
+		}
+
 		if (displayid == 0) {
 			dispif_info[displayid].displayWidth = primary_display_get_width();
 			dispif_info[displayid].displayHeight = primary_display_get_height();
@@ -1640,6 +1649,9 @@ static void mtkfb_blank_resume(void);
 
 static int mtkfb_blank(int blank_mode, struct fb_info *info)
 {
+	if (get_boot_mode() == RECOVERY_BOOT)
+		return 0;
+
 	switch (blank_mode) {
 	case FB_BLANK_UNBLANK:
 	case FB_BLANK_NORMAL:
@@ -2520,7 +2532,9 @@ int mtkfb_ipo_init(void)
 static void mtkfb_shutdown(struct platform_device *pdev)
 {
 	MTKFB_LOG("[FB Driver] mtkfb_shutdown()\n");
-	/* mt65xx_leds_brightness_set(MT65XX_LED_TYPE_LCD, LED_OFF); */
+#ifdef CONFIG_MTK_LEDS
+	mt65xx_leds_brightness_set(MT65XX_LED_TYPE_LCD, LED_OFF);
+#endif
 	if (!lcd_fps)
 		msleep(30);
 	else
@@ -2584,7 +2598,7 @@ static void mtkfb_blank_suspend(void)
 
 	pr_debug("[FB Driver] enter early_suspend\n");
 #ifdef CONFIG_MTK_LEDS
-/* mt65xx_leds_brightness_set(MT65XX_LED_TYPE_LCD, LED_OFF); */
+	mt65xx_leds_brightness_set(MT65XX_LED_TYPE_LCD, LED_OFF);
 #endif
 	msleep(30);
 

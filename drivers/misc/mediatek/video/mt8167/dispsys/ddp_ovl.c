@@ -922,6 +922,9 @@ static int ovl_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_confi
 			has_sec_layer = 1;
 	}
 
+	if (force_ovl_sec)
+		has_sec_layer = 1;
+
 	/* warm reset ovl every time we use it */
 	if (handle
 	    && ((primary_display_is_decouple_mode() == 1)
@@ -951,18 +954,24 @@ static int ovl_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_confi
 			struct cmdqRecStruct *nonsec_switch_handle;
 			int ret;
 
-			/* because always de-couple, */
 			/* ovl->wdma use CMDQ_SCENARIO_PRIMARY_MEMOUT, */
 			/* the secure hw thread will be CMDQ_THREAD_SEC_SUB_DISP, */
 			/* disable secure path should use the same hw thread. */
-			ret =
-				cmdqRecCreate(CMDQ_SCENARIO_DISP_SUB_DISABLE_SECURE_PATH,
+			if (primary_display_is_decouple_mode())
+				ret = cmdqRecCreate(CMDQ_SCENARIO_DISP_SUB_DISABLE_SECURE_PATH,
+					&(nonsec_switch_handle));
+			else
+				ret = cmdqRecCreate(CMDQ_SCENARIO_DISP_PRIMARY_DISABLE_SECURE_PATH,
 					&(nonsec_switch_handle));
 			if (ret)
 				DDPAEE("[SVP]fail to create disable handle %s ret=%d\n",
 				       __func__, ret);
 
 			cmdqRecReset(nonsec_switch_handle);
+			if (primary_display_is_decouple_mode())
+				cmdqRecWaitNoClear(nonsec_switch_handle, CMDQ_EVENT_DISP_WDMA0_EOF);
+			else
+				_cmdq_insert_wait_frame_done_token_mira(nonsec_switch_handle);
 			cmdqRecSetSecure(nonsec_switch_handle, 1);
 			cmdqRecSetSecureMode(nonsec_switch_handle, mode);
 

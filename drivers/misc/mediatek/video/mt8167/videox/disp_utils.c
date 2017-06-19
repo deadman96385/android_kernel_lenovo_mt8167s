@@ -64,7 +64,7 @@ unsigned int disp_allocate_mva(unsigned int pa, unsigned int size, M4U_PORT_ID p
 {
 	int ret = 0;
 	unsigned int mva = 0;
-	struct m4u_client_t *client = NULL;
+	m4u_client_t *client = NULL;
 	struct sg_table *sg_table = kzalloc(sizeof(struct sg_table), GFP_ATOMIC);
 
 	sg_alloc_table(sg_table, 1, GFP_KERNEL);

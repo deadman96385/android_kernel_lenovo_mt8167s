@@ -357,7 +357,7 @@ void *ddp_map_mva_to_va(unsigned long mva, unsigned int size)
 {
 	void *va = NULL;
 #ifdef CONFIG_MTK_IOMMU
-	struct m4u_buf_info_t *pMvaInfo;
+	m4u_buf_info_t *pMvaInfo;
 	struct sg_table *table;
 	struct scatterlist *sg;
 	int i, j, k, ret = 0;
@@ -437,7 +437,6 @@ void ddp_umap_va(void *va)
 }
 #endif
 
-#define MVA_LINE_MAP
 #ifdef MVA_LINE_MAP
 struct page **pages;
 void *ddp_map_mva_to_va(unsigned long mva, unsigned int size)
@@ -480,6 +479,19 @@ void ddp_umap_va(void *va)
 	}
 }
 #endif
+
+#define MVA_IS_VA
+#ifdef MVA_IS_VA
+void *ddp_map_mva_to_va(unsigned long mva, unsigned int size)
+{
+	return (void *)mva;
+}
+
+void ddp_umap_va(void *va)
+{
+}
+#endif
+
 
 void ddp_mmp_ovl_layer(struct OVL_CONFIG_STRUCT *pLayer, unsigned int down_sample_x,
 		       unsigned int down_sample_y,
@@ -671,7 +683,7 @@ void ddp_mmp_rdma_layer(struct RDMA_CONFIG_STRUCT *rdma_layer, unsigned int rdma
 		Bitmap.bpp = 16;
 		break;
 	case eRGB888:
-		Bitmap.format = MMPROFILE_BITMAP_RGB888;
+		Bitmap.format = MMPROFILE_BITMAP_BGR888;
 		Bitmap.bpp = 24;
 		break;
 	case eBGRA8888:
@@ -679,7 +691,7 @@ void ddp_mmp_rdma_layer(struct RDMA_CONFIG_STRUCT *rdma_layer, unsigned int rdma
 		Bitmap.bpp = 32;
 		break;
 	case eBGR888:
-		Bitmap.format = MMPROFILE_BITMAP_BGR888;
+		Bitmap.format = MMPROFILE_BITMAP_RGB888;
 		Bitmap.bpp = 24;
 		break;
 	case eRGBA8888:

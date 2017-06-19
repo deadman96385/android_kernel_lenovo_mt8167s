@@ -285,12 +285,15 @@ enum DPI_STATUS ddp_dpi_ConfigPclk(enum DISP_MODULE_ENUM module, struct cmdqRecS
 	else if (ck_div == 4)
 		clksrc = TOP_TVDPLL_D16;
 
-	ddp_clk_prepare_enable(MUX_DPI1_SEL);
-	ddp_clk_set_parent(MUX_DPI1_SEL, clksrc);
+	ddp_dpi_power_off(module, cmdq);
 	ddp_clk_disable_unprepare(MUX_DPI1_SEL);
 
-	ddp_clk_prepare_enable(APMIXED_TVDPLL);
 	ddp_clk_set_rate(APMIXED_TVDPLL, bclk);
+	ddp_clk_set_parent(MUX_DPI1_SEL, clksrc);
+
+	ddp_clk_prepare_enable(APMIXED_TVDPLL);
+	ddp_clk_prepare_enable(MUX_DPI1_SEL);
+	ddp_dpi_power_on(module, cmdq);
 	ddp_clk_disable_unprepare(APMIXED_TVDPLL);
 #endif
 	/*DPI output clock polarity */
@@ -805,23 +808,6 @@ void LVDS_PLL_Init(enum DISP_MODULE_ENUM module, void *cmdq_handle, uint32_t PLL
 	ddp_clk_prepare_enable(APMIXED_LVDSPLL);
 	ddp_clk_set_rate(APMIXED_LVDSPLL, bclk);
 	ddp_clk_disable_unprepare(APMIXED_LVDSPLL);
-
-	/*LVDS PLL SSC, 30k, range -8~0,default: 5 */
-	/*
-	if (1 != SSC_disable) {
-	   OUTREG32(clk_apmixed_base + 0x2d0, (1 << 17) | 0x1B1);
-	   if (0 != SSC_range)
-	   delta1 = SSC_range;
-	   ASSERT(delta1 <= 8);
-	   pdelta1 = (delta1*n_info*12*262144)/260000;
-	   OUTREG32(clk_apmixed_base + 0x2d4, (pdelta1 << 16) | pdelta1);
-	   OUTREG32(clk_apmixed_base + 0x2d0, (1 << 17) | (1 << 16) | 0x1B1);
-	   DISPCHECK("DPI0 LVDSPLL_SSC enable: delta1 = %d,pdelta1 = 0x%x\n", delta1, pdelta1);
-	   } else {
-	   OUTREG32(clk_apmixed_base + 0x2d0, (0 << 16));
-	   DISPCHECK("DPI0 LVDSPLL_SSC disable: delta1 = %d,pdelta1 = 0x%x\n", delta1, pdelta1);
-	   }
-	 */
 }
 
 void LVDS_ANA_Init(enum DISP_MODULE_ENUM module, void *cmdq_handle)

@@ -97,13 +97,7 @@
 #include "extd_hdmi.h"
 #endif
 #include "external_display.h"
-
-enum ePREPARE_FENCE_TYPE {
-	PREPARE_INPUT_FENCE,
-	PREPARE_OUTPUT_FENCE,
-	PREPARE_PRESENT_FENCE
-};
-
+#include "compat_mtk_disp_mgr.h"
 
 static dev_t mtk_disp_mgr_devno;
 static struct cdev *mtk_disp_mgr_cdev;
@@ -669,7 +663,7 @@ int _ioctl_prepare_present_fence(unsigned long arg)
 
 #endif
 
-int _ioctl_prepare_buffer(unsigned long arg, enum ePREPARE_FENCE_TYPE type)
+int _ioctl_prepare_buffer(unsigned long arg, enum PREPARE_FENCE_TYPE type)
 {
 	int ret = 0;
 	void __user *argp = (void __user *)arg;
@@ -1521,7 +1515,7 @@ int _ioctl_set_input_buffer(unsigned long arg)
 			if (session_input->config[i].layer_id == 0) {
 				session_input->config[i].security = DISP_SECURE_BUFFER;
 				if (secure_handle == 0)
-					secure_handle = alloc_sec_buffer(1920*1080*4);
+					secure_handle = alloc_sec_buffer(1920*1200*4);
 				session_input->config[i].src_phy_addr = (void *)secure_handle;
 			}
 		}
@@ -1529,6 +1523,19 @@ int _ioctl_set_input_buffer(unsigned long arg)
 		if (secure_handle) {
 			free_sec_buffer(secure_handle);
 			secure_handle = 0;
+		}
+	}
+
+	if (force_ovl_en&0x80) {
+		unsigned int disable_layer_id = (~force_ovl_en)&0xf;
+		unsigned int layer_id;
+
+		for (i = 0; i < session_input->config_layer_num; i++) {
+			layer_id = session_input->config[i].layer_id;
+			if ((1<<layer_id)&disable_layer_id) {
+				session_input->config[i].layer_enable = 0;
+				mtkfb_release_layer_fence(session_id, layer_id);
+			}
 		}
 	}
 
@@ -2163,30 +2170,6 @@ long mtk_disp_mgr_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	return ret;
 }
-
-#ifdef CONFIG_COMPAT
-static long mtk_disp_mgr_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-{
-	long ret = -ENOIOCTLCMD;
-
-	switch (cmd) {
-
-		/* add cases here for 32bit/64bit conversion */
-		/* ... */
-
-	default:
-		/*
-		*DISPERR("mtk_disp_mgr_compat_ioctl, file=0x%x, cmd=0x%x(%s), arg=0x%lx, "
-			   "cmd nr=0x%08x, cmd size=0x%08x\n", file, cmd, _session_ioctl_spy(cmd), arg,
-			   (unsigned int)_IOC_NR(cmd), (unsigned int)_IOC_SIZE(cmd));
-		*/
-		return mtk_disp_mgr_ioctl(file, cmd, arg);
-	}
-
-	return ret;
-}
-#endif
-
 
 static const struct file_operations mtk_disp_mgr_fops = {
 	.owner = THIS_MODULE,

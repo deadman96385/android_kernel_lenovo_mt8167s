@@ -72,7 +72,7 @@
  * Enable idle screen low power mode.
  * turned off for FPGA and bringup
  */
-/* #define MTK_DISP_IDLE_LP */
+#define MTK_DISP_IDLE_LP
 
 /**
  * Enable Multipass support.
@@ -207,6 +207,7 @@ enum DISP_SESSION_ENUM {
  * HW_MODE_CAP: Direct-Link, Decouple or Switchable.
  * HW_PASS_MODE: Multi-Pass, Single-Pass.
  */
+/*
 #ifdef CONFIG_MTK_GMO_RAM_OPTIMIZE
 	#define DISP_HW_MODE_CAP DISP_OUTPUT_CAP_SWITCHABLE
 	#define DISP_HW_PASS_MODE DISP_OUTPUT_CAP_SINGLE_PASS
@@ -217,15 +218,18 @@ enum DISP_SESSION_ENUM {
 
 	#define DISP_INTERNAL_BUFFER_COUNT 1
 #else
-	#define DISP_HW_MODE_CAP DISP_OUTPUT_CAP_DECOUPLE
+*/
+	#define DISP_HW_MODE_CAP DISP_OUTPUT_CAP_SWITCHABLE
 	#ifdef OVL_MULTIPASS_SUPPORT
 		#define DISP_HW_PASS_MODE DISP_OUTPUT_CAP_MULTI_PASS
 	#else
 		#define DISP_HW_PASS_MODE DISP_OUTPUT_CAP_SINGLE_PASS
 	#endif
 
-	#define DISP_INTERNAL_BUFFER_COUNT 3
+	#define DISP_INTERNAL_BUFFER_COUNT 1
+/*
 #endif
+*/
 
 /**
  * DISP_NO_DPI: option for DPI
