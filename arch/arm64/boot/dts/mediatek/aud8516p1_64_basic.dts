@@ -761,6 +761,16 @@ pwm_goio_def_cfg: pwmdefault {
 	};
 /* Connectivity GPIO end */
 
+	spi_pins_a: spi {
+		pins_spi {
+			pinmux = <MT8167_PIN_3_EINT3__FUNC_SPI_MI>,
+				 <MT8167_PIN_51_SPI_MO__FUNC_SPI_MO>,
+				 <MT8167_PIN_5_EINT5__FUNC_SPI_CSB>,
+				 <MT8167_PIN_6_EINT6__FUNC_SPI_CLK>;
+			bias-disable;
+		};
+	};
+
 /* USB GPIO start */
 	usb0_drvvbus: drvvbus_init {
 		pins_cmd_dat {
@@ -805,6 +815,18 @@ pwm_goio_def_cfg: pwmdefault {
 &ptp_od {
 	vproc-supply = <&mt6392_vproc_reg>;
 	vcore-supply = <&mt6392_vcore_reg>;
+};
+
+&spi {
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi_pins_a>;
+	status = "okay";
+
+	spidev: spidev@0 {
+		compatible = "linux,spidev";
+		reg = <0>;
+		spi-max-frequency = <1000000>;
+	};
 };
 
 &touch {
