@@ -155,7 +155,7 @@ static IMG_VOID MTKWriteBackFreqToRGX(PVRSRV_DEVICE_NODE *psDevNode, IMG_UINT32 
 	do {											\
 		if (clk) {									\
 			if (clk_prepare_enable(clk))						\
-				pr_alert("MALI: clk_prepare_enable failed when enabling " #clk);\
+				pr_alert("PVR_K: clk_prepare_enable failed when enabling " #clk);\
 		}										\
 	} while (0)
 
