@@ -72,6 +72,12 @@ enum codec_pga_gain_enum_id {
 	PGA_GAIN_MAX,
 };
 
+enum aif_tx_mux_id {
+	AIF_TX_FROM_AMIC = 0,
+	AIF_TX_FROM_DMIC,
+	AIF_TX_FROM_AIF_RX,
+};
+
 struct mt8167_codec_priv {
 #ifdef CONFIG_MTK_SPEAKER
 	struct mt6392_codec_priv mt6392_data;
@@ -92,6 +98,7 @@ struct mt8167_codec_priv {
 	uint32_t headphone_cap_sel;
 	uint32_t loopback_type;
 	uint32_t ul_lr_swap_en;
+	uint32_t aif_tx_mux_sel;
 	struct clk *clk;
 #ifdef TIMESTAMP_INFO
 	uint64_t latency_cali_ldac_to_op;
@@ -261,28 +268,7 @@ static int mt8167_codec_dmic_event(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
 	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
-	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
-	uint32_t abb_afe_con9_val = 0;
 	uint32_t audio_codec_con03_val = 0;
-
-	/* wire mode */
-	if (codec_data->dmic_wire_mode == DMIC_TWO_WIRE)
-		abb_afe_con9_val |=
-			ABB_AFE_CON9_TWO_WIRE_EN;
-
-	/* clock rate */
-	if (codec_data->dmic_rate_mode == DMIC_RATE_D3P25M)
-		abb_afe_con9_val |=
-			ABB_AFE_CON9_D3P25M_SEL;
-
-	/* latch phase */
-	abb_afe_con9_val |=
-		(codec_data->dmic_ch_phase[DMIC_L_CH] << 13);
-	abb_afe_con9_val |=
-		(codec_data->dmic_ch_phase[DMIC_R_CH] << 10);
-
-	abb_afe_con9_val |=
-		ABB_AFE_CON9_DIG_MIC_EN;
 
 	audio_codec_con03_val =
 		AUDIO_CODEC_CON03_SLEW_RATE_10 |
@@ -292,20 +278,48 @@ static int mt8167_codec_dmic_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
-		snd_soc_update_bits(codec, ABB_AFE_CON9,
-			abb_afe_con9_val, abb_afe_con9_val);
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON03,
 			audio_codec_con03_val, audio_codec_con03_val);
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON03,
 			AUDIO_CODEC_CON03_DIG_MIC_EN, 0x0);
-		snd_soc_update_bits(codec, ABB_AFE_CON9,
-			ABB_AFE_CON9_DIG_MIC_EN, 0x0);
 		break;
 	default:
 		break;
 	}
+
+	return 0;
+}
+
+static int mt8167_codec_aif_tx_from_dmic(struct snd_soc_codec *codec)
+{
+	/* choose mux from digital mic */
+	snd_soc_update_bits(codec, ABB_AFE_CON9,
+		ABB_AFE_CON9_DIG_MIC_EN, ABB_AFE_CON9_DIG_MIC_EN);
+
+	/* disable loopback from downlink to uplink */
+	snd_soc_update_bits(codec, ABB_AFE_CON2, BIT(3), 0x0);
+
+	return 0;
+}
+
+static int mt8167_codec_aif_tx_from_amic(struct snd_soc_codec *codec)
+{
+	/* choose mux from analog mic */
+	snd_soc_update_bits(codec, ABB_AFE_CON9,
+		ABB_AFE_CON9_DIG_MIC_EN, 0x0);
+
+	/* disable loopback from downlink to uplink */
+	snd_soc_update_bits(codec, ABB_AFE_CON2, BIT(3), 0x0);
+
+	return 0;
+}
+
+static int mt8167_codec_aif_tx_from_aif_rx(struct snd_soc_codec *codec)
+{
+	/* enable loopback from downlink to uplink */
+	snd_soc_update_bits(codec, ABB_AFE_CON2, BIT(3), BIT(3));
 
 	return 0;
 }
@@ -757,30 +771,6 @@ static int mt8167_codec_depop_vcm_event(struct snd_soc_dapm_widget *w,
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		mt8167_codec_hp_depop_enable(codec_data);
-		break;
-	default:
-		break;
-	}
-
-	return 0;
-}
-
-/* AIF DL_UL loopback Switch */
-static int mt8167_codec_aif_dl_ul_lpbk_event(struct snd_soc_dapm_widget *w,
-	struct snd_kcontrol *kcontrol, int event)
-{
-	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
-
-	dev_dbg(codec->dev, "%s, event %d\n", __func__, event);
-
-	switch (event) {
-	case SND_SOC_DAPM_POST_PMU:
-		/* Enable downlink data loopback to uplink */
-		snd_soc_update_bits(codec, ABB_AFE_CON2, BIT(3), BIT(3));
-		break;
-	case SND_SOC_DAPM_PRE_PMD:
-		/* Disable downlink data loopback to uplink */
-		snd_soc_update_bits(codec, ABB_AFE_CON2, BIT(3), 0x0);
 		break;
 	default:
 		break;
@@ -1391,14 +1381,57 @@ static const struct snd_kcontrol_new mt8167_codec_right_pga_mux =
 
 /* AIF TX Mux */
 static const char * const aif_tx_mux_text[] = {
-	"Analog MIC", "Digital MIC", "Aif Rx"
+	[AIF_TX_FROM_AMIC] = "Analog MIC",
+	[AIF_TX_FROM_DMIC] = "Digital MIC",
+	[AIF_TX_FROM_AIF_RX] = "Aif Rx",
 };
 
 static SOC_ENUM_SINGLE_DECL(mt8167_codec_aif_tx_mux_enum,
 	SND_SOC_NOPM, 0, aif_tx_mux_text);
 
+static int mt8167_codec_aif_tx_mux_enum_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_kcontrol_codec(kcontrol);
+	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
+	int ret = 0;
+
+	ret = snd_soc_dapm_get_enum_double(kcontrol, ucontrol);
+	if (ret < 0)
+		return ret;
+
+	ucontrol->value.enumerated.item[0] = codec_data->aif_tx_mux_sel;
+
+	return ret;
+}
+
+static int mt8167_codec_aif_tx_mux_enum_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_kcontrol_codec(kcontrol);
+	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
+	int ret = 0;
+
+	ret = snd_soc_dapm_put_enum_double(kcontrol, ucontrol);
+	if (ret < 0)
+		return ret;
+
+	codec_data->aif_tx_mux_sel = ucontrol->value.enumerated.item[0];
+
+	if (codec_data->aif_tx_mux_sel == AIF_TX_FROM_DMIC)
+		mt8167_codec_aif_tx_from_dmic(codec);
+	else if (codec_data->aif_tx_mux_sel == AIF_TX_FROM_AMIC)
+		mt8167_codec_aif_tx_from_amic(codec);
+	else if (codec_data->aif_tx_mux_sel == AIF_TX_FROM_AIF_RX)
+		mt8167_codec_aif_tx_from_aif_rx(codec);
+
+	return ret;
+}
+
 static const struct snd_kcontrol_new mt8167_codec_aif_tx_mux =
-	SOC_DAPM_ENUM("AIF TX Mux", mt8167_codec_aif_tx_mux_enum);
+	SOC_DAPM_ENUM_EXT("AIF TX Mux", mt8167_codec_aif_tx_mux_enum,
+		mt8167_codec_aif_tx_mux_enum_get,
+		mt8167_codec_aif_tx_mux_enum_put);
 
 /* HPOUT Mux */
 static const char * const hp_out_mux_text[] = {
@@ -1423,10 +1456,6 @@ static SOC_ENUM_SINGLE_DECL(mt8167_codec_line_out_mux_enum,
 static const struct snd_kcontrol_new mt8167_codec_line_out_mux =
 	SOC_DAPM_ENUM("LINEOUT Mux",
 		mt8167_codec_line_out_mux_enum);
-
-/* AIF DL_UL loopback Switch */
-static const struct snd_kcontrol_new mt8167_codec_aif_dl_ul_lpbk_ctrl =
-	SOC_DAPM_SINGLE_VIRT("Switch", 1);
 
 /* DMIC Data Gen Switch */
 static const struct snd_kcontrol_new mt8167_codec_dmic_data_gen_ctrl =
@@ -1496,10 +1525,6 @@ static const struct snd_soc_dapm_widget mt8167_codec_dapm_widgets[] = {
 			SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_MUX("LINEOUT Mux", SND_SOC_NOPM, 0, 0,
 			&mt8167_codec_line_out_mux),
-	SND_SOC_DAPM_SWITCH_E("AIF DL_UL loopback", SND_SOC_NOPM, 0, 0,
-			&mt8167_codec_aif_dl_ul_lpbk_ctrl,
-			mt8167_codec_aif_dl_ul_lpbk_event,
-			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
 	SND_SOC_DAPM_SWITCH_E("DMIC Data Gen", SND_SOC_NOPM, 0, 0,
 			&mt8167_codec_dmic_data_gen_ctrl,
 			mt8167_codec_dmic_data_gen_event,
@@ -1558,8 +1583,7 @@ static const struct snd_soc_dapm_route mt8167_codec_dapm_routes[] = {
 	{"AIF RX", NULL, "DL_CLK"},
 
 	/* DL to UL loopback */
-	{"AIF DL_UL loopback", "Switch", "AIF RX"},
-	{"AIF TX Mux", "Aif Rx", "AIF DL_UL loopback"},
+	{"AIF TX Mux", "Aif Rx", "AIF RX"},
 
 	/* UL */
 	{"AIF TX", NULL, "AIF TX Mux"},
@@ -1862,7 +1886,39 @@ static const struct file_operations mt8167_codec_debug_ops = {
 };
 #endif
 
-static void mt8167_codec_init_regs(struct mt8167_codec_priv *codec_data)
+static void mt8167_codec_init_regs_volatile(
+	struct mt8167_codec_priv *codec_data)
+{
+	struct snd_soc_codec *codec = codec_data->codec;
+	uint32_t abb_afe_con9_val = 0;
+
+	/* wire mode */
+	if (codec_data->dmic_wire_mode == DMIC_TWO_WIRE)
+		abb_afe_con9_val |= ABB_AFE_CON9_TWO_WIRE_EN;
+
+	/* clock rate */
+	if (codec_data->dmic_rate_mode == DMIC_RATE_D3P25M)
+		abb_afe_con9_val |= ABB_AFE_CON9_D3P25M_SEL;
+
+	/* latch phase */
+	abb_afe_con9_val |=
+		(codec_data->dmic_ch_phase[DMIC_L_CH] << 13);
+	abb_afe_con9_val |=
+		(codec_data->dmic_ch_phase[DMIC_R_CH] << 10);
+
+	snd_soc_update_bits(codec, ABB_AFE_CON9,
+		abb_afe_con9_val, abb_afe_con9_val);
+
+	if (codec_data->aif_tx_mux_sel == AIF_TX_FROM_DMIC)
+		mt8167_codec_aif_tx_from_dmic(codec);
+	else if (codec_data->aif_tx_mux_sel == AIF_TX_FROM_AMIC)
+		mt8167_codec_aif_tx_from_amic(codec);
+	else if (codec_data->aif_tx_mux_sel == AIF_TX_FROM_AIF_RX)
+		mt8167_codec_aif_tx_from_aif_rx(codec);
+}
+
+static void mt8167_codec_init_regs_nonvolatile(
+	struct mt8167_codec_priv *codec_data)
 {
 	struct snd_soc_codec *codec = codec_data->codec;
 
@@ -1882,6 +1938,12 @@ static void mt8167_codec_init_regs(struct mt8167_codec_priv *codec_data)
 		(codec_data->pga_gain[LOUT_PGA_GAIN]) << 9);
 
 	mt8167_codec_hp_depop_setup(codec);
+}
+
+static void mt8167_codec_init_regs(struct mt8167_codec_priv *codec_data)
+{
+	mt8167_codec_init_regs_nonvolatile(codec_data);
+	mt8167_codec_init_regs_volatile(codec_data);
 }
 
 static struct regmap *mt8167_codec_get_regmap_from_dt(const char *phandle_name,
@@ -2071,8 +2133,15 @@ static int mt8167_codec_suspend(struct snd_soc_codec *codec)
 static int mt8167_codec_resume(struct snd_soc_codec *codec)
 {
 	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
+	int ret;
 
-	return clk_prepare_enable(codec_data->clk);
+	ret = clk_prepare_enable(codec_data->clk);
+	if (ret)
+		return ret;
+
+	mt8167_codec_init_regs_volatile(codec_data);
+
+	return 0;
 }
 
 static struct snd_soc_codec_driver mt8167_codec_driver = {
