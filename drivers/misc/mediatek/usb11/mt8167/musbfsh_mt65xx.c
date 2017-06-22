@@ -509,7 +509,7 @@ static const struct musbfsh_platform_ops mt_usb11_ops = {
 
 static u64 mt_usb11_dmamask = DMA_BIT_MASK(32);
 
-static int __init mt_usb11_probe(struct platform_device *pdev)
+static int mt_usb11_probe(struct platform_device *pdev)
 {
 	struct musbfsh_hdrc_platform_data *pdata = pdev->dev.platform_data;
 	struct platform_device *musbfsh;
@@ -652,7 +652,7 @@ static struct platform_driver mt_usb11_driver = {
 	},
 };
 
-int usb11_init(void)
+int __init usb11_init(void)
 {
 	INFO("[Flow][USB11]%s:%d\n", __func__, __LINE__);
 	return platform_driver_register(&mt_usb11_driver);
@@ -660,7 +660,7 @@ int usb11_init(void)
 
 /*mubsys_initcall(usb11_init);*/
 
-void usb11_exit(void)
+void __exit usb11_exit(void)
 {
 	platform_driver_unregister(&mt_usb11_driver);
 }

@@ -691,7 +691,7 @@ static void musbfsh_shutdown(struct platform_device *pdev)
 /* fits in 4KB */
 #define MAXFIFOSIZE 8096
 
-static struct musbfsh_fifo_cfg epx_cfg[] __initdata = {
+static struct musbfsh_fifo_cfg epx_cfg[] = {
 	{.hw_ep_num = 1, .style = FIFO_TX, .maxpacket = 512, .mode = BUF_SINGLE},
 	{.hw_ep_num = 1, .style = FIFO_RX, .maxpacket = 512, .mode = BUF_SINGLE},
 	{.hw_ep_num = 2, .style = FIFO_TX, .maxpacket = 512, .mode = BUF_SINGLE},
@@ -716,7 +716,7 @@ static struct musbfsh_fifo_cfg epx_cfg[] __initdata = {
  *
  * returns negative errno or offset for next fifo.
  */
-static int __init
+static int
 fifo_setup(struct musbfsh *musbfsh, struct musbfsh_hw_ep *hw_ep,
 	   const struct musbfsh_fifo_cfg *cfg, u16 offset)
 {
@@ -785,7 +785,7 @@ fifo_setup(struct musbfsh *musbfsh, struct musbfsh_hw_ep *hw_ep,
 	return offset + (maxpacket << ((c_size & MUSBFSH_FIFOSZ_DPB) ? 1 : 0));
 }
 
-static int __init ep_config_from_table(struct musbfsh *musbfsh)
+static int ep_config_from_table(struct musbfsh *musbfsh)
 {
 	const struct musbfsh_fifo_cfg *cfg = NULL;
 	unsigned i = 0;
@@ -842,7 +842,7 @@ done:
 /* Initialize MUSB (M)HDRC part of the USB hardware subsystem;
  * configure endpoints, or take their config from silicon
  */
-static int __init musbfsh_core_init(struct musbfsh *musbfsh)
+static int musbfsh_core_init(struct musbfsh *musbfsh)
 {
 	void __iomem *mbase = musbfsh->mregs;
 	int status = 0;
@@ -1045,7 +1045,7 @@ irqreturn_t musbfsh_interrupt(struct musbfsh *musbfsh)
 
 
 #ifndef CONFIG_MUSBFSH_PIO_ONLY
-static bool use_dma __initdata = 1;
+static bool use_dma = 1;
 
 /* "modprobe ... use_dma=0" etc */
 module_param(use_dma, bool, 0);
@@ -1071,7 +1071,7 @@ void musbfsh_dma_completion(struct musbfsh *musbfsh, u8 epnum, u8 transmit)
  * Init support
 */
 
-static struct musbfsh *__init
+static struct musbfsh *
 allocate_instance(struct device *dev, struct musbfsh_hdrc_config *config, void __iomem *mbase)
 {
 	struct musbfsh *musbfsh;
@@ -1337,7 +1337,7 @@ fail0:
 static u64 *orig_dma_mask;
 #endif
 
-static int __init musbfsh_probe(struct platform_device *pdev)
+static int musbfsh_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct device_node *node;
@@ -1395,7 +1395,7 @@ static int __init musbfsh_probe(struct platform_device *pdev)
 	return status;
 }
 
-static int __exit musbfsh_remove(struct platform_device *pdev)
+static int musbfsh_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct musbfsh *musbfsh = dev_to_musbfsh(dev);
@@ -1619,7 +1619,7 @@ static struct platform_driver musbfsh_driver = {
 		   .pm = MUSBFSH_DEV_PM_OPS,
 		   },
 	.probe = musbfsh_probe,
-	.remove = __exit_p(musbfsh_remove),
+	.remove = musbfsh_remove,
 	.shutdown = musbfsh_shutdown,
 };
 
