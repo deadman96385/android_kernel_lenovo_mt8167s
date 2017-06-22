@@ -12,14 +12,8 @@
 */
 
 #include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/init.h>
-#include <linux/list.h>
-#include <linux/io.h>
 /*#include <linux/usb/nop-usb-xceiv.h>*/
-#include <linux/switch.h>
-#include <linux/i2c.h>
+
 #ifndef CONFIG_OF
 #include <mach/irqs.h>
 #endif
@@ -44,15 +38,13 @@ struct clk *usb_clk;
 struct clk *icusb_clk;
 #endif
 #include "usb20.h"
-#include <linux/delay.h>
+
 #ifdef CONFIG_OF
-#include <linux/of_irq.h>
-#include <linux/of_address.h>
 #ifndef CONFIG_MTK_LEGACY
-#include <linux/regulator/consumer.h>
 #endif
 #endif
 /*#include <mach/mt_boot_common.h>*/
+#include <mt-plat/mtk_boot_common.h>
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH
 struct regmap *mt_regmap;
@@ -134,8 +126,6 @@ static const struct of_device_id apusb_of_ids[] = {
 	{ .compatible = "mediatek,mt8167-usb20", },
 	{},
 };
-
-
 
 #if defined(CONFIG_USB_MTK_ACM_TEMP)
 static struct platform_device usbacm_temp_device = {
@@ -989,6 +979,36 @@ static ssize_t mt_usb_show_uart_path(struct device *dev, struct device_attribute
 DEVICE_ATTR(uartpath,  0444, mt_usb_show_uart_path, NULL);
 #endif
 
+#ifndef FPGA_PLATFORM
+static struct device_attribute *mt_usb_attributes[] = {
+	&dev_attr_saving,
+#ifdef CONFIG_MTK_UART_USB_SWITCH
+	&dev_attr_portmode,
+	&dev_attr_uartpath,
+#endif
+	NULL
+};
+
+static int init_sysfs(struct device *dev)
+{
+	struct device_attribute **attr;
+	int rc;
+
+	for (attr = mt_usb_attributes; *attr; attr++) {
+		rc = device_create_file(dev, *attr);
+		if (rc)
+			goto out_unreg;
+	}
+	return 0;
+
+out_unreg:
+	for (; attr >= mt_usb_attributes; attr--)
+		device_remove_file(dev, *attr);
+	return rc;
+}
+#endif
+
+
 #ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE
 static bool device_mode;
 static bool host_mode;
@@ -1055,13 +1075,11 @@ UINT8 USB_PHY_Read_Register8(UINT8 addr)
 
 static int usb_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-#ifdef CONFIG_OF
 	unsigned long base;
 	/* if i2c probe before musb prob, this would cause KE */
 	/* base = (unsigned long)((unsigned long)mtk_musb->xceiv->io_priv); */
 	base = usb_phy_base;
 	DBG(0, "[MUSB]usb_i2c_probe, start, base:%lx\n", base);
-#endif
 
 	usb_i2c_client = client;
 
@@ -1191,12 +1209,10 @@ static int usb_i2c_remove(struct i2c_client *client)
 	return 0;
 }
 
-#ifdef CONFIG_OF
 static const struct of_device_id usb_of_match[] = {
 	{.compatible = "mediatek,mtk-usb"},
 	{},
 };
-#endif
 
 struct i2c_driver usb_i2c_driver = {
 	.probe = usb_i2c_probe,
@@ -1204,9 +1220,7 @@ struct i2c_driver usb_i2c_driver = {
 	/*.detect = usb_i2c_detect,*/
 	.driver = {
 		.name = "mtk-usb",
-		#ifdef CONFIG_OF
 		.of_match_table = usb_of_match,
-		#endif
 	},
 	.id_table = usb_i2c_id,
 };
@@ -1241,12 +1255,6 @@ static int __init mt_usb_init(struct musb *musb)
 		return -EPROBE_DEFER;
 	}
 
-
-#ifdef CONFIG_OF
-	/*musb->nIrq = usb_irq_number1;*/
-#else
-	musb->nIrq = USB_MCU_IRQ_BIT1_ID;
-#endif
 	musb->dma_irq = (int)SHARE_IRQ;
 	musb->fifo_cfg = fifo_cfg;
 	musb->fifo_cfg_size = ARRAY_SIZE(fifo_cfg);
@@ -1335,12 +1343,12 @@ static int mt_usb_probe(struct platform_device *pdev)
 	struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;
 	struct platform_device		*musb;
 	struct mt_usb_glue		*glue;
-#ifdef CONFIG_OF
+
 	struct musb_hdrc_config		*config;
 	struct device_node		*np = pdev->dev.of_node;
 	/*u32 temp_id = 0; */
 	/*unsigned long usb_mac;*/
-#endif
+
 #ifdef CONFIG_MTK_UART_USB_SWITCH
 	struct device_node *np, *node_pctl;
 #endif
@@ -1364,8 +1372,10 @@ static int mt_usb_probe(struct platform_device *pdev)
 		goto err1;
 	}
 
-#ifdef CONFIG_OF
 	/*dts_np = pdev->dev.of_node;*/
+	musb->dev.of_node = pdev->dev.of_node;	/* it should be put in musb_core probe */
+	if (musb->dev.of_node == NULL)
+		pr_info("musb set of node failed\n");
 
 	/*usb_irq_number1 = irq_of_parse_and_map(pdev->dev.of_node, 0);*/
 	/*usb_mac = (unsigned long)of_iomap(pdev->dev.of_node, 0);*/
@@ -1398,16 +1408,14 @@ static int mt_usb_probe(struct platform_device *pdev)
 	/*config->dma = of_property_read_bool(np, "dma");*/
 
 	pdata->config       = config;
-#endif
 
 	musb->dev.parent		= &pdev->dev;
 	musb->dev.dma_mask		= &mt_usb_dmamask;
 	musb->dev.coherent_dma_mask	= mt_usb_dmamask;
-#ifdef CONFIG_OF
+
 	pdev->dev.dma_mask = &mt_usb_dmamask;
 	pdev->dev.coherent_dma_mask = mt_usb_dmamask;
 	arch_setup_dma_ops(&musb->dev, 0, mt_usb_dmamask, NULL, 0);
-#endif
 
 	glue->dev			= &pdev->dev;
 	glue->musb			= musb;
@@ -1444,12 +1452,9 @@ static int mt_usb_probe(struct platform_device *pdev)
 	}
 
 	ret = device_create_file(&pdev->dev, &dev_attr_cmode);
-	ret = device_create_file(&pdev->dev, &dev_attr_saving);
 #ifdef CONFIG_MTK_UART_USB_SWITCH
-	ret = device_create_file(&pdev->dev, &dev_attr_portmode);
 	ret = device_create_file(&pdev->dev, &dev_attr_tx);
 	ret = device_create_file(&pdev->dev, &dev_attr_rx);
-	ret = device_create_file(&pdev->dev, &dev_attr_uartpath);
 #endif
 #ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE
 	ret = device_create_file(&pdev->dev, &dev_attr_swmode);
@@ -1543,7 +1548,12 @@ static int mt_usb_probe(struct platform_device *pdev)
 #endif
 	DBG(0, "[U2]usb20 dts probe\n");
 
+	if (init_sysfs(&pdev->dev)) {
+		DBG(0, "failed to init_sysfs\n");
+		goto err2;
+	}
 
+	DBG(0, "[U2]usb20 dts probe ret:%d\n", ret);
 
 
 #ifdef CONFIG_OF
@@ -1556,6 +1566,13 @@ static int mt_usb_probe(struct platform_device *pdev)
 	/* run time force on */
 #if defined(FPGA_PLATFORM) || defined(FOR_BRING_UP)
 	musb_force_on = 1;
+#endif
+
+#ifndef FPGA_PLATFORM
+	if (get_boot_mode() == META_BOOT) {
+		DBG(0, "in special mode %d\n", get_boot_mode());
+		musb_force_on = 1;
+	}
 #endif
 
 	DBG(0, "[U2]success to register musb\n");
