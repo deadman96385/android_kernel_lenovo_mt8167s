@@ -329,7 +329,7 @@ static signed int dump_register_fgadc(void *data)
 
 static signed int(*bm_func[BATTERY_METER_CMD_NUMBER]) (void *data);
 
-signed int bm_ctrl_cmd(BATTERY_METER_CTRL_CMD cmd, void *data)
+signed int bm_ctrl_cmd(enum BATTERY_METER_CTRL_CMD cmd, void *data)
 {
 	signed int status = 0;
 	static signed int init = -1;
