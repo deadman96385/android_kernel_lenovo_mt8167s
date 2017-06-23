@@ -78,7 +78,8 @@ struct mt_usb_glue {
 
 #define glue_to_musb(g)         platform_get_drvdata(g->musb)
 
-typedef unsigned int kal_uint32;
+/* typedef unsigned int kal_uint32; */
+#define kal_uint32 unsigned int
 
 extern enum CHARGER_TYPE mt_charger_type_detection(void);
 extern bool upmu_is_chr_det(void);
