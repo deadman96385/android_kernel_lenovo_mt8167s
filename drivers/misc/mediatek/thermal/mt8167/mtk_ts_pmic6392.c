@@ -134,11 +134,10 @@ static kal_int32 thermal_cal_exec(kal_uint32 ret)
 
 	VBE_T = ((g_o_vts * 1800) / 4096);
 
-	if (g_o_slope_sign == 0) {
+	if (g_o_slope_sign == 0)
 		slope_data = (y_curr - VBE_T) * 100 / (170 + g_o_slope);
-	} else {
+	else
 		slope_data = (y_curr - VBE_T) * 100 / (170 - g_o_slope);
-	}
 
 	slope_data = slope_data - 2 * slope_data;
 
