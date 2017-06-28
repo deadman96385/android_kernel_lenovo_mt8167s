@@ -457,6 +457,15 @@
 			reg = <0 0x10018f00 0 0x100>;
 		};
 
+		irrx: irrx@10019000 {
+			compatible = "mediatek,mt8167-irrx";
+			reg = <0 0x10019000 0 0x1000>;
+			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_LOW>;
+			clocks = <&clk32k>;
+			clock-names = "irrx_clock";
+			status = "disabled";
+		};
+
 		accdet: accdet@1001b000 {
 			compatible = "mediatek,mt8167-accdet";
 			reg = <0 0x1001b000 0 0x1000>;

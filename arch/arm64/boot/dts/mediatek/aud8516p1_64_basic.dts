@@ -95,23 +95,6 @@
 		status = "disabled";
 	};
 
-	irrx: irrx@0x10019000 {
-		compatible = "mediatek,mt8167_irrx";
-		reg = <0 0x10019000 0 0x1000>;
-		interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_LOW>;
-/**
-	*	clocks = <&infracfg CLK_AUD_INTDIR>;
-	* clock-names = "irrx_clock";
-**/
-		pinctrl-names = "default", "state_pin_as_ir";
-		pinctrl-0 = <&irrx_pins_default>;
-		pinctrl-1 = <&irrx_pins_ir_input>;
-
-	/** power supply
-	*		virrx-supply = <&mt_pmic_vldo28_ldo_reg>;
-	**/
-	};
-
 	gpio-keys {
 		compatible = "gpio-keys";
 		pinctrl-names = "default";
@@ -359,6 +342,12 @@
 	};
 };
 
+&irrx {
+	pinctrl-names = "default";
+	pinctrl-0 = <&irrx_pins_ir_input>;
+	status = "disabled";
+};
+
 &keypad {
 	mediatek,kpd-key-debounce = <1024>;
 	mediatek,kpd-sw-pwrkey = <116>;
@@ -530,16 +519,6 @@ pwm_goio_def_cfg: pwmdefault {
 		};
 	};
 
-
-	irrx_pins_default: irrx_pin {
-	};
-	irrx_pins_ir_input: irrx_pin_ir {
-		pins_cmd_dat {
-		pinmux = <MT8167_PIN_36_MRG_CLK__FUNC_IR>;
-		bias-pull-up;
-		};
-	};
-
 	/* CONSYS GPIO Settings - Start */
 	gpslna_pins_init: gpslna@0 {
 	};
@@ -574,6 +553,13 @@ pwm_goio_def_cfg: pwmdefault {
 		pins1 {
 			pinmux = <MT8167_PIN_52_SDA1__FUNC_SDA1_0>,
 				 <MT8167_PIN_53_SCL1__FUNC_SCL1_0>;
+			bias-disable;
+		};
+	};
+
+	irrx_pins_ir_input: irrx_pin_ir {
+		pins_cmd_dat {
+			pinmux = <MT8167_PIN_36_MRG_CLK__FUNC_IR>;
 			bias-disable;
 		};
 	};
