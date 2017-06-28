@@ -26,7 +26,7 @@
 /* #include <linux/io.h> */
 #include <linux/delay.h>
 #include <linux/uaccess.h>
-#include <asm/atomic.h>
+#include <linux/atomic.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <mt-plat/aee.h>
@@ -81,20 +81,20 @@
 /*******************************************************************************
 * common type define
 ********************************************************************************/
-typedef unsigned char MUINT8;
-typedef unsigned short MUINT16;
-typedef unsigned int MUINT32;
-typedef unsigned long long MUINT64;
+#define MUINT8 unsigned char
+#define MUINT16 unsigned short
+#define MUINT32 unsigned int
+#define MUINT64 unsigned long long
 
-typedef signed char MINT8;
-typedef signed short MINT16;
-typedef signed int MINT32;
-typedef signed long long MINT64;
+#define MINT8 signed char
+#define MINT16 signed short
+#define MINT32 signed int
+#define MINT64 signed long long
 
-typedef float MFLOAT;
+#define MFLOAT	float
 
-typedef void MVOID;
-typedef bool MBOOL;
+#define MVOID	void
+#define MBOOL	bool
 
 #ifndef MTRUE
 #define MTRUE               1
@@ -6116,7 +6116,6 @@ static MINT32 ISP_probe(struct platform_device *pDev)
 	cam_isp_devs = kmalloc(
 				sizeof(struct cam_isp_device) * new_count, GFP_KERNEL);
 	if (!cam_isp_devs) {
-		dev_err(&pDev->dev, "Unable to allocate cam_isp_devs\n");
 		return -ENOMEM;
 	}
 	cam_isp_dev = &(cam_isp_devs[nr_camisp_devs]);
