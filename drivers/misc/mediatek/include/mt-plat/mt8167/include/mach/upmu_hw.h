@@ -4908,15 +4908,4 @@
 #define MT6392_PMIC_REG_TYPE_C_SW_DBG_PORT_1_MASK                        0xFFFF
 #define MT6392_PMIC_REG_TYPE_C_SW_DBG_PORT_1_SHIFT                       0
 
-typedef enum {
-	PMIC_RG_VCDT_HV_EN,
-} PMU_FLAGS_LIST_ENUM;
-
-typedef struct {
-	PMU_FLAGS_LIST_ENUM flagname;
-	unsigned short offset;
-	unsigned short mask;
-	unsigned char shift;
-} PMU_FLAG_TABLE_ENTRY;
-
 #endif
