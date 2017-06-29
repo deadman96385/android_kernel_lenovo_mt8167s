@@ -94,6 +94,7 @@
 #define OFFSET_EMMC50_CFG3              (0x220)
 #define OFFSET_EMMC50_CFG4              (0x224)
 #define OFFSET_EMMC50_BLOCK_LENGTH      (0x228)
+#define OFFSET_MSDC_SDC_FIFO_CFG        (0x228)
 
 /*--------------------------------------------------------------------------*/
 /* Register Address                                                         */
@@ -184,6 +185,7 @@
 #define EMMC50_CFG3                     REG_ADDR(EMMC50_CFG3)
 #define EMMC50_CFG4                     REG_ADDR(EMMC50_CFG4)
 #define EMMC50_BLOCK_LENGTH             REG_ADDR(EMMC50_BLOCK_LENGTH)
+#define MSDC_SDC_FIFO_CFG               REG_ADDR(MSDC_SDC_FIFO_CFG)
 
 /*--------------------------------------------------------------------------*/
 /* Register Mask                                                            */
@@ -402,7 +404,7 @@
 #define MSDC_PB1_CMD_RSP_TA_CNTR        (0x7 << 3)
 #define MSDC_PB1_GET_BUSY_MA            (0x1 << 6)
 #define MSDC_PB1_GET_CRC_MA             (0x1 << 7)
-#define MSDC_PB1_BIAS_TUNE_28NM         (0xf << 8)
+#define MSDC_PB1_STOP_DLY_SEL           (0xf << 8)
 #define MSDC_PB1_BIAS_EN18IO_28NM       (0x1 << 12)
 #define MSDC_PB1_BIAS_EXT_28NM          (0x1 << 13)
 #define MSDC_PB1_RESV2                  (0x1 << 14)
@@ -619,6 +621,10 @@
 
 /* EMMC50_BLOCK_LENGTH mask */
 #define MSDC_EMMC50_BLOCK_LENGTH_MASK           (0x1FF << 0)
+
+/* MSDC SDC FIFO CFG masd */
+#define MSDC_WR_VALID_SEL                       (0x1 << 24)
+#define MSDC_RD_VALID_SEL                       (0x1 << 25)
 
 /* SDIO_TUNE_WIND mask*/
 #define MSDC_SDIO_TUNE_WIND                     (0x1F << 0)

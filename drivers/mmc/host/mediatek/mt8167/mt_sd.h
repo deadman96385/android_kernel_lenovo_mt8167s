@@ -417,6 +417,7 @@ struct msdc_host {
 	u8                      power_mode;     /* host power mode */
 	u8                      bus_width;
 	u8                      card_inserted;  /* card inserted ? */
+	bool                    drv_suspend;    /* driver suspended ? */
 	u8                      suspend;        /* host suspended ? */
 	u8                      app_cmd;        /* for app command */
 	u32                     app_cmd_arg;
@@ -461,6 +462,7 @@ struct msdc_host {
 	void    (*power_switch)(struct msdc_host *host, u32 on);
 	u32                     vmc_cal_default;
 
+	bool   clk_on;
 	struct clk *src_clk_ctrl;
 	struct clk *bus_clk_ctrl;
 	struct delayed_work	work_init; /* for init mmc card */
@@ -547,21 +549,21 @@ static inline unsigned int uffs(unsigned int x)
 #define mt_reg_sync_writel(v, a) \
 	do {    \
 		__raw_writel((v), (void __force __iomem *)((a)));   \
-		/*mb memory ...*/ \
+		/*make sure write committed*/  \
 		mb();  \
 	} while (0)
 
 #define mt_reg_sync_writew(v, a) \
 	do {    \
 		__raw_writew((v), (void __force __iomem *)((a)));   \
-		/*mb memory ...*/ \
+		/*make sure write committed*/  \
 		mb();  \
 	} while (0)
 
 #define mt_reg_sync_writeb(v, a) \
 	do {    \
 		__raw_writeb((v), (void __force __iomem *)((a)));   \
-		/*mb memory ...*/ \
+		/*make sure write committed*/  \
 		mb();  \
 	} while (0)
 
@@ -577,7 +579,7 @@ static inline unsigned int uffs(unsigned int x)
 #define mt_reg_sync_writew(v, a)        mt65xx_reg_sync_writew(v, a)
 #define mt_reg_sync_writeb(v, a)        mt65xx_reg_sync_writeb(v, a)
 
-/* define mb */
+/*define mb*/
 #define mb()   \
 	{    \
 		__asm__ __volatile__ ("dsb" : : : "memory"); \
@@ -586,21 +588,21 @@ static inline unsigned int uffs(unsigned int x)
 #define mt65xx_reg_sync_writel(v, a) \
 	do {    \
 		*(unsigned int *)(a) = (v);    \
-		/*mb memory ...*/ \
+		/*make sure write committed*/  \
 		mb(); \
 	} while (0)
 
 #define mt65xx_reg_sync_writew(v, a) \
 	do {    \
 		*(unsigned short *)(a) = (v);    \
-		/*mb memory ...*/ \
+		/*make sure write committed*/  \
 		mb(); \
 	} while (0)
 
 #define mt65xx_reg_sync_writeb(v, a) \
 	do {    \
 		*(unsigned char *)(a) = (v);    \
-		/*mb memory ...*/ \
+		/*make sure write committed*/  \
 		mb(); \
 	} while (0)
 
@@ -814,6 +816,8 @@ extern int msdc_rsp[];
 /* Function provided by sd.c */
 void msdc_ungate_clock(struct msdc_host *host);
 void msdc_gate_clock(struct msdc_host *host);
+int msdc_prepare_clk(struct msdc_host *host);
+void msdc_unprepare_clk(struct msdc_host *host);
 int msdc_clk_stable(struct msdc_host *host, u32 mode, u32 div,
 	u32 hs400_src);
 void msdc_clr_fifo(unsigned int id);

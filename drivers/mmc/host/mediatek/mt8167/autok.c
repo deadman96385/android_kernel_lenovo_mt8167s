@@ -31,7 +31,7 @@
 #define TUNE_DATA_TX_ADDR               (-33-32768)
 #define CMDQ
 #define AUTOK_LATCH_CK_EMMC_TUNE_TIMES  (10) /* 5.0IP eMMC 1KB fifo ZIZE */
-#define AUTOK_LATCH_CK_SDIO_TUNE_TIMES  (3)  /* 4.5IP SDIO 128fifo ZIZE */
+#define AUTOK_LATCH_CK_SDIO_TUNE_TIMES  (20)  /* 4.5IP SDIO 128fifo ZIZE */
 #define AUTOK_LATCH_CK_SD_TUNE_TIMES    (3)  /* 4.5IP SD 128fifo ZIZE */
 #define AUTOK_CMD_TIMES                 (20)
 #define AUTOK_TUNING_INACCURACY         (3)  /* scan result may find xxxxooxxx */
@@ -62,6 +62,10 @@
 #define AUTOK_CRC_TA_VALUE                      (0)
 #define AUTOK_CRC_MA_VALUE                      (1)
 #define AUTOK_BUSY_MA_VALUE                     (1)
+#define AUTOK_STOP_DLY_SEL                      (6)
+#define AUTOK_POP_EN_CNT                        (0)
+#define AUTOK_WR_VALID_SEL                      (0)
+#define AUTOK_RD_VALID_SEL                      (0)
 
 enum TUNE_TYPE {
 	TUNE_CMD = 0,
@@ -456,17 +460,10 @@ static int autok_send_tune_cmd(struct msdc_host *host, unsigned int opcode, enum
 		if (tune_type_value == TUNE_LATCH_CK) {
 			fifo_have = msdc_rxfifocnt();
 			if ((opcode == MMC_SEND_TUNING_BLOCK_HS200) || (opcode == MMC_READ_SINGLE_BLOCK)
-				|| (opcode == MMC_SEND_EXT_CSD)) {
+				|| (opcode == MMC_SEND_EXT_CSD) || (opcode == MMC_SEND_TUNING_BLOCK)) {
 				MSDC_SET_FIELD(MSDC_DBG_SEL, 0xffff << 0, 0x0b);
 				MSDC_GET_FIELD(MSDC_DBG_OUT, 0x7ff << 0, fifo_1k_cnt);
 				if ((fifo_1k_cnt >= MSDC_FIFO_THD_1K) && (fifo_have >= MSDC_FIFO_SZ)) {
-					value = MSDC_READ32(MSDC_RXDATA);
-					value = MSDC_READ32(MSDC_RXDATA);
-					value = MSDC_READ32(MSDC_RXDATA);
-					value = MSDC_READ32(MSDC_RXDATA);
-				}
-			} else if (opcode == MMC_SEND_TUNING_BLOCK) {
-				if (fifo_have >= MSDC_FIFO_SZ) {
 					value = MSDC_READ32(MSDC_RXDATA);
 					value = MSDC_READ32(MSDC_RXDATA);
 					value = MSDC_READ32(MSDC_RXDATA);
@@ -1760,13 +1757,7 @@ static int autok_register_dump(struct msdc_host *host)
 
 void autok_tuning_parameter_init(struct msdc_host *host, u8 *res)
 {
-	unsigned int ret = 0;
-	/* void __iomem *base = host->base; */
-
-	/* MSDC_SET_FIELD(MSDC_PATCH_BIT2, 7<<29, 2); */
-	/* MSDC_SET_FIELD(MSDC_PATCH_BIT2, 7<<16, 4); */
-
-	ret = autok_param_apply(host, res);
+	autok_param_apply(host, res);
 }
 
 /*******************************************************
@@ -1897,6 +1888,10 @@ int autok_path_sel(struct msdc_host *host)
 
 	MSDC_SET_FIELD(MSDC_PATCH_BIT1, MSDC_PB1_GET_BUSY_MA, AUTOK_BUSY_MA_VALUE);
 	MSDC_SET_FIELD(MSDC_PATCH_BIT1, MSDC_PB1_GET_CRC_MA, AUTOK_CRC_MA_VALUE);
+	MSDC_SET_FIELD(MSDC_PATCH_BIT1, MSDC_PB1_STOP_DLY_SEL, AUTOK_STOP_DLY_SEL);
+
+	MSDC_SET_FIELD(MSDC_SDC_FIFO_CFG, MSDC_WR_VALID_SEL, AUTOK_WR_VALID_SEL);
+	MSDC_SET_FIELD(MSDC_SDC_FIFO_CFG, MSDC_RD_VALID_SEL, AUTOK_RD_VALID_SEL);
 
 	return 0;
 }
@@ -1912,6 +1907,7 @@ int autok_init_sdr104(struct msdc_host *host)
 	/* if any specific config need modify add here */
 	/* LATCH_TA_EN Config for WCRC Path non_HS400 */
 	MSDC_SET_FIELD(MSDC_PATCH_BIT2, MSDC_PB2_CRCSTSENSEL, AUTOK_CRC_LATCH_EN_NON_HS400_VALUE);
+	MSDC_SET_FIELD(MSDC_PATCH_BIT2, MSDC_PB2_POPENCNT, AUTOK_POP_EN_CNT);
 	/* LATCH_TA_EN Config for CMD Path non_HS400 */
 	MSDC_SET_FIELD(MSDC_PATCH_BIT2, MSDC_PB2_RESPSTENSEL, AUTOK_CMD_LATCH_EN_NON_HS400_VALUE);
 
@@ -1933,6 +1929,7 @@ int autok_init_hs200(struct msdc_host *host)
 	/* if any specific config need modify add here */
 	/* LATCH_TA_EN Config for WCRC Path non_HS400 */
 	MSDC_SET_FIELD(MSDC_PATCH_BIT2, MSDC_PB2_CRCSTSENSEL, AUTOK_CRC_LATCH_EN_NON_HS400_VALUE);
+	MSDC_SET_FIELD(MSDC_PATCH_BIT2, MSDC_PB2_POPENCNT, AUTOK_POP_EN_CNT);
 	/* LATCH_TA_EN Config for CMD Path non_HS400 */
 	MSDC_SET_FIELD(MSDC_PATCH_BIT2, MSDC_PB2_RESPSTENSEL, AUTOK_CMD_LATCH_EN_NON_HS400_VALUE);
 
@@ -1949,6 +1946,7 @@ int autok_init_hs400(struct msdc_host *host)
 	/* if any specific config need modify add here */
 	/* LATCH_TA_EN Config for WCRC Path HS400 */
 	MSDC_SET_FIELD(MSDC_PATCH_BIT2, MSDC_PB2_RESPSTENSEL, AUTOK_CMD_LATCH_EN_HS400_VALUE);
+	MSDC_SET_FIELD(MSDC_PATCH_BIT2, MSDC_PB2_POPENCNT, AUTOK_POP_EN_CNT);
 	/* LATCH_TA_EN Config for CMD Path HS400 */
 	MSDC_SET_FIELD(MSDC_PATCH_BIT2, MSDC_PB2_CRCSTSENSEL, AUTOK_CRC_LATCH_EN_HS400_VALUE);
 	/* write path switch to emmc50 */
@@ -2564,9 +2562,6 @@ int execute_online_tuning(struct msdc_host *host, u8 *res)
 	autok_tuning_parameter_init(host, p_autok_tune_res);
 
 	/* Step3 : Tuning LATCH CK */
-	p_autok_tune_res[INT_DAT_LATCH_CK] = autok_execute_tuning_latch_ck(host, opcode,
-		p_autok_tune_res[INT_DAT_LATCH_CK]);
-
 	autok_result_dump(host, p_autok_tune_res);
 #if AUTOK_PARAM_DUMP_ENABLE
 	autok_register_dump(host);

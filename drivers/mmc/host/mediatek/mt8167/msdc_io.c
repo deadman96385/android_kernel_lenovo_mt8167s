@@ -398,6 +398,8 @@ int msdc_cg_clk_id[HOST_MAX_NUM] = {
 int msdc_get_ccf_clk_pointer(struct platform_device *pdev,
 	struct msdc_host *host)
 {
+	int ret = 0;
+
 	static char const * const clk_names[] = {
 		MSDC0_CLK_NAME, MSDC1_CLK_NAME, MSDC2_CLK_NAME, MSDC3_CLK_NAME
 	};
@@ -406,25 +408,19 @@ int msdc_get_ccf_clk_pointer(struct platform_device *pdev,
 
 	if (IS_ERR(host->src_clk_ctrl)) {
 		pr_err("can not get msdc%d src clock control\n", pdev->id);
-		return 1;
-	}
-	if (clk_prepare(host->src_clk_ctrl)) {
-		pr_err("can not prepare msdc%d src clock control\n", pdev->id);
-		return 1;
+		return PTR_ERR(host->src_clk_ctrl);
 	}
 
 	host->bus_clk_ctrl = devm_clk_get(&pdev->dev, clk_names[pdev->id]);
 
 	if (IS_ERR(host->bus_clk_ctrl)) {
 		pr_err("can not get msdc%d clock control\n", pdev->id);
-		return 1;
-	}
-	if (clk_prepare(host->bus_clk_ctrl)) {
-		pr_err("can not prepare msdc%d clock control\n", pdev->id);
-		return 1;
+		return PTR_ERR(host->bus_clk_ctrl);
 	}
 
-	return 0;
+	host->clk_on = false;
+	ret = msdc_prepare_clk(host);
+	return ret;
 }
 
 void msdc_select_clksrc(struct msdc_host *host, int clksrc)
