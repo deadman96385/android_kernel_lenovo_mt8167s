@@ -822,6 +822,7 @@ static void base_ops_disable_locked(struct ptp_det *det, int reason)
 static void base_ops_disable(struct ptp_det *det, int reason)
 {
 	unsigned long flags;
+
 	FUNC_ENTER(FUNC_LV_HELP);
 
 	mt_ptp_lock(&flags);
