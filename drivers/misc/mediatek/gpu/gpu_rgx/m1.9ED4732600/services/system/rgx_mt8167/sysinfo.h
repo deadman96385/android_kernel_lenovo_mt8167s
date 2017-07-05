@@ -68,7 +68,6 @@
 #define SYS_RGX_OF_COMPATIBLE "mediatek,mt8167-clark"
 
 #if defined(__linux__)
-#define SYS_RGX_DEV_NAME    "pvrsrvkm"
 /* #if defined(SUPPORT_DRM) */
 /*
  * Use the static bus ID for the platform DRM device.
