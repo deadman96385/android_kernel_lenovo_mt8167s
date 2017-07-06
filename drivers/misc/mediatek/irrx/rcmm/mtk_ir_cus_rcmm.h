@@ -25,7 +25,7 @@
  * for BD     (1/3MHZ) * MTK_RCMM_SAPERIOD
  * for 8127 (1/32KHZ)*MTK_RCMM_SAPERIOD
  ************************************/
-#define MTK_RCMM_CONFIG          0x1f0021
+#define MTK_RCMM_CONFIG          0x1f4021
 #define MTK_RCMM_SAPERIOD        0x2
 #define MTK_RCMM_THRESHOLD       0x200
 #define MTK_RCMM_THRESHOLD_REG   0x80C10200

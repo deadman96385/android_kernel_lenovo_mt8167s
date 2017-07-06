@@ -139,29 +139,15 @@ static int mtk_ir_rc6_resume(void *preserve)
 
 static int mtk_ir_rc6_enable_hwirq(int enable)
 {
-	u32 info;
-
 	IR_RC6_LOG("IRRX enable hwirq: %d\n", enable);
 	if (enable) {
-		info = IR_READ32(IRRX_COUNT_HIGH_REG);
-		IR_WRITE_MASK(IRRX_IRCLR, IRRX_IRCLR_MASK,
-						IRRX_IRCLR_OFFSET, 0x1);
-		dsb(sy);
-		IR_WRITE_MASK(IRRX_IRINT_CLR, IRRX_INTCLR_MASK,
-						IRRX_INTCLR_OFFSET, 0x1);
+		IR_WRITE_MASK(IRRX_IRINT_CLR, IRRX_INTCLR_MASK, IRRX_INTCLR_OFFSET, 0x1);
 		dsb(sy);
 
-		do {
-			info = IR_READ32(IRRX_COUNT_HIGH_REG);
-		} while (info != 0);
-
-		IR_WRITE_MASK(IRRX_IRINT_EN, IRRX_INTEN_MASK, IRRX_INTCLR_OFFSET, 0x1);
+		IR_WRITE_MASK(IRRX_IRCLR, IRRX_IRCLR_MASK, IRRX_IRCLR_OFFSET, 0x1);
 		dsb(sy);
 	} else {
-		IR_WRITE_MASK(IRRX_IRINT_EN, IRRX_INTEN_MASK, IRRX_INTCLR_OFFSET, 0x0);
-		dsb(sy);
-		IR_WRITE_MASK(IRRX_IRINT_CLR, IRRX_INTCLR_MASK,
-						IRRX_INTCLR_OFFSET, 0x1);
+		IR_WRITE_MASK(IRRX_IRINT_CLR, IRRX_INTCLR_MASK, IRRX_INTCLR_OFFSET, 0x1);
 		dsb(sy);
 	}
 	return 0;
@@ -210,7 +196,6 @@ static struct mtk_ir_core_platform_data mtk_ir_pdata_rc6 = {
 
 static int mtk_ir_rc6_uninit_hw(void)
 {
-	IR_WRITE_MASK(IRRX_IRINT_EN, IRRX_INTEN_MASK, IRRX_INTCLR_OFFSET, 0x0);
 	mtk_ir_rc6_enable_hwirq(0);
 	rc_map_unregister(&mtk_rc6_map);
 	return 0;

@@ -26,7 +26,7 @@
  * for 8127 (1/32KHZ)*MTK_SIRC_SAPERIOD
  ************************************/
 
-#define MTK_SIRC_CONFIG      (IRRX_CH_END_15 + IRRX_CH_HWIR + IRRX_CH_ORDINV)
+#define MTK_SIRC_CONFIG      (IRRX_CH_END_15 + IRRX_CH_IGB0 + IRRX_CH_HWIR + IRRX_CH_ORDINV)
 #define MTK_SIRC_SAPERIOD    (0x006)
 #define MTK_SIRC_THRESHOLD   (0x602)
 

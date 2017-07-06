@@ -25,7 +25,7 @@
 * for BD     (8/3MHZ) * MTK_NEC_SAPERIOD
 * for 8127 (1/32KHZ)*MTK_NEC_SAPERIOD
 ************************************/
-#define MTK_NEC_CONFIG      (IRRX_CH_END_15 + IRRX_CH_IGSYN + IRRX_CH_HWIR)
+#define MTK_NEC_CONFIG      (IRRX_CH_END_15 + IRRX_CH_IGB0 + IRRX_CH_IGSYN + IRRX_CH_HWIR)
 #define MTK_NEC_SAPERIOD    (0x00F)
 #define MTK_NEC_THRESHOLD   (0x1)
 

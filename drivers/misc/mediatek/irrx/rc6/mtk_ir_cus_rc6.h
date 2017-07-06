@@ -25,7 +25,8 @@
  * for BD     (8/3MHZ) * MTK_RC6_SAPERIOD
  * for 8127 (1/32KHZ)*MTK_RC6_SAPERIOD
  ************************************/
-#define MTK_RC6_CONFIG      (IRRX_CH_END_15 | IRRX_CH_IGSYN | IRRX_CH_HWIR  | IRRX_CH_ORDINV | IRRX_CH_RC5)
+#define MTK_RC6_CONFIG      (IRRX_CH_END_15 | IRRX_CH_IGB0 | IRRX_CH_IGSYN \
+				| IRRX_CH_HWIR | IRRX_CH_ORDINV | IRRX_CH_RC5)
 #define MTK_RC6_SAPERIOD    (0xe)
 #define MTK_RC6_THRESHOLD   (0x1)
 

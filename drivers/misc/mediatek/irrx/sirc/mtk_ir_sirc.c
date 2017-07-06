@@ -141,30 +141,15 @@ static int mtk_ir_sirc_resume(void *preserve)
 
 static int mtk_ir_sirc_enable_hwirq(int enable)
 {
-	u32 info;
-
 	IR_SIRC_LOG("IRRX enable hwirq: %d\n", enable);
 	if (enable) {
-		info = IR_READ32(IRRX_COUNT_HIGH_REG);
-		IR_WRITE_MASK(IRRX_IRCLR, IRRX_IRCLR_MASK,
-						IRRX_IRCLR_OFFSET, 0x1);
+		IR_WRITE_MASK(IRRX_IRINT_CLR, IRRX_INTCLR_MASK, IRRX_INTCLR_OFFSET, 0x1);
 		dsb(sy);
 
-		IR_WRITE_MASK(IRRX_IRINT_CLR, IRRX_INTCLR_MASK,
-						IRRX_INTCLR_OFFSET, 0x1);
-		dsb(sy);
-
-		do {
-			info = IR_READ32(IRRX_COUNT_HIGH_REG);
-		} while (info != 0);
-
-		IR_WRITE_MASK(IRRX_IRINT_EN, IRRX_INTEN_MASK, IRRX_INTCLR_OFFSET, 0x1);
+		IR_WRITE_MASK(IRRX_IRCLR, IRRX_IRCLR_MASK, IRRX_IRCLR_OFFSET, 0x1);
 		dsb(sy);
 	} else {
-		IR_WRITE_MASK(IRRX_IRINT_EN, IRRX_INTEN_MASK, IRRX_INTCLR_OFFSET, 0x0);
-		dsb(sy);
-		IR_WRITE_MASK(IRRX_IRINT_CLR, IRRX_INTCLR_MASK,
-						IRRX_INTCLR_OFFSET, 0x1);
+		IR_WRITE_MASK(IRRX_IRINT_CLR, IRRX_INTCLR_MASK, IRRX_INTCLR_OFFSET, 0x1);
 		dsb(sy);
 	}
 	return 0;
@@ -213,7 +198,6 @@ static struct mtk_ir_core_platform_data mtk_ir_pdata_sirc = {
 
 static int mtk_ir_sirc_uninit_hw(void)
 {
-	IR_WRITE_MASK(IRRX_IRINT_EN, IRRX_INTEN_MASK, IRRX_INTCLR_OFFSET, 0x0);
 	mtk_ir_sirc_enable_hwirq(0);
 	rc_map_unregister(&mtk_sirc_map);
 	return 0;
@@ -346,7 +330,7 @@ u32 mtk_ir_sirc_decode(void *preserve)
 	IR_SIRC_LOG("repeat_out=%dms\n", jiffies_to_msecs(current_jiffers - last_jiffers));
 	last_jiffers = current_jiffers;
 
-	MTK_IR_KEY_LOG("Customer code:0x%08x, Key:0x%08x\n", u1Device, _u4PrevKey);
+	MTK_IR_KEY_LOG("Key:0x%08x\n", _u4PrevKey);
 	return _u4PrevKey;
 }
 
