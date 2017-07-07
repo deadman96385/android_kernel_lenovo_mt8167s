@@ -63,19 +63,17 @@
 struct platform_device *gpsPVRLDMDev;
 #endif
 
+#define RGX_CR_ISP_GRIDOFFSET   (0x0FA0U)
 
-#define RGX_CR_ISP_GRIDOFFSET	(0x0FA0U)
+static RGX_TIMING_INFORMATION   gsRGXTimingInfo;
+static RGX_DATA                 gsRGXData;
+static PVRSRV_DEVICE_CONFIG     gsDevices[1];
 
-static RGX_TIMING_INFORMATION	gsRGXTimingInfo;
-static RGX_DATA			gsRGXData;
-static PVRSRV_DEVICE_CONFIG	gsDevices[1];
-
-static PHYS_HEAP_FUNCTIONS	gsPhysHeapFuncs;
-static PHYS_HEAP_CONFIG		gsPhysHeapConfig;
+static PHYS_HEAP_FUNCTIONS      gsPhysHeapFuncs;
+static PHYS_HEAP_CONFIG         gsPhysHeapConfig;
 
 #if  defined(SUPPORT_PDVFS)
 /* Dummy DVFS configuration used purely for testing purposes */
-
 static const IMG_OPP asOPPTable[] = {
 	{ 100000, 253500000},
 	{ 100000, 338000000},
@@ -174,34 +172,28 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 	gsDevices[0].pui32BIFTilingHeapConfigs = gauiBIFTilingHeapXStrides;
 	gsDevices[0].ui32BIFTilingHeapCount = IMG_ARR_NUM_ELEMS(gauiBIFTilingHeapXStrides);
 
-	/*
-	 * Setup RGX specific timing data
-	 */
-	gsRGXTimingInfo.ui32CoreClockSpeed        = RGX_HW_CORE_CLOCK_SPEED;
+	/* Setup RGX specific timing data */
+	gsRGXTimingInfo.ui32CoreClockSpeed = RGX_HW_CORE_CLOCK_SPEED;
 
 #if MTK_PM_SUPPORT
-	gsRGXTimingInfo.bEnableActivePM           = true;
-	gsRGXTimingInfo.ui32ActivePMLatencyms     = SYS_RGX_ACTIVE_POWER_LATENCY_MS,
+	gsRGXTimingInfo.bEnableActivePM = true;
+	gsRGXTimingInfo.ui32ActivePMLatencyms = SYS_RGX_ACTIVE_POWER_LATENCY_MS,
 #else
-	gsRGXTimingInfo.bEnableActivePM           = false;
+	gsRGXTimingInfo.bEnableActivePM = false;
 #endif
 
 	/* define HW APM */
 #if defined(MTK_USE_HW_APM)
-	gsRGXTimingInfo.bEnableRDPowIsland        = true;
+	gsRGXTimingInfo.bEnableRDPowIsland = true;
 #else
-	gsRGXTimingInfo.bEnableRDPowIsland        = false;
+	gsRGXTimingInfo.bEnableRDPowIsland = false;
 #endif
 
-	/*
-	 * Setup RGX specific data
-	 */
+	/* Setup RGX specific data */
 	gsRGXData.psRGXTimingInfo = &gsRGXTimingInfo;
 
-	/*
-	 * Setup RGX device
-	 */
-	gsDevices[0].pszName                = "RGX";
+	/* Setup RGX device */
+	gsDevices[0].pszName = "RGX";
 	gsDevices[0].pszVersion = NULL;
 
 	/* Device setup information */
@@ -215,44 +207,42 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 		irq_res = platform_get_resource(gpsPVRLDMDev, IORESOURCE_IRQ, 0);
 
 		if (irq_res) {
-			gsDevices[0].ui32IRQ				= irq_res->start;
-
+			gsDevices[0].ui32IRQ = irq_res->start;
 			g32SysIrq = irq_res->start;
 
 			PVR_LOG(("irq_res = 0x%x", (int)irq_res->start));
 		} else {
 			PVR_DPF((PVR_DBG_ERROR, "irq_res = NULL!"));
-err_out:
 			return PVRSRV_ERROR_INIT_FAILURE;
 		}
 
 		reg_res = platform_get_resource(gpsPVRLDMDev, IORESOURCE_MEM, 0);
 
 		if (reg_res) {
-			gsDevices[0].sRegsCpuPBase.uiAddr	= reg_res->start;
-			gsDevices[0].ui32RegsSize			= resource_size(reg_res);
+			gsDevices[0].sRegsCpuPBase.uiAddr = reg_res->start;
+			gsDevices[0].ui32RegsSize = resource_size(reg_res);
 
 			PVR_LOG(("reg_res = 0x%x, 0x%x", (int)reg_res->start,
 									(int)resource_size(reg_res)));
 		} else {
 			PVR_DPF((PVR_DBG_ERROR, "reg_res = NULL!"));
-			goto err_out;
+			return PVRSRV_ERROR_INIT_FAILURE;
 		}
 	}
 #else
-	gsDevices[0].sRegsCpuPBase.uiAddr   = SYS_MTK_RGX_REGS_SYS_PHYS_BASE;
-	gsDevices[0].ui32RegsSize           = SYS_MTK_RGX_REGS_SIZE;
-	gsDevices[0].ui32IRQ                = SYS_MTK_RGX_IRQ;
+	gsDevices[0].sRegsCpuPBase.uiAddr = SYS_MTK_RGX_REGS_SYS_PHYS_BASE;
+	gsDevices[0].ui32RegsSize = SYS_MTK_RGX_REGS_SIZE;
+	gsDevices[0].ui32IRQ = SYS_MTK_RGX_IRQ;
 #endif
 
-	/* power management on HW system */
-	gsDevices[0].pfnPrePowerState       = MTKDevPrePowerState;
-	gsDevices[0].pfnPostPowerState      = MTKDevPostPowerState;
+	/* Power management on HW system */
+	gsDevices[0].pfnPrePowerState = MTKDevPrePowerState;
+	gsDevices[0].pfnPostPowerState = MTKDevPostPowerState;
 
-	/* clock frequency */
-	gsDevices[0].pfnClockFreqGet        = NULL;
+	/* Clock frequency */
+	gsDevices[0].pfnClockFreqGet = NULL;
 
-	gsDevices[0].hDevData               = &gsRGXData;
+	gsDevices[0].hDevData = &gsRGXData;
 
 	gsDevices[0].eCacheSnoopingMode = PVRSRV_DEVICE_SNOOP_NONE;
 
@@ -261,14 +251,6 @@ err_out:
 	gsDevices[0].sDVFS.sDVFSDeviceCfg.pasOPPTable = asOPPTable;
 	gsDevices[0].sDVFS.sDVFSDeviceCfg.ui32OPPTableSize = LEVEL_COUNT;
 #endif
-
-	/*
-	 * Setup system config
-	 */
-	/* gsSysConfig.uiDeviceCount = sizeof(gsDevices)/sizeof(gsDevices[0]); */
-	/* gsSysConfig.pasDevices = &gsDevices[0]; */
-
-	/* power management on HW system */
 
 	/* Setup other system specific stuff */
 #if defined(SUPPORT_ION)
@@ -297,7 +279,7 @@ PVRSRV_ERROR SysInstallDeviceLISR(IMG_HANDLE hSysData,
 				  void *pvData,
 				  IMG_HANDLE *phLISRData)
 {
-	IMG_UINT32 ui32IRQFlags = SYS_IRQ_FLAG_TRIGGER_LOW; /*SYS_IRQ_FLAG_TRIGGER_DEFAULT;*/
+	IMG_UINT32 ui32IRQFlags = SYS_IRQ_FLAG_TRIGGER_LOW; /* SYS_IRQ_FLAG_TRIGGER_DEFAULT; */
 
 	PVR_UNREFERENCED_PARAMETER(hSysData);
 
@@ -321,7 +303,6 @@ PVRSRV_ERROR SysDebugInfo(PVRSRV_DEVICE_CONFIG *psDevConfig, DUMPDEBUG_PRINTF_FU
 	PVR_UNREFERENCED_PARAMETER(pfnDumpDebugPrintf);
 	return PVRSRV_OK;
 }
-
 
 /******************************************************************************
 * End of file (sysconfig.c)
