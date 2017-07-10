@@ -1027,7 +1027,7 @@ static ssize_t mt_usb_store_swmode(struct device *dev, struct device_attribute *
 	}
 
 	if (count >= 4 && !strncmp(buf, "host", 4)) {
-			DBG(0, "switch to host mode\n");
+		DBG(0, "switch to host mode\n");
 		if (mtk_musb->is_active) {
 			if (mtk_musb->is_host) {
 				DBG(0, "already in host mode\n");
