@@ -76,12 +76,6 @@ static const char * const top_mfg_clk_sel_name[] = {
 	"mfg_mm_in_sel",
 };
 
-static const char * const top_mfg_clk_sel_parent_name_e1[] = {
-	"slow_clk26m",
-	"bus_univpll_d24",
-	"engine_csw_mux",
-};
-
 static const char * const top_mfg_clk_sel_parent_name[] = {
 	"slow_clk26m",
 	"bus_mainpll_d11",
@@ -225,10 +219,6 @@ static void mtk_mfg_enable_clock(void)
 
 	/* Enable(un-gated) mfg clock */
 	mtk_mfg_clr_clock_gating(mfg_base->reg_base);
-
-	/* E1: enlarge the sync fifo, to avoid that CPU accesses GPU register fail problem */
-	if (mt_get_chip_sw_ver() == 0)
-		writel((readl(mfg_base->reg_base + 0x1c) | 0xf0), mfg_base->reg_base + 0x1c);
 }
 
 static void mtk_mfg_disable_clock(void)
@@ -548,12 +538,6 @@ static bool MTKCheckDeviceInit(void)
 	return ret;
 }
 
-void MTKSetICVerion(void)
-{
-	if (mt_get_chip_sw_ver() == 0) /* E1 */
-		strcat(rgx_fw_name, ".e1");
-}
-
 PVRSRV_ERROR MTKDevPrePowerState(IMG_HANDLE hSysData, PVRSRV_DEV_POWER_STATE eNewPowerState,
 				 PVRSRV_DEV_POWER_STATE eCurrentPowerState,
 				 IMG_BOOL bForced)
@@ -747,24 +731,13 @@ static int mtk_mfg_bind_device_resource(struct platform_device *pdev,
 	}
 
 	for (i = 0; i < MAX_TOP_MFG_CLK; i++) {
-		if (mt_get_chip_sw_ver() == 0) { /* E1 */
-			mfg_base->top_clk_sel_parent[i] = devm_clk_get(&pdev->dev,
-						top_mfg_clk_sel_parent_name_e1[i]);
-			if (IS_ERR(mfg_base->top_clk_sel_parent[i])) {
-				err = PTR_ERR(mfg_base->top_clk_sel_parent[i]);
-				dev_err(&pdev->dev, "devm_clk_get %s failed !!!\n",
-					top_mfg_clk_sel_parent_name_e1[i]);
-				goto err_iounmap_reg_base;
-			}
-		} else {
-			mfg_base->top_clk_sel_parent[i] = devm_clk_get(&pdev->dev,
-						top_mfg_clk_sel_parent_name[i]);
-			if (IS_ERR(mfg_base->top_clk_sel_parent[i])) {
-				err = PTR_ERR(mfg_base->top_clk_sel_parent[i]);
-				dev_err(&pdev->dev, "devm_clk_get %s failed !!!\n",
+		mfg_base->top_clk_sel_parent[i] = devm_clk_get(&pdev->dev,
 					top_mfg_clk_sel_parent_name[i]);
-				goto err_iounmap_reg_base;
-			}
+		if (IS_ERR(mfg_base->top_clk_sel_parent[i])) {
+			err = PTR_ERR(mfg_base->top_clk_sel_parent[i]);
+			dev_err(&pdev->dev, "devm_clk_get %s failed !!!\n",
+				top_mfg_clk_sel_parent_name[i]);
+			goto err_iounmap_reg_base;
 		}
 	}
 
