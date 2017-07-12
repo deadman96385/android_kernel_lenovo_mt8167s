@@ -99,7 +99,7 @@ bool fgCaHDMIClose(void)
 void vCaHDMIWriteReg(unsigned int u4addr, unsigned int u4data)
 {
 	TZ_RESULT tz_ret = 0;
-	MTEEC_PARAM param[2];
+	union MTEEC_PARAM param[2];
 
 	if (get_boot_mode() != FACTORY_BOOT) {
 		if (ca_hdmi_handle == 0) {
@@ -131,7 +131,7 @@ void vCaHDMIWriteReg(unsigned int u4addr, unsigned int u4data)
 void vCaDPI1WriteReg(unsigned int u4addr, unsigned int u4data)
 {
 	TZ_RESULT tz_ret = 0;
-	MTEEC_PARAM param[2];
+	union MTEEC_PARAM param[2];
 
 	pr_err("[HDMI_DPI1]W:%X=%X\n", u4addr, u4data);
 
@@ -158,7 +158,7 @@ void vCaDPI1WriteReg(unsigned int u4addr, unsigned int u4data)
 bool fgCaHDMIInstallHdcpKey(unsigned char *pdata, unsigned int u4Len)
 {
 	TZ_RESULT tz_ret = 0;
-	MTEEC_PARAM param[2];
+	union MTEEC_PARAM param[2];
 	unsigned char *ptr;
 	unsigned int i;
 
@@ -196,7 +196,7 @@ bool fgCaHDMIInstallHdcpKey(unsigned char *pdata, unsigned int u4Len)
 bool fgCaHDMIGetAKsv(unsigned char *pdata)
 {
 	TZ_RESULT tz_ret = 0;
-	MTEEC_PARAM param[1];
+	union MTEEC_PARAM param[1];
 	unsigned char *ptr;
 	unsigned char i;
 
@@ -226,7 +226,7 @@ bool fgCaHDMIGetAKsv(unsigned char *pdata)
 bool fgCaHDMILoadHDCPKey(void)
 {
 	TZ_RESULT tz_ret = 0;
-	MTEEC_PARAM param[1];
+	union MTEEC_PARAM param[1];
 
 	if (ca_hdmi_handle == 0) {
 		pr_err("[HDMI] TEE ca_hdmi_handle=0\n");
@@ -249,7 +249,7 @@ bool fgCaHDMILoadHDCPKey(void)
 bool fgCaHDMIHDCPReset(bool fgen)
 {
 	TZ_RESULT tz_ret = 0;
-	MTEEC_PARAM param[1];
+	union MTEEC_PARAM param[1];
 
 	if (ca_hdmi_handle == 0) {
 		pr_err("[HDMI] TEE ca_hdmi_handle=0\n");
@@ -275,7 +275,7 @@ bool fgCaHDMIHDCPReset(bool fgen)
 bool fgCaHDMIHDCPEncEn(bool fgen)
 {
 	TZ_RESULT tz_ret = 0;
-	MTEEC_PARAM param[1];
+	union MTEEC_PARAM param[1];
 
 	if (ca_hdmi_handle == 0) {
 		pr_err("[HDMI] TEE ca_hdmi_handle=0\n");
@@ -301,7 +301,7 @@ bool fgCaHDMIHDCPEncEn(bool fgen)
 bool fgCaHDMIVideoUnMute(bool fgen)
 {
 	TZ_RESULT tz_ret = 0;
-	MTEEC_PARAM param[1];
+	union MTEEC_PARAM param[1];
 
 	if (ca_hdmi_handle == 0) {
 		pr_err("[HDMI] TEE ca_hdmi_handle=0\n");
@@ -327,7 +327,7 @@ bool fgCaHDMIVideoUnMute(bool fgen)
 bool fgCaHDMIAudioUnMute(bool fgen)
 {
 	TZ_RESULT tz_ret = 0;
-	MTEEC_PARAM param[1];
+	union MTEEC_PARAM param[1];
 
 	if (ca_hdmi_handle == 0) {
 		pr_err("[HDMI] TEE ca_hdmi_handle=0\n");
@@ -353,7 +353,7 @@ bool fgCaHDMIAudioUnMute(bool fgen)
 void vCaHDCPFailState(unsigned int u4addr, unsigned int u4data)
 {
 	TZ_RESULT tz_ret = 0;
-	MTEEC_PARAM param[2];
+	union MTEEC_PARAM param[2];
 
 	if (ca_hdmi_handle == 0) {
 		pr_err("[HDMI_HDCP] vCaHDCPFailState=0\n");
@@ -378,7 +378,7 @@ void vCaHDCPFailState(unsigned int u4addr, unsigned int u4data)
 void vCaHDCPOffState(unsigned int u4addr, unsigned int u4data)
 {
 	TZ_RESULT tz_ret = 0;
-	MTEEC_PARAM param[2];
+	union MTEEC_PARAM param[2];
 
 	if (ca_hdmi_handle == 0) {
 		pr_err("[HDMI_HDCP] vCaHDCPOffState=0\n");
