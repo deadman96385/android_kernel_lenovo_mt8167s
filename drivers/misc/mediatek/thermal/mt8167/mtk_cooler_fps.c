@@ -134,10 +134,10 @@ static unsigned int fps_target_adjust;
 #endif
 
 #ifndef __GED_TYPE_H__
-typedef enum GED_INFO_TA {
+enum GED_INFO_TAG {
 GED_EVENT_GAS_MODE,
 GED_UNDEFINED
-} GED_INFO;
+};
 #endif
 
 #define STEADY_TARGET_TPCB      46000
@@ -149,7 +149,7 @@ mtk_thermal_get_tpcb_target(void)
 EXPORT_SYMBOL(mtk_thermal_get_tpcb_target);
 
 unsigned long  __attribute__ ((weak))
-ged_query_info(GED_INFO eType)
+ged_query_info(enum GED_INFO_TAG eType)
 {
 	pr_err("E_WF: %s doesn't exist\n", __func__);
 	return 0;

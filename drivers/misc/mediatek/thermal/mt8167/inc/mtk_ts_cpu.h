@@ -46,7 +46,6 @@ void mtktspmic_unregister_thermal(void);
 extern int mtktscpu_limited_dmips;
 #if defined(CONFIG_MTK_SMART_BATTERY)
 /* global variable from battery driver... */
-extern kal_bool gFG_Is_Charging;
 #endif
 extern unsigned int mt_gpufreq_get_cur_freq(void);
 
