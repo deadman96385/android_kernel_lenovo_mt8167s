@@ -195,6 +195,7 @@ static void mtk_mfg_disable_hw_apm(void) {};
 static void mtk_mfg_enable_clock(void)
 {
 	int i;
+	static int mfg_async_init;
 	struct mtk_mfg_base *mfg_base = GET_MTK_MFG_BASE(sPVRLDMDev);
 
 	/*
@@ -207,7 +208,11 @@ static void mtk_mfg_enable_clock(void)
 	ged_dvfs_gpu_clock_switch_notify(1);
 
 	/* Resume mfg power domain */
-	pm_runtime_get_sync(&mfg_base->mfg_async_pdev->dev);
+
+	if (mfg_async_init == 0) {
+		pm_runtime_get_sync(&mfg_base->mfg_async_pdev->dev);
+		mfg_async_init = 1;
+	}
 	pm_runtime_get_sync(&mfg_base->mfg_2d_pdev->dev);
 #if !defined(MTK_USE_HW_APM)
 	pm_runtime_get_sync(&mfg_base->pdev->dev);
@@ -238,7 +243,6 @@ static void mtk_mfg_disable_clock(void)
 	pm_runtime_put_sync(&mfg_base->pdev->dev);
 #endif
 	pm_runtime_put_sync(&mfg_base->mfg_2d_pdev->dev);
-	pm_runtime_put_sync(&mfg_base->mfg_async_pdev->dev);
 
 	ged_dvfs_gpu_clock_switch_notify(0);
 
