@@ -631,13 +631,30 @@ static int mtk_cpufreq_init(struct cpufreq_policy *policy)
 	} else if (lv == 0 || lv == 2) {
 		/* efuse = 0, default 1.3G */
 		/* efuse = 2, 1.3G */
+	} else if (lv == 7) {
+		/* efuse = 7, 1.4G */
+		cpufreq_for_each_valid_entry(pos, freq_table) {
+			freq_long = pos->frequency * 1000;
+			dev_pm_opp_remove(info->cpu_dev, freq_long);
+		}
+		/* now dev_pm_opp_get_opp_count(info->cpu_dev) is 0 */
+
+		/* add opp table by efuse */
+		dev_pm_opp_add(info->cpu_dev, 598000000, 1150000);
+		dev_pm_opp_add(info->cpu_dev, 747500000, 1150000);
+		dev_pm_opp_add(info->cpu_dev, 1040000000, 1200000);
+		dev_pm_opp_add(info->cpu_dev, 1196000000, 1250000);
+		dev_pm_opp_add(info->cpu_dev, 1300000000, 1300000);
+		dev_pm_opp_add(info->cpu_dev, 1400000000, 1300000);
+
+		dev_pm_opp_free_cpufreq_table(info->cpu_dev, &freq_table);
+		dev_pm_opp_init_cpufreq_table(info->cpu_dev, &freq_table);
 	} else {
 		/* will not appear in mt8167 now */
 		/* efuse = 3, 1.2G */
 		/* efuse = 4, 1.1G */
 		/* efuse = 5, 1.0G */
 		/* efuse = 6, Not Define */
-		/* efuse = 7, 1.4G */
 		pr_err("%s: invalid efuse value: %d\n", __func__, lv);
 		ret = -EINVAL;
 		goto out_free_cpufreq_table;
