@@ -78,7 +78,10 @@ extern int (*ged_dvfs_vsync_trigger_fp)(int idx);
 extern unsigned int mt_gpufreq_get_volt_by_idx(unsigned int idx);
 #endif
 
-extern char rgx_fw_name[20];
+#if defined(MODULE)
+int mtk_mfg_async_init(void);
+int mtk_mfg_2d_init(void);
+#endif
 
 #endif
 

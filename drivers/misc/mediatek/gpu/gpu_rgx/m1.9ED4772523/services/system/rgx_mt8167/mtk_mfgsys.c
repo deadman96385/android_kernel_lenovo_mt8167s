@@ -103,9 +103,6 @@ static const char * const top_mfg_clk_name[] = {
 #define REG_MFG_CG_SET 0x04
 #define REG_MFG_CG_CLR 0x08
 
-
-char rgx_fw_name[20] = "rgx.fw.signed";
-
 #ifdef CONFIG_MTK_HIBERNATION
 int gpu_pm_restore_noirq(struct device *device)
 {
@@ -867,7 +864,11 @@ static struct platform_driver mtk_mfg_async_driver = {
 	}
 };
 
+#if defined(MODULE)
+int mtk_mfg_async_init(void)
+#else
 static int __init mtk_mfg_async_init(void)
+#endif
 {
 	int ret;
 
@@ -884,8 +885,6 @@ static int __init mtk_mfg_async_init(void)
 
 	return ret;
 }
-subsys_initcall(mtk_mfg_async_init);
-
 
 static int mtk_mfg_2d_probe(struct platform_device *pdev)
 {
@@ -923,7 +922,11 @@ static struct platform_driver mtk_mfg_2d_driver = {
 	}
 };
 
+#if defined(MODULE)
+int mtk_mfg_2d_init(void)
+#else
 static int __init mtk_mfg_2d_init(void)
+#endif
 {
 	int ret;
 
@@ -940,5 +943,8 @@ static int __init mtk_mfg_2d_init(void)
 
 	return ret;
 }
-subsys_initcall(mtk_mfg_2d_init);
 
+#ifndef MODULE
+subsys_initcall(mtk_mfg_async_init);
+subsys_initcall(mtk_mfg_2d_init);
+#endif
