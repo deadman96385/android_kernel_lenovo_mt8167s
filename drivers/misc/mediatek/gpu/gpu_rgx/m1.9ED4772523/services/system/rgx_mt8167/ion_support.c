@@ -18,16 +18,15 @@
 #include "ion_sys.h"
 #include "ion_drv.h"
 
-
 #include <linux/version.h>
 #include PVR_ANDROID_ION_HEADER
-#include PVR_ANDROID_ION_PRIV_HEADER
+/* #include PVR_ANDROID_ION_PRIV_HEADER */
 #include <linux/err.h>
 #include <linux/slab.h>
 
 struct ion_client *MTKGetIonClient(void);
 
-/*#define MTK_USE_IMG_ION_IMPLEMENTATION*/
+/* #define MTK_USE_IMG_ION_IMPLEMENTATION */
 
 #ifdef MTK_USE_IMG_ION_IMPLEMENTATION
 
@@ -106,7 +105,7 @@ struct ion_device *IonDevAcquire(void)
 void IonDevRelease(struct ion_device *psIonDev)
 {
 	/* Nothing to do, sanity check the pointer we're passed back */
-	/*PVR_ASSERT(psIonDev == g_ion_device);*/
+	/* PVR_ASSERT(psIonDev == g_ion_device); */
 }
 
 void IonDeinit(void)
@@ -161,5 +160,5 @@ struct ion_client *MTKGetIonClient(void)
 	return g_ion_client;
 }
 
-#endif
+#endif /* MTK_USE_IMG_ION_IMPLEMENTATION */
 
