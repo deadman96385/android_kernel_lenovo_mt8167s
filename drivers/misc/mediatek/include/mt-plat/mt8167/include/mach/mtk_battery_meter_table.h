@@ -62,11 +62,11 @@ struct r_profile_struct {
 };
 
 
-typedef enum {
+enum PROFILE_TEMPERATURE {
 	T1_0C,
 	T2_25C,
 	T3_50C
-} PROFILE_TEMPERATURE;
+};
 
 /* ============================================================*/
 /* External Variables*/
