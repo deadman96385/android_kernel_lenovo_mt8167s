@@ -23,7 +23,7 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/ \
              -I$(srctree)/drivers/misc/mediatek/hdmi/inc/ \
              -I$(srctree)/drivers/misc/mediatek/hdmi/hdmitx/$(CONFIG_MTK_PLATFORM)/inc/ \
              -I$(srctree)/drivers/misc/mediatek//ext_disp/ \
-             -I$(srctree)/drivers/misc/mediatek/ext_disp/v1/ \
+             -I$(srctree)/drivers/misc/mediatek/ext_disp/$(MTK_PLATFORM)/ \
              -I$(srctree)/drivers/misc/mediatek/include/mt-plat/ \
              -I$(srctree)/drivers/misc/mediatek/include/mt-plat/trustzone/ \
 
