@@ -60,22 +60,6 @@
 		status = "disabled";
 	};
 
-	gpio-keys {
-		compatible = "gpio-keys";
-		pinctrl-names = "default";
-		pinctrl-0 = <&blth_key>;
-
-		button@0 {
-			debounce_interval = <50>;
-			wakeup-source;
-			gpio-key,wakeup = <1>;
-			gpios = <&pio 60 1>;
-			label = "Bluetooth";
-			linux,input-type = <0x1>;
-			linux,code = <237>;
-		};
-	};
-
 	msdc1: sdio@11130000 {
 		compatible = "mediatek,mt8167-sdio";
 		reg = <0 0x11130000 0 0x1000>;
@@ -290,17 +274,26 @@
 };
 
 &keypad {
+	pinctrl-names = "default";
+	pinctrl-0 = <&kpd_pins_default>;
+	status = "okay";
 	mediatek,kpd-key-debounce = <1024>;
-	mediatek,kpd-sw-pwrkey = <116>;
-	mediatek,kpd-hw-pwrkey = <8>;
-	mediatek,kpd-sw-rstkey  = <114>;
-	mediatek,kpd-hw-rstkey = <17>;
+	mediatek,kpd-sw-pwrkey = <0>;
+	mediatek,kpd-hw-pwrkey = <0>;
+	mediatek,kpd-sw-rstkey  = <0>;
+	mediatek,kpd-hw-rstkey = <0>;
 	mediatek,kpd-use-extend-type = <0>;
 	/*HW Keycode [0~71] -> Linux Keycode*/
 	mediatek,kpd-hw-map-num = <72>;
-	mediatek,kpd-hw-init-map = <115 113 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-			0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-			0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 >;
+	/*8 rows * 9 columns  */
+	mediatek,kpd-hw-init-map = <115 248 0 0 0 0 0 0 0
+				213 164 0 0 0 0 0 0 0
+				0 0 0 0 0 0 0 0 0
+				0 0 0 0 0 0 0 0 0
+				0 0 0 0 0 0 0 0 0
+				0 0 0 0 0 0 0 0 0
+				0 0 0 0 0 0 0 0 0
+				0 0 0 0 0 0 0 0 0>;
 	mediatek,kpd-pwrkey-eint-gpio = <0>;
 	mediatek,kpd-pwkey-gpio-din  = <0>;
 	mediatek,kpd-hw-dl-key0 = <0>;
@@ -376,15 +369,6 @@ pwm_goio_def_cfg: pwmdefault {
 		};
 	};
 
-	blth_key: eint60default {
-		pins_cmd_dat {
-			pins = <MT8167_PIN_60_SDA2__FUNC_GPIO60>;
-			slew-rate = <0>;
-			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
-			input-enable;
-		};
-	};
-
 	/* CONSYS GPIO Settings - Start */
 	consys_pins_default: default {
 
@@ -445,6 +429,22 @@ pwm_goio_def_cfg: pwmdefault {
 	irrx_pins_ir_input: irrx_pin_ir {
 		pins_cmd_dat {
 			pinmux = <MT8167_PIN_36_MRG_CLK__FUNC_IR>;
+			bias-disable;
+		};
+	};
+
+	kpd_pins_default: kpddefault {
+		pins_cols {
+			pinmux = <MT8167_PIN_42_KPCOL0__FUNC_KPCOL0>,
+				 <MT8167_PIN_43_KPCOL1__FUNC_KPCOL1>;
+			input-enable;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
+		};
+
+		pins_rows {
+			pinmux = <MT8167_PIN_40_KPROW0__FUNC_KPROW0>,
+				 <MT8167_PIN_41_KPROW1__FUNC_KPROW1>;
+			output-low;
 			bias-disable;
 		};
 	};
