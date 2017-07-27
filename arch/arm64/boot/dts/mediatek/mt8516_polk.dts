@@ -672,7 +672,7 @@ pwm_goio_def_cfg: pwmdefault {
 
 	usb0_iddig: iddig_irq_init {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_41_KPROW1__FUNC_IDDIG>;
+			pins = <MT8167_PIN_19_EINT19__FUNC_GPIO19>;
 			slew-rate = <0>;
 			bias-pull-up = <00>;
 		};
@@ -720,6 +720,11 @@ pwm_goio_def_cfg: pwmdefault {
 	pinctrl-3 = <&usb0_drvvbus_high>;
 	status = "okay";
 	drvvbus_gpio = <&pio 49 2>;
+	iddig_gpio = <&pio 19 0>;
+};
+
+&usb1 {
+	status = "disabled";
 };
 
 &pwm {
