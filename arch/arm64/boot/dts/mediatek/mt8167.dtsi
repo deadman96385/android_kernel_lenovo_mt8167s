@@ -158,19 +158,19 @@
 			reg = <0 0x43000000 0 0x30000>;
 		};
 
-		ram_console-reserved-memory@44400000{
+		ram_console-reserved-memory {
 			compatible = "mediatek,ram_console";
-			reg = <0 0x44400000 0 0x10000>;
+			reg = <0 0x54400000 0 0x10000>;
 		};
 
-		pstore-reserved-memory@44410000 {
+		pstore-reserved-memory {
 			compatible = "mediatek,pstore";
-			reg = <0 0x44410000 0 0xe0000>;
+			reg = <0 0x54410000 0 0xe0000>;
 		};
 
-		minirdump-reserved-memory@444f0000{
+		minirdump-reserved-memory {
 			compatible = "mediatek,minirdump";
-			reg = <0 0x444f0000 0 0x10000>;
+			reg = <0 0x544f0000 0 0x10000>;
 		};
 
 	};
