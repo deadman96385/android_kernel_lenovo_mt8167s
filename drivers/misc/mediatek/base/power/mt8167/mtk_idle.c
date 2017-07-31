@@ -145,7 +145,7 @@ static u32 dpidle_condition_mask[NR_GRPS] = {
 	0x00000037, /* CG_CTRL0: */
 	0x808FB2FC, /* CG_CTRL1: */
 	0x017F7F16, /* CG_CTRL2: */
-	0x000430FD, /* CG_CTRL8: */
+	0x0004303D, /* CG_CTRL8: */
 	0x000F0203, /* CG_MMSYS0: */
 	0x003FC03C, /* CG_MMSYS1: */
 	0x000003E1, /* CG_IMGSYS: */
@@ -160,7 +160,7 @@ static u32 soidle_condition_mask[NR_GRPS] = {
 	0x00000026, /* CG_CTRL0: */
 	0x808FB2F8, /* CG_CTRL1: */
 	0x017F7F06, /* CG_CTRL2: */
-	0x000430ED, /* CG_CTRL8: */
+	0x0004302D, /* CG_CTRL8: */
 	0x00000200, /* CG_MMSYS0: */
 	0x003F0000, /* CG_MMSYS1: */
 	0x000003E1, /* CG_IMGSYS: */
@@ -472,8 +472,7 @@ static void get_all_clock_state(u32 clks[NR_GRPS])
 	if (sys_is_on(SYS_ISP))
 		clks[CG_IMGSYS] = 0xffffffff;
 
-	if (sys_is_on(SYS_MFG_ASYNC) && sys_is_on(SYS_MFG_2D) &&
-			sys_is_on(SYS_MFG_3D))
+	if (sys_is_on(SYS_MFG_2D) || sys_is_on(SYS_MFG_3D))
 		clks[CG_MFGSYS] = 0xffffffff;
 
 	if (sys_is_on(SYS_VDE)) {
@@ -484,8 +483,8 @@ static void get_all_clock_state(u32 clks[NR_GRPS])
 	if (sys_is_on(SYS_ISP) && is_valid_reg(imgsys_base))
 		clks[CG_IMGSYS] = ~idle_readl(IMG_CG_CON);
 
-	if (sys_is_on(SYS_MFG_ASYNC) && sys_is_on(SYS_MFG_2D) &&
-			sys_is_on(SYS_MFG_3D) && is_valid_reg(mfgsys_base))
+	if ((sys_is_on(SYS_MFG_2D) || sys_is_on(SYS_MFG_3D)) &&
+			is_valid_reg(mfgsys_base))
 		clks[CG_MFGSYS] = ~idle_readl(MFG_CG_CON);
 
 	if (sys_is_on(SYS_VDE) && is_valid_reg(vdecsys_base)) {
