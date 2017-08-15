@@ -17,6 +17,7 @@
 #include <sound/soc.h>
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
+#include <sound/pcm_params.h>
 
 
 #define ENUM_TO_STR(enum) #enum
@@ -34,6 +35,18 @@ struct polk_at1_priv {
 static const char * const polk_at1_pinctrl_pin_str[PIN_STATE_MAX] = {
 	"default",
 };
+
+static int polk_at1_i2s_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
+		struct snd_pcm_hw_params *params)
+{
+	struct snd_mask *mask;
+
+	mask = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
+
+	snd_mask_none(mask);
+	snd_mask_set(mask, SNDRV_PCM_FORMAT_S32_LE);
+	return 0;
+}
 
 /* Digital audio interface glue - connects codec <---> CPU */
 static struct snd_soc_dai_link polk_at1_dais[] = {
@@ -125,6 +138,7 @@ static struct snd_soc_dai_link polk_at1_dais[] = {
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
 			   SND_SOC_DAIFMT_CBS_CFS,
+		.be_hw_params_fixup = polk_at1_i2s_hw_params_fixup,
 		.dpcm_playback = 1,
 	},
 	{
