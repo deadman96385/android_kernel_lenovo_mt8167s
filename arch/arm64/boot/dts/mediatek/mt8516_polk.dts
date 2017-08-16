@@ -64,8 +64,10 @@
 		compatible = "mediatek,mt8167-sdio";
 		reg = <0 0x11130000 0 0x1000>;
 		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_LOW>;
-		clocks = <&topckgen CLK_TOP_MSDC1>;
-		clock-names = "sdio-clock";
+		clocks = <&topckgen CLK_TOP_MSDC1>,
+			 <&topckgen CLK_TOP_AHB_INFRA_SEL>,
+			 <&topckgen CLK_TOP_MSDC1_INFRA>;
+		clock-names = "sdio-bus", "sdio-src", "sdio-src-cg";
 		status = "disabled";
 	};
 

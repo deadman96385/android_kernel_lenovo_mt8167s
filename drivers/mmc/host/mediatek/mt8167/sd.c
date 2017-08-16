@@ -615,7 +615,9 @@ void msdc_set_smpl_all(struct msdc_host *host, u32 clock_mode)
 /*host doesn't need the clock on*/
 void msdc_gate_clock(struct msdc_host *host)
 {
-	clk_disable(host->clock_control);
+	clk_disable(host->bus_clk_ctrl);
+	clk_disable(host->src_clk_ctrl);
+	clk_disable(host->src_cg_ctrl);
 }
 
 /* host does need the clock on */
@@ -623,9 +625,37 @@ void msdc_ungate_clock(struct msdc_host *host)
 {
 	void __iomem *base = host->base;
 
-	clk_enable(host->clock_control);
+	clk_enable(host->src_cg_ctrl);
+	clk_enable(host->src_clk_ctrl);
+	clk_enable(host->bus_clk_ctrl);
 	while (!(MSDC_READ32(MSDC_CFG) & MSDC_CFG_CKSTB))
 		cpu_relax();
+}
+
+void msdc_prepare_clk(struct msdc_host *host)
+{
+	if (!host->clk_on) {
+		if (host->bus_clk_ctrl)
+			clk_prepare_enable(host->bus_clk_ctrl);
+		if (host->src_clk_ctrl)
+			clk_prepare_enable(host->src_clk_ctrl);
+		if (host->src_cg_ctrl)
+			clk_prepare_enable(host->src_cg_ctrl);
+		host->clk_on = true;
+	}
+}
+
+void msdc_unprepare_clk(struct msdc_host *host)
+{
+	if (host->clk_on) {
+		if (host->bus_clk_ctrl)
+			clk_disable_unprepare(host->bus_clk_ctrl);
+		if (host->src_clk_ctrl)
+			clk_disable_unprepare(host->src_clk_ctrl);
+		if (host->src_cg_ctrl)
+			clk_disable_unprepare(host->src_cg_ctrl);
+		host->clk_on = false;
+	}
 }
 
 #if 0
@@ -815,7 +845,7 @@ void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
 	}
 
 	MSDC_SET_FIELD(MSDC_CFG, MSDC_CFG_CKMOD | MSDC_CFG_CKDIV, (mode << 12) | (div & 0xfff));
-	MSDC_SET_BIT32(MSDC_CFG, MSDC_CFG_CKPDN);
+	MSDC_CLR_BIT32(MSDC_CFG, MSDC_CFG_CKPDN);
 	while (!(MSDC_READ32(MSDC_CFG) & MSDC_CFG_CKSTB))
 		cpu_relax();
 
@@ -1090,8 +1120,6 @@ static void msdc_pm(pm_message_t state, void *data)
 
 	int evt = state.event;
 
-	msdc_ungate_clock(host);
-
 	if (evt == PM_EVENT_SUSPEND || evt == PM_EVENT_USER_SUSPEND) {
 		if (host->suspend)
 			goto end;
@@ -1102,16 +1130,18 @@ static void msdc_pm(pm_message_t state, void *data)
 		pr_err("msdc%d -> %s Suspend\n", host->id,
 			evt == PM_EVENT_SUSPEND ? "PM" : "USR");
 		if (host->hw->flags & MSDC_SYS_SUSPEND) {
+			msdc_ungate_clock(host);
 			if (host->hw->host_function == MSDC_EMMC) {
 				msdc_save_timing_setting(host, 1);
 				msdc_set_power_mode(host, MMC_POWER_OFF);
 			}
 
 			msdc_set_tdsel(host, 1, 0);
-
+			msdc_gate_clock(host);
 		} else {
 			host->mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;
 			mmc_remove_host(host->mmc);
+			msdc_unprepare_clk(host);
 		}
 
 		host->power_cycle = 0;
@@ -1133,11 +1163,13 @@ static void msdc_pm(pm_message_t state, void *data)
 			evt == PM_EVENT_RESUME ? "PM" : "USR");
 
 		if (!(host->hw->flags & MSDC_SYS_SUSPEND)) {
+			msdc_prepare_clk(host);
 			host->mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;
 			mmc_add_host(host->mmc);
 			goto end;
 		}
 
+		msdc_ungate_clock(host);
 		/* Begin for host->hw->flags & MSDC_SYS_SUSPEND*/
 		msdc_set_tdsel(host, 1, 0);
 
@@ -1156,6 +1188,7 @@ static void msdc_pm(pm_message_t state, void *data)
 				mmc_set_clock(host->mmc, 260000);
 			}
 		}
+		msdc_gate_clock(host);
 	}
 
 end:
@@ -1170,7 +1203,6 @@ end:
 				host->id);
 		}
 	}
-	msdc_gate_clock(host);
 
 	if (host->hw->host_function == MSDC_SDIO) {
 		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
@@ -5753,9 +5785,7 @@ static int msdc_drv_remove(struct platform_device *pdev)
 	ERR_MSG("msdc_drv_remove");
 #ifndef FPGA_PLATFORM
 	/* clock unprepare */
-	if (host->clock_control)
-		clk_disable_unprepare(host->clock_control);
-
+	msdc_unprepare_clk(host);
 #endif
 	platform_set_drvdata(pdev, NULL);
 	mmc_remove_host(host->mmc);
@@ -5813,6 +5843,7 @@ static int msdc_drv_suspend(struct platform_device *pdev, pm_message_t state)
 		}
 	}
 
+	msdc_prepare_clk(host);
 	if (is_card_sdio(host) || (host->hw->flags & MSDC_SDIO_IRQ)) {
 		if (host->clk_gate_count > 0) {
 			host->error = 0;
@@ -5838,8 +5869,7 @@ static int msdc_drv_suspend(struct platform_device *pdev, pm_message_t state)
 			msdc_gate_clock(host);
 		}
 	}
-	if (host->clock_control)
-		clk_disable_unprepare(host->clock_control);
+	msdc_unprepare_clk(host);
 	return ret;
 }
 
@@ -5849,8 +5879,7 @@ static int msdc_drv_resume(struct platform_device *pdev)
 	struct msdc_host *host = mmc_priv(mmc);
 	struct pm_message state;
 
-	if (host->clock_control)
-		clk_prepare_enable(host->clock_control);
+	msdc_prepare_clk(host);
 	if (host->hw->flags & MSDC_SDIO_IRQ)
 		pr_err("msdc msdc_drv_resume\n");
 	state.event = PM_EVENT_RESUME;

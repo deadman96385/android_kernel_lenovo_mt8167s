@@ -461,7 +461,10 @@ struct msdc_host {
 	void    (*power_switch)(struct msdc_host *host, u32 on);
 	u32                     vmc_cal_default;
 
-	struct clk *clock_control;
+	bool   clk_on;
+	struct clk *src_clk_ctrl;
+	struct clk *src_cg_ctrl;
+	struct clk *bus_clk_ctrl;
 	struct delayed_work	work_init; /* for init mmc card */
 	struct platform_device  *pdev;
 	struct pinctrl *pinctrl;
@@ -806,6 +809,8 @@ extern int msdc_rsp[];
 /* Function provided by sd.c */
 void msdc_ungate_clock(struct msdc_host *host);
 void msdc_gate_clock(struct msdc_host *host);
+void msdc_prepare_clk(struct msdc_host *host);
+void msdc_unprepare_clk(struct msdc_host *host);
 int msdc_clk_stable(struct msdc_host *host, u32 mode, u32 div,
 	u32 hs400_src);
 void msdc_clr_fifo(unsigned int id);

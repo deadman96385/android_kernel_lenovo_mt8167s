@@ -216,6 +216,9 @@ void dbg_add_host_log(struct mmc_host *host, int type, int cmd, int arg)
 	unsigned long long nanosec_rem;
 	unsigned long flags;
 
+	if (!host)
+		return;
+
 	spin_lock_irqsave(&host->cmd_dump_lock, flags);
 	t = cpu_clock(printk_cpu_test);
 	nanosec_rem = do_div(t, 1000000000)/1000;
@@ -236,6 +239,9 @@ void mmc_cmd_dump(struct mmc_host *host)
 	int i;
 	int tag = -1;
 	unsigned long flags;
+
+	if (!host)
+		return;
 
 	pr_err("-------------------------------------------------------------------------------\n");
 	spin_lock_irqsave(&host->cmd_dump_lock, flags);
@@ -315,10 +321,12 @@ void mmc_cmd_dump(struct mmc_host *host)
 void msdc_cmdq_status_print(struct msdc_host *host)
 {
 #ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
-	struct mmc_host *mmc = host->mmc;
+	struct mmc_host *mmc;
 
-	if (!mmc)
+	if (!host || !host->mmc || !host->mmc->card)
 		return;
+
+	mmc = host->mmc;
 
 	pr_err("===============================\n");
 	pr_err("cmdq support : %s\n",
@@ -370,11 +378,18 @@ void msdc_cmdq_func(struct msdc_host *host, const int num)
 /* Clone from core/mmc.c since it is static in mmc.c */
 static void msdc_select_card_type(struct mmc_host *host)
 {
-	struct mmc_card *card = host->card;
-	u8 card_type = card->ext_csd.raw_card_type;
-	u32 caps = host->caps, caps2 = host->caps2;
+	struct mmc_card *card;
+	u8 card_type;
+	u32 caps, caps2;
 	unsigned int hs_max_dtr = 0, hs200_max_dtr = 0;
 	unsigned int avail_type = 0;
+
+	if (!host || !host->card)
+		return;
+
+	card = host->card;
+	card_type = card->ext_csd.raw_card_type;
+	caps = host->caps, caps2 = host->caps2;
 
 	if (caps & MMC_CAP_MMC_HIGHSPEED &&
 	    card_type & EXT_CSD_CARD_TYPE_HS_26) {
@@ -431,6 +446,9 @@ static void msdc_select_card_type(struct mmc_host *host)
 
 void msdc_get_host_mode_speed(struct mmc_host *mmc)
 {
+	if (!mmc)
+		return;
+
 	pr_err("[SD_Debug]msdc[%d] supports:\n", mmc->index);
 
 	if (mmc->caps & MMC_CAP_MMC_HIGHSPEED)
@@ -458,7 +476,12 @@ void msdc_get_host_mode_speed(struct mmc_host *mmc)
 
 void msdc_set_host_mode_speed(struct mmc_host *mmc, int spd_mode, int cmdq)
 {
-	struct msdc_host *host = mmc_priv(mmc);
+	struct msdc_host *host;
+
+	if (!mmc)
+		return;
+
+	host = mmc_priv(mmc);
 
 	/* Clear HS400, HS200 timing */
 	mmc->caps2 &=
@@ -1308,6 +1331,9 @@ void msdc_hw_parameter_debug(struct msdc_hw *hw, struct seq_file *m, void *v)
 {
 	int i;
 
+	if (!hw)
+		return;
+
 	seq_printf(m, "hw->clk_src = %x\n", hw->clk_src);
 	seq_printf(m, "hw->cmd_edge = %x\n", hw->cmd_edge);
 	seq_printf(m, "hw->rdata_edge = %x\n", hw->rdata_edge);
@@ -1331,6 +1357,10 @@ void msdc_hw_parameter_debug(struct msdc_hw *hw, struct seq_file *m, void *v)
 /* ========== driver proc interface =========== */
 static int msdc_debug_proc_show(struct seq_file *m, void *v)
 {
+	if (mtk_msdc_host[0])
+		return -1;
+	if  (mtk_msdc_host[1])
+		return -1;
 
 	seq_puts(m, "\n=========================================\n");
 
@@ -1485,7 +1515,8 @@ static int msdc_check_emmc_cache_status(struct msdc_host *host)
 {
 	struct mmc_card *card;
 
-	WARN_ON(!host || !host->mmc || !host->mmc->card);
+	if (!host || !host->mmc || !host->mmc->card)
+		return -1;
 
 	card = host->mmc->card;
 	if (!mmc_card_mmc(card)) {
@@ -1511,6 +1542,9 @@ static int msdc_enable_emmc_cache(struct msdc_host *host, int enable)
 	int err;
 	u8 c_ctrl;
 	struct mmc_card *card;
+
+	if (!host || !host->mmc || !host->mmc->card)
+		return -1;
 
 	err = msdc_check_emmc_cache_status(host);
 
@@ -1588,7 +1622,12 @@ static void msdc_error_tune_debug_print(int p1, int p2, int p3, int p4, int p5)
 void msdc_error_tune_debug1(struct msdc_host *host, struct mmc_command *cmd,
 	struct mmc_command *sbc, u32 *intsts)
 {
-	u32 opcode = cmd->opcode;
+	u32 opcode;
+
+	if (!host || !cmd)
+		return;
+
+	opcode = cmd->opcode;
 
 	if (!g_err_tune_dbg_error ||
 	    (g_err_tune_dbg_count <= 0) ||
@@ -1637,7 +1676,12 @@ void msdc_error_tune_debug1(struct msdc_host *host, struct mmc_command *cmd,
 void msdc_error_tune_debug2(struct msdc_host *host, struct mmc_command *stop,
 	u32 *intsts)
 {
-	void __iomem *base = host->base;
+	void __iomem *base;
+
+	if (!host)
+		return;
+
+	base = host->base;
 
 	if (!g_err_tune_dbg_error ||
 	    (g_err_tune_dbg_count <= 0) ||
@@ -1675,6 +1719,9 @@ void msdc_error_tune_debug2(struct msdc_host *host, struct mmc_command *stop,
 void msdc_error_tune_debug3(struct msdc_host *host, struct mmc_command *cmd,
 	u32 *intsts)
 {
+	if (!host || !cmd)
+		return;
+
 	if (!g_err_tune_dbg_error ||
 	    (g_err_tune_dbg_count <= 0) ||
 	    (g_err_tune_dbg_host != host->id))
