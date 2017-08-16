@@ -310,6 +310,14 @@
 	regulator-always-on;
 };
 
+&mt6392_vmch_reg {
+	regulator-always-on;
+};
+
+&mt6392_vmc_reg {
+	regulator-always-on;
+};
+
 &pio {
 	pinctrl-names = "default";
 	pinctrl-0 = <&state_default>;
