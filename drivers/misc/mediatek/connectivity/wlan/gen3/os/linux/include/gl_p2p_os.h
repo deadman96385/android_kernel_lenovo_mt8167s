@@ -84,6 +84,22 @@ extern const struct net_device_ops p2p_netdev_ops;
 *                  F U N C T I O N   D E C L A R A T I O N S
 ********************************************************************************
 */
+typedef struct _AP_PARAMS {
+	struct cfg80211_chan_def chandef;
+	struct ieee80211_channel chan;
+	BOOLEAN APCHSwitching;
+	BOOLEAN privacy;
+	UINT_32 BcnInterval;
+	UINT_32 DtimPeriod;
+	UINT_8 HiddenSsidType;
+	UINT_8 Ssid[32];
+	UINT_16 SsidLen;
+	struct completion rStopAPComp;
+	struct completion rStartAPComp;
+	size_t head_len, tail_len;
+	u8 head[128];
+	u8 tail[128];
+} AP_PARAMS, *P_AP_PARAMS;
 
 struct _GL_P2P_INFO_T {
 
@@ -173,6 +189,7 @@ struct _GL_P2P_INFO_T {
 	BOOLEAN fgEnableHotspotOptimization;
 	UINT_32 u4PsLevel;
 #endif
+	AP_PARAMS apsetting;
 };
 
 #if CONFIG_NL80211_TESTMODE

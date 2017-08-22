@@ -596,6 +596,8 @@
 
 #define CFG_AUTO_CHANNEL_SEL_SUPPORT            1
 
+#define CFG_AP_OFFCHANNEL_OP_SUPPORT            1
+
 /*------------------------------------------------------------------------------
  * Configuration Flags (Linux Only)
  *------------------------------------------------------------------------------

@@ -305,6 +305,10 @@ extern UINT_32 mtk_cipher_suites[5];
 
 #if CFG_ENABLE_WIFI_DIRECT_CFG_80211
 
+INT_32 mtk_Netdev_To_RoleIdx(P_GL_P2P_INFO_T prGlP2pInfo,
+			struct net_device *ndev,
+			PUINT_8 pucRoleIdx);
+
 struct wireless_dev *
 mtk_p2p_cfg80211_add_iface(struct wiphy *wiphy,
 			    const char *name,

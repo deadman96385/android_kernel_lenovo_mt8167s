@@ -709,6 +709,7 @@ int mtk_p2p_cfg80211_start_ap(struct wiphy *wiphy, struct net_device *dev, struc
 
 		if (mtk_Netdev_To_RoleIdx(prGlueInfo->prP2PInfo, dev, &ucRoleIdx) < 0)
 			break;
+		kalStoreAPSetting(prGlueInfo, settings);
 
 		if (chandef)
 			mtk_p2p_cfg80211_set_channel(wiphy, chandef);
@@ -936,6 +937,8 @@ int mtk_p2p_cfg80211_change_beacon(struct wiphy *wiphy, struct net_device *dev, 
 
 			mboxSendMsg(prGlueInfo->prAdapter,
 				    MBOX_ID_0, (P_MSG_HDR_T) prP2pBcnUpdateMsg, MSG_SEND_METHOD_BUF);
+
+			i4Rslt = 0;
 
 		}
 

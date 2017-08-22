@@ -212,4 +212,6 @@ BOOLEAN kalP2PMaxClients(IN P_GLUE_INFO_T prGlueInfo, IN UINT_32 u4NumClient);
 
 #endif
 
+VOID kalStoreAPSetting(IN P_GLUE_INFO_T prGlueInfo, struct cfg80211_ap_settings *settings);
+
 #endif /* _GL_P2P_KAL_H */

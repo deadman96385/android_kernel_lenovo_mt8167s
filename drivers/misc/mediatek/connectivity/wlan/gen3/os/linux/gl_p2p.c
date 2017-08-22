@@ -292,12 +292,13 @@ static const struct iw_priv_args rP2PIwPrivTable[] = {
 	 .name = "get_oid"}
 };
 
-#if 0
+#if 1
+/*when we set num_standard = 0, all iwconfig command will go to .ndo_do_ioctl*/
 const struct iw_handler_def mtk_p2p_wext_handler_def = {
-	.num_standard = (__u16) sizeof(rP2PIwStandardHandler) / sizeof(iw_handler),
+	.num_standard = 0,
 /* .num_private        = (__u16)sizeof(rP2PIwPrivHandler)/sizeof(iw_handler), */
 	.num_private_args = (__u16) sizeof(rP2PIwPrivTable) / sizeof(struct iw_priv_args),
-	.standard = rP2PIwStandardHandler,
+	.standard = NULL,
 /* .private            = rP2PIwPrivHandler, */
 	.private_args = rP2PIwPrivTable,
 #if CFG_SUPPORT_P2P_RSSI_QUERY
@@ -759,7 +760,9 @@ BOOLEAN glRegisterP2P(P_GLUE_INFO_T prGlueInfo, const char *prDevName, BOOLEAN f
 
 	/* 4.3 register callback functions */
 	prGlueInfo->prP2PInfo->prDevHandler->netdev_ops = &p2p_netdev_ops;
-/* prGlueInfo->prP2PInfo->prDevHandler->wireless_handlers    = &mtk_p2p_wext_handler_def; */
+	/*must wireless_handlers, so that the iwconfif netdev command will work*/
+	prGlueInfo->prP2PInfo->prDevHandler->wireless_handlers    = &mtk_p2p_wext_handler_def;
+
 
 #if (MTK_WCN_HIF_SDIO == 0)
 	SET_NETDEV_DEV(prGlueInfo->prP2PInfo->prDevHandler, prHif->Dev);
@@ -1245,6 +1248,200 @@ void mtk_p2p_wext_set_Multicastlist(P_GLUE_INFO_T prGlueInfo)
 
 /*----------------------------------------------------------------------------*/
 /*!
+* \brief To set the operating channel in the wireless device.
+*
+* \param[in] prDev Net device requested.
+* \param[in] prIwrInfo NULL
+* \param[in] prFreq Buffer to store frequency information
+* \param[in] pcExtra NULL
+*
+* \retval 0 For success.
+* \retval -EOPNOTSUPP If infrastructure mode is not NET NET_TYPE_IBSS.
+* \retval -EINVAL Invalid channel frequency.
+*
+* \note If infrastructure mode is IBSS, new channel frequency is set to device.
+*      The range of channel number depends on different regulatory domain.
+*/
+/*----------------------------------------------------------------------------*/
+static int
+p2p_wext_set_freq(IN struct net_device *prNetDev,
+	      IN struct iw_request_info *prIwReqInfo, IN struct iw_freq *prIwFreq, IN char *pcExtra)
+{
+	struct cfg80211_chan_def chandef;
+	UINT_32 u4ChnlFreq;	/* Store channel or frequency information */
+	struct wiphy *wiphy = NULL;
+	P_GLUE_INFO_T prGlueInfo = (P_GLUE_INFO_T) NULL;
+	INT_32 i4Rslt = -EINVAL;
+	P_MSG_P2P_BEACON_UPDATE_T prP2pBcnUpdateMsg = (P_MSG_P2P_BEACON_UPDATE_T) NULL;
+	P_MSG_P2P_START_AP_T prP2pStartAPMsg = (P_MSG_P2P_START_AP_T) NULL;
+	PUINT_8 pucBuffer = (PUINT_8) NULL;
+	UINT_8 ucRoleIdx = 0;
+	P_AP_PARAMS prApSetting = NULL;
+
+	ASSERT(prNetDev);
+	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
+	ASSERT(prGlueInfo);
+	prApSetting = &prGlueInfo->prP2PInfo->apsetting;
+	ASSERT(prApSetting);
+	ASSERT(prIwFreq);
+	wiphy = prNetDev->ieee80211_ptr->wiphy;
+
+	u4ChnlFreq = (UINT_32) prIwFreq->m;
+	/*set freq with real number, ex: 2.462G, 2412M
+	* if prIwFreq->e == 1, we need to divide 1000000
+	* if prIwFreq->e == 0, it is already divided
+	* if prIwFreq->m < 1000, the number indicates the channel number
+	*/
+	if ((prIwFreq->e == 1) && (prIwFreq->m >= (int)2.412e8) && (prIwFreq->m <= (int)2.484e8)) {
+		/* Change to KHz format */
+		u4ChnlFreq = (UINT_32) (prIwFreq->m / (KILO / 10) /KILO);
+	} else if (prIwFreq->m < 1000) { /*set by channel number, 1~165*/
+		if (prIwFreq->m > 14)
+			u4ChnlFreq = ieee80211_channel_to_frequency(prIwFreq->m, NL80211_BAND_5GHZ);
+		else
+			u4ChnlFreq = ieee80211_channel_to_frequency(prIwFreq->m, NL80211_BAND_2GHZ);
+	} else if (prIwFreq->e == 0 && prIwFreq->m > 1000) /*set by frequency 2412~5xxx*/
+		u4ChnlFreq = prIwFreq->m;
+	else {
+		DBGLOG(P2P, WARN, "%s(): not support param\n", __func__);
+		return -EOPNOTSUPP;
+	}
+
+	DBGLOG(P2P, TRACE, "%s(): switch to ch freq %d\n", __func__, u4ChnlFreq);
+	/*ap channel switching*/
+	prApSetting->APCHSwitching = TRUE;
+	init_completion(&prApSetting->rStopAPComp);
+	i4Rslt = mtk_p2p_cfg80211_stop_ap(prNetDev->ieee80211_ptr->wiphy , prNetDev);
+	if(i4Rslt)
+		DBGLOG(P2P, TRACE, "stop ap fail (%d)\n", i4Rslt);
+
+	if (!wait_for_completion_timeout(&prApSetting->rStopAPComp, MSEC_TO_JIFFIES(3000))) {
+		DBGLOG(P2P, ERROR, "wait ap stopped timeout, longer than 3s\n");
+	} else
+		kalMsleep(1000);
+	cfg80211_chandef_create(
+		&chandef,
+		ieee80211_get_channel(
+			wiphy,
+			u4ChnlFreq),
+		NL80211_CHAN_HT20);
+
+	do {
+		if (wiphy == NULL)
+			break;
+
+		DBGLOG(P2P, TRACE, "channel switched start_ap\n");
+		prGlueInfo = *((P_GLUE_INFO_T *) wiphy_priv(wiphy));
+
+		if (mtk_Netdev_To_RoleIdx(prGlueInfo->prP2PInfo, prNetDev, &ucRoleIdx) < 0)
+			break;
+		mtk_p2p_cfg80211_set_channel(wiphy, &chandef);
+
+		prP2pBcnUpdateMsg = (P_MSG_P2P_BEACON_UPDATE_T) cnmMemAlloc(prGlueInfo->prAdapter,
+									    RAM_TYPE_MSG,
+									    (sizeof(MSG_P2P_BEACON_UPDATE_T)
+									     +
+									     prApSetting->head_len +
+									     prApSetting->tail_len));
+
+		if (prP2pBcnUpdateMsg == NULL) {
+			ASSERT(FALSE);
+			i4Rslt = -ENOMEM;
+			break;
+		}
+		prP2pBcnUpdateMsg->ucRoleIndex = ucRoleIdx;
+		prP2pBcnUpdateMsg->rMsgHdr.eMsgId = MID_MNY_P2P_BEACON_UPDATE;
+		pucBuffer = prP2pBcnUpdateMsg->aucBuffer;
+		DBGLOG(P2P, TRACE, "head ie length %d\n", prApSetting->head_len);
+		DBGLOG(P2P, TRACE, "tail ie length %d\n", prApSetting->tail_len);
+
+		if (prApSetting->head_len != 0) {
+			kalMemCopy(pucBuffer, prApSetting->head, prApSetting->head_len);
+
+			prP2pBcnUpdateMsg->u4BcnHdrLen = prApSetting->head_len;
+
+			prP2pBcnUpdateMsg->pucBcnHdr = pucBuffer;
+
+			pucBuffer = (PUINT_8) ((ULONG) pucBuffer + (ULONG) prApSetting->head_len);
+		} else {
+			prP2pBcnUpdateMsg->u4BcnHdrLen = 0;
+
+			prP2pBcnUpdateMsg->pucBcnHdr = NULL;
+		}
+
+		if (prApSetting->tail_len != 0) {
+			UINT_32 ucLen = prApSetting->tail_len;
+
+			prP2pBcnUpdateMsg->pucBcnBody = pucBuffer;
+
+			/*Add TIM IE */
+			/* IEEE 802.11 2007 - 7.3.2.6 */
+			TIM_IE(pucBuffer)->ucId = ELEM_ID_TIM;
+			/* NOTE: fixed PVB length (AID is allocated from 8 ~ 15 only) */
+			TIM_IE(pucBuffer)->ucLength = (3 + MAX_LEN_TIM_PARTIAL_BMP) /*((u4N2 - u4N1) + 4) */;
+			/* will be overwrite by FW */
+			TIM_IE(pucBuffer)->ucDTIMCount = 0 /*prBssInfo->ucDTIMCount */;
+			TIM_IE(pucBuffer)->ucDTIMPeriod = 1;
+			/* will be overwrite by FW */
+			TIM_IE(pucBuffer)->ucBitmapControl = 0 /*ucBitmapControl | (UINT_8)u4N1 */;
+			ucLen += IE_SIZE(pucBuffer);
+			pucBuffer += IE_SIZE(pucBuffer);
+
+			kalMemCopy(pucBuffer, prApSetting->tail, prApSetting->tail_len);
+
+			prP2pBcnUpdateMsg->u4BcnBodyLen = ucLen;
+		} else {
+			prP2pBcnUpdateMsg->u4BcnBodyLen = 0;
+
+			prP2pBcnUpdateMsg->pucBcnBody = NULL;
+		}
+
+		mboxSendMsg(prGlueInfo->prAdapter, MBOX_ID_0, (P_MSG_HDR_T) prP2pBcnUpdateMsg, MSG_SEND_METHOD_BUF);
+
+		prP2pStartAPMsg = (P_MSG_P2P_START_AP_T) cnmMemAlloc(prGlueInfo->prAdapter,
+								     RAM_TYPE_MSG, sizeof(MSG_P2P_START_AP_T));
+
+		if (prP2pStartAPMsg == NULL) {
+			ASSERT(FALSE);
+			i4Rslt = -ENOMEM;
+			break;
+		}
+
+		prP2pStartAPMsg->rMsgHdr.eMsgId = MID_MNY_P2P_START_AP;
+
+		prP2pStartAPMsg->fgIsPrivacy = prApSetting->privacy;
+
+		prP2pStartAPMsg->u4BcnInterval = prApSetting->BcnInterval;
+
+		prP2pStartAPMsg->u4DtimPeriod = prApSetting->DtimPeriod;
+
+		/* Copy NO SSID. */
+		prP2pStartAPMsg->ucHiddenSsidType = prApSetting->HiddenSsidType;
+
+		prP2pStartAPMsg->ucRoleIdx = ucRoleIdx;
+
+		kalP2PSetRole(prGlueInfo, 2);
+
+		COPY_SSID(prP2pStartAPMsg->aucSsid, prP2pStartAPMsg->u2SsidLen, prApSetting->Ssid, prApSetting->SsidLen);
+		init_completion(&prApSetting->rStartAPComp);
+		mboxSendMsg(prGlueInfo->prAdapter, MBOX_ID_0, (P_MSG_HDR_T) prP2pStartAPMsg, MSG_SEND_METHOD_BUF);
+
+		i4Rslt = 0;
+		if (!wait_for_completion_timeout(&prApSetting->rStartAPComp, MSEC_TO_JIFFIES(3000)))
+			DBGLOG(P2P, ERROR, "wait ap stopped timeout, longer than 3s\n");
+	} while (FALSE);
+	prApSetting->APCHSwitching = FALSE;
+	mutex_lock(&prNetDev->ieee80211_ptr->mtx);
+	cfg80211_ch_switch_notify(prNetDev, &chandef);
+	mutex_unlock(&prNetDev->ieee80211_ptr->mtx);
+	DBGLOG(P2P, TRACE, "%s set freq finished\n", __func__);
+
+	return i4Rslt;
+
+}/* p2p_wext_set_freq */
+
+/*----------------------------------------------------------------------------*/
+/*!
  * \brief This function is TX entry point of NET DEVICE.
  *
  * \param[in] prSkb  Pointer of the sk_buff to be sent
@@ -1303,6 +1500,7 @@ int p2pDoIOCTL(struct net_device *prDev, struct ifreq *prIfReq, int i4Cmd)
 {
 	P_GLUE_INFO_T prGlueInfo = NULL;
 	int ret = 0;
+	struct iwreq *iwr = (struct iwreq *)prIfReq;
 	/* char *prExtraBuf = NULL; */
 	/* UINT_32 u4ExtraSize = 0; */
 	/* struct iwreq *prIwReq = (struct iwreq *)prIfReq; */
@@ -1324,6 +1522,9 @@ int p2pDoIOCTL(struct net_device *prDev, struct ifreq *prIfReq, int i4Cmd)
 	if (i4Cmd == SIOCDEVPRIVATE + 1) {
 		ret = priv_support_driver_cmd(prDev, prIfReq, i4Cmd);
 
+	} else if (i4Cmd == SIOCSIWFREQ){
+		DBGLOG(INIT, TRACE, "set channel: freq 0x%x\n", iwr->u.freq);
+		ret = p2p_wext_set_freq(prDev, NULL, &iwr->u.freq, NULL);
 	} else {
 		DBGLOG(INIT, WARN, "Unexpected ioctl command: 0x%04x\n", i4Cmd);
 		ret = -1;
@@ -1449,6 +1650,9 @@ int p2pSetMACAddress(IN struct net_device *prDev, void *addr)
 	P_ADAPTER_T prAdapter = NULL;
 	P_GLUE_INFO_T prGlueInfo = NULL;
 
+	struct sockaddr *sock_addr = addr;
+	P_BSS_INFO_T prBssInfo;
+	int ucBssIndex = 0;
 	ASSERT(prDev);
 
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prDev));
@@ -1456,11 +1660,23 @@ int p2pSetMACAddress(IN struct net_device *prDev, void *addr)
 
 	prAdapter = prGlueInfo->prAdapter;
 	ASSERT(prAdapter);
+	DBGLOG(INIT, WARN, "%s set p2p mac " MACSTR "\n", __func__, MAC2STR(sock_addr->sa_data));
+	for (ucBssIndex = 0; ucBssIndex < BSS_INFO_NUM; ucBssIndex++) {
+                prBssInfo = prAdapter->aprBssInfo[ucBssIndex];
 
+		if (prBssInfo && prBssInfo->fgIsInUse && prBssInfo->eNetworkType == NETWORK_TYPE_P2P)
+			break;
+	}
+
+	COPY_MAC_ADDR(prBssInfo->aucOwnMacAddr, sock_addr->sa_data);
+	COPY_MAC_ADDR(prAdapter->rWifiVar.aucInterfaceAddress, sock_addr->sa_data);
+	COPY_MAC_ADDR(prAdapter->rWifiVar.aucDeviceAddress, sock_addr->sa_data);
+
+        nicActivateNetwork(prAdapter, ucBssIndex);
 	/* @FIXME */
 	return eth_mac_addr(prDev, addr);
-}
 
+}
 #if 0
 /*----------------------------------------------------------------------------*/
 /*!

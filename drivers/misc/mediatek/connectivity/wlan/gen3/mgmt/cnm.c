@@ -402,7 +402,9 @@ BOOLEAN cnmAisInfraChannelFixed(P_ADAPTER_T prAdapter, P_ENUM_BAND_T prBand, PUI
 
 		if (!IS_NET_ACTIVE(prAdapter, i))
 			continue;
-
+#if CFG_AP_OFFCHANNEL_OP_SUPPORT
+		return FALSE;
+#endif
 #if CFG_ENABLE_WIFI_DIRECT
 		if (prBssInfo->eNetworkType == NETWORK_TYPE_P2P) {
 			BOOLEAN fgFixedChannel = p2pFuncIsAPMode(prAdapter->rWifiVar.prP2PConnSettings);

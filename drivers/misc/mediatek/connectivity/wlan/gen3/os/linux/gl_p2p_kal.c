@@ -1351,3 +1351,46 @@ BOOLEAN kalP2PMaxClients(IN P_GLUE_INFO_T prGlueInfo, IN UINT_32 u4NumClient)
 }
 
 #endif
+
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief to save ap settings from start ap
+*
+* \param[in]
+*           prGlueInfo
+*
+* \return
+*
+*/
+/*----------------------------------------------------------------------------*/
+VOID kalStoreAPSetting(IN P_GLUE_INFO_T prGlueInfo, struct cfg80211_ap_settings *settings)
+{
+	P_AP_PARAMS prApSetting = NULL;
+
+	ASSERT(prGlueInfo);
+	prApSetting = &prGlueInfo->prP2PInfo->apsetting;
+	ASSERT(prApSetting);
+
+	prApSetting->head_len = 0;
+	if (settings->beacon.head_len !=0 && settings->beacon.head_len < 128) {
+		prApSetting->head_len = settings->beacon.head_len;
+		kalMemCopy(prApSetting->head, settings->beacon.head, settings->beacon.head_len);
+	} else
+		DBGLOG(P2P, WARN, "invalid head ie size(%d)\n", settings->beacon.head_len);
+	prApSetting->tail_len = 0;
+	if (settings->beacon.tail_len !=0 && settings->beacon.tail_len < 128) {
+		prApSetting->tail_len = settings->beacon.tail_len;
+		kalMemCopy(prApSetting->tail, settings->beacon.tail, settings->beacon.tail_len);
+	} else
+		DBGLOG(P2P, WARN, "invalid hetailad ie size(%d)\n", settings->beacon.tail_len);
+	prApSetting->chandef.chan = &prApSetting->chan;
+	kalMemCopy(prApSetting->chandef.chan, settings->chandef.chan, sizeof(struct ieee80211_channel));
+	prApSetting->chandef.width = settings->chandef.width;
+
+	prApSetting->privacy = settings->privacy;
+	prApSetting->BcnInterval = settings->beacon_interval;
+	prApSetting->DtimPeriod = settings->dtim_period;
+	prApSetting->HiddenSsidType = 0;
+	COPY_SSID(prApSetting->Ssid, prApSetting->SsidLen, settings->ssid, settings->ssid_len);
+
+}				/* end of kalStoreAPSetting() */

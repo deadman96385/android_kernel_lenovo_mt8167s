@@ -2065,6 +2065,8 @@ VOID nicTxReturnMsduInfo(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfoLi
 BOOLEAN nicTxFillMsduInfo(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo, IN P_NATIVE_PACKET prPacket)
 {
 	P_GLUE_INFO_T prGlueInfo;
+	P_STA_RECORD_T prStaRec;
+	P_BSS_INFO_T prBssInfo;
 
 	ASSERT(prAdapter);
 
@@ -2081,7 +2083,13 @@ BOOLEAN nicTxFillMsduInfo(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo,
 	prMsduInfo->ucMacHeaderLength = GLUE_GET_PKT_HEADER_LEN(prPacket);
 	prMsduInfo->u2FrameLength = (UINT_16) GLUE_GET_PKT_FRAME_LEN(prPacket);
 	prMsduInfo->ucPageCount = nicTxGetPageCount(prMsduInfo->u2FrameLength, FALSE);
-
+	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prMsduInfo->ucBssIndex);
+	if (prBssInfo) {
+		prStaRec = cnmGetStaRecByAddress(prAdapter, prMsduInfo->ucBssIndex, prBssInfo->aucBSSID);
+		if (prStaRec && prStaRec->eStaType == STA_TYPE_LEGACY_AP) {
+			prMsduInfo->ucStaRecIndex = prStaRec->ucIndex;
+		}
+	}
 	if (GLUE_IS_PKT_FLAG_SET(prPacket)) {
 		prMsduInfo->fgIs802_1x = GLUE_TEST_PKT_FLAG(prPacket, ENUM_PKT_1X);
 		prMsduInfo->fgIs802_3 = GLUE_TEST_PKT_FLAG(prPacket, ENUM_PKT_802_3);
@@ -2106,6 +2114,8 @@ BOOLEAN nicTxFillMsduInfo(IN P_ADAPTER_T prAdapter, IN P_MSDU_INFO_T prMsduInfo,
 			}
 		if (GLUE_TEST_PKT_FLAG(prPacket, ENUM_PKT_DHCP) || GLUE_TEST_PKT_FLAG(prPacket, ENUM_PKT_ARP)) {
 			prMsduInfo->ucUserPriority = 6; /* use VO priority */
+			DBGLOG(TX, INFO, "%s StaRecIndex %d, bss idx %d\n",
+				__func__, prMsduInfo->ucStaRecIndex, prMsduInfo->ucBssIndex);
 			nicTxSetPktLowestFixedRate(prAdapter, prMsduInfo);
 		}
 	}

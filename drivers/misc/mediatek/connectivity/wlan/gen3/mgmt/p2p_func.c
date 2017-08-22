@@ -893,8 +893,12 @@ p2pFuncStartGO(IN P_ADAPTER_T prAdapter,
 	       IN P_BSS_INFO_T prBssInfo,
 	       IN P_P2P_CONNECTION_REQ_INFO_T prP2pConnReqInfo, IN P_P2P_CHNL_REQ_INFO_T prP2pChnlReqInfo)
 {
+	P_AP_PARAMS prApSetting = (P_AP_PARAMS) NULL;
+
 	do {
 		ASSERT_BREAK((prAdapter != NULL) && (prBssInfo != NULL));
+
+		prApSetting = &prAdapter->prGlueInfo->prP2PInfo->apsetting;
 
 		if (prBssInfo->ucBssIndex >= P2P_DEV_BSS_INDEX) {
 			DBGLOG(P2P, ERROR, "P2P BSS exceed the number of P2P interface number.");
@@ -1001,6 +1005,12 @@ p2pFuncStartGO(IN P_ADAPTER_T prAdapter,
 		nicPmIndicateBssCreated(prAdapter, prBssInfo->ucBssIndex);
 
 	} while (FALSE);
+
+
+	if (prApSetting && prApSetting->APCHSwitching) {
+		DBGLOG(P2P, TRACE, "ch switch start ap finished\n");
+		complete(&prApSetting->rStartAPComp);
+	}
 
 }				/* p2pFuncStartGO() */
 

@@ -744,6 +744,8 @@ VOID p2pRoleFsmRunEventStartAP(IN P_ADAPTER_T prAdapter, IN P_MSG_HDR_T prMsgHdr
 			 * 2. && Intentd OP mode is OP_MODE_NUM. (finished start the AP mode)
 			 */
 			/* AP mode is started, do nothing. */
+			DBGLOG(P2P, WARN,
+			       "AP mode is started, do nothing\n");
 			break;
 		}
 
@@ -759,9 +761,12 @@ VOID p2pRoleFsmRunEventStopAP(IN P_ADAPTER_T prAdapter, IN P_MSG_HDR_T prMsgHdr)
 	P_BSS_INFO_T prP2pBssInfo = (P_BSS_INFO_T) NULL;
 	P_MSG_P2P_SWITCH_OP_MODE_T prP2pSwitchMode = (P_MSG_P2P_SWITCH_OP_MODE_T) NULL;
 	P_P2P_ROLE_FSM_INFO_T prP2pRoleFsmInfo = (P_P2P_ROLE_FSM_INFO_T) NULL;
+	P_AP_PARAMS prApSetting = (P_AP_PARAMS) NULL;
 
 	do {
 		ASSERT_BREAK((prAdapter != NULL) && (prMsgHdr != NULL));
+
+		prApSetting = &prAdapter->prGlueInfo->prP2PInfo->apsetting;
 
 		prP2pSwitchMode = (P_MSG_P2P_SWITCH_OP_MODE_T) prMsgHdr;
 
@@ -786,6 +791,11 @@ VOID p2pRoleFsmRunEventStopAP(IN P_ADAPTER_T prAdapter, IN P_MSG_HDR_T prMsgHdr)
 		p2pRoleFsmStateTransition(prAdapter, prP2pRoleFsmInfo, P2P_ROLE_STATE_IDLE);
 
 	} while (FALSE);
+	if (prApSetting->APCHSwitching) {
+		DBGLOG(P2P, TRACE,
+			       "%s ap ch switched\n", __func__);
+		complete(&prApSetting->rStopAPComp);
+	}
 
 	if (prMsgHdr)
 		cnmMemFree(prAdapter, prMsgHdr);
