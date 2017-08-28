@@ -341,11 +341,18 @@ static inline bool m4u_enable_4G(void)
 {
 	return (max_pfn > (0xffffffffUL >> PAGE_SHIFT));
 }
+#ifdef CONFIG_ARM64
 struct iova *__alloc_iova(struct iova_domain *iovad, size_t size,
 		dma_addr_t dma_limit);
 void __free_iova(struct iova_domain *iovad, struct iova *iova);
 void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t dma_addr);
+#else
+int arm_coherent_iommu_map_sg(struct device *dev, struct scatterlist *sg,
+		int nents, enum dma_data_direction dir, struct dma_attrs *attrs);
 
+void arm_coherent_iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
+		int nents, enum dma_data_direction dir, struct dma_attrs *attrs);
+#endif
 
 /* IOCTL commnad */
 #define MTK_M4U_MAGICNO 'g'
