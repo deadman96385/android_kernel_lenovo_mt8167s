@@ -31,6 +31,9 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <asm/barrier.h>
+#ifndef CONFIG_ARM64
+#include <asm/dma-iommu.h>
+#endif
 #include <dt-bindings/memory/mt8167-larb-port.h>
 #include <soc/mediatek/smi.h>
 #include <mt-plat/mtk_memcfg.h>
@@ -288,6 +291,7 @@ static int mtk_iommu_domain_finalise(struct mtk_iommu_data *data)
 	return 0;
 }
 
+#ifdef CONFIG_ARM64
 static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
 {
 	struct mtk_iommu_domain *dom;
@@ -310,10 +314,27 @@ static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
 
 	return &dom->domain;
 }
+#else
+static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
+{
+	struct mtk_iommu_domain *dom;
+
+	if (type != IOMMU_DOMAIN_UNMANAGED)
+		return NULL;
+
+	dom = kzalloc(sizeof(*dom), GFP_KERNEL);
+	if (!dom)
+		return NULL;
+
+	return &dom->domain;
+}
+#endif
 
 static void mtk_iommu_domain_free(struct iommu_domain *domain)
 {
+#ifdef CONFIG_ARM64
 	iommu_put_dma_cookie(domain);
+#endif
 	kfree(to_mtk_domain(domain));
 }
 
@@ -401,6 +422,7 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
 	return pa;
 }
 
+#ifdef CONFIG_ARM64
 static int mtk_iommu_add_device(struct device *dev)
 {
 	struct iommu_group *group;
@@ -415,6 +437,107 @@ static int mtk_iommu_add_device(struct device *dev)
 	iommu_group_put(group);
 	return 0;
 }
+#else
+/*
+ * MTK generation one iommu HW only support one iommu domain, and all the client
+ * sharing the same iova address space.
+ */
+static int mtk_iommu_create_mapping(struct device *dev,
+				    struct of_phandle_args *args)
+{
+	struct mtk_iommu_client_priv *head, *priv, *next;
+	struct platform_device *m4updev;
+	struct dma_iommu_mapping *mtk_mapping;
+	struct device *m4udev;
+	int ret;
+
+	if (args->args_count != 1) {
+		dev_err(dev, "invalid #iommu-cells(%d) property for IOMMU\n",
+			args->args_count);
+		return -EINVAL;
+	}
+
+	if (!dev->archdata.iommu) {
+		/* Get the m4u device */
+		m4updev = of_find_device_by_node(args->np);
+		if (WARN_ON(!m4updev))
+			return -EINVAL;
+
+		head = kzalloc(sizeof(*head), GFP_KERNEL);
+		if (!head)
+			return -ENOMEM;
+
+		dev->archdata.iommu = head;
+		INIT_LIST_HEAD(&head->client);
+		head->m4udev = &m4updev->dev;
+	} else {
+		head = dev->archdata.iommu;
+	}
+
+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+	if (!priv) {
+		ret = -ENOMEM;
+		goto err_free_mem;
+	}
+	priv->mtk_m4u_id = args->args[0];
+	list_add_tail(&priv->client, &head->client);
+
+	m4udev = head->m4udev;
+	mtk_mapping = m4udev->archdata.iommu;
+	if (!mtk_mapping) {
+		/* MTK iommu support 4GB iova address space. */
+		mtk_mapping = arm_iommu_create_mapping(&platform_bus_type,
+						0, 1ULL << 32);
+		if (IS_ERR(mtk_mapping)) {
+			pr_err("arm_iommu_create_mapping error\n");
+			ret = PTR_ERR(mtk_mapping);
+			goto err_free_mem;
+		}
+		m4udev->archdata.iommu = mtk_mapping;
+	}
+
+	ret = arm_iommu_attach_device(dev, mtk_mapping);
+	if (ret)
+		goto err_release_mapping;
+
+	return 0;
+
+err_release_mapping:
+	arm_iommu_release_mapping(mtk_mapping);
+	m4udev->archdata.iommu = NULL;
+err_free_mem:
+	list_for_each_entry_safe(priv, next, &head->client, client)
+		kfree(priv);
+	kfree(head);
+	dev->archdata.iommu = NULL;
+	return ret;
+}
+
+static int mtk_iommu_add_device(struct device *dev)
+{
+	struct iommu_group *group;
+	struct of_phandle_args iommu_spec;
+	int idx = 0;
+
+	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+					   "#iommu-cells", idx,
+					   &iommu_spec)) {
+		mtk_iommu_create_mapping(dev, &iommu_spec);
+		of_node_put(iommu_spec.np);
+		idx++;
+	}
+
+	if (!dev->archdata.iommu) /* Not a iommu client device */
+		return -ENODEV;
+
+	group = iommu_group_get_for_dev(dev);
+	if (IS_ERR(group))
+		return PTR_ERR(group);
+
+	iommu_group_put(group);
+	return 0;
+}
+#endif
 
 static void mtk_iommu_remove_device(struct device *dev)
 {
@@ -453,6 +576,7 @@ static struct iommu_group *mtk_iommu_device_group(struct device *dev)
 	return data->m4u_group;
 }
 
+#ifdef CONFIG_ARM64
 static int mtk_iommu_of_xlate(struct device *dev, struct of_phandle_args *args)
 {
 	struct mtk_iommu_client_priv *head, *priv, *next;
@@ -498,6 +622,7 @@ err_free_mem:
 	dev->archdata.iommu = NULL;
 	return -ENOMEM;
 }
+#endif
 
 #ifndef CONFIG_MTK_MEMCFG
 #define CONFIG_MTK_MEMCFG
@@ -566,7 +691,9 @@ static struct iommu_ops mtk_iommu_ops = {
 	.add_device	= mtk_iommu_add_device,
 	.remove_device	= mtk_iommu_remove_device,
 	.device_group	= mtk_iommu_device_group,
+#ifdef CONFIG_ARM64
 	.of_xlate	= mtk_iommu_of_xlate,
+#endif
 	.pgsize_bitmap	= SZ_4K | SZ_64K | SZ_1M | SZ_16M,
 	.get_dm_regions	= mtk_iommu_get_dm_regions,
 	.put_dm_regions	= mtk_iommu_put_dm_regions,
@@ -800,7 +927,7 @@ static struct platform_driver mtk_iommu_driver = {
 		.pm = &mtk_iommu_pm_ops,
 	}
 };
-
+#ifdef CONFIG_ARM64
 static int mtk_iommu_init_fn(struct device_node *np)
 {
 	int ret;
@@ -819,5 +946,19 @@ static int mtk_iommu_init_fn(struct device_node *np)
 	of_iommu_set_ops(np, &mtk_iommu_ops);
 	return 0;
 }
+#else
+static int mtk_iommu_init_fn(struct device_node *np)
+{
+	int ret;
+
+	ret = platform_driver_register(&mtk_iommu_driver);
+	if (ret) {
+		pr_err("%s: Failed to register driver\n", __func__);
+		return ret;
+	}
+
+	return 0;
+}
+#endif
 
 IOMMU_OF_DECLARE(mtkm4u, "mediatek,mt8167-m4u", mtk_iommu_init_fn);
