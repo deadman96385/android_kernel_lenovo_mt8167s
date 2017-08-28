@@ -154,14 +154,6 @@ ROOT_NODE {
 		mnt_flags = "ro";
 		fsmgr_flags = "wait,verify";
 	};
-
-	odm {
-		compatible = "android,odm";
-		dev = "/dev/block/platform/soc/11120000.mmc/by-name/odm";
-		type = "ext4";
-		mnt_flags = "ro";
-		fsmgr_flags = "wait";
-	};
 };
 
 &hdmi0 {
