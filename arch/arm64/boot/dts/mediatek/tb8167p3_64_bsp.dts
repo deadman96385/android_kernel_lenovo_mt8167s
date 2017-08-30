@@ -174,11 +174,6 @@ ROOT_NODE {
 		reg = <0x0c>;
 	};
 
-	lp8557_led@2c {
-		compatible = "ti,lp8557-led";
-		reg = <0x2c>;
-	};
-
 	cap_touch@40 {
 		compatible = "mediatek,cap_touch";
 		reg = <0x40>;
@@ -210,18 +205,6 @@ ROOT_NODE {
 		power_vol = <0>;
 		firlen = <0>;
 		is_batch_supported = <0>;
-	};
-
-	vproc: sym827@60 {
-		compatible = "silergy,sym827-regulator";
-		reg = <0x60>;
-		regulator-name = "vproc";
-		regulator-min-microvolt = <600000>;
-		regulator-max-microvolt = <1387500>;
-		regulator-enable-ramp-delay = <400>;
-		regulator-ramp-delay = <8333>;
-		regulator-always-on;
-		vsel-gpio = <&pio 34 0>;
 	};
 };
 
