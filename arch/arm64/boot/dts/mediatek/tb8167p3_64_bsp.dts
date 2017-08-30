@@ -46,7 +46,6 @@ ROOT_NODE {
 
 	mtcpufreq {
 		compatible = "mediatek,mt8167-cpufreq";
-		reg-ext-vproc-supply = <&vproc>;
 	};
 
 	mt8167_audio_codec: mt8167_audio_codec {
