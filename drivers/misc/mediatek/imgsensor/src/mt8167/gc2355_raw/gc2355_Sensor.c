@@ -1289,6 +1289,8 @@ static kal_uint32 get_default_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenar
 						    MUINT32 *framerate)
 {
 	LOG_INF("scenario_id = %d\n", scenario_id);
+	if (framerate == NULL)
+		return ERROR_NONE;
 
 	spin_lock(&imgsensor_drv_lock);
 	switch (scenario_id) {
@@ -1405,7 +1407,47 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 		LOG_INF("SENSOR_FEATURE_GET_CROP_INFO scenarioId:%d\n", (UINT32) *feature_data);
 
 		wininfo = (SENSOR_WINSIZE_INFO_STRUCT *) (uintptr_t) (*(feature_data + 1));
-
+#if 1
+		switch (*feature_data_32) {
+		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
+			if (copy_to_user((void *)wininfo, (void *)&imgsensor_winsize_info[1],
+				sizeof(SENSOR_WINSIZE_INFO_STRUCT))) {
+				LOG_INF("copy to user failed\n");
+				return -EFAULT;
+			}
+			break;
+		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
+			if (copy_to_user((void *)wininfo, (void *)&imgsensor_winsize_info[2],
+				sizeof(SENSOR_WINSIZE_INFO_STRUCT))) {
+				LOG_INF("copy to user failed\n");
+				return -EFAULT;
+			}
+			break;
+		case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
+			if (copy_to_user((void *)wininfo, (void *)&imgsensor_winsize_info[3],
+				sizeof(SENSOR_WINSIZE_INFO_STRUCT))) {
+				LOG_INF("copy to user failed\n");
+				return -EFAULT;
+			}
+			break;
+		case MSDK_SCENARIO_ID_SLIM_VIDEO:
+			if (copy_to_user((void *)wininfo, (void *)&imgsensor_winsize_info[4],
+				sizeof(SENSOR_WINSIZE_INFO_STRUCT))) {
+				LOG_INF("copy to user failed\n");
+				return -EFAULT;
+			}
+			break;
+		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
+			if (copy_to_user((void *)wininfo, (void *)&imgsensor_winsize_info[0],
+				sizeof(SENSOR_WINSIZE_INFO_STRUCT))) {
+				LOG_INF("copy to user failed\n");
+				return -EFAULT;
+			}
+			break;
+		default:
+			break;
+		}
+#else
 		switch (*feature_data_32) {
 		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
 			memcpy((void *)wininfo, (void *)&imgsensor_winsize_info[1],
@@ -1424,11 +1466,13 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 			       sizeof(SENSOR_WINSIZE_INFO_STRUCT));
 			break;
 		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
-		default:
 			memcpy((void *)wininfo, (void *)&imgsensor_winsize_info[0],
 			       sizeof(SENSOR_WINSIZE_INFO_STRUCT));
 			break;
+		default:
+			break;
 		}
+#endif
 	case SENSOR_FEATURE_SET_IHDR_SHUTTER_GAIN:
 		LOG_INF("SENSOR_SET_SENSOR_IHDR LE=%d, SE=%d, Gain=%d\n", (UINT16) *feature_data,
 			(UINT16) *(feature_data + 1), (UINT16) *(feature_data + 2));
