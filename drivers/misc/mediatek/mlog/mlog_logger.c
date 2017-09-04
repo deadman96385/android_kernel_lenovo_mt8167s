@@ -46,6 +46,7 @@
 #ifdef CONFIG_MTK_ION
 #include <mtk/ion_drv.h>
 #endif
+#include <aee.h>
 
 #include "mlog_internal.h"
 #include "mlog_logger.h"
