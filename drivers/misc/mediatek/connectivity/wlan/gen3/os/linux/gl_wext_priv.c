@@ -1010,6 +1010,8 @@ priv_get_int(IN struct net_device *prNetDev,
 		break;
 	}
 
+	/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
 	u4SubCmd = (UINT_32) prIwReqData->data.flags;
 
 	switch (u4SubCmd) {
@@ -1090,6 +1092,8 @@ priv_set_ints(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+	/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
 	u4SubCmd = (UINT_32) prIwReqData->data.flags;
 	u4CmdLen = (UINT_32) prIwReqData->data.length;
 
@@ -1191,6 +1195,8 @@ priv_get_ints(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+	/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
 	u4SubCmd = (UINT_32) prIwReqData->data.flags;
 
 	switch (u4SubCmd) {
@@ -1258,11 +1264,13 @@ priv_set_struct(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+	/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
 	u4SubCmd = (UINT_32) prIwReqData->data.flags;
 
 #if 0
 	DBGLOG(INIT, INFO, "priv_set_struct(): prIwReqInfo->cmd(0x%X), u4SubCmd(%ld)\n",
-	       prIwReqInfo->cmd, u4SubCmd;
+	       prIwReqInfo->cmd, u4SubCmd);
 #endif
 
 	switch (u4SubCmd) {
@@ -1442,6 +1450,8 @@ priv_get_struct(IN struct net_device *prNetDev,
 		return -EINVAL;
 	}
 
+	/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
 	u4SubCmd = (UINT_32) prIwReqData->data.flags;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 	ASSERT(prGlueInfo);
@@ -1550,7 +1560,6 @@ priv_set_ndis(IN struct net_device *prNetDev, IN NDIS_TRANSPORT_STRUCT * prNdisR
 	ASSERT(prNetDev);
 	ASSERT(prNdisReq);
 	ASSERT(pu4OutputLen);
-
 	if (!prNetDev || !prNdisReq || !pu4OutputLen) {
 		DBGLOG(REQ, INFO, "priv_set_ndis(): invalid param(0x%p, 0x%p, 0x%p)\n",
 				   prNetDev, prNdisReq, pu4OutputLen);
@@ -2122,6 +2131,10 @@ reqExtSetAcpiDevicePowerState(IN P_GLUE_INFO_T prGlueInfo,
 #define CMD_OKC_ENABLE		"OKC_ENABLE"
 
 #define CMD_SETMONITOR		"MONITOR"
+#define CMD_SETPWR_OFFSET	"SET_PWR_OFFSET"
+#define CMD_GETPWR_OFFSET	"GET_PWR_OFFSET"
+#define CMD_5G_SETPWR_OFFSET	"SET_5G_PWR_OFFSET"
+#define CMD_5G_GETPWR_OFFSET	"GET_5G_PWR_OFFSET"
 
 /* miracast related definition */
 #define MIRACAST_MODE_OFF	0
@@ -2155,6 +2168,8 @@ reqExtSetAcpiDevicePowerState(IN P_GLUE_INFO_T prGlueInfo,
 #define CMD_GET_CHIP            "GET_CHIP"
 #define CMD_SET_DBG_LEVEL       "SET_DBG_LEVEL"
 #define CMD_GET_DBG_LEVEL       "GET_DBG_LEVEL"
+#define CMD_SET_TEST_CMD        "SET_TEST_CMD"
+
 #define PRIV_CMD_SIZE 512
 
 static UINT_8 g_ucMiracastMode = MIRACAST_MODE_OFF;
@@ -2482,6 +2497,462 @@ int priv_driver_get_chip_config(IN struct net_device *prNetDev, IN char *pcComma
 	return i4BytesWritten;
 
 }				/* priv_driver_get_chip_config  */
+
+int priv_driver_set_test_cmd(IN struct net_device *prNetDev, IN char *pcCommand, IN int i4TotalLen)
+{
+	P_GLUE_INFO_T prGlueInfo = NULL;
+	WLAN_STATUS rStatus = WLAN_STATUS_SUCCESS;
+	UINT_32 u4BufLen = 0;
+	INT_32 i4BytesWritten = 0;
+	INT_32 i4Argc = 0;
+	PCHAR apcArgv[WLAN_CFG_ARGV_MAX] = { 0 };
+	UINT_32 u4Ret = 0;
+	P_NDIS_TRANSPORT_STRUCT prNdisReq;
+
+	ASSERT(prNetDev);
+	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
+		return -1;
+	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
+
+	DBGLOG(REQ, LOUD, "command is %s\n", pcCommand);
+	wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
+	DBGLOG(REQ, LOUD, "argc is %i\n", i4Argc);
+
+	if (i4Argc >= 3) {
+		/*
+		 * rSwCtrlInfo.u4Id = kalStrtoul(apcArgv[1], NULL, 0);
+		 * rSwCtrlInfo.u4Data = kalStrtoul(apcArgv[2], NULL, 0);
+		 */
+		prNdisReq = (P_NDIS_TRANSPORT_STRUCT) &aucOidBuf[0];
+
+		u4Ret = kalkStrtou32(apcArgv[1], 0, (PUINT_32)&(prNdisReq->ndisOidContent[0]));
+		if (u4Ret)
+			DBGLOG(REQ, LOUD, "parse rSwCtrlInfo error u4Ret=%d\n", u4Ret);
+		u4Ret = kalkStrtou32(apcArgv[2], 0, (PUINT_32)&(prNdisReq->ndisOidContent[4]));
+		if (u4Ret)
+			DBGLOG(REQ, LOUD, "parse rSwCtrlInfo error u4Ret=%d\n", u4Ret);
+
+		//kalMemCopy(&prNdisReq->ndisOidContent[0], &apcArgv[1], 8);
+		prNdisReq->ndisOidCmd = OID_CUSTOM_MTK_WIFI_TEST;
+		prNdisReq->inNdisOidlength = 8;
+		prNdisReq->outNdisOidLength = 8;
+		rStatus = priv_set_ndis(prNetDev, prNdisReq, &u4BufLen);
+
+		if (rStatus != WLAN_STATUS_SUCCESS) {
+			i4BytesWritten = snprintf(pcCommand, i4TotalLen, "Exec result Fail");
+			return -1;
+		}
+
+	}
+
+	i4BytesWritten = snprintf(pcCommand, i4TotalLen, "Exec result OK");
+	return i4BytesWritten;
+
+}
+
+#define EFUSE_CH_OFFSET_POSITION        28
+#define NVRAM_CH_OFFSET_POSITION        0x50
+#define EFUSE_CH_OFFSET1_L_MASK         BITS(0, 7)
+#define EFUSE_CH_OFFSET1_L_SHIFT        0
+#define EFUSE_CH_OFFSET1_M_MASK         BITS(8, 15)
+#define EFUSE_CH_OFFSET1_M_SHIFT        8
+#define EFUSE_CH_OFFSET1_H_MASK         BITS(16, 23)
+#define EFUSE_CH_OFFSET1_H_SHIFT        16
+#define EFUSE_CH_OFFSET1_VLD_MASK       BIT(24)
+#define EFUSE_CH_OFFSET1_VLD_SHIFT      24
+#define EFUSE_ALL_CH_OFFSET1_MASK       BITS(25, 27)
+#define EFUSE_ALL_CH_OFFSET1_SHIFT      25
+
+int priv_driver_set_pwr_offset(IN struct net_device *prNetDev, IN char *pcCommand, IN int i4TotalLen)
+{
+	P_GLUE_INFO_T prGlueInfo = NULL;
+	P_ADAPTER_T prAdapter = NULL;
+	P_REG_INFO_T prRegInfo = NULL;
+	INT_32 i4Argc = 0;
+	INT_32 i4BytesWritten = 0;
+	PCHAR apcArgv[WLAN_CFG_ARGV_MAX];
+	UINT_32 u4Parse = 0;
+	INT_32 u4Ret = 0;
+	UINT_8 l_offset = 0, m_offset = 0, h_offset = 0, all_offset = 0,offset_valid = 0;
+	BOOLEAN fgStatus;
+	UINT_16 u2Data = 0;
+	INT_32 au4ChOffset, test;
+	UINT_32 u4OffsetPos;
+
+	DBGLOG(REQ, INFO, "++priv_driver_set_pwr_offset++\n");
+
+	/* "SET_PWR_OFFSET L-offset M-offet H-offset All-offset" */
+	ASSERT(prNetDev);
+	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
+		return -1;
+
+	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
+	prAdapter = prGlueInfo->prAdapter;
+	prRegInfo = &prGlueInfo->rRegInfo;
+
+	wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
+
+	if (i4Argc >= 5) {
+		u4Ret = kalkStrtou32(apcArgv[1], 0, &u4Parse);
+		l_offset = (UINT_8)u4Parse;
+
+		u4Ret = kalkStrtou32(apcArgv[2], 0, &u4Parse);
+		m_offset = (UINT_8)u4Parse;
+
+		u4Ret = kalkStrtou32(apcArgv[3], 0, &u4Parse);
+		h_offset = (UINT_8)u4Parse;
+
+		u4Ret = kalkStrtou32(apcArgv[4], 0, &u4Parse);
+		all_offset = (UINT_8)u4Parse;
+
+		DBGLOG(REQ, INFO, "set_pwr_offset l_offset=%d, m_offset=%d, h_offset=%d, all_offset=%d\n",
+			l_offset, m_offset, h_offset, all_offset);
+	}
+	else{
+		DBGLOG(REQ, INFO, "priv_driver_set_pwr_offset cmd error\n");
+		DBGLOG(REQ, INFO, "--priv_driver_set_pwr_offset--\n");
+		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "Exec result Fail");
+		return -1;
+	}
+
+	/* convert offset to EFUSE */
+	au4ChOffset = *(UINT_32 *) (prRegInfo->aucEFUSE + EFUSE_CH_OFFSET_POSITION);
+
+	DBGLOG(REQ, INFO, "RegInfo->EFUSE.ChOffset=0x%08x\n", au4ChOffset);
+
+	au4ChOffset = 0;
+	offset_valid = 1;
+
+	au4ChOffset |=
+		((((UINT_32) l_offset) << EFUSE_CH_OFFSET1_L_SHIFT) & EFUSE_CH_OFFSET1_L_MASK);
+	au4ChOffset |=
+		((((UINT_32) m_offset) << EFUSE_CH_OFFSET1_M_SHIFT) & EFUSE_CH_OFFSET1_M_MASK);
+	au4ChOffset |=
+		((((UINT_32) h_offset) << EFUSE_CH_OFFSET1_H_SHIFT) & EFUSE_CH_OFFSET1_H_MASK);
+	au4ChOffset |=
+		((((UINT_32) offset_valid) << EFUSE_CH_OFFSET1_VLD_SHIFT) & EFUSE_CH_OFFSET1_VLD_MASK);
+	au4ChOffset |=
+		((((UINT_32) all_offset) << EFUSE_ALL_CH_OFFSET1_SHIFT) & EFUSE_ALL_CH_OFFSET1_MASK);
+
+	*((INT_32 *) ((prRegInfo->aucEFUSE + EFUSE_CH_OFFSET_POSITION))) = au4ChOffset;
+	test = *(UINT_32 *) (prRegInfo->aucEFUSE + EFUSE_CH_OFFSET_POSITION);
+	DBGLOG(REQ, INFO, "RegInfo->EFUSE.ChOffset=0x%08x\n", test);
+
+	/* set WIFI_NVRAM_FILE_NAME 0x50 2.4G channel offset */
+	u4OffsetPos = NVRAM_CH_OFFSET_POSITION;
+	u2Data = au4ChOffset & 0xFFFF;
+	fgStatus = kalCfgDataWrite16(prAdapter->prGlueInfo,
+					u4OffsetPos,
+					u2Data);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Write Failed.\r\n");
+	}
+
+	u2Data = (au4ChOffset & 0xFFFF0000) >> 16;
+	fgStatus = kalCfgDataWrite16(prAdapter->prGlueInfo,
+					u4OffsetPos+2,
+					u2Data);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Write Failed.\r\n");
+	}
+
+	DBGLOG(REQ, INFO, "New RegInfo->EFUSE.ChOffset=0x%08x,nvram offset=%d\n", au4ChOffset, u4OffsetPos);
+
+	/* Set FW EFUSE */
+	wlanSendSetQueryCmd(prAdapter,
+			    CMD_ID_SET_PHY_PARAM,
+			    TRUE,
+			    FALSE,
+			    FALSE, NULL, NULL, sizeof(CMD_PHY_PARAM_T), (PUINT_8) (prRegInfo->aucEFUSE), NULL, 0);
+
+	i4BytesWritten = snprintf(pcCommand, i4TotalLen, "Exec result OK");
+	DBGLOG(REQ, INFO, "--priv_driver_set_pwr_offset--\n");
+	return i4BytesWritten;
+}
+
+int priv_driver_get_pwr_offset(IN struct net_device *prNetDev, IN char *pcCommand, IN int i4TotalLen)
+{
+	P_GLUE_INFO_T prGlueInfo = NULL;
+	P_ADAPTER_T prAdapter = NULL;
+	P_REG_INFO_T prRegInfo = NULL;
+	INT_32 i4BytesWritten = 0;
+	INT_32 au4ChOffset;
+	UINT_8 l_offset = 0, m_offset = 0, h_offset = 0, all_offset = 0,offset_valid = 0;
+	UINT_16 u2Data1 = 0, u2Data2 = 0;
+	UINT_32 u4OffsetPos;
+	BOOLEAN fgStatus;
+
+	DBGLOG(REQ, INFO, "++priv_driver_get_pwr_offset++\n");
+
+	/* "GET_PWR_OFFSET" */
+	ASSERT(prNetDev);
+	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
+		return -1;
+
+	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
+	prAdapter = prGlueInfo->prAdapter;
+	prRegInfo = &prGlueInfo->rRegInfo;
+
+	/* convert offset to EFUSE */
+	au4ChOffset = *(UINT_32 *) (prRegInfo->aucEFUSE + EFUSE_CH_OFFSET_POSITION);
+
+	l_offset = ((au4ChOffset & EFUSE_CH_OFFSET1_L_MASK) >> EFUSE_CH_OFFSET1_L_SHIFT);
+
+	m_offset = ((au4ChOffset & EFUSE_CH_OFFSET1_M_MASK) >> EFUSE_CH_OFFSET1_M_SHIFT);
+
+	h_offset = ((au4ChOffset & EFUSE_CH_OFFSET1_H_MASK) >> EFUSE_CH_OFFSET1_H_SHIFT);
+
+	all_offset = ((au4ChOffset & EFUSE_ALL_CH_OFFSET1_MASK) >> EFUSE_ALL_CH_OFFSET1_SHIFT);
+
+	offset_valid = ((au4ChOffset & EFUSE_CH_OFFSET1_VLD_MASK) >> EFUSE_CH_OFFSET1_VLD_SHIFT);
+
+	DBGLOG(REQ, INFO, "get_pwr_offset l_offset=%d, m_offset=%d, h_offset=%d, all_offset=%d, valid=%d\n",
+		l_offset, m_offset, h_offset, all_offset, offset_valid);
+
+	/* 0x50 2.4G channel offset */
+	u4OffsetPos = NVRAM_CH_OFFSET_POSITION;
+	fgStatus = kalCfgDataRead16(prAdapter->prGlueInfo,
+					u4OffsetPos,
+					&u2Data1);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Read Failed.\r\n");
+	}
+
+	fgStatus = kalCfgDataRead16(prAdapter->prGlueInfo,
+					u4OffsetPos+2,
+					&u2Data2);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Read Failed.\r\n");
+	}
+	DBGLOG(REQ, INFO, "read nvram data1=0x%04x, data2=0x%04x, total=0x%08x\n",
+		u2Data1, u2Data2, (((u2Data1<<16)&0xFFFF) + u2Data2));
+
+	i4BytesWritten = snprintf(pcCommand, i4TotalLen, "L=%d, M=%d, H=%d, ALL=%d, Valid=%d\nExec result OK",
+		l_offset, m_offset, h_offset, all_offset, offset_valid);
+	DBGLOG(REQ, INFO, "--priv_driver_get_pwr_offset--\n");
+	return i4BytesWritten;
+}
+
+#define EFUSE_5G_CH_OFFSET_POSITION        44
+#define NVRAM_5G_CH_OFFSET_POSITION        0x60
+#define EFUSE_5G_CH_OFFSET_SHIFT           8
+#define EFUSE_5G_CH_OFFSET_MASK            BITS(8, 15)
+
+int priv_driver_set_5g_pwr_offset(IN struct net_device *prNetDev, IN char *pcCommand, IN int i4TotalLen)
+{
+	P_GLUE_INFO_T prGlueInfo = NULL;
+	P_ADAPTER_T prAdapter = NULL;
+	P_REG_INFO_T prRegInfo = NULL;
+	INT_32 i4Argc = 0;
+	INT_32 i4BytesWritten = 0;
+	PCHAR apcArgv[WLAN_CFG_ARGV_MAX];
+	UINT_32 u4Parse = 0;
+	INT_32 u4Ret = 0;
+	UINT_8 offset_grp[8] = {0},offset_valid = 0;
+	BOOLEAN fgStatus;
+	UINT_16 u2Data = 0;
+	UINT_32 u4OffsetPos;
+
+	DBGLOG(REQ, INFO, "++priv_driver_set_5g_pwr_offset++\n");
+
+	/* "SET_5G_PWR_OFFSET 1st-grp 2nd-grp 3rd-grp 4th-grp 5th-grp 6th-grp 7th-grp 8th-grp" */
+	ASSERT(prNetDev);
+	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
+		return -1;
+
+	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
+	prAdapter = prGlueInfo->prAdapter;
+	prRegInfo = &prGlueInfo->rRegInfo;
+
+	wlanCfgParseArgument(pcCommand, &i4Argc, apcArgv);
+
+	if (i4Argc >= 9) {
+		u4Ret = kalkStrtou32(apcArgv[1], 0, &u4Parse);
+		offset_grp[0] = (UINT_8)u4Parse;
+
+		u4Ret = kalkStrtou32(apcArgv[2], 0, &u4Parse);
+		offset_grp[1] = (UINT_8)u4Parse;
+
+		u4Ret = kalkStrtou32(apcArgv[3], 0, &u4Parse);
+		offset_grp[2] = (UINT_8)u4Parse;
+
+		u4Ret = kalkStrtou32(apcArgv[4], 0, &u4Parse);
+		offset_grp[3] = (UINT_8)u4Parse;
+
+		u4Ret = kalkStrtou32(apcArgv[5], 0, &u4Parse);
+		offset_grp[4] = (UINT_8)u4Parse;
+
+		u4Ret = kalkStrtou32(apcArgv[6], 0, &u4Parse);
+		offset_grp[5] = (UINT_8)u4Parse;
+
+		u4Ret = kalkStrtou32(apcArgv[7], 0, &u4Parse);
+		offset_grp[6] = (UINT_8)u4Parse;
+
+		u4Ret = kalkStrtou32(apcArgv[8], 0, &u4Parse);
+		offset_grp[7] = (UINT_8)u4Parse;
+
+		DBGLOG(REQ, INFO, "set_5g_pwr_offset %d %d %d %d %d %d %d %d\n",
+			offset_grp[0], offset_grp[1], offset_grp[2], offset_grp[3],
+			offset_grp[4], offset_grp[5], offset_grp[6], offset_grp[7]);
+	}
+	else{
+		DBGLOG(REQ, INFO, "priv_driver_set_5g_pwr_offset cmd error\n");
+		DBGLOG(REQ, INFO, "--priv_driver_set_5g_pwr_offset--\n");
+		i4BytesWritten = snprintf(pcCommand, i4TotalLen, "Exec result Fail");
+		return -1;
+	}
+
+	offset_valid = 1;
+	prRegInfo->aucEFUSE[EFUSE_5G_CH_OFFSET_POSITION] = offset_grp[0];
+	prRegInfo->aucEFUSE[EFUSE_5G_CH_OFFSET_POSITION+1] = offset_grp[1];
+	prRegInfo->aucEFUSE[EFUSE_5G_CH_OFFSET_POSITION+2] = offset_grp[2];
+	prRegInfo->aucEFUSE[EFUSE_5G_CH_OFFSET_POSITION+3] = offset_grp[3];
+	prRegInfo->aucEFUSE[EFUSE_5G_CH_OFFSET_POSITION+4] = offset_grp[4];
+	prRegInfo->aucEFUSE[EFUSE_5G_CH_OFFSET_POSITION+5] = offset_grp[5];
+	prRegInfo->aucEFUSE[EFUSE_5G_CH_OFFSET_POSITION+6] = offset_grp[6];
+	prRegInfo->aucEFUSE[EFUSE_5G_CH_OFFSET_POSITION+7] = offset_grp[7];
+	prRegInfo->aucEFUSE[EFUSE_5G_CH_OFFSET_POSITION+8] = offset_valid;
+
+	/* set WIFI_NVRAM_FILE_NAME 0x60 5G channel offset */
+	u4OffsetPos = NVRAM_5G_CH_OFFSET_POSITION;
+	u2Data = (offset_grp[1] << EFUSE_5G_CH_OFFSET_SHIFT) & EFUSE_5G_CH_OFFSET_MASK;
+	u2Data |= offset_grp[0];
+	fgStatus = kalCfgDataWrite16(prAdapter->prGlueInfo,
+					u4OffsetPos,
+					u2Data);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Write Failed.\r\n");
+	}
+
+	u2Data = (offset_grp[3] << EFUSE_5G_CH_OFFSET_SHIFT) & EFUSE_5G_CH_OFFSET_MASK;
+	u2Data |= offset_grp[2];
+	fgStatus = kalCfgDataWrite16(prAdapter->prGlueInfo,
+					u4OffsetPos+2,
+					u2Data);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Write Failed.\r\n");
+	}
+
+	u2Data = (offset_grp[5] << EFUSE_5G_CH_OFFSET_SHIFT) & EFUSE_5G_CH_OFFSET_MASK;
+	u2Data |= offset_grp[4];
+	fgStatus = kalCfgDataWrite16(prAdapter->prGlueInfo,
+					u4OffsetPos+4,
+					u2Data);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Write Failed.\r\n");
+	}
+
+	u2Data = (offset_grp[7] << EFUSE_5G_CH_OFFSET_SHIFT) & EFUSE_5G_CH_OFFSET_MASK;
+	u2Data |= offset_grp[6];
+	fgStatus = kalCfgDataWrite16(prAdapter->prGlueInfo,
+					u4OffsetPos+6,
+					u2Data);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Write Failed.\r\n");
+	}
+
+	u2Data = (prRegInfo->aucEFUSE[EFUSE_5G_CH_OFFSET_POSITION+9] << EFUSE_5G_CH_OFFSET_SHIFT)
+		& EFUSE_5G_CH_OFFSET_MASK;
+	u2Data |= offset_valid;
+	fgStatus = kalCfgDataWrite16(prAdapter->prGlueInfo,
+					u4OffsetPos+8,
+					u2Data);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Write Failed.\r\n");
+	}
+
+	/* Set FW EFUSE */
+	wlanSendSetQueryCmd(prAdapter,
+			    CMD_ID_SET_PHY_PARAM,
+			    TRUE,
+			    FALSE,
+			    FALSE, NULL, NULL, sizeof(CMD_PHY_PARAM_T), (PUINT_8) (prRegInfo->aucEFUSE), NULL, 0);
+
+	i4BytesWritten = snprintf(pcCommand, i4TotalLen, "Exec result OK");
+	DBGLOG(REQ, INFO, "--priv_driver_set_5g_pwr_offset--\n");
+	return i4BytesWritten;
+}
+
+int priv_driver_get_5g_pwr_offset(IN struct net_device *prNetDev, IN char *pcCommand, IN int i4TotalLen)
+{
+	P_GLUE_INFO_T prGlueInfo = NULL;
+	P_ADAPTER_T prAdapter = NULL;
+	P_REG_INFO_T prRegInfo = NULL;
+	INT_32 i4BytesWritten = 0;
+	UINT_8 offset_grp[8] = {0},offset_valid = 0;
+	UINT_16 u2Data = 0;
+	UINT_32 u4OffsetPos;
+	BOOLEAN fgStatus;
+
+	DBGLOG(REQ, INFO, "++priv_driver_get_5g_pwr_offset++\n");
+
+	/* "GET_PWR_OFFSET" */
+	ASSERT(prNetDev);
+	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
+		return -1;
+
+	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
+	prAdapter = prGlueInfo->prAdapter;
+	prRegInfo = &prGlueInfo->rRegInfo;
+
+	/* 0x60 5G channel offset */
+	u4OffsetPos = NVRAM_5G_CH_OFFSET_POSITION;
+	fgStatus = kalCfgDataRead16(prAdapter->prGlueInfo,
+					u4OffsetPos,
+					&u2Data);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Read Failed.\r\n");
+	}
+	offset_grp[0] = u2Data & 0xFF;
+	offset_grp[1] = (u2Data & EFUSE_5G_CH_OFFSET_MASK) >> EFUSE_5G_CH_OFFSET_SHIFT;
+
+	fgStatus = kalCfgDataRead16(prAdapter->prGlueInfo,
+					u4OffsetPos+2,
+					&u2Data);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Read Failed.\r\n");
+	}
+	offset_grp[2] = u2Data & 0xFF;
+	offset_grp[3] = (u2Data & EFUSE_5G_CH_OFFSET_MASK) >> EFUSE_5G_CH_OFFSET_SHIFT;
+
+	fgStatus = kalCfgDataRead16(prAdapter->prGlueInfo,
+					u4OffsetPos+4,
+					&u2Data);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Read Failed.\r\n");
+	}
+	offset_grp[4] = u2Data & 0xFF;
+	offset_grp[5] = (u2Data & EFUSE_5G_CH_OFFSET_MASK) >> EFUSE_5G_CH_OFFSET_SHIFT;
+
+	fgStatus = kalCfgDataRead16(prAdapter->prGlueInfo,
+					u4OffsetPos+6,
+					&u2Data);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Read Failed.\r\n");
+	}
+	offset_grp[6] = u2Data & 0xFF;
+	offset_grp[7] = (u2Data & EFUSE_5G_CH_OFFSET_MASK) >> EFUSE_5G_CH_OFFSET_SHIFT;
+
+	fgStatus = kalCfgDataRead16(prAdapter->prGlueInfo,
+					u4OffsetPos+8,
+					&u2Data);
+	if (fgStatus == FALSE) {
+		DBGLOG(REQ, ERROR, "NVRAM Read Failed.\r\n");
+	}
+	offset_valid = u2Data & 0xFF;
+
+	DBGLOG(REQ, INFO, "get_5g_pwr_offset %d %d %d %d %d %d %d %d valid=%d\n",
+		offset_grp[0], offset_grp[1], offset_grp[2], offset_grp[3],
+		offset_grp[4], offset_grp[5], offset_grp[6], offset_grp[7],
+		offset_valid);
+
+	i4BytesWritten = snprintf(pcCommand, i4TotalLen, "Value=%d,%d,%d,%d,%d,%d,%d,%d Valid=%d\nExec result OK",
+		offset_grp[0], offset_grp[1], offset_grp[2], offset_grp[3], offset_grp[4],
+		offset_grp[5], offset_grp[6], offset_grp[7], offset_valid);
+
+	DBGLOG(REQ, INFO, "--priv_driver_get_pwr_offset--\n");
+	return i4BytesWritten;
+}
 
 static void
 priv_driver_get_chip_config_16(PUINT_8 pucStartAddr, UINT_32 u4Length, UINT_32 u4Line, int i4TotalLen,
@@ -3082,6 +3553,8 @@ INT_32 priv_driver_cmds(IN struct net_device *prNetDev, IN PCHAR pcCommand, IN I
 			i4BytesWritten = priv_driver_set_chip_config(prNetDev, pcCommand, i4TotalLen);
 		} else if (strncasecmp(pcCommand, CMD_GET_CHIP, strlen(CMD_GET_CHIP)) == 0) {
 			i4BytesWritten = priv_driver_get_chip_config(prNetDev, pcCommand, i4TotalLen);
+		} else if (strncasecmp(pcCommand, CMD_SET_TEST_CMD, strlen(CMD_SET_TEST_CMD)) == 0) {
+			i4BytesWritten = priv_driver_set_test_cmd(prNetDev, pcCommand, i4TotalLen);
 		}
 #if CFG_SUPPORT_BATCH_SCAN
 		else if (strncasecmp(pcCommand, CMD_BATCH_SET, strlen(CMD_BATCH_SET)) == 0) {
@@ -3136,6 +3609,14 @@ INT_32 priv_driver_cmds(IN struct net_device *prNetDev, IN PCHAR pcCommand, IN I
 		else if (strncasecmp(pcCommand, CMD_SETMONITOR, strlen(CMD_SETMONITOR)) == 0)
 			i4BytesWritten = priv_driver_set_monitor(prNetDev, pcCommand, i4TotalLen);
 #endif
+		else if (strncasecmp(pcCommand, CMD_SETPWR_OFFSET, strlen(CMD_SETPWR_OFFSET)) == 0)
+			i4BytesWritten = priv_driver_set_pwr_offset(prNetDev, pcCommand, i4TotalLen);
+		else if (strncasecmp(pcCommand, CMD_GETPWR_OFFSET, strlen(CMD_GETPWR_OFFSET)) == 0)
+			i4BytesWritten = priv_driver_get_pwr_offset(prNetDev, pcCommand, i4TotalLen);
+		else if (strncasecmp(pcCommand, CMD_5G_SETPWR_OFFSET, strlen(CMD_5G_SETPWR_OFFSET)) == 0)
+			i4BytesWritten = priv_driver_set_5g_pwr_offset(prNetDev, pcCommand, i4TotalLen);
+		else if (strncasecmp(pcCommand, CMD_5G_GETPWR_OFFSET, strlen(CMD_5G_GETPWR_OFFSET)) == 0)
+			i4BytesWritten = priv_driver_get_5g_pwr_offset(prNetDev, pcCommand, i4TotalLen);
 		else
 			i4CmdFound = 0;
 	}
@@ -3226,3 +3707,25 @@ exit:
 
 	return ret;
 }				/* priv_support_driver_cmd */
+
+#ifdef CONFIG_COMPAT
+/*
+* CONFIG_COMPAT, kernel support 32/64COMPAT
+* IW_REQUEST_FLAG_COMPAT means ioctl from 32 bit userspace program
+*/
+void convert_compat_fromuser(IN struct iw_request_info *prIwReqInfo, IN OUT union iwreq_data *prIwReqData)
+{
+	struct compat_iw_point *iwp_compat;
+	struct iw_point *iwp = &prIwReqData->data;
+	if (prIwReqInfo->flags == IW_REQUEST_FLAG_COMPAT) {
+		DBGLOG(REQ, INFO,
+			"%s: convert to 32bit userspace compat\n", __func__);
+		iwp_compat = (struct compat_iw_point *) &prIwReqData->data;
+		iwp->length = iwp_compat->length;
+		iwp->flags = iwp_compat->flags;
+		iwp->pointer = compat_ptr(iwp_compat->pointer);
+		DBGLOG(REQ, INFO,
+			"%s: flags 0x%x\n", __func__, iwp->flags);
+	}
+}
+#endif
