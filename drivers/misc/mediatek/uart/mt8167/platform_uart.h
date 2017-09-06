@@ -401,12 +401,12 @@ enum {
 #define UART_CLK_OFF_ACK			(1 << 0)
 /*---------------------------------------------------------------------------*/
 /* Debugging */
-typedef struct {
+struct uart_iir_reg {
 	u32 NINT:1;
 	u32 ID:5;
 	u32 FIFOE:2;
 	u32 dummy:24;
-} UART_IIR_REG;
+};
 /*---------------------------------------------------------------------------*/
 #ifndef CONFIG_OF
 #define VFF_BASE_CH_S           (6)
