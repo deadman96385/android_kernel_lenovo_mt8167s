@@ -337,6 +337,9 @@ static int nvram_write(char *filename, char *buf, ssize_t len, int offset)
 	int retLen = -1;
 	loff_t pos;
 	char __user *p;
+	unsigned int i=0;
+	unsigned char flag=0;
+	char buf_check,cCheckNo;
 
 	mm_segment_t old_fs = get_fs();
 
@@ -374,6 +377,43 @@ static int nvram_write(char *filename, char *buf, ssize_t len, int offset)
 			DBGLOG(INIT, ERROR, "[nvram_write] : write failed!! Error code: %d\n", retLen);
 
 	} while (FALSE);
+
+	cCheckNo = 0;
+	if (fd->f_pos != 0) {
+		if (fd->f_op->llseek) {
+			if (fd->f_op->llseek(fd, 0, 0) != 0) {
+				DBGLOG(INIT, INFO, "[nvram_write] : failed to seek!!\n");
+			}
+		} else {
+			fd->f_pos = 0;
+		}
+	}
+	for(i = 0; i < 512; i++) {
+		p = (__force char __user *)(&buf_check);
+		pos = (loff_t)i;
+		retLen = __vfs_read(fd, p, 1, &pos);
+
+		if (retLen < 0)
+			DBGLOG(INIT, ERROR, "[nvram_read] : read failed!! Error code: %d\n", retLen);
+		else {
+			if(flag) {
+				cCheckNo^=buf_check;
+				flag=false;
+			} else {
+				cCheckNo+=buf_check;
+				flag=true;
+			}
+		}
+	}
+
+	/*write offset 513*/
+	p = (__force char __user *)(&cCheckNo);
+	i = 513;
+	pos = (loff_t)i;
+
+	retLen = __vfs_write(fd, p, 1, &pos);
+	if (retLen < 0)
+		DBGLOG(INIT, ERROR, "[nvram_write] : write failed!! Error code: %d\n", retLen);
 
 	filp_close(fd, NULL);
 
