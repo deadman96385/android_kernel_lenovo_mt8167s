@@ -28,7 +28,7 @@ obj-$(CONFIG_MACH_MT8167) += mtk_spm_sodi.o
 obj-$(CONFIG_MACH_MT8167) += mtk_spm_fs.o
 obj-$(CONFIG_MACH_MT8167) += mtk_udi.o
 obj-$(CONFIG_MACH_MT8167) += mtk_dcm.o
-obj-$(CONFIG_MACH_MT8167) += mtk_gpufreq.o
+obj-$(CONFIG_MTK_GPU_SUPPORT) += mtk_gpufreq.o
 
 obj-y += mtk_cpuidle.o
 
