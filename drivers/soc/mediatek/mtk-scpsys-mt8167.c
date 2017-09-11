@@ -582,6 +582,65 @@ static int __init scpsys_probe_mt8167(struct platform_device *pdev)
 
 	return 0;
 }
+/*
+ * MT8516 power domain support
+ */
+
+static const struct scp_domain_data scp_domain_data_mt8516[] = {
+	[MT8167_POWER_DOMAIN_DISP] = {
+		.name = "disp",
+		.sta_mask = PWR_STATUS_DISP,
+		.ctl_offs = SPM_DIS_PWR_CON,
+		.sram_pdn_bits = GENMASK(11, 8),
+		.sram_pdn_ack_bits = GENMASK(12, 12),
+		.bus_prot_mask = BIT(1) | BIT(11),
+		.clk_id = {CLK_MM},
+		.active_wakeup = true,
+	},
+	[MT8167_POWER_DOMAIN_VDEC] = {
+		.name = "vdec",
+		.sta_mask = PWR_STATUS_VDEC,
+		.ctl_offs = SPM_VDE_PWR_CON,
+		.sram_pdn_bits = GENMASK(8, 8),
+		.sram_pdn_ack_bits = GENMASK(12, 12),
+		.clk_id = {CLK_MM, CLK_VDEC},
+		.active_wakeup = true,
+	},
+	[MT8167_POWER_DOMAIN_ISP] = {
+		.name = "isp",
+		.sta_mask = PWR_STATUS_ISP,
+		.ctl_offs = SPM_ISP_PWR_CON,
+		.sram_pdn_bits = GENMASK(11, 8),
+		.sram_pdn_ack_bits = GENMASK(13, 12),
+		.clk_id = {CLK_MM},
+		.active_wakeup = true,
+	},
+	[MT8167_POWER_DOMAIN_CONN] = {
+		.name = "conn",
+		.sta_mask = PWR_STATUS_CONN,
+		.ctl_offs = SPM_CONN_PWR_CON,
+		.sram_pdn_bits = GENMASK(8, 8),
+		.sram_pdn_ack_bits = 0,
+		.bus_prot_mask = BIT(4) | BIT(8) | BIT(9),
+		.clk_id = {CLK_NONE},
+		.active_wakeup = true,
+	},
+};
+
+#define NUM_DOMAINS_MT8516	ARRAY_SIZE(scp_domain_data_mt8516)
+
+static int __init scpsys_probe_mt8516(struct platform_device *pdev)
+{
+	struct scp *scp;
+
+	scp = init_scp(pdev, scp_domain_data_mt8516, NUM_DOMAINS_MT8516);
+	if (IS_ERR(scp))
+		return PTR_ERR(scp);
+
+	mtk_register_power_domains(pdev, scp, NUM_DOMAINS_MT8516);
+
+	return 0;
+}
 
 /*
  * scpsys driver init
@@ -591,6 +650,9 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
 	{
 		.compatible = "mediatek,mt8167-scpsys",
 		.data = scpsys_probe_mt8167,
+	}, {
+		.compatible = "mediatek,mt8516-scpsys",
+		.data = scpsys_probe_mt8516,
 	}, {
 		/* sentinel */
 	}
