@@ -12,7 +12,7 @@
 
 /dts-v1/;
 
-#include "mt8167.dtsi"
+#include "mt8516.dtsi"
 #include "mt6392.dtsi"
 #include "aud8516p1_64_basic_bat_setting.dtsi"
 
