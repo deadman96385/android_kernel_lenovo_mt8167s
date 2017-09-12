@@ -22,6 +22,10 @@
 #include <linux/of_address.h>
 #include <linux/io.h>
 #include <linux/suspend.h>
+#include <linux/fs.h>
+#include <linux/uaccess.h>
+#include <linux/timer.h>
+#include <linux/jiffies.h>
 #include <linux/mfd/mt6397/rtc_misc.h>
 
 #define BSI_BASE          (xo_inst->base)
@@ -42,6 +46,8 @@
 #define READ_REGISTER_UINT32(reg)          readl((void __iomem *)reg)
 #define WRITE_REGISTER_UINT32(reg, val)     writel((val), (void __iomem *)(reg))
 
+#define XOCAP_NVRAM_FILE_NAME   "/data/nvram/APCFG/APRDEB/XOCAP"
+
 #define KEEP_LDOH
 
 struct xo_dev {
@@ -51,10 +57,15 @@ struct xo_dev {
 	struct clk *bsi_clk;
 	struct clk *rg_bsi_clk;
 	uint32_t cur_xo_capid;
+	uint32_t ori_xo_capid;
 	bool has_ext_crystal;
 	bool crystal_check_done;
 };
 
+void __iomem *pxo_efuse;
+unsigned long xo_data;
+struct timer_list xocap_timer;
+struct work_struct xocap_work;
 static struct xo_dev *xo_inst;
 static const struct of_device_id apxo_of_ids[] = {
 	{ .compatible = "mediatek,mt8167-xo", },
@@ -62,6 +73,149 @@ static const struct of_device_id apxo_of_ids[] = {
 };
 
 MODULE_DEVICE_TABLE(of, apxo_of_ids);
+
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief Utility function for reading data from files on NVRAM-FS
+*
+* \param[in]
+*           filename
+*           len
+*           offset
+* \param[out]
+*           buf
+* \return
+*           actual length of data being read
+*/
+/*----------------------------------------------------------------------------*/
+static int nvram_read(char *filename, char *buf, ssize_t len, int offset)
+{
+#if 1
+	struct file *fd;
+	int retLen = -1;
+	loff_t pos;
+	char __user *p;
+
+	mm_segment_t old_fs = get_fs();
+
+	set_fs(KERNEL_DS);
+
+	fd = filp_open(filename, O_RDONLY, 0644);
+
+	if (IS_ERR(fd)) {
+		pr_err("[MT6620][nvram_read] : failed to open!!\n");
+		return -1;
+	}
+
+	do {
+		if (fd->f_op == NULL) {
+			pr_err("[MT6620][nvram_read] : f_op is NULL!!\n");
+			break;
+		}
+
+		if (fd->f_pos != offset) {
+			if (fd->f_op->llseek) {
+				if (fd->f_op->llseek(fd, offset, 0) != offset) {
+					pr_err("[MT6620][nvram_read] : failed to seek!!\n");
+					break;
+				}
+			} else {
+				fd->f_pos = offset;
+			}
+		}
+
+		p = (__force char __user *)buf;
+		pos = (loff_t)offset;
+		retLen = __vfs_read(fd, p, len, &pos);
+		if (retLen < 0)
+			pr_err("[MT6620][nvram_read] : read failed!! Error code: %d\n", retLen);
+
+	} while (0);
+
+	filp_close(fd, NULL);
+
+	set_fs(old_fs);
+
+	return retLen;
+
+#else /* !CFG_SUPPORT_NVRAM */
+
+	return -EIO;
+
+#endif
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief Utility function for writing data to files on NVRAM-FS
+*
+* \param[in]
+*           filename
+*           buf
+*           len
+*           offset
+* \return
+*           actual length of data being written
+*/
+/*----------------------------------------------------------------------------*/
+static int nvram_write(char *filename, char *buf, ssize_t len, int offset)
+{
+/* #if CFG_SUPPORT_NVRAM */
+#if 1
+	struct file *fd;
+	int retLen = -1;
+	loff_t pos;
+	char __user *p;
+
+	mm_segment_t old_fs = get_fs();
+
+	set_fs(KERNEL_DS);
+
+	fd = filp_open(filename, O_WRONLY | O_CREAT, 0644);
+
+	if (IS_ERR(fd)) {
+		pr_debug("[MT6620][nvram_write] : failed to open!!\n");
+		return -1;
+	}
+
+	do {
+		if (fd->f_op == NULL) {
+			pr_debug("[MT6620][nvram_write] : f_op is NULL!!\n");
+			break;
+		}
+		/* End of if */
+		if (fd->f_pos != offset) {
+			if (fd->f_op->llseek) {
+				if (fd->f_op->llseek(fd, offset, 0) != offset) {
+					pr_debug("[MT6620][nvram_write] : failed to seek!!\n");
+					break;
+				}
+			} else {
+				fd->f_pos = offset;
+			}
+		}
+
+		p = (__force char __user *)buf;
+		pos = (loff_t)offset;
+
+		retLen = __vfs_write(fd, p, len, &pos);
+		if (retLen < 0)
+			pr_debug("[MT6620][nvram_write] : write failed!! Error code: %d\n", retLen);
+
+	} while (0);
+
+	filp_close(fd, NULL);
+
+	set_fs(old_fs);
+
+	return retLen;
+
+#else /* !CFG_SUPPORT_NVRAMS */
+
+	return -EIO;
+
+#endif
+}
 
 static uint32_t BSI_read(uint32_t rdaddr)
 {
@@ -380,6 +534,43 @@ static void bsi_clock_enable(bool en)
 	}
 }
 
+static ssize_t show_xo_nvram_board_offset(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	char capid = 0;
+
+	nvram_read(XOCAP_NVRAM_FILE_NAME, &capid, sizeof(unsigned char), 0);
+
+	return sprintf(buf, "xo nvram capid: 0x%x\n", capid);
+}
+
+static ssize_t store_xo_nvram_board_offset(struct device *dev, struct device_attribute *attr,
+							const char *buf, size_t size)
+{
+	uint32_t capid_tmp = 0;
+	char capid = 0;
+	int ret;
+
+	if ((buf != NULL) && (size != 0)) {
+		ret = kstrtouint(buf, 0, &capid_tmp);
+		if (ret) {
+			pr_err("wrong format!\n");
+			return size;
+		}
+	} else {
+		pr_err("no data to write!\n");
+		return size;
+	}
+
+	capid = (char)capid_tmp;
+	pr_notice("store_xo_nvram_board_offset xo set buf is 0x%x!\n", capid);
+	nvram_write(XOCAP_NVRAM_FILE_NAME, &capid, sizeof(unsigned char), 0);
+
+	return size;
+}
+
+static DEVICE_ATTR(xo_nvram_board_offset, 0664, show_xo_nvram_board_offset, store_xo_nvram_board_offset);
+
+
 static ssize_t show_xo_capid(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	uint32_t capid;
@@ -391,7 +582,7 @@ static ssize_t show_xo_capid(struct device *dev, struct device_attribute *attr, 
 }
 
 static ssize_t store_xo_capid(struct device *dev, struct device_attribute *attr,
-				     const char *buf, size_t size)
+					const char *buf, size_t size)
 {
 	uint32_t capid;
 	int ret;
@@ -425,7 +616,16 @@ static DEVICE_ATTR(xo_capid, 0664, show_xo_capid, store_xo_capid);
 
 static ssize_t show_xo_board_offset(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "not support!\n");
+	uint32_t offset;
+
+	if (xo_inst->cur_xo_capid > xo_inst->ori_xo_capid)
+		offset = xo_inst->cur_xo_capid - xo_inst->ori_xo_capid;
+	else {
+		offset = xo_inst->ori_xo_capid - xo_inst->cur_xo_capid;
+		offset |= 0x40;
+	}
+
+	return sprintf(buf, "xo capid offset: 0x%x\n", offset);
 }
 
 static ssize_t store_xo_board_offset(struct device *dev, struct device_attribute *attr,
@@ -447,7 +647,7 @@ static ssize_t store_xo_board_offset(struct device *dev, struct device_attribute
 
 		bsi_clock_enable(true);
 
-		capid = XO_trim_read();
+		capid = xo_inst->ori_xo_capid;
 		pr_notice("original cap code: 0x%x\n", capid);
 
 		/* check sign bit */
@@ -459,7 +659,7 @@ static ssize_t store_xo_board_offset(struct device *dev, struct device_attribute
 		XO_trim_write(capid);
 		mdelay(10);
 		xo_inst->cur_xo_capid = XO_trim_read();
-		pr_notice("write cap code 0x%x done. current cap code:0x%x\n", capid, xo_inst->cur_xo_capid);
+		pr_notice("write cap code offset 0x%x done. current cap code:0x%x\n", offset, xo_inst->cur_xo_capid);
 
 		bsi_clock_enable(false);
 	}
@@ -617,6 +817,101 @@ bool mt_xo_has_ext_crystal(void)
 }
 EXPORT_SYMBOL(mt_xo_has_ext_crystal);
 
+static void xocap_work_func(struct work_struct *work)
+{
+	char xo_nvram_cap = 0;
+	uint32_t capid;
+	int ret;
+
+	pr_err("[XO] xocap_work_func\n");
+	bsi_clock_enable(true);
+
+	capid = XO_trim_read();
+
+	ret = nvram_read(XOCAP_NVRAM_FILE_NAME, &xo_nvram_cap, sizeof(unsigned char), 0);
+	if (ret < 0)
+		pr_err(" ret is %d!\n", ret);
+
+	if (xo_nvram_cap > 0x7f)
+		pr_err("offset should be within 7bit!\n");
+	else {
+		/* check sign bit */
+		if (xo_nvram_cap & 0x40)
+			capid -= (xo_nvram_cap & 0x3F);
+		else
+			capid += (xo_nvram_cap & 0x3F);
+
+		XO_trim_write(capid);
+		mdelay(10);
+		xo_inst->cur_xo_capid = XO_trim_read();
+		pr_notice("current cap code(after nvram):0x%x\n", xo_inst->cur_xo_capid);
+	}
+
+	bsi_clock_enable(false);
+}
+
+static void xocap_timer_func(unsigned long data)
+{
+	pr_err("[XO] xocap_timer_func\n");
+	schedule_work(&xocap_work);
+}
+
+void mt_xo_init_pre(void)
+{
+	uint32_t xo_efuse;
+	uint32_t cap_code;
+
+	pr_notice("[xo] default cap_code: 0x%x\n", XO_trim_read());
+
+	xo_efuse = READ_REGISTER_UINT32(pxo_efuse);
+
+	if ((xo_efuse>>31) & 0x1) {
+
+		pr_notice("[xo] get xo efuse: %x\n", xo_efuse);
+		cap_code = (xo_efuse & BITS(24, 30))>>24;
+
+		if ((xo_efuse>>23) & 0x1) {
+			if ((xo_efuse>>22) & 0x1)
+				cap_code = cap_code + ((xo_efuse & BITS(16, 21))>>16);
+			else
+				cap_code = cap_code - ((xo_efuse & BITS(16, 21))>>16);
+		}
+
+		if ((xo_efuse>>15) & 0x1) {
+			if ((xo_efuse>>14) & 0x1)
+				cap_code = cap_code + ((xo_efuse & BITS(8, 13))>>8);
+			else
+				cap_code = cap_code - ((xo_efuse & BITS(8, 13))>>8);
+		}
+		XO_trim_write(cap_code);
+
+	} else {
+		pr_notice("[xo] no efuse, apply sw default cap code!\n");
+		#ifdef MTK_MT8167_EVB
+		XO_trim_write(0x22);
+		#else
+		XO_trim_write(0x1c);
+		#endif
+	}
+
+	pr_notice("[xo] current cap_code: 0x%x\n", XO_trim_read());
+
+	/*Audio use XO path, so add the workaround setting for Audio 26M*/
+
+	if ((BSI_read(0x25) & 0x1000) != 0) {
+		BSI_write(0x25, BSI_read(0x25) & ~(1 << 12));
+		pr_notice("[Preloader] BSI read: [0x25] = 0x%x\n", BSI_read(0x25));
+		BSI_write(0x29, BSI_read(0x29) | (1 << 0));
+		pr_notice("[Preloader] BSI read: [0x29] = 0x%x\n", BSI_read(0x29));
+		/*delay 100us*/
+		udelay(100);
+		BSI_write(0x29, BSI_read(0x29) & ~(1 << 0));
+		pr_notice("[Preloader] BSI read: [0x29] = 0x%x\n", BSI_read(0x29));
+	}
+
+	get_xo_status();
+}
+
 static int mt_xo_dts_probe(struct platform_device *pdev)
 {
 	int retval = 0;
@@ -635,6 +930,10 @@ static int mt_xo_dts_probe(struct platform_device *pdev)
 	if (IS_ERR(xo_inst->top_rtc32k))
 		return PTR_ERR(xo_inst->top_rtc32k);
 
+	pxo_efuse = devm_ioremap(&pdev->dev, 0x10009264, PAGE_SIZE);
+	if (IS_ERR(pxo_efuse))
+		return PTR_ERR(pxo_efuse);
+
 	xo_inst->crystal_check_done = false;
 	xo_inst->dev = &pdev->dev;
 	platform_set_drvdata(pdev, xo_inst);
@@ -644,6 +943,10 @@ static int mt_xo_dts_probe(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "fail to create file: %d\n", retval);
 
 	retval = device_create_file(&pdev->dev, &dev_attr_bsi_write);
+	if (retval != 0)
+		dev_dbg(&pdev->dev, "fail to create file: %d\n", retval);
+
+	retval = device_create_file(&pdev->dev, &dev_attr_xo_nvram_board_offset);
 	if (retval != 0)
 		dev_dbg(&pdev->dev, "fail to create file: %d\n", retval);
 
@@ -673,10 +976,14 @@ static int mt_xo_dts_probe(struct platform_device *pdev)
 
 	bsi_clock_enable(true);
 
+	mt_xo_init_pre();
 	xo_inst->cur_xo_capid = XO_trim_read();
-	pr_notice("[xo] current cap code: 0x%x\n", xo_inst->cur_xo_capid);
+	xo_inst->ori_xo_capid = XO_trim_read();
 
 	bsi_clock_enable(false);
+	INIT_WORK(&xocap_work, xocap_work_func);
+	setup_timer(&xocap_timer, xocap_timer_func, (unsigned long)xo_data);
+	mod_timer(&xocap_timer, jiffies + msecs_to_jiffies(5000));
 
 	return retval;
 }
