@@ -229,6 +229,12 @@ typedef struct _NDIS_TRANSPORT_STRUCT {
 ********************************************************************************
 */
 
+#ifdef CONFIG_COMPAT
+#define COMPAT_FROMUSER(prIwri, prIwrd) convert_compat_fromuser(prIwri, prIwrd)
+#else
+#define COMPAT_FROMUSER(iwri, iwrd)
+#endif
+
 /*******************************************************************************
 *                  F U N C T I O N   D E C L A R A T I O N S
 ********************************************************************************
@@ -267,6 +273,11 @@ int priv_support_ioctl(IN struct net_device *prDev, IN OUT struct ifreq *prReq, 
 int priv_support_driver_cmd(IN struct net_device *prDev, IN OUT struct ifreq *prReq, IN int i4Cmd);
 
 INT_32 priv_driver_cmds(IN struct net_device *prNetDev, IN PCHAR pcCommand, IN INT_32 i4TotalLen);
+
+#ifdef CONFIG_COMPAT
+void convert_compat_fromuser(IN struct iw_request_info *prIwReqInfo, IN OUT union iwreq_data *prIwReqData);
+#endif
+
 /*******************************************************************************
 *                              F U N C T I O N S
 ********************************************************************************

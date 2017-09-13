@@ -83,7 +83,7 @@
 
 #define NUM_TC_RESOURCE_TO_STATISTICS       4
 
-#define WLAN_CFG_ARGV_MAX 8
+#define WLAN_CFG_ARGV_MAX 9
 #define WLAN_CFG_ENTRY_NUM_MAX 128
 #define WLAN_CFG_KEY_LEN_MAX 32	/* include \x00  EOL */
 #define WLAN_CFG_VALUE_LEN_MAX 32	/* include \x00 EOL */
