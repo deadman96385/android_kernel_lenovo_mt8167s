@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2017 MediaTek Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,11 +11,24 @@
  * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
-#ifndef _KD_IMGSENSOR_API_H_
-#define _KD_IMGSENSOR_API_H_
+#ifndef __SENINF_H__
+#define __SENINF_H__
 
-/* API for termal driver use*/
-extern MUINT32 Get_Camera_Temperature(CAMERA_DUAL_CAMERA_SENSOR_ENUM indexDual, MUINT8 *invalid,
-		MINT32 *temp);
+#include "seninf_cfg.h"
+#include "seninf_clk.h"
 
+#define SENINF_DEV_NAME "seninf"
+
+struct SENINF {
+	dev_t dev_no;
+	struct cdev *pchar_dev;
+	struct class *pclass;
+
+	struct SENINF_CLK clk;
+
+	void __iomem *pseninf_base[SENINF_MAX_NUM];
+};
+
+extern unsigned int mt_get_ckgen_freq(int ID);
 #endif
+

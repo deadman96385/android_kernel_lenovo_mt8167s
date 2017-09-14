@@ -11,11 +11,11 @@
  * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
-#ifndef _KD_IMGSENSOR_API_H_
-#define _KD_IMGSENSOR_API_H_
+#ifndef _s5k3m3MIPI_PDAF_H_
+#define _s5k3m3MIPI_PDAF_H_
 
-/* API for termal driver use*/
-extern MUINT32 Get_Camera_Temperature(CAMERA_DUAL_CAMERA_SENSOR_ENUM indexDual, MUINT8 *invalid,
-		MINT32 *temp);
+extern int iReadRegI2C(u8 *a_pSendData, u16 a_sizeSendData, u8 *a_pRecvData, u16 a_sizeRecvData, u16 i2cId);
+extern int iWriteRegI2C(u8 *a_pSendData, u16 a_sizeSendData, u16 i2cId);
+extern int iMultiReadReg(u16 a_u2Addr, u8 *a_puBuff, u16 i2cId, u8 number);
 
 #endif
