@@ -125,11 +125,15 @@ BOOLEAN p2pLaunch(P_GLUE_INFO_T prGlueInfo)
 	return TRUE;
 }
 
-VOID p2pSetMode(IN BOOLEAN fgIsAPMode)
+VOID p2pSetMode(IN BOOLEAN fgIsAPMode, const char *name)
 {
 	if (fgIsAPMode) {
 		mode = RUNNING_AP_MODE;
-		ifname = AP_INF_NAME;
+        if(NULL == name){
+            ifname = AP_INF_NAME;
+        }else{
+            ifname = (PUCHAR)name;
+        }
 	} else {
 		mode = RUNNING_P2P_MODE;
 		ifname = P2P_INF_NAME;

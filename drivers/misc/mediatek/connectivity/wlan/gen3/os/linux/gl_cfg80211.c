@@ -78,6 +78,51 @@
 ********************************************************************************
 */
 
+struct wireless_dev *
+mtk_cfg80211_add_iface(struct wiphy *wiphy,
+			   const char *name, unsigned char name_assign_type,
+			   enum nl80211_iftype type, u32 *flags, struct vif_params *params)
+{
+    P_GLUE_INFO_T prGlueInfo;
+	WLAN_STATUS rStatus = WLAN_STATUS_SUCCESS;
+
+	prGlueInfo = (P_GLUE_INFO_T) wiphy_priv(wiphy);
+	ASSERT(prGlueInfo);
+
+    if (fgIsResetting == FALSE){
+        p2pNetUnregister(prGlueInfo, TRUE);
+    }
+
+    if (prGlueInfo->prAdapter->fgIsP2PRegistered){
+        p2pRemove(prGlueInfo->prAdapter->prGlueInfo);
+    }
+
+    p2pSetMode(TRUE, name);
+    if (p2pLaunch(prGlueInfo->prAdapter->prGlueInfo)) {
+        ASSERT(prGlueInfo->prAdapter->fgIsP2PRegistered);
+        rStatus = WLAN_STATUS_SUCCESS;
+    } else
+        rStatus = WLAN_STATUS_FAILURE;
+
+    if (rStatus != WLAN_STATUS_SUCCESS) {
+        DBGLOG(INIT, ERROR, "kalIoctl failed: 0x%08lx\n", (UINT_32) rStatus);
+        return gprP2pWdev;
+    }
+
+    if (fgIsResetting == FALSE){
+        p2pNetRegister(prGlueInfo, TRUE);
+    }
+
+    return gprP2pWdev;
+}
+
+int mtk_cfg80211_del_iface(struct wiphy *wiphy,
+			       struct wireless_dev *wdev)
+{
+	/* TODO: */
+	return 0;
+}
+
 /*----------------------------------------------------------------------------*/
 /*!
  * @brief This routine is responsible for change STA type between

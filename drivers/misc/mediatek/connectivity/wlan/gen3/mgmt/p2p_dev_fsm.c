@@ -975,7 +975,7 @@ VOID p2pFsmRunEventNetDeviceRegister(IN P_ADAPTER_T prAdapter, IN P_MSG_HDR_T pr
 		prNetDevRegisterMsg = (P_MSG_P2P_NETDEV_REGISTER_T) prMsgHdr;
 
 		if (prNetDevRegisterMsg->fgIsEnable) {
-			p2pSetMode((prNetDevRegisterMsg->ucMode == 1) ? TRUE : FALSE);
+			p2pSetMode(((prNetDevRegisterMsg->ucMode == 1) ? TRUE : FALSE), NULL);
 			if (p2pLaunch(prAdapter->prGlueInfo))
 				ASSERT(prAdapter->fgIsP2PRegistered);
 		} else {

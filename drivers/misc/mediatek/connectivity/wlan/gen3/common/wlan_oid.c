@@ -9654,7 +9654,7 @@ wlanoidSetP2pMode(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4S
 	 */
 
 	if (prSetP2P->u4Enable) {
-		p2pSetMode((prSetP2P->u4Mode == 1) ? TRUE : FALSE);
+		p2pSetMode(((prSetP2P->u4Mode == 1) ? TRUE : FALSE), NULL);
 
 		if (p2pLaunch(prAdapter->prGlueInfo)) {
 			ASSERT(prAdapter->fgIsP2PRegistered);

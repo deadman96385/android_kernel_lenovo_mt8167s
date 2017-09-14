@@ -74,6 +74,7 @@ extern const struct net_device_ops p2p_netdev_ops;
 *                            P U B L I C   D A T A
 ********************************************************************************
 */
+extern struct wireless_dev *gprP2pWdev;
 
 /*******************************************************************************
 *                           P R I V A T E   D A T A
@@ -273,7 +274,7 @@ BOOLEAN p2pLaunch(P_GLUE_INFO_T prGlueInfo);
 
 BOOLEAN p2pRemove(P_GLUE_INFO_T prGlueInfo);
 
-VOID p2pSetMode(IN BOOLEAN fgIsAPMode);
+VOID p2pSetMode(IN BOOLEAN fgIsAPMode, const char *name);
 
 BOOLEAN glRegisterP2P(P_GLUE_INFO_T prGlueInfo, const char *prDevName, BOOLEAN fgIsApMode);
 

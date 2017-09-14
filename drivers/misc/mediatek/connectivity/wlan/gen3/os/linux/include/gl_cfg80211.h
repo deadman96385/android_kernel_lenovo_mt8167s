@@ -180,6 +180,15 @@ typedef enum _ENUM_TESTMODE_STA_STATISTICS_ATTR {
 ********************************************************************************
 */
 /* cfg80211 hooks */
+struct wireless_dev *
+mtk_cfg80211_add_iface(struct wiphy *wiphy,
+						const char *name, unsigned char name_assign_type,
+						enum nl80211_iftype type, u32 *flags, struct vif_params *params);
+
+int
+mtk_cfg80211_del_iface(struct wiphy *wiphy, struct wireless_dev *wdev);
+
+
 int
 mtk_cfg80211_change_iface(struct wiphy *wiphy,
 			  struct net_device *ndev, enum nl80211_iftype type, u32 *flags, struct vif_params *params);

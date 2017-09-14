@@ -236,6 +236,8 @@ struct delayed_work sched_workq;
 */
 
 static struct cfg80211_ops mtk_wlan_ops = {
+	.add_virtual_intf = mtk_cfg80211_add_iface,
+	.del_virtual_intf = mtk_cfg80211_del_iface,
 	.suspend = mtk_cfg80211_suspend,
 	.resume	= mtk_cfg80211_resume,
 	.change_virtual_intf = mtk_cfg80211_change_iface,

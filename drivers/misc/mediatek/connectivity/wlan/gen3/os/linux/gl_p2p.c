@@ -71,7 +71,7 @@
 */
 
 static struct net_device *g_P2pPrDev;
-static struct wireless_dev *gprP2pWdev;
+struct wireless_dev *gprP2pWdev;
 
 #if CFG_ENABLE_WIFI_DIRECT_CFG_80211
 static struct cfg80211_ops mtk_p2p_ops = {
