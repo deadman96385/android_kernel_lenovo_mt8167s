@@ -18,7 +18,9 @@
 #include <linux/fs.h>
 #include <dt-bindings/memory/mt8167-larb-port.h>
 #include <linux/list.h>
+#ifdef CONFIG_ARM64
 #include <linux/iova.h>
+#endif
 #include <linux/iommu.h>
 
 #define M4U_PAGE_SIZE	0x1000
@@ -356,12 +358,6 @@ struct iova *__alloc_iova(struct iova_domain *iovad, size_t size,
 		dma_addr_t dma_limit);
 void __free_iova(struct iova_domain *iovad, struct iova *iova);
 void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t dma_addr);
-#else
-int arm_coherent_iommu_map_sg(struct device *dev, struct scatterlist *sg,
-		int nents, enum dma_data_direction dir, struct dma_attrs *attrs);
-
-void arm_coherent_iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
-		int nents, enum dma_data_direction dir, struct dma_attrs *attrs);
 #endif
 
 /* IOCTL commnad */
