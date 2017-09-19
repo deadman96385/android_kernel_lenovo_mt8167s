@@ -1415,7 +1415,7 @@ static inline int soidle_handler(int cpu)
 }
 
 static u32 slp_spm_deepidle_flags = {
-	SPM_INFRA_PDN_DIS | SPM_26M_OFF_DIS | SPM_MCU_PDN_DIS
+	SPM_INFRA_PDN_DIS | SPM_26M_OFF_DIS
 };
 
 void set_slp_spm_deepidle_flags(bool en)

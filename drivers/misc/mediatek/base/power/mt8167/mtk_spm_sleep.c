@@ -73,7 +73,7 @@ struct wake_status spm_wakesta;	/* record last wakesta */
 
 #define WAKE_SRC_FOR_SUSPEND \
 	(WAKE_SRC_KP | WAKE_SRC_EINT |  WAKE_SRC_CONN_WDT  | WAKE_SRC_CONN2AP | \
-	WAKE_SRC_USB_CD | WAKE_SRC_USB_PDN | \
+	WAKE_SRC_USB_CD | WAKE_SRC_USB_PDN | WAKE_SRC_ETH | WAKE_SRC_IRRX | \
 	WAKE_SRC_SYSPWREQ)
 
 #define spm_is_wakesrc_invalid(wakesrc)     (!!((u32)(wakesrc) & 0xFC7F3A9B))

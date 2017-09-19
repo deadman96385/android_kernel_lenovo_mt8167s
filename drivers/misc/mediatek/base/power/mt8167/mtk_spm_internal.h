@@ -19,6 +19,7 @@
 #include <linux/atomic.h>
 #include <linux/io.h>
 #include <mt-plat/aee.h>
+#include <mt-plat/mtk_chip.h>
 
 #include "mtk_spm.h"
 /*#include <mt-plat/mt_lpae.h>*/
@@ -27,7 +28,7 @@
 /*
  * Config and Parameter
  */
-#define CONFIG_SUPPORT_PCM_ALLINONE		0
+#define CONFIG_SUPPORT_PCM_ALLINONE		1
 #define CONFIG_SPMC_MODE	1
 
 #ifdef MTK_FORCE_CLUSTER1

@@ -195,7 +195,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	aee_rr_rec_sodi_val(1 << SPM_SODI_ENTER);
 #endif
 
-	spm_flags |= (SPM_BUS26M_DIS | SPM_MPLLOFF_DIS | SPM_FHC_SLEEP_DIS | SPM_26M_DIS | SPM_MCU_PDN_DIS);
+	spm_flags |= (SPM_BUS26M_DIS | SPM_MPLLOFF_DIS | SPM_FHC_SLEEP_DIS | SPM_26M_DIS);
 
 	if (gSpm_SODI_mempll_pwr_mode == 1)
 		spm_flags |= SPM_DDRPHY_S1_DIS;	/* MEMPLL CG mode */
