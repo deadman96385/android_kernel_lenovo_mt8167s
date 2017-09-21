@@ -26,6 +26,7 @@
 #define ROOT_NODE /
 #endif
 #include "tb8167p3_64_bsp_bat_setting.dtsi"
+#include <dt-bindings/gpio/gpio.h>
 
 ROOT_NODE {
 	dummy1v8: fixedregulator@0 {
@@ -316,7 +317,7 @@ ROOT_NODE {
 	cap-sd-highspeed;
 	sd-uhs-sdr50;
 	sd-uhs-sdr104;
-	cd-gpios = <&pio 20 0>;
+	cd-gpios = <&pio 20 GPIO_ACTIVE_LOW>;
 	vmmc-supply = <&mt6392_vmch_reg>;
 	vqmmc-supply = <&mt6392_vmc_reg>;
 };
