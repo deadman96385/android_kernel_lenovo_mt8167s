@@ -18,6 +18,7 @@
 };
 
 &mfgcfg {
+	compatible = "syscon";
 	status = "disabled";
 };
 
