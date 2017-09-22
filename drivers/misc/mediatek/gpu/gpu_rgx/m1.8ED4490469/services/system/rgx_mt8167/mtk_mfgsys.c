@@ -112,6 +112,8 @@ static const char * const top_mfg_clk_name[] = {
 #define REG_MFG_CG_CLR 0x08
 
 
+char rgx_fw_name[20] = "rgx.fw.signed";
+
 #ifdef CONFIG_MTK_HIBERNATION
 int gpu_pm_restore_noirq(struct device *device)
 {
@@ -548,6 +550,12 @@ static bool MTKCheckDeviceInit(void)
 	}
 
 	return ret;
+}
+
+void MTKSetICVerion(void)
+{
+	if (mt_get_chip_sw_ver() == 0) /* E1 */
+		strcat(rgx_fw_name, ".e1");
 }
 
 PVRSRV_ERROR MTKDevPrePowerState(IMG_HANDLE hSysData, PVRSRV_DEV_POWER_STATE eNewPowerState,
