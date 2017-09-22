@@ -93,6 +93,7 @@
 #include <linux/kobject.h>
 #include <linux/prefetch.h>
 #include <linux/platform_device.h>
+#include <linux/of_platform.h>
 #include <linux/io.h>
 #include <linux/idr.h>
 #include <linux/proc_fs.h>
@@ -102,6 +103,8 @@
 #ifdef CONFIG_OF
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
 #endif
 
 #include "musbfsh_core.h"
@@ -128,6 +131,22 @@ module_param(mtk11_host_qmu_concurrent, int, 0644);
 module_param(mtk11_host_qmu_pipe_msk, int, 0644);
 module_param(mtk11_host_qmu_max_active_isoc_gpd, int, 0644);
 module_param(mtk11_host_qmu_max_number_of_pkts, int, 0644);
+#endif
+#if (defined(CONFIG_MUSBFSH_VBUS) && !defined(CONFIG_MUSBFSH_IDDIG))
+bool mtk11_suspend;
+bool mtk11_with_device;
+#endif
+#ifdef CONFIG_MUSBFSH_VBUS
+struct pinctrl *mt_pinctrl;
+struct pinctrl_state *pinctrl_drvvbus1;
+struct pinctrl_state *pinctrl_drvvbus1_low;
+struct pinctrl_state *pinctrl_drvvbus1_high;
+#endif
+#ifdef CONFIG_MUSBFSH_IDDIG
+struct pinctrl_state *pinctrl_usb11_iddig;
+static int usb11_iddig_number;
+static unsigned int usb11_iddig_pin;
+struct wake_lock usb11_lock;
 #endif
 
 int musbfsh_host_dynamic_fifo = 1;
@@ -519,7 +538,9 @@ static irqreturn_t musbfsh_stage0_irq(struct musbfsh *musbfsh, u8 int_usb, u8 de
 			usb_hcd_poll_rh_status(hcd);
 		else
 			usb_hcd_resume_root_hub(hcd);
-
+#if (defined(CONFIG_MUSBFSH_VBUS) && !defined(CONFIG_MUSBFSH_IDDIG))
+		mtk11_with_device = true;
+#endif
 		WARNING("CONNECT ! devctl 0x%02x\n", devctl);
 	}
 
@@ -532,6 +553,12 @@ static irqreturn_t musbfsh_stage0_irq(struct musbfsh *musbfsh, u8 int_usb, u8 de
 		handled = IRQ_HANDLED;
 		usb_hcd_resume_root_hub(musbfsh_to_hcd(musbfsh));
 		musbfsh_root_disconnect(musbfsh);
+#if (defined(CONFIG_MUSBFSH_VBUS) && !defined(CONFIG_MUSBFSH_IDDIG))
+		if (mtk11_suspend && mtk11_with_device)
+			mt_usb11_clock_unprepare();
+		else
+			mtk11_with_device = false;
+#endif
 	}
 
 	/* mentor saves a bit: bus reset and babble share the same irq.
@@ -551,7 +578,7 @@ static irqreturn_t musbfsh_stage0_irq(struct musbfsh *musbfsh, u8 int_usb, u8 de
 		} else {
 			ERR("Stopping host session -- babble\n");
 			devctl |= MUSBFSH_DEVCTL_SESSION;
-			musbfsh_writeb(musbfsh->mregs, MUSBFSH_DEVCTL, devctl);
+			/*musbfsh_writeb(musbfsh->mregs, MUSBFSH_DEVCTL, devctl);*/ /*ignore babble*/
 		}
 	}
 
@@ -591,6 +618,12 @@ void musbfsh_start(struct musbfsh *musbfsh)
 	musbfsh_writew(regs, MUSBFSH_INTRRX, 0xffff);
 	musbfsh_writeb(regs, MUSBFSH_INTRUSB, 0xff);
 	musbfsh_writeb(regs, MUSBFSH_HSDMA_INTR, 0xff);
+
+	/*remove babble: NOISE_STALL_SOF:1, BABBLE_CLR_EN:0*/
+	devctl = musbfsh_readb(regs, MUSBFSH_ULPI_REG_DATA);
+	devctl = devctl | 0x80;
+	devctl = devctl & 0xbf;
+	musbfsh_writeb(regs, MUSBFSH_ULPI_REG_DATA, devctl);
 
 	musbfsh->is_active = 0;
 	musbfsh->is_multipoint = 1;
@@ -1149,6 +1182,73 @@ static void musbfsh_free(struct musbfsh *musbfsh)
  *	not yet corrected for platform-specific offsets
  */
 #ifdef CONFIG_OF
+#ifdef CONFIG_MUSBFSH_IDDIG
+static void musbfsh_id_pin_work(struct work_struct *data)
+{
+	int iddig_state = 1;
+
+	WARNING("musbfsh_id_pin_work\n");
+	iddig_state = __gpio_get_value(usb11_iddig_pin);
+	WARNING("iddig_state = %d\n", iddig_state);
+	wake_lock(&usb11_lock);
+	if (!iddig_state) {
+		WARNING("Device was plug in\n");
+		pinctrl_select_state(mt_pinctrl, pinctrl_drvvbus1_high);
+		mt_usb11_clock_prepare();
+		mt65xx_usb11_clock_enable(true);
+		musbfsh_power = true;
+		WARNING("enable usb11 iddig irq HIGH @lin %d\n", __LINE__);
+		irq_set_irq_type(usb11_iddig_number, IRQF_TRIGGER_HIGH);
+		enable_irq(usb11_iddig_number);
+		irq_set_irq_wake(usb11_iddig_number, 1);
+	} else {
+		WARNING("Device was unplug\n");
+		pinctrl_select_state(mt_pinctrl, pinctrl_drvvbus1_low);
+		mdelay(1000);
+		WARNING("enable usb11 iddig irq LOW @lin %d\n", __LINE__);
+		mt65xx_usb11_clock_enable(false);
+		mt_usb11_clock_unprepare();
+		musbfsh_power = false;
+		irq_set_irq_type(usb11_iddig_number, IRQF_TRIGGER_LOW);
+		enable_irq(usb11_iddig_number);
+		irq_set_irq_wake(usb11_iddig_number, 1);
+		if (wake_lock_active(&usb11_lock))
+			wake_unlock(&usb11_lock);
+	}
+}
+
+static irqreturn_t mt_usb11_iddig_int(int irq, void *dev_id)
+{
+	schedule_delayed_work(&musbfsh_Device->id_pin_work, 0);
+	disable_irq_nosync(usb11_iddig_number);
+	WARNING("disable iddig irq @lin %d\n", __LINE__);
+	WARNING("id pin interrupt assert\n");
+	return IRQ_HANDLED;
+}
+
+void musbfsh_iddig_int(void)
+{
+	int ret = 0;
+
+	WARNING("****%s:%d before Init IDDIG KS!!!!!\n", __func__, __LINE__);
+	pinctrl_usb11_iddig = pinctrl_lookup_state(mt_pinctrl, "iddig_irq");
+	if (IS_ERR(pinctrl_usb11_iddig)) {
+		ret = PTR_ERR(pinctrl_usb11_iddig);
+		WARNING("Cannot find usb pinctrl iddig_irq\n");
+	}
+	pinctrl_select_state(mt_pinctrl, pinctrl_usb11_iddig);
+	usb11_iddig_number = __gpio_to_irq(usb11_iddig_pin);
+	WARNING("usb usb_iddig_number %d\n", usb11_iddig_number);
+
+	ret = request_irq(usb11_iddig_number, mt_usb11_iddig_int, IRQF_TRIGGER_LOW, "USB11_IDDIG", NULL);
+	if (ret > 0)
+		WARNING("USB IDDIG IRQ LINE not available!!\n");
+	else
+		WARNING("USB IDDIG IRQ LINE available!!\n");
+	irq_set_irq_wake(usb11_iddig_number, 1);
+}
+#endif
+
 static int
 musbfsh_init_controller(struct device *dev, int nIrq, void __iomem *ctrl, void __iomem *ctrlp)
 #else
@@ -1291,6 +1391,14 @@ static int musbfsh_init_controller(struct device *dev, int nIrq, void __iomem *c
 		ERR("usb_add_hcd fail!");
 		goto fail3;
 	}
+
+	/*initial done, turn off usb */
+	#ifdef CONFIG_MUSBFSH_IDDIG
+	mt65xx_usb11_clock_enable(false);
+	mt_usb11_clock_unprepare();
+	musbfsh_power = false;
+	#endif
+
 	status = musbfsh_init_debugfs(musbfsh);
 
 	if (status < 0) {
@@ -1337,10 +1445,46 @@ fail0:
 static u64 *orig_dma_mask;
 #endif
 
+#ifdef CONFIG_MUSBFSH_VBUS
+void musbfsh_init_drvvbus(void)
+{
+	int ret = 0;
+
+	WARNING("****%s:%d Init Drive VBUS!!!!!\n", __func__, __LINE__);
+
+	pinctrl_drvvbus1 = pinctrl_lookup_state(mt_pinctrl, "vbus_init");
+	if (IS_ERR(pinctrl_drvvbus1)) {
+		ret = PTR_ERR(pinctrl_drvvbus1);
+		WARNING("ERROR:Cannot find usb pinctrl drvvbus1\n");
+		return;
+	}
+
+	pinctrl_drvvbus1_low = pinctrl_lookup_state(mt_pinctrl, "vbus_low");
+	if (IS_ERR(pinctrl_drvvbus1_low)) {
+		ret = PTR_ERR(pinctrl_drvvbus1_low);
+		WARNING("ERROR:Cannot find usb pinctrl drvvbus1_low\n");
+		return;
+	}
+
+	pinctrl_drvvbus1_high = pinctrl_lookup_state(mt_pinctrl, "vbus_high");
+	if (IS_ERR(pinctrl_drvvbus1_high)) {
+		ret = PTR_ERR(pinctrl_drvvbus1_high);
+		WARNING("ERROR:Cannot find usb pinctrl drvvbus1_high\n");
+	}
+
+	pinctrl_select_state(mt_pinctrl, pinctrl_drvvbus1);
+	WARNING("****%s:%d end Init Drive VBUS KS!!!!!\n", __func__, __LINE__);
+
+}
+#endif
+
 static int musbfsh_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct device_node *node;
+	#ifdef CONFIG_MUSBFSH_VBUS
+	struct platform_device *pdev_node;
+	#endif
 
 	int irq = MT_USB1_IRQ_ID;
 	int status;
@@ -1386,6 +1530,27 @@ static int musbfsh_probe(struct platform_device *pdev)
 	if (status < 0)
 		ERR("musbfsh_init_controller failed with status %d\n", status);
 	INFO("--\n");
+	#ifdef CONFIG_MUSBFSH_VBUS
+	pdev_node = of_find_device_by_node(node);
+	if (!pdev_node) {
+		WARNING("ERROR: Cannot find usb pdev!\n");
+		return PTR_ERR(node);
+	}
+	mt_pinctrl = devm_pinctrl_get(&pdev_node->dev);
+	if (IS_ERR(mt_pinctrl))
+		WARNING("ERROR: Cannot find usb pinctrl!\n");
+	musbfsh_init_drvvbus();
+	#endif
+	#ifdef CONFIG_MUSBFSH_IDDIG
+	pinctrl_select_state(mt_pinctrl, pinctrl_drvvbus1_low);
+	usb11_iddig_pin = of_get_named_gpio(node, "iddig_gpio", 0);
+	if (usb11_iddig_pin == 0)
+		WARNING("iddig_gpio fail\n");
+	WARNING("usb11 iddig_pin %x\n", usb11_iddig_pin);
+	INIT_DELAYED_WORK(&musbfsh_Device->id_pin_work, musbfsh_id_pin_work);
+	musbfsh_iddig_int();
+	wake_lock_init(&usb11_lock, WAKE_LOCK_SUSPEND, "USB11 suspend lock");
+	#endif
 #ifdef IC_USB
 	device_create_file(dev, &dev_attr_start);
 	WARNING("IC-USB is enabled\n");
@@ -1538,9 +1703,11 @@ int mt_usb11_clock_prepare(void)
 	retval = clk_prepare(usbpll_clk);
 	if (retval)
 		goto exit;
+	#if 0
 	retval = clk_prepare(usb_clk);
 	if (retval)
 		goto exit;
+	#endif
 
 	retval = clk_prepare(usbmcu_clk);
 	if (retval)
@@ -1561,7 +1728,7 @@ void mt_usb11_clock_unprepare(void)
 
 	clk_unprepare(icusb_clk);
 	clk_unprepare(usbmcu_clk);
-	clk_unprepare(usb_clk);
+	/*clk_unprepare(usb_clk);*/
 	clk_unprepare(usbpll_clk);
 }
 
@@ -1572,11 +1739,38 @@ static int musbfsh_suspend(struct device *dev)
 	struct musbfsh *musbfsh = dev_to_musbfsh(&pdev->dev);
 
 	WARNING("++\n");
+#if (defined(CONFIG_MUSBFSH_VBUS) && !defined(CONFIG_MUSBFSH_IDDIG))
+	mtk11_suspend = true;
+#elif (defined(CONFIG_MUSBFSH_VBUS) && defined(CONFIG_MUSBFSH_IDDIG))
+	musbfsh_power = true;
+	mt_usb11_clock_prepare();
+	mt65xx_usb11_clock_enable(true);
+#endif
 	spin_lock_irqsave(&musbfsh->lock, flags);
 	musbfsh_save_context(musbfsh);
+#if (defined(CONFIG_MUSBFSH_VBUS) && !defined(CONFIG_MUSBFSH_IDDIG))
+	pinctrl_select_state(mt_pinctrl, pinctrl_drvvbus1_low);
+	mdelay(1000);
+	WARNING("+++\n");
 	musbfsh_platform_set_power(musbfsh, 0);
+#elif (defined(CONFIG_MUSBFSH_VBUS) && defined(CONFIG_MUSBFSH_IDDIG))
+	mt65xx_usb11_phy_savecurrent();
+#else
+	musbfsh_platform_set_power(musbfsh, 0);
+#endif
 	spin_unlock_irqrestore(&musbfsh->lock, flags);
+#if (defined(CONFIG_MUSBFSH_VBUS) && !defined(CONFIG_MUSBFSH_IDDIG))
+	if (!mtk11_with_device) {
+		mt_usb11_clock_unprepare();
+		WARNING("unprepare++\n");
+	}
+#elif (defined(CONFIG_MUSBFSH_VBUS) && defined(CONFIG_MUSBFSH_IDDIG))
+	mt65xx_usb11_clock_enable(false);
+	musbfsh_power = false;
 	mt_usb11_clock_unprepare();
+#endif
+
+	WARNING("++++\n");
 	return 0;
 }
 
@@ -1585,18 +1779,38 @@ static int musbfsh_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	unsigned long flags;
 	struct musbfsh *musbfsh = dev_to_musbfsh(&pdev->dev);
+#if (defined(CONFIG_MUSBFSH_VBUS) && !defined(CONFIG_MUSBFSH_IDDIG))
 	int retval = 0;
 
 	WARNING("++\n");
+	pinctrl_select_state(mt_pinctrl, pinctrl_drvvbus1_high);
+	mtk11_suspend = false;
+	mtk11_with_device = false;
 	retval = mt_usb11_clock_prepare();
 	if (retval) {
 		WARNING("!!musbfsh clock prepre fail,need to check!!\n");
 		return retval;
 	}
+#elif (defined(CONFIG_MUSBFSH_VBUS) && defined(CONFIG_MUSBFSH_IDDIG))
+	musbfsh_power = true;
+	mt_usb11_clock_prepare();
+	mt65xx_usb11_clock_enable(true);
+#endif
 	spin_lock_irqsave(&musbfsh->lock, flags);
+#if defined(CONFIG_MUSBFSH_IDDIG)
+	mt65xx_usb11_phy_recover();
+#else
 	musbfsh_platform_set_power(musbfsh, 1);
+#endif
 	musbfsh_restore_context(musbfsh);
+	WARNING("++++\n");
 	spin_unlock_irqrestore(&musbfsh->lock, flags);
+#if (defined(CONFIG_MUSBFSH_VBUS) && defined(CONFIG_MUSBFSH_IDDIG))
+	mt65xx_usb11_clock_enable(false);
+	musbfsh_power = false;
+	mt_usb11_clock_unprepare();
+#endif
+
 	return 0;
 }
 

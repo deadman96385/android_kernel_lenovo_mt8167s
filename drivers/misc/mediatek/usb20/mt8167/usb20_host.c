@@ -343,14 +343,15 @@ static void musb_id_pin_work(struct work_struct *data)
 		goto out;
 	}
 
+	wake_lock(&mtk_musb->usb_lock);
 	mtk_musb->is_host = musb_is_host();
-	DBG(0, "musb is as %s\n", mtk_musb->is_host?"host":"device");
+	DBG(0, "musb is as %s, already lock\n", mtk_musb->is_host?"host":"device");
 	switch_set_state((struct switch_dev *)&otg_state, mtk_musb->is_host);
 
 	if (mtk_musb->is_host) {
 		/*setup fifo for host mode*/
 		ep_config_from_table_for_host(mtk_musb);
-		wake_lock(&mtk_musb->usb_lock);
+		/* wake_lock(&mtk_musb->usb_lock); */
 		musb_platform_set_vbus(mtk_musb, 1);
 
 		/* for no VBUS sensing IP*/
@@ -398,8 +399,6 @@ static void musb_id_pin_work(struct work_struct *data)
 	} else {
 		DBG(0, "devctl is %x\n", musb_readb(mtk_musb->mregs, MUSB_DEVCTL));
 		musb_writeb(mtk_musb->mregs, MUSB_DEVCTL, 0);
-		if (wake_lock_active(&mtk_musb->usb_lock))
-			wake_unlock(&mtk_musb->usb_lock);
 		musb_platform_set_vbus(mtk_musb, 0);
 
 	/* for no VBUS sensing IP */
@@ -413,13 +412,14 @@ static void musb_id_pin_work(struct work_struct *data)
 #endif
 
 #if !defined(MTK_HDMI_SUPPORT)
-		#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-		spin_lock(&mtk_musb->lock);
-		#endif
 		musb_stop(mtk_musb);
 #else
 		mt_usb_check_reconnect();/*ALPS01688604, IDDIG noise caused by MHL init*/
 #endif
+
+		if (wake_lock_active(&mtk_musb->usb_lock))
+			wake_unlock(&mtk_musb->usb_lock);
+
 		mtk_musb->xceiv->otg->state = OTG_STATE_B_IDLE;
 		MUSB_DEV_MODE(mtk_musb);
 		switch_int_to_host(mtk_musb);

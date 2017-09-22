@@ -287,15 +287,23 @@ void usb_phy_switch_to_uart(void)
 	/*if (usb_phy_check_in_uart_mode()) */
 		/*return;*/
 	DBG(0, "USB Port -> UART\n");
+	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	mt_usb_clock_prepare();
+	#endif
 	usb_enable_clock(true);
 	udelay(50);
 
 	USBPHY_SET8(0x00, 0x01);
-	USBPHY_CLR8(0x1a, 0x80);
+	USBPHY_CLR8(0x1a, 0x80);/*818 bit23*/
+	USBPHY_SET8(0x1d, 0x40);/*81C bit14*/
+	USBPHY_CLR8(0x1d, 0x20);/*81C bit13*/
+	USBPHY_SET8(0x1d, 0x10);/*81C bit12*/
+	USBPHY_SET8(0x1d, 0x08);/*81C bit11*/
+	USBPHY_CLR8(0x1d, 0x04);/*81C bit10*/
 	USBPHY_SET8(0x6e, 0x01);
 	USBPHY_SET8(0x6b, 0x40);
 	USBPHY_CLR8(0x6b, 0x80);
-	USBPHY_SET8(0x22, 0x02);
+	USBPHY_SET8(0x22, 0x02);/*820 bit17*/
 	USBPHY_SET8(0x6b, 0x04);
 	USBPHY_SET8(0x6e, 0x04);
 	USBPHY_SET8(0x6b, 0x10);
@@ -322,6 +330,10 @@ void usb_phy_switch_to_uart(void)
 #endif
 	usb_enable_clock(false);
 
+	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	mt_usb_clock_unprepare();
+	#endif
+
 	/*set uart rx path*/
 	/*mtk_uart_usb_rx_sel(1, 1);*/
 	usb_port_mode_temp = 1;
@@ -333,10 +345,28 @@ void usb_phy_switch_to_uart(void)
 
 void usb_phy_switch_to_usb(void)
 {
+#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	mt_usb_clock_prepare();
+#endif
 	usb_enable_clock(true);
 	udelay(50);
 
 	regmap_update_bits(mt_regmap, 0x980, 1<<7, 0<<7);
+	USBPHY_CLR8(0x00, 0x01);
+	USBPHY_SET8(0x1a, 0x80);/*818 bit23*/
+	USBPHY_CLR8(0x1d, 0x40);/*81C bit14*/
+	USBPHY_SET8(0x1d, 0x20);/*81C bit13*/
+	USBPHY_CLR8(0x1d, 0x10);/*81C bit12*/
+	USBPHY_CLR8(0x1d, 0x08);/*81C bit11*/
+	USBPHY_SET8(0x1d, 0x04);/*81C bit10*/
+	USBPHY_CLR8(0x6e, 0x01);
+	USBPHY_CLR8(0x6b, 0x40);
+	USBPHY_SET8(0x6b, 0x80);
+	USBPHY_CLR8(0x22, 0x02);/*820 bit17*/
+	USBPHY_CLR8(0x6b, 0x04);
+	USBPHY_CLR8(0x6e, 0x04);
+	USBPHY_CLR8(0x6b, 0x10);
+
 #if 0
 	/* GPIO Selection */
 	/*DRV_WriteReg32(GPIO_BASE + 0x508, 0x10);		//set */
@@ -346,10 +376,10 @@ void usb_phy_switch_to_usb(void)
 	/* clear force_uart_en */
 	USBPHY_WRITE8(0x6B, 0x00);
 #endif
-	usb_enable_clock(false);
-	usb_phy_poweron();
+	/* usb_enable_clock(false); */
+	/* usb_phy_poweron(); */
 	/* disable the USB clock turned on in usb_phy_poweron() */
-	usb_enable_clock(false);
+	/* usb_enable_clock(false); */
 
 	usb_port_mode_temp = 0;
 	DBG(0, "usb port value in usb function:%d\n", usb_port_mode_temp);

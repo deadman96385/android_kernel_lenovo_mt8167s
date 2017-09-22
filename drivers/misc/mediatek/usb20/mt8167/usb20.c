@@ -49,10 +49,7 @@ struct clk *icusb_clk;
 #ifdef CONFIG_MTK_UART_USB_SWITCH
 struct regmap *mt_regmap;
 #endif
-
-#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-static bool usb_shutdown;
-#endif
+struct work_struct musb_do_idle_work;
 
 /*static bool platform_init_first = true;*/
 static u32 cable_mode = CABLE_MODE_NORMAL;
@@ -140,12 +137,36 @@ MODULE_DEVICE_TABLE(of, apusb_of_ids);
 
 static struct timer_list musb_idle_timer;
 
-static void musb_do_idle(unsigned long _musb)
+static inline u8 musb_rbyte(const void __iomem *addr, unsigned offset)
 {
-	struct musb	*musb = (void *)_musb;
+	u8 rc = 0;
+
+	usb_enable_clock(true);
+	DBG(1, "[MUSB]:access %s function when usb clock is off 0x%X\n", __func__, offset);
+	rc = readb(addr + offset);
+	usb_enable_clock(false);
+
+	return rc;
+}
+
+u8 musb_readB(const void __iomem *addr, unsigned offset)
+{
+	u8 rc = 0;
+
+	if (!mtk_usb_power)
+		rc = musb_rbyte(addr, offset);
+	else
+		rc = musb_readb(addr, offset);
+	return rc;
+}
+
+static void musb_idle_work_func(struct work_struct *work)
+{
+	struct musb	*musb = mtk_musb;
 	unsigned long	flags;
 	u8	devctl;
 
+	DBG(0, "%s:%d\n", __func__, __LINE__);
 #if !defined(CONFIG_POWER_EXT)
 	if (musb->is_active) {
 		DBG(0, "%s active, igonre do_idle\n",
@@ -154,12 +175,19 @@ static void musb_do_idle(unsigned long _musb)
 	}
 #endif
 
+#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+		if (!mtk_usb_power) {
+			DBG(0, "musb already disable\n");
+			mt_usb_clock_prepare();
+		}
+#endif
+
 	spin_lock_irqsave(&musb->lock, flags);
 
 	switch (musb->xceiv->otg->state) {
 	case OTG_STATE_B_PERIPHERAL:
 	case OTG_STATE_A_WAIT_BCON:
-		devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+		devctl = musb_readB(musb->mregs, MUSB_DEVCTL);
 		if (devctl & MUSB_DEVCTL_BDEVICE) {
 			musb->xceiv->otg->state = OTG_STATE_B_IDLE;
 			MUSB_DEV_MODE(musb);
@@ -169,7 +197,7 @@ static void musb_do_idle(unsigned long _musb)
 		}
 		break;
 	case OTG_STATE_A_HOST:
-		devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+		devctl = musb_readB(musb->mregs, MUSB_DEVCTL);
 		if (devctl &  MUSB_DEVCTL_BDEVICE)
 			musb->xceiv->otg->state = OTG_STATE_B_IDLE;
 		else
@@ -180,7 +208,20 @@ static void musb_do_idle(unsigned long _musb)
 	}
 	spin_unlock_irqrestore(&musb->lock, flags);
 
+#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+		if (!mtk_usb_power) {
+			DBG(0, "done\n");
+			mt_usb_clock_unprepare();
+		}
+#endif
+
 	DBG(0, "otg_state %s\n", otg_state_string(musb->xceiv->otg->state));
+}
+
+static void musb_do_idle(unsigned long _musb)
+{
+	DBG(0, "schedule work to do musb_do_idle\n");
+	schedule_work(&musb_do_idle_work);
 }
 
 static void mt_usb_try_idle(struct musb *musb, unsigned long timeout)
@@ -387,19 +428,16 @@ void do_connection_work(struct work_struct *data)
 
 	} else if (mtk_musb->power && (usb_in == false)) {
 		/* disable usb */
-		musb_stop(mtk_musb);
 		#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-		spin_lock_irqsave(&mtk_musb->lock, flags);
+		spin_unlock_irqrestore(&mtk_musb->lock, flags);
 		#endif
+		musb_stop(mtk_musb);
 		if (wake_lock_active(&mtk_musb->usb_lock)) {
 			DBG(0, "unlock\n");
 			wake_unlock(&mtk_musb->usb_lock);
 		} else {
 			DBG(0, "lock not active\n");
 		}
-		#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-		spin_unlock_irqrestore(&mtk_musb->lock, flags);
-		#endif
 	} else {
 		DBG(0, "do nothing, usb_in:%d, power:%d\n",
 				usb_in, mtk_musb->power);
@@ -647,7 +685,7 @@ static irqreturn_t mt_usb_interrupt(int irq, void *dev_id)
 	u32 usb_l1_ints;
 
 #ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-	if (usb_shutdown) {
+	if (musb_shutted) {
 		pr_err("%s, already shut down\n", __func__);
 		return IRQ_HANDLED;
 	}
@@ -1309,6 +1347,7 @@ static int __init mt_usb_init(struct musb *musb)
 							DMA_INT_STATUS);
 #endif
 
+	INIT_WORK(&musb_do_idle_work, musb_idle_work_func);
 	setup_timer(&musb_idle_timer, musb_do_idle, (unsigned long) musb);
 
 	DBG(0, "%s, init_otg before\n", __func__);
@@ -1739,7 +1778,6 @@ static void mt_usb_shutdown(struct platform_device *pdev)
 	pr_err("%s, 0xa4 = 0x%x, 0x200 = 0x%x\n", __func__,
 		musb_readl(mtk_musb->mregs, USB_L1INTM),
 		musb_readb(mtk_musb->mregs, MUSB_HSDMA_INTR));
-	usb_shutdown = true;
 
 }
 #endif
