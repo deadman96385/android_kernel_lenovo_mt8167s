@@ -82,9 +82,9 @@ static struct musb_fifo_cfg fifo_cfg_host[] = {
 { .hw_ep_num =	8, .style = MUSB_FIFO_RX,   .maxpacket = 64,  .mode = MUSB_BUF_SINGLE},
 };
 
-u32 delay_time = 15;
+int delay_time = 15;
 module_param(delay_time, int, 0400);
-u32 delay_time1 = 55;
+int delay_time1 = 55;
 module_param(delay_time1, int, 0400);
 
 void mt_usb_set_vbus(struct musb *musb, int is_on)
@@ -191,7 +191,7 @@ void mt_usb_init_drvvbus(void)
 #endif
 }
 
-u32 sw_deboun_time = 400;
+int sw_deboun_time = 400;
 module_param(sw_deboun_time, int, 0400);
 struct switch_dev otg_state;
 
