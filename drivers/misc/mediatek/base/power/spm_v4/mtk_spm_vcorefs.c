@@ -184,9 +184,7 @@ char *spm_vcorefs_dump_dvfs_regs(char *p)
 		/* SPM */
 		spm_vcorefs_warn("SPM_SW_FLAG            : 0x%x\n", spm_read(SPM_SW_FLAG));
 		spm_vcorefs_warn("SPM_SW_RSV_5           : 0x%x\n", spm_read(SPM_SW_RSV_5));
-#if !defined(CONFIG_MACH_MT6771)
 		spm_vcorefs_warn("SPM_SW_RSV_11          : 0x%x\n", spm_read(SPM_SW_RSV_11));
-#endif
 		spm_vcorefs_warn("DVFSRC_MD_GEAR         : 0x%x\n", spm_read(DVFSRC_MD_GEAR));
 		spm_vcorefs_warn("MD2SPM_DVFS_CON        : 0x%x\n", spm_read(MD2SPM_DVFS_CON));
 		spm_vcorefs_warn("SPM_DVFS_EVENT_STA     : 0x%x\n", spm_read(SPM_DVFS_EVENT_STA));
