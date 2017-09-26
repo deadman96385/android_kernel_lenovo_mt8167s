@@ -180,54 +180,9 @@ enum ptp_det_id {
 	NR_PTP_DET,	/* 1 or 2 */
 };
 
-enum ptp_state {
-	PTP_CPU_BIG_IS_SET_VOLT = 0,	/* B */
-	PTP_GPU_IS_SET_VOLT = 1,	/* G */
-	PTP_CPU_LITTLE_IS_SET_VOLT = 2,	/* L */
-};
-
-
 /* PTP Extern Function */
 extern int is_ptp_initialized_done(void);
 unsigned int mt_ptp_get_level(void);
 int get_ptpod_status(void);
-
-/* aee set function */
-extern void aee_rr_rec_ptp_e0(u32 val);
-extern void aee_rr_rec_ptp_e1(u32 val);
-extern void aee_rr_rec_ptp_e2(u32 val);
-extern void aee_rr_rec_ptp_e3(u32 val);
-extern void aee_rr_rec_ptp_e4(u32 val);
-extern void aee_rr_rec_ptp_e5(u32 val);
-extern void aee_rr_rec_ptp_e6(u32 val);
-extern void aee_rr_rec_ptp_e7(u32 val);
-extern void aee_rr_rec_ptp_e8(u32 val);
-extern void aee_rr_rec_ptp_e9(u32 val);
-extern void aee_rr_rec_ptp_e10(u32 val);
-extern void aee_rr_rec_ptp_e11(u32 val);
-extern void aee_rr_rec_ptp_vboot(u64 val);
-extern void aee_rr_rec_ptp_gpu_volt(u64 val);
-extern void aee_rr_rec_ptp_cpu_little_volt(u64 val);
-extern void aee_rr_rec_ptp_temp(u64 val);
-extern void aee_rr_rec_ptp_status(u8 val);
-
-/* aee get function */
-extern u32 aee_rr_curr_ptp_e0(void);
-extern u32 aee_rr_curr_ptp_e1(void);
-extern u32 aee_rr_curr_ptp_e2(void);
-extern u32 aee_rr_curr_ptp_e3(void);
-extern u32 aee_rr_curr_ptp_e4(void);
-extern u32 aee_rr_curr_ptp_e5(void);
-extern u32 aee_rr_curr_ptp_e6(void);
-extern u32 aee_rr_curr_ptp_e7(void);
-extern u32 aee_rr_curr_ptp_e8(void);
-extern u32 aee_rr_curr_ptp_e9(void);
-extern u32 aee_rr_curr_ptp_e10(void);
-extern u32 aee_rr_curr_ptp_e11(void);
-extern u64 aee_rr_curr_ptp_vboot(void);
-extern u64 aee_rr_curr_ptp_gpu_volt(void);
-extern u64 aee_rr_curr_ptp_cpu_little_volt(void);
-extern u64 aee_rr_curr_ptp_temp(void);
-extern u8 aee_rr_curr_ptp_status(void);
 
 #endif

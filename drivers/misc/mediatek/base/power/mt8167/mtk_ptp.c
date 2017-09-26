@@ -1432,25 +1432,11 @@ static int ptp_volt_thread_handler(void *data)
 {
 	struct ptp_ctrl *ctrl = (struct ptp_ctrl *)data;
 	struct ptp_det *det = id_to_ptp_det(ctrl->det_id);
-	int ptp_status_temp = -1;
 
 	FUNC_ENTER(FUNC_LV_HELP);
 
 	do {
 		wait_event_interruptible(ctrl->wq, ctrl->volt_update);
-
-		/* update set volt status for this bank */
-		switch (det->ctrl_id) {
-		case PTP_CTRL_MCUSYS:
-			aee_rr_rec_ptp_status(aee_rr_curr_ptp_status() |
-				(1 << PTP_CPU_LITTLE_IS_SET_VOLT));
-			ptp_status_temp = PTP_CPU_LITTLE_IS_SET_VOLT;
-			break;
-		default:
-			ptp_error("%s: %u, wrong ctrl_id = %d\n",
-				__func__, __LINE__, det->ctrl_id);
-			break;
-		}
 
 		if ((ctrl->volt_update & PTP_VOLT_UPDATE) && det->ops->set_volt)
 			det->ops->set_volt(det);
@@ -1459,11 +1445,6 @@ static int ptp_volt_thread_handler(void *data)
 			det->ops->restore_default_volt(det);
 
 		ctrl->volt_update = PTP_VOLT_NONE;
-
-		/* clear out set volt status for this bank */
-		if (ptp_status_temp >= 0)
-			aee_rr_rec_ptp_status(aee_rr_curr_ptp_status() &
-				~(1 << ptp_status_temp));
 
 	} while (!kthread_should_stop());
 
@@ -1701,13 +1682,9 @@ static void ptp_init_det_done(struct ptp_det *det)
 static void ptp_set_ptp_volt(struct ptp_det *det)
 {
 #if SET_PMIC_VOLT
-	int cur_temp, low_temp_offset, dvfs_index;
+	int i, cur_temp, low_temp_offset;
 	unsigned int clamp_signed_off_vmax;
 	struct ptp_ctrl *ctrl = id_to_ptp_ctrl(det->ctrl_id);
-#ifdef CONFIG_THERMAL
-	unsigned long long temp_long;
-	unsigned long long temp_cur = (unsigned long long)aee_rr_curr_ptp_temp();
-#endif
 
 	cur_temp = det->ops->get_temp(det);
 
@@ -1720,35 +1697,11 @@ static void ptp_set_ptp_volt(struct ptp_det *det)
 		low_temp_offset = 0;
 
 	/* all scale of volt_tbl_pmic,volt_tbl,volt_offset are pmic value */
-	for (dvfs_index = 0; dvfs_index < det->num_freq_tbl; dvfs_index++) {
-		clamp_signed_off_vmax = PTP_VOLT_TO_PMIC_VAL(det->volt_table[dvfs_index]);
-		det->volt_tbl_pmic[dvfs_index] =
-			clamp(det->volt_tbl[dvfs_index] + det->volt_offset + low_temp_offset,
+	for (i = 0; i < det->num_freq_tbl; i++) {
+		clamp_signed_off_vmax = PTP_VOLT_TO_PMIC_VAL(det->volt_table[i]);
+		det->volt_tbl_pmic[i] =
+			clamp(det->volt_tbl[i] + det->volt_offset + low_temp_offset,
 					(det->VMIN + PTPOD_PMIC_OFFSET), clamp_signed_off_vmax);
-	}
-
-	switch (det->ctrl_id) {
-	case PTP_CTRL_MCUSYS:
-#ifdef CONFIG_THERMAL
-		/* update AEE temperature */
-		temp_long = (unsigned long long) det->ops->get_temp(det) / 1000;
-		if (temp_long != 0) {
-			aee_rr_rec_ptp_temp(temp_long << (8 * PTP_CPU_LITTLE_IS_SET_VOLT) |
-				(temp_cur & ~((unsigned long long)0xFF <<
-					(8 * PTP_CPU_LITTLE_IS_SET_VOLT))));
-		}
-#endif
-		/* update AEE voltage */
-		for (dvfs_index = 0; dvfs_index < NR_FREQ; dvfs_index++) {
-			aee_rr_rec_ptp_cpu_little_volt(
-				((unsigned long long)(det->volt_tbl_pmic[dvfs_index])
-					<< (8 * dvfs_index)) | (aee_rr_curr_ptp_cpu_little_volt()
-						& ~((unsigned long long)(0xFF) << (8 * dvfs_index))));
-		}
-		break;
-	default:
-		ptp_error("%s: %u, wrong ctrl_id = %d\n", __func__, __LINE__, det->ctrl_id);
-		break;
 	}
 
 	ctrl->volt_update |= PTP_VOLT_UPDATE;
@@ -2316,11 +2269,6 @@ static int ptp_init01(struct ptp_det *det, struct ptp_ctrl *ctrl)
 	if (ptp_log_en)
 		ptp_info("@%s(), get_volt(%s) = 0x%08X, VBOOT = 0x%08X\n",
 			__func__, det->name, vboot, det->VBOOT);
-
-	/* record vboot of this bank */
-	aee_rr_rec_ptp_vboot(((unsigned long long)(vboot) << (8 * det->ctrl_id)) |
-		(aee_rr_curr_ptp_vboot() & ~((unsigned long long)(0xFF) << (8 * det->ctrl_id))));
-
 	if (vboot != det->VBOOT) {
 		ptp_error("@%s():%d, get_volt(%s) = 0x%08X, VBOOT = 0x%08X\n",
 			__func__, __LINE__, det->name, vboot, det->VBOOT);
@@ -2430,19 +2378,18 @@ unsigned int leakage_sram1;
 
 void get_devinfo(struct ptp_devinfo *p)
 {
-	int *M_HW_RES = (int *)p;
-	int array_index;
+	int *PTPOD = (int *)p;
 
 	FUNC_ENTER(FUNC_LV_HELP);
 
 #if 1
-	M_HW_RES[0] = get_devinfo_with_index(67);
-	M_HW_RES[1] = get_devinfo_with_index(68);
-	M_HW_RES[2] = get_devinfo_with_index(69);
-	M_HW_RES[3] = get_devinfo_with_index(70);
-	M_HW_RES[4] = get_devinfo_with_index(71);
-	M_HW_RES[5] = get_devinfo_with_index(72);
-	M_HW_RES[6] = get_devinfo_with_index(73);
+	PTPOD[0] = get_devinfo_with_index(67);
+	PTPOD[1] = get_devinfo_with_index(68);
+	PTPOD[2] = get_devinfo_with_index(69);
+	PTPOD[3] = get_devinfo_with_index(70);
+	PTPOD[4] = get_devinfo_with_index(71);
+	PTPOD[5] = get_devinfo_with_index(72);
+	PTPOD[6] = get_devinfo_with_index(73);
 #else
 	PTPOD[0] = 0x10BD3C1B;
 	PTPOD[1] = 0x005500FF;
@@ -2453,18 +2400,14 @@ void get_devinfo(struct ptp_devinfo *p)
 	PTPOD[6] = 0x00000000;
 #endif
 
-	aee_rr_rec_ptp_e0((unsigned int)M_HW_RES[0]);
-	aee_rr_rec_ptp_e1((unsigned int)M_HW_RES[1]);
-	aee_rr_rec_ptp_e2((unsigned int)M_HW_RES[2]);
-	aee_rr_rec_ptp_e3((unsigned int)M_HW_RES[3]);
-	aee_rr_rec_ptp_e4((unsigned int)M_HW_RES[4]);
-	aee_rr_rec_ptp_e5((unsigned int)M_HW_RES[5]);
-	aee_rr_rec_ptp_e6((unsigned int)M_HW_RES[6]);
-
-
 	if (ptp_log_en) {
-		for (array_index = 0; array_index <= 6; array_index++)
-			ptp_info("M_HW_RES%d=0x%08X\n", array_index, M_HW_RES[array_index]);
+		ptp_info("PTPOD[0]=0x%08X\n", PTPOD[0]);
+		ptp_info("PTPOD[1]=0x%08X\n", PTPOD[1]);
+		ptp_info("PTPOD[2]=0x%08X\n", PTPOD[2]);
+		ptp_info("PTPOD[3]=0x%08X\n", PTPOD[3]);
+		ptp_info("PTPOD[4]=0x%08X\n", PTPOD[4]);
+		ptp_info("PTPOD[5]=0x%08X\n", PTPOD[5]);
+		ptp_info("PTPOD[6]=0x%08X\n", PTPOD[6]);
 
 		ptp_info("p->PTPINITEN=0x%x\n", p->PTPINITEN);
 		ptp_info("p->PTPMONEN=0x%x\n", p->PTPMONEN);
@@ -2558,17 +2501,6 @@ static int ptp_cpufreq_notifier_registration(int registration)
 	return ret;
 }
 
-static void _mt_ptp_aee_init(void)
-{
-	aee_rr_rec_ptp_vboot(0x0);
-	aee_rr_rec_ptp_cpu_little_volt(0x0);
-	aee_rr_rec_ptp_temp(0x0);
-
-	/* 0xFF default value. 1 means writing new voltage, 0 means finish */
-	aee_rr_rec_ptp_status(0x0);
-}
-
-
 static int ptp_probe(struct platform_device *pdev)
 {
 	struct ptp_det *det;
@@ -2590,8 +2522,6 @@ static int ptp_probe(struct platform_device *pdev)
 		if (ret)
 			return ret;
 	}
-
-	_mt_ptp_aee_init();
 
 	ret = create_procfs();
 	if (ret)
@@ -2832,7 +2762,7 @@ out:
 static int ptp_dump_proc_show(struct seq_file *m, void *v)
 {
 	struct ptp_det *det;
-	int *M_HW_RES = (int *)&ptp_devinfo;
+	int *val = (int *)&ptp_devinfo;
 	int i;
 
 	FUNC_ENTER(FUNC_LV_HELP);
@@ -2843,7 +2773,7 @@ static int ptp_dump_proc_show(struct seq_file *m, void *v)
 	/* mt_ptp_reg_dump(); */
 
 	for (i = 0; i < sizeof(struct ptp_devinfo)/sizeof(unsigned int); i++)
-		seq_printf(m, "M_HW_RES%d\t= 0x%08X\n", i, M_HW_RES[i]);
+		seq_printf(m, "PTPOD%d\t= 0x%08X\n", i, val[i]);
 
 	/* seq_printf(m, "det->PTPMONEN= 0x%08X,det->PTPINITEN= 0x%08X\n", det->PTPMONEN, det->PTPINITEN); */
 #if 0
