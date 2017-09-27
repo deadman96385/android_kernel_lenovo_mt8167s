@@ -26,22 +26,6 @@
 		bootargs = "console=ttyS0,921600n1 root=/dev/ram initrd=0x44000200,0x200000";
 	};
 
-	dummy1v8: fixedregulator@0 {
-		compatible = "regulator-fixed";
-		regulator-name = "mmc_io";
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <1800000>;
-		regulator-always-on;
-	};
-
-	dummy3v3: fixedregulator@1 {
-		compatible = "regulator-fixed";
-		regulator-name = "mmc_power";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		regulator-always-on;
-	};
-
 	ethernet: ethernet@11180000 {
 		compatible = "mediatek,mt8516-ethernet";
 		reg = <0 0x11180000 0 0x1000>,
@@ -73,7 +57,6 @@
 
 	mtcpufreq {
 		compatible = "mediatek,mt8167-cpufreq";
-		reg-ext-vproc-supply = <&vproc>;
 	};
 
 	mt8167_audio_codec: mt8167_audio_codec {
@@ -95,13 +78,6 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&aud_pins_default>;
 		status = "okay";
-	};
-
-	vibrator0:vibrator@0 {
-		compatible = "mediatek,vibrator";
-		vib_timer = <25>;
-		vib_limit = <9>;
-		vib_vol= <5>;
 	};
 
 	/* Connectivity */
@@ -205,16 +181,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c0_pins_a>;
 	status = "okay";
-
-	lp8557_led@2c {
-		compatible = "ti,lp8557-led";
-		reg = <0x2c>;
-	};
-
-	strobe_main@63 {
-		compatible = "mediatek,strobe_main";
-		reg = <0x63>;
-	};
 };
 
 &i2c1 {
@@ -222,18 +188,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c1_pins_a>;
 	status = "okay";
-
-	vproc: sym827@60 {
-		compatible = "silergy,sym827-regulator";
-		reg = <0x60>;
-		regulator-name = "vproc";
-		regulator-min-microvolt = <600000>;
-		regulator-max-microvolt = <1387500>;
-		regulator-enable-ramp-delay = <400>;
-		regulator-ramp-delay = <8333>;
-		regulator-always-on;
-		vsel-gpio = <&pio 34 0>;
-	};
 };
 
 &irrx {
@@ -384,9 +338,6 @@ pwm_goio_def_cfg: pwmdefault {
 	gpslna_pins_ol: gpslna@2 {
 	};
 	/* CONSYS GPIO Settings - End */
-
-	hdmi_pins_default: hdmi_pins_default {
-	};
 
 	i2c0_pins_a: i2c0@0 {
 		pins1 {

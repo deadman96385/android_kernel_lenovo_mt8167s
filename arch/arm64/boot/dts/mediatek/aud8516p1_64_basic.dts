@@ -27,56 +27,6 @@
 		bootargs = "console=ttyS0,921600n1 root=/dev/ram initrd=0x44000200,0x200000";
 	};
 
-/* sensor standardization */
-	cust_accel@0 {
-		compatible = "mediatek,mpu6050g";
-		i2c_num	= <2>;
-		i2c_addr = <0x68 0 0 0>;
-		direction = <7>;
-		power_id = <0xffff>;
-		power_vol = <0>;
-		firlen = <0>;
-		is_batch_supported = <0>;
-	};
-
-	cust_gyro@0 {
-		compatible = "mediatek,mpu6050gy";
-		i2c_num = <2>;
-		i2c_addr = <0x68 0 0 0>;
-		direction = <7>;
-		power_id = <0xffff>;
-		power_vol = <0>;
-		firlen = <0>;
-		is_batch_supported = <0>;
-	};
-
-	cust_mag@0 {
-		compatible = "mediatek,akm09911";
-		i2c_num = <2>;
-		i2c_addr = <0x0C 0 0 0>;
-		direction = <6>;
-		power_id = <0xffff>;
-		power_vol = <0>;
-		is_batch_supported			= <0>;
-	};
-/* sensor gpio standization */
-
-	dummy1v8: fixedregulator@0 {
-		compatible = "regulator-fixed";
-		regulator-name = "mmc_io";
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <1800000>;
-		regulator-always-on;
-	};
-
-	dummy3v3: fixedregulator@1 {
-		compatible = "regulator-fixed";
-		regulator-name = "mmc_power";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		regulator-always-on;
-	};
-
 	ethernet: ethernet@11180000 {
 		compatible = "mediatek,mt8516-ethernet";
 		reg = <0 0x11180000 0 0x1000>,
@@ -124,7 +74,6 @@
 
 	mtcpufreq {
 		compatible = "mediatek,mt8167-cpufreq";
-		reg-ext-vproc-supply = <&vproc>;
 	};
 
 	mt8167_audio_codec: mt8167_audio_codec {
@@ -180,13 +129,6 @@
 		regulator-max-microvolt = <5000000>;
 		gpio = <&pio 50 0>;
 		enable-active-high;
-	};
-
-	vibrator0:vibrator@0 {
-		compatible = "mediatek,vibrator";
-		vib_timer = <25>;
-		vib_limit = <9>;
-		vib_vol= <5>;
 	};
 
 	/* Connectivity */
@@ -305,11 +247,6 @@
 		cs4382a-supply = <&mt6392_vcamaf_reg>;
 	};
 
-	lp8557_led@2c {
-		compatible = "ti,lp8557-led";
-		reg = <0x2c>;
-	};
-
 	cap_touch@40 {
 		compatible = "mediatek,cap_touch";
 		reg = <0x40>;
@@ -318,11 +255,6 @@
 		int-gpio = <&pio 100 0>;
 		rst-gpio = <&pio 101 0>;
 	};
-
-	strobe_main@63 {
-		compatible = "mediatek,strobe_main";
-		reg = <0x63>;
-	};
 };
 
 &i2c1 {
@@ -330,18 +262,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c1_pins_a>;
 	status = "okay";
-
-	vproc: sym827@60 {
-		compatible = "silergy,sym827-regulator";
-		reg = <0x60>;
-		regulator-name = "vproc";
-		regulator-min-microvolt = <600000>;
-		regulator-max-microvolt = <1387500>;
-		regulator-enable-ramp-delay = <400>;
-		regulator-ramp-delay = <8333>;
-		regulator-always-on;
-		vsel-gpio = <&pio 34 0>;
-	};
 };
 
 &irrx {
