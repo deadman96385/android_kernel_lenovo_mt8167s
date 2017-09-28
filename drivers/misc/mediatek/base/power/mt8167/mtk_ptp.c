@@ -276,6 +276,9 @@ int ptpod_phy_base;
 #define PERCENT(numerator, denominator)	\
 	(unsigned char)(((numerator) * 100 + (denominator) - 1) / (denominator))
 
+#define PERCENT_U64(numerator, denominator)	\
+	(unsigned char)(div_u64(((numerator) * 100 + (denominator) - 1), (denominator)))
+
 static int ptp_log_en;
 static int is_ptp_initializing;
 /*=============================================================
@@ -509,7 +512,7 @@ struct ptp_det {
 	unsigned long ptp_dvfs_min_freq_khz;
 
 	unsigned char freq_table_percent[NR_FREQ]; /* percentage to maximum freq */
-	unsigned long freq_table[NR_FREQ];     /* in KHz */
+	u64 freq_table[NR_FREQ];     /* in KHz */
 	int volt_table[NR_FREQ]; /* signed-off volt table in uVolt */
 
 	unsigned int volt_tbl[NR_FREQ]; /* pmic value */
@@ -1284,10 +1287,10 @@ static void get_freq_volt_table_cpu(struct ptp_det *det)
 
 		det->freq_table[i] = rate;
 		det->volt_table[i] = dev_pm_opp_get_voltage(opp);
-		det->freq_table_percent[i] = PERCENT(det->freq_table[i], det->freq_base);
+		det->freq_table_percent[i] = PERCENT_U64(det->freq_table[i], det->freq_base);
 
 		if (ptp_log_en)
-			ptp_error("cpu: freq_table[%d] = %ld, volt_table[%d] = %d, freq_percent[%d] = %d\n",
+			ptp_error("cpu: freq_table[%d] = %llu, volt_table[%d] = %d, freq_percent[%d] = %d\n",
 					i, det->freq_table[i], i, det->volt_table[i], i, det->freq_table_percent[i]);
 	}
 	rcu_read_unlock();
@@ -1540,8 +1543,8 @@ static int limit_mcusys_env(struct ptp_det *det)
 			(!det->ptp_dvfs_max_freq_khz || !det->ptp_dvfs_min_freq_khz)) {
 
 			/* seem no need ? det->volt_tbl_pmic[opp_index] = det->VBOOT; */
-			det->ptp_dvfs_max_freq_khz = det->freq_table[opp_index] / 1000;
-			det->ptp_dvfs_min_freq_khz = det->freq_table[opp_index] / 1000;
+			det->ptp_dvfs_max_freq_khz = div_u64(det->freq_table[opp_index], 1000);
+			det->ptp_dvfs_min_freq_khz = div_u64(det->freq_table[opp_index], 1000);
 			ret = dev_pm_opp_adjust_voltage(det->dev, det->freq_table[opp_index], u_vboot);
 			if (ret) {
 				ptp_error("Fail dev_pm_opp_adjust_voltage(), ret = %d\n", ret);
