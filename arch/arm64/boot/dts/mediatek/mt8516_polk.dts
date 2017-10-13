@@ -41,7 +41,7 @@
 		pinctrl-0 = <&ethernet_pins_default>;
 		mac-address = [00 00 00 00 00 00];
 		/*local-mac-address = [00 0C E7 06 00 00];*/
-		status = "disabled";
+		status = "okay";
 	};
 
 	msdc1: sdio@11130000 {
