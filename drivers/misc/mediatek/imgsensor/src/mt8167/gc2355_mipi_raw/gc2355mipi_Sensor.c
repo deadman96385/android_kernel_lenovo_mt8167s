@@ -1536,6 +1536,9 @@ static kal_uint32 get_default_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenar
 						    MUINT32 *framerate)
 {
 	LOG_INF("scenario_id = %d\n", scenario_id);
+	if (framerate == NULL) {
+		return ERROR_NONE;
+	}
 
 	switch (scenario_id) {
 	case MSDK_SCENARIO_ID_CAMERA_PREVIEW:

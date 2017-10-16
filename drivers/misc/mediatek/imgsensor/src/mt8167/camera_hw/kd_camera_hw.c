@@ -409,6 +409,8 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 	else if (SensorIdx == DUAL_CAMERA_MAIN_2_SENSOR)
 		pinSetIdx = 2;
 
+	PK_DBG("----sesnor name: %s, pinSetIdx = %d\n", currSensorName, pinSetIdx);
+
 	if (On) {
 
 		ISP_MCLK1_EN(1);
@@ -615,11 +617,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 		}
 
 
-
-
-
 		else if (pinSetIdx == 1 && currSensorName
-			 && (strcmp(currSensorName, SENSOR_DRVNAME_GC2355_MIPI_RAW) == 0)) {
+			&& (strcmp(currSensorName, SENSOR_DRVNAME_GC2355_MIPI_RAW) == 0)) {
+			PK_DBG("----SENSOR_DRVNAME_GC2355_MIPI_RAW: %s\n", SENSOR_DRVNAME_GC2355_MIPI_RAW);
 			/* First Power Pin low and Reset Pin Low */
 			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(pinSetIdx, CAMPDN, 1);

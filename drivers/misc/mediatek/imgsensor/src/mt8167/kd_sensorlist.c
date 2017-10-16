@@ -2305,7 +2305,7 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 	signed int ret = 0;
 
 
-	PK_INFO("feature id:%d", pFeatureCtrl->FeatureId);
+	PK_INFO("feature id:%d\n", pFeatureCtrl->FeatureId);
 	if (pFeatureCtrl == NULL) {
 		PK_ERR(" NULL arg.\n");
 		return -EFAULT;
@@ -3022,7 +3022,7 @@ bool CAMERA_Regulator_PowerOnOFF(struct regulator *pwrreg, BOOL IsOn, int vol)
 	int voltage_count = 0, high_bound_voltage = 0, low_bound_voltage = 0;
 	unsigned int volt;
 
-	PK_DBG("IsOn:%d , vol:%d", IsOn, vol);
+	PK_DBG("IsOn:%d , vol:%d\n", IsOn, vol);
 
 	if (IS_ERR(pwrreg)) {
 		PK_ERR("camera power regulator is null, ret:%ld", PTR_ERR(pwrreg));
@@ -3057,7 +3057,7 @@ bool CAMERA_Regulator_PowerOnOFF(struct regulator *pwrreg, BOOL IsOn, int vol)
 		if (volt != vol)
 			PK_ERR("Regulator Need to Check: volt(%u) != vol(%d)", volt, vol);
 		else
-			PK_INFO("Set vol:%d, get the same:%u", vol, volt);
+			PK_INFO("Set vol:%d, get the same:%u\n", vol, volt);
 
 		ret = regulator_enable(pwrreg);
 		if (ret != 0) {
@@ -3090,7 +3090,7 @@ bool CAMERA_Regulator_PowerOnOFF(struct regulator *pwrreg, BOOL IsOn, int vol)
 		}
 
 		low_bound_voltage = regulator_list_voltage(pwrreg, 0);
-		PK_DBG("low_bound_voltage = %d", low_bound_voltage);
+		PK_DBG("low_bound_voltage = %d\n", low_bound_voltage);
 
 		if (low_bound_voltage <= 0) {
 			PK_ERR("Fails to list, low_bound_voltage = %d", low_bound_voltage);
@@ -3557,7 +3557,7 @@ static long CAMERA_HW_Ioctl(struct file *a_pstFile,
 
 	mutex_lock(&kdCam_Mutex);
 
-	PK_INFO("cmd:%x", a_u4Command);
+	PK_INFO("cmd:%x\n", a_u4Command);
 	if (_IOC_DIR(a_u4Command) == _IOC_NONE) {
 	} else {
 		pBuff = kmalloc(_IOC_SIZE(a_u4Command), GFP_KERNEL);

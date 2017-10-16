@@ -1563,22 +1563,22 @@
 		/* led part */
 		led0:led@0 {
 			compatible = "mediatek,red";
-			led_mode = <0>;
-			data = < >;
+			led_mode = <6>;
+			data = <0>;
 			pwm_config = <0 0 0 0 0>;
 		};
 
 		led1:led@1 {
 			compatible = "mediatek,green";
-			led_mode = <0>;
-			data = < >;
+			led_mode = <6>;
+			data = <1>;
 			pwm_config = <0 0 0 0 0>;
 		};
 
 		led2:led@2 {
 			compatible = "mediatek,blue";
-			led_mode = <0>;
-			data = < >;
+			led_mode = <6>;
+			data = <2>;
 			pwm_config = <0 0 0 0 0>;
 		};
 
