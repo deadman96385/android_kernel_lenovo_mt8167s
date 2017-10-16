@@ -50,9 +50,7 @@
 
 #define BYPASS_GPIO		0
 
-#ifndef DEMO_BOARD_SUPPORT
-#define DEMO_BOARD_SUPPORT	1
-#endif
+
 
 /* GPIO Pin control*/
 struct platform_device *cam_plt_dev;
@@ -70,6 +68,7 @@ struct pinctrl_state *cam_ldo0_l;
 
 /* for not demo board, eg: EVB*/
 #if (DEMO_BOARD_SUPPORT == 0)
+
 int mtkcam_gpio_init(struct platform_device *pdev)
 {
 	int ret = 0;

@@ -89,8 +89,10 @@ static DEFINE_SPINLOCK(kdsensor_drv_lock);
 #define SUPPORT_I2C_BUS_NUM2        1
 #endif
 
+#if 0
 #ifndef DEMO_BOARD_SUPPORT
 #define DEMO_BOARD_SUPPORT	    0
+#endif
 #endif
 
 /* If need workaround for fpga, then modify them=== START*/
