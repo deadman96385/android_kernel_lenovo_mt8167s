@@ -34,15 +34,9 @@ static int wmt_detect_dump_pin_conf(void)
 {
 	WMT_DETECT_DBG_FUNC("[WMT-DETECT]=>dump wmt pin configuration start<=\n");
 
-	WMT_DETECT_INFO_FUNC("LDO(GPIO%d), PMU(GPIO%d), PMUV28(GPIO%d)\n",
-			gpio_ctrl_info.gpio_ctrl_state[GPIO_COMBO_LDO_EN_PIN].gpio_num,
+	WMT_DETECT_INFO_FUNC("PMU(GPIO%d), RST(GPIO%d)\n",
 			gpio_ctrl_info.gpio_ctrl_state[GPIO_COMBO_PMU_EN_PIN].gpio_num,
-			gpio_ctrl_info.gpio_ctrl_state[GPIO_COMBO_PMUV28_EN_PIN].gpio_num);
-
-	WMT_DETECT_INFO_FUNC("RST(GPIO%d), BGF_EINT(GPIO%d), BGF_EINT_NUM(%d)\n",
-			gpio_ctrl_info.gpio_ctrl_state[GPIO_COMBO_RST_PIN].gpio_num,
-			gpio_ctrl_info.gpio_ctrl_state[GPIO_COMBO_BGF_EINT_PIN].gpio_num,
-			gpio_to_irq(gpio_ctrl_info.gpio_ctrl_state[GPIO_COMBO_BGF_EINT_PIN].gpio_num));
+			gpio_ctrl_info.gpio_ctrl_state[GPIO_COMBO_RST_PIN].gpio_num);
 
 	WMT_DETECT_INFO_FUNC("WIFI_EINT(GPIO%d), WIFI_EINT_NUM(%d)\n",
 			gpio_ctrl_info.gpio_ctrl_state[GPIO_WIFI_EINT_PIN].gpio_num,
