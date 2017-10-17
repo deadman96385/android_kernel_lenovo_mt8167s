@@ -33,7 +33,7 @@ else
 	# 8167 evb
 	ifneq (,$(findstring tb8167m,$(ARCH_MTK_PROJECT)))
 		ccflags-y += -DDEMO_BOARD_SUPPORT=0
-	# customer projects... use DEMO_BOARD_SUPPORT for using GPIO instead of pinctrl
+	# evb projects... use DEMO_BOARD_SUPPORT=0 for using GPIO instead of pinctrl
 	else
 		ccflags-y += -DDEMO_BOARD_SUPPORT=1
 	endif

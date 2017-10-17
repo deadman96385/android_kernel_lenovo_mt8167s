@@ -18,7 +18,6 @@
 #include <linux/types.h>
 #include "kd_camera_typedef.h"
 
-#define DEMO_BOARD_SUPPORT	1
 
 #if 0				/*defined CONFIG_MTK_LEGACY */
 #include <mach/mt_gpio.h>

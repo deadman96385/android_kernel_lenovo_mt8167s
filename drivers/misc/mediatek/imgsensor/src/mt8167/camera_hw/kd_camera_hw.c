@@ -50,7 +50,9 @@
 
 #define BYPASS_GPIO		0
 
-
+#ifndef DEMO_BOARD_SUPPORT
+#define DEMO_BOARD_SUPPORT	1
+#endif
 
 /* GPIO Pin control*/
 struct platform_device *cam_plt_dev;
