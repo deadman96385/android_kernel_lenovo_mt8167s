@@ -609,12 +609,6 @@ bool usb_cable_connected(void)
 	return connected;
 }
 
-static void usb_reconnect(void)
-{
-	DBG(0, "issue work\n");
-	queue_delayed_work(mtk_musb->st_wq, &connection_work, 0);
-	DBG(0, "%s end\n", __func__);
-}
 
 void musb_platform_reset(struct musb *musb)
 {
@@ -739,79 +733,6 @@ static irqreturn_t mt_usb_interrupt(int irq, void *dev_id)
 	return status;
 }
 
-/*--FOR INSTANT POWER ON USAGE--------------------------------------------------*/
-static ssize_t mt_usb_show_cmode(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	if (!dev) {
-		DBG(0, "dev is null!!\n");
-		return 0;
-	}
-	return scnprintf(buf, PAGE_SIZE, "%d\n", cable_mode);
-}
-
-static ssize_t mt_usb_store_cmode(struct device *dev, struct device_attribute *attr,
-	const char *buf, size_t count)
-{
-	unsigned int cmode;
-
-	if (!dev) {
-		DBG(0, "dev is null!!\n");
-		return count;
-	/* } else if (1 == sscanf(buf, "%d", &cmode)) { */
-	} else if (kstrtol(buf, 10, (long *)&cmode) == 0) {
-		DBG(0, "cmode=%d, cable_mode=%d\n", cmode, cable_mode);
-		if (cmode >= CABLE_MODE_MAX)
-			cmode = CABLE_MODE_NORMAL;
-
-		if (cable_mode != cmode) {
-			if (mtk_musb) {
-				if (down_interruptible(&mtk_musb->musb_lock))
-					DBG(0, "USB20: %s: busy, Couldn't get power_clock_lock\n",
-					    __func__);
-			}
-			if (cmode == CABLE_MODE_CHRG_ONLY) { /* IPO shutdown, disable USB*/
-				if (mtk_musb)
-					mtk_musb->in_ipo_off = true;
-
-			} else {	/* IPO bootup, enable USB */
-				if (mtk_musb)
-					mtk_musb->in_ipo_off = false;
-			}
-
-			cable_mode = cmode;
-			usb_reconnect();
-			mdelay(10);
-
-#ifdef CONFIG_USB_MTK_OTG
-			if (cmode == CABLE_MODE_CHRG_ONLY) {
-				if (mtk_musb && mtk_musb->is_host) { /* shut down USB host for IPO*/
-					if (wake_lock_active(&mtk_musb->usb_lock))
-						wake_unlock(&mtk_musb->usb_lock);
-					musb_platform_set_vbus(mtk_musb, 0);
-					msleep(50); /*add sleep time to ensure vbus off and disconnect irq processed.*/
-					musb_stop(mtk_musb);
-					MUSB_DEV_MODE(mtk_musb);
-					/* Think about IPO shutdown with A-cable, then switch to B-cable and IPO bootup.
-					*	We need a point to clear session bit
-					*/
-					musb_writeb(mtk_musb->mregs, MUSB_DEVCTL,
-											(~MUSB_DEVCTL_SESSION) &
-					musb_readb(mtk_musb->mregs, MUSB_DEVCTL));
-				}
-				/* mask ID pin interrupt even if A-cable is not plugged in*/
-				switch_int_to_host_and_mask(mtk_musb);
-			} else {
-				switch_int_to_host(mtk_musb); /* resotre ID pin interrupt*/
-			}
-#endif
-			if (mtk_musb)
-				up(&mtk_musb->musb_lock);
-		}
-	}
-	return count;
-}
-
-DEVICE_ATTR(cmode,  0664, mt_usb_show_cmode, mt_usb_store_cmode);
 
 static bool saving_mode;
 
@@ -1474,7 +1395,6 @@ static int mt_usb_probe(struct platform_device *pdev)
 		goto err2;
 	}
 
-	ret = device_create_file(&pdev->dev, &dev_attr_cmode);
 	ret = device_create_file(&pdev->dev, &dev_attr_saving);
 #ifdef CONFIG_MTK_UART_USB_SWITCH
 	ret = device_create_file(&pdev->dev, &dev_attr_portmode);

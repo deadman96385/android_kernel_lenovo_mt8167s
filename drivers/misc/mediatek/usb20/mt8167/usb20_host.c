@@ -338,11 +338,6 @@ static void musb_id_pin_work(struct work_struct *data)
 
 	down(&mtk_musb->musb_lock);
 	DBG(0, "work start, is_host=%d\n", mtk_musb->is_host);
-	if (mtk_musb->in_ipo_off) {
-		DBG(0, "do nothing due to in_ipo_off\n");
-		goto out;
-	}
-
 	wake_lock(&mtk_musb->usb_lock);
 	mtk_musb->is_host = musb_is_host();
 	DBG(0, "musb is as %s, already lock\n", mtk_musb->is_host?"host":"device");
@@ -422,7 +417,6 @@ static void musb_id_pin_work(struct work_struct *data)
 		MUSB_DEV_MODE(mtk_musb);
 		switch_int_to_host(mtk_musb);
 	}
-out:
 	DBG(0, "work end, is_host=%d\n", mtk_musb->is_host);
 	up(&mtk_musb->musb_lock);
 }
@@ -439,11 +433,6 @@ void musb_id_pin_sw_work(bool host_mode)
 
 	down(&mtk_musb->musb_lock);
 	DBG(0, "work start, is_host=%d\n", mtk_musb->is_host);
-	if (mtk_musb->in_ipo_off) {
-		DBG(0, "do nothing due to in_ipo_off\n");
-		goto out;
-	}
-
 	mtk_musb->is_host = host_mode;
 	musb_platform_enable(mtk_musb);
 	DBG(0, "musb is as %s\n", mtk_musb->is_host?"host":"device");
@@ -525,7 +514,6 @@ void musb_id_pin_sw_work(bool host_mode)
 		MUSB_DEV_MODE(mtk_musb);
 		switch_int_to_host(mtk_musb);
 	}
-out:
 	DBG(0, "work end, is_host=%d\n", mtk_musb->is_host);
 	up(&mtk_musb->musb_lock);
 }
