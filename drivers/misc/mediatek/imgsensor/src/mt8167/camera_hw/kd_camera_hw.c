@@ -74,6 +74,7 @@ struct pinctrl_state *cam_ldo0_l;
 int mtkcam_gpio_init(struct platform_device *pdev)
 {
 	int ret = 0;
+	PK_DBG("---- EVB board mtkcam_gpio_init ----\n");
 
 	camctrl = devm_pinctrl_get(&pdev->dev);
 	if (IS_ERR(camctrl)) {
@@ -151,6 +152,7 @@ int mtkcam_gpio_init(struct platform_device *pdev)
 int mtkcam_gpio_set(int PinIdx, int PwrType, int Val)
 {
 	int ret = 0;
+	PK_DBG("---- EVB board mtkcam_gpio_set----\n");
 
 	switch (PwrType) {
 	case CAMRST:
@@ -199,8 +201,6 @@ int mtkcam_gpio_set(int PinIdx, int PwrType, int Val)
 /* for demo board */
 int mtkcam_gpio_init(struct platform_device *pdev)
 {
-
-
 	int ret = 0;
 	/* struct device        *dev = &pdev->dev; */
 
@@ -210,6 +210,7 @@ int mtkcam_gpio_init(struct platform_device *pdev)
 int mtkcam_gpio_set(int PinIdx, int PwrType, int Val)
 {
 	int ret = 0;
+	PK_DBG("---- Demo board mtkcam_gpio_set----\n");
 
 	/* if (!check_pdn_rst_pin()) */
 	PK_INFO("mtkcam_gpio_set: pinIdx:%d, pwrType:%d, Val:%d\n", PinIdx, PwrType, Val);
@@ -400,8 +401,6 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 		 }
 	};
 
-
-
 	if (SensorIdx == DUAL_CAMERA_MAIN_SENSOR)
 		pinSetIdx = 0;
 	else if (SensorIdx == DUAL_CAMERA_SUB_SENSOR)
@@ -409,14 +408,14 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 	else if (SensorIdx == DUAL_CAMERA_MAIN_2_SENSOR)
 		pinSetIdx = 2;
 
-	PK_DBG("----sesnor name: %s, pinSetIdx = %d\n", currSensorName, pinSetIdx);
+	PK_DBG("----sesnor name: %s, pinSetIdx = %d, ON = %d\n", currSensorName, pinSetIdx, On);
 
 	if (On) {
-
 		ISP_MCLK1_EN(1);
 
 		if (pinSetIdx == 0 && currSensorName
 		    && (strcmp(currSensorName, SENSOR_DRVNAME_IMX219_MIPI_RAW) == 0)) {
+			PK_DBG("----SENSOR_DRVNAME_IMX219_MIPI_RAW: %s\n", SENSOR_DRVNAME_IMX219_MIPI_RAW);
 			/* First Power Pin low and Reset Pin Low */
 			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(pinSetIdx, CAMPDN,
@@ -475,7 +474,6 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				mtkcam_gpio_set(pinSetIdx, CAMRST,
 						pinSet[pinSetIdx][IDX_PS_CMRST + IDX_PS_ON]);
 		}
-
 
 /* neostra add clj 20161222 */
 		else if (currSensorName && pinSetIdx == MAIN_PINSET
@@ -550,8 +548,6 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 			/* disable inactive sensor */
 			PK_DBG("[PowerON]pinSetIdx:%d, currSensorName: %s\n", pinSetIdx,
 			       currSensorName);
-
-
 #if 0
 			if (pinSet[0][IDX_PS_CMRST] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(0, CAMRST, pinSet[0][IDX_PS_CMRST + IDX_PS_OFF]);
@@ -596,26 +592,19 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				goto _kdCISModulePowerOn_exit_;
 			}
 
-
 			/* enable active sensor */
 			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(pinSetIdx, CAMPDN,
 						pinSet[pinSetIdx][IDX_PS_CMPDN + IDX_PS_OFF]);
 
-
-
-
-
 			if (pinSet[pinSetIdx][IDX_PS_CMRST] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(pinSetIdx, CAMRST,
 						pinSet[pinSetIdx][IDX_PS_CMRST + IDX_PS_ON]);
-
 
 			PK_INFO("[PowerON]pinSetIdx:%d, currSensorName: %s\n", pinSetIdx,
 			       currSensorName);
 
 		}
-
 
 		else if (pinSetIdx == 1 && currSensorName
 			&& (strcmp(currSensorName, SENSOR_DRVNAME_GC2355_MIPI_RAW) == 0)) {
@@ -623,6 +612,8 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 			/* First Power Pin low and Reset Pin Low */
 			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(pinSetIdx, CAMPDN, 1);
+
+			mdelay(1);
 
 			if (pinSet[pinSetIdx][IDX_PS_CMRST] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(pinSetIdx, CAMRST, 0);
@@ -656,15 +647,17 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 
 			mdelay(5);
 
-			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID) {
+			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(pinSetIdx, CAMPDN, 0);
-				mdelay(1);
-			}
+			mdelay(1);
 
 			/* enable active sensor */
 			if (pinSet[pinSetIdx][IDX_PS_CMRST] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(pinSetIdx, CAMRST, 1);
-		} else if (pinSetIdx == 0 && currSensorName
+
+		}
+
+		else if (pinSetIdx == 0 && currSensorName
 			&& (strcmp(currSensorName, SENSOR_DRVNAME_GC2355_RAW) == 0)) {	/* demo board RFC */
 			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(pinSetIdx, CAMPDN,
@@ -713,7 +706,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				mtkcam_gpio_set(pinSetIdx, CAMRST,
 						pinSet[pinSetIdx][IDX_PS_CMRST + IDX_PS_ON]);
 			}
-		} else if (pinSetIdx == 1 && currSensorName
+		}
+
+		else if (pinSetIdx == 1 && currSensorName
 			&& (strcmp(currSensorName, SENSOR_DRVNAME_GC0312_YUV) == 0)) {	/* demo board FFC */
 			/* First Power Pin low and Reset Pin Low */
 			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
@@ -749,7 +744,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				mtkcam_gpio_set(pinSetIdx, CAMPDN,
 						pinSet[pinSetIdx][IDX_PS_CMPDN + IDX_PS_OFF]);
 			mdelay(1);
-		} else if (pinSetIdx == 0 && currSensorName
+		}
+
+		else if (pinSetIdx == 0 && currSensorName
 			   && (strcmp(currSensorName, SENSOR_DRVNAME_OV5648_MIPI_RAW) == 0)) {
 			/* First Power Pin low and Reset Pin Low */
 			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
@@ -808,7 +805,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 			if (pinSet[pinSetIdx][IDX_PS_CMRST] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(pinSetIdx, CAMRST,
 						pinSet[pinSetIdx][IDX_PS_CMRST + IDX_PS_ON]);
-		} else if (pinSetIdx == 1 && currSensorName
+		}
+
+		else if (pinSetIdx == 1 && currSensorName
 			   && (strcmp(currSensorName, SENSOR_DRVNAME_SP2518_YUV) == 0)) {
 			/* First Power Pin low and Reset Pin Low */
 			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
@@ -854,8 +853,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 			if (pinSet[pinSetIdx][IDX_PS_CMRST] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(pinSetIdx, CAMRST,
 						pinSet[pinSetIdx][IDX_PS_CMRST + IDX_PS_ON]);
-		} else {
+		}
 
+		else {
 			/* VCAM_IO */
 			if (_hwPowerOnCnt(pinSetIdx, VCAMIO, VOL_1800, mode_name) != TRUE) {
 				PK_DBG
@@ -864,7 +864,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				goto _kdCISModulePowerOn_exit_;
 			}
 		}
-	} else {		/* power OFF */
+	}
+
+	else {		/* power OFF */
 		ISP_MCLK1_EN(0);
 		if (pinSetIdx == 0 && currSensorName
 		    && (strcmp(currSensorName, SENSOR_DRVNAME_IMX219_MIPI_RAW) == 0)) {
@@ -948,7 +950,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				goto _kdCISModulePowerOn_exit_;
 			}
 
-		} else if (pinSetIdx == SUB_PINSET && currSensorName
+		}
+
+		else if (pinSetIdx == SUB_PINSET && currSensorName
 			 && (strcmp(currSensorName, SENSOR_DRVNAME_SP2509_MIPI_RAW) == 0)) {
 			/* Set Power Pin low and Reset Pin Low */
 			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
@@ -986,14 +990,7 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				goto _kdCISModulePowerOn_exit_;
 			}
 
-
-
-
 		}
-
-
-
-
 
 		else if (pinSetIdx == 1 && currSensorName
 			 && (strcmp(currSensorName, SENSOR_DRVNAME_GC2355_MIPI_RAW) == 0)) {
@@ -1028,7 +1025,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				goto _kdCISModulePowerOn_exit_;
 			}
 
-		} else if (pinSetIdx == 0 && currSensorName
+		}
+
+		else if (pinSetIdx == 0 && currSensorName
 			&& (strcmp(currSensorName, SENSOR_DRVNAME_GC2355_RAW) == 0)) {	/* demo board RFC */
 			/* Set Power Pin low and Reset Pin Low */
 			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
@@ -1060,7 +1059,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				     VCAMIO);
 				goto _kdCISModulePowerOn_exit_;
 			}
-		} else if (pinSetIdx == 1 && currSensorName
+		}
+
+		else if (pinSetIdx == 1 && currSensorName
 			&& (strcmp(currSensorName, SENSOR_DRVNAME_GC0312_YUV) == 0)) {
 			/* Set Power Pin low and Reset Pin Low */
 			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
@@ -1083,7 +1084,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				     VCAMIO);
 				goto _kdCISModulePowerOn_exit_;
 			}
-		} else if (pinSetIdx == 0 && currSensorName
+		}
+
+		else if (pinSetIdx == 0 && currSensorName
 			   && (strcmp(currSensorName, SENSOR_DRVNAME_OV5648_MIPI_RAW) == 0)) {
 			/* Set Power Pin low and Reset Pin Low */
 			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
@@ -1122,7 +1125,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				goto _kdCISModulePowerOn_exit_;
 			}
 
-		} else if (pinSetIdx == 1 && currSensorName
+		}
+
+		else if (pinSetIdx == 1 && currSensorName
 			   && (strcmp(currSensorName, SENSOR_DRVNAME_SP2518_YUV) == 0)) {
 			/* Set Power Pin low and Reset Pin Low */
 			/* Set Power Pin low and Reset Pin Low */
@@ -1156,7 +1161,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				goto _kdCISModulePowerOn_exit_;
 			}
 
-		} else {
+		}
+
+		else {
 			/* VCAM_IO */
 			if (_hwPowerDownCnt(pinSetIdx, VCAMIO, mode_name) != TRUE) {
 				PK_DBG

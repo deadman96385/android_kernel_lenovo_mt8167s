@@ -1585,28 +1585,28 @@
 		led3:led@3 {
 			compatible = "mediatek,jogball-backlight";
 			led_mode = <0>;
-			data = < >;
+			data = <0>;
 			pwm_config = <0 0 0 0 0>;
 		};
 
 		led4:led@4 {
 			compatible = "mediatek,keyboard-backlight";
 			led_mode = <0>;
-			data = < >;
+			data = <0>;
 			pwm_config = <0 0 0 0 0>;
 		};
 
 		led5:led@5 {
 			compatible = "mediatek,button-backlight";
 			led_mode = <0>;
-			data = < >;
+			data = <0>;
 			pwm_config = <0 0 0 0 0>;
 		};
 
 		led6:led@6 {
 			compatible = "mediatek,lcd-backlight";
 			led_mode = <5>;
-			data = < >;
+			data = <>;
 			pwm_config = <0 0 0 0 0>;
 			gpios = <&pio 43 0>;
 		};
@@ -1640,6 +1640,9 @@
 		/* flashlight  */
 		flashlight_core: flashlight_core {
 			compatible = "mediatek,flashlight_core";
+		};
+		flashlights_lm3642: flashlights_lm3642 {
+			compatible = "mediatek,flashlights_lm3642";
 		};
 
 		ice: ice_debug {
