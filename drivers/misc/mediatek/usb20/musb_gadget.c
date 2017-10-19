@@ -137,11 +137,21 @@ static inline void map_dma_buffer(struct musb_request *request,
 #endif
 
 	if (request->request.dma == DMA_ADDR_INVALID) {
-		request->request.dma = dma_map_single(musb->controller,
-						      request->request.buf,
-						      length,
-						      request->tx
-						      ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+		dma_addr_t dma_addr;
+		int ret;
+
+		dma_addr = dma_map_single(
+				musb->controller,
+				request->request.buf,
+				length,
+				request->tx
+					? DMA_TO_DEVICE
+					: DMA_FROM_DEVICE);
+		ret = dma_mapping_error(musb->controller, dma_addr);
+		if (ret)
+			return;
+
+		request->request.dma = dma_addr;
 		request->map_state = MUSB_MAPPED;
 	} else {
 		dma_sync_single_for_device(musb->controller,
@@ -202,7 +212,10 @@ void musb_g_giveback(struct musb_ep *ep,
 
 	ep->busy = 1;
 	spin_unlock(&musb->lock);
-	unmap_dma_buffer(req, musb);
+
+	if (!dma_mapping_error(&musb->g.dev, request->dma))
+		unmap_dma_buffer(req, musb);
+
 	if (request->status == 0)
 		DBG(1, "%s done request %p,  %d/%d\n",
 		    ep->end_point.name, request, req->request.actual, req->request.length);
