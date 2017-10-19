@@ -225,7 +225,7 @@ static int dma_channel_abort(struct dma_channel *channel)
 	int offset;
 	u16 csr;
 
-	if (channel->status == MUSB_DMA_STATUS_BUSY) {
+	if (channel->status == MUSB_DMA_STATUS_BUSY || channel->status == MUSB_DMA_STATUS_CORE_ABORT) {
 		if (musb_channel->transmit) {
 			offset = MUSB_EP_OFFSET(musb_channel->epnum, MUSB_TXCSR);
 
