@@ -177,7 +177,7 @@
 };
 
 &i2c0 {
-	clock-div = <2>;
+	clock-frequency = <50000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c0_pins_a>;
 	status = "okay";
