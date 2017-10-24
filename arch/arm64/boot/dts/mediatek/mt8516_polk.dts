@@ -209,7 +209,7 @@
 	/*HW Keycode [0~71] -> Linux Keycode*/
 	mediatek,kpd-hw-map-num = <72>;
 	/*8 rows * 9 columns  */
-	mediatek,kpd-hw-init-map = <115 248 0 0 0 0 0 0 0
+	mediatek,kpd-hw-init-map = <115 50 0 0 0 0 0 0 0
 				213 164 0 0 0 0 0 0 0
 				0 0 0 0 0 0 0 0 0
 				0 0 0 0 0 0 0 0 0
