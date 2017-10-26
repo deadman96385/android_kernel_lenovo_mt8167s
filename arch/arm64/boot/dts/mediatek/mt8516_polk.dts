@@ -210,7 +210,7 @@
 	mediatek,kpd-hw-map-num = <72>;
 	/*8 rows * 9 columns  */
 	mediatek,kpd-hw-init-map = <115 50 0 0 0 0 0 0 0
-				213 164 0 0 0 0 0 0 0
+				30 164 0 0 0 0 0 0 0
 				0 0 0 0 0 0 0 0 0
 				0 0 0 0 0 0 0 0 0
 				0 0 0 0 0 0 0 0 0
