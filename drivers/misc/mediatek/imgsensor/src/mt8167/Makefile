@@ -16,6 +16,7 @@
 
 MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
 ARCH_MTK_PROJECT := $(subst ",,$(CONFIG_ARCH_MTK_PROJECT))
+IMGSENSOR_DRIVER_PATH  := $(srctree)/drivers/misc/mediatek/imgsensor/src
 
 define FILTER_PROJECT_DRV
 ifeq ($(wildcard $(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)/$(ARCH_MTK_PROJECT)/imgsensor/$(1)),)
@@ -40,6 +41,7 @@ else
 #$(info "ARCH_MTK_PROJECT:$(ARCH_MTK_PROJECT)")
 endif
 
+subdir-ccflags-y	+= -I$(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/camera_hw
 obj-y				+= kd_sensorlist.o
 obj-y				+= camera_hw/
 
