@@ -820,7 +820,7 @@ static int mtk_i2c_probe(struct platform_device *pdev)
 	i2c->adap.owner = THIS_MODULE;
 	i2c->adap.algo = &mtk_i2c_algorithm;
 	i2c->adap.quirks = i2c->dev_comp->quirks;
-	i2c->adap.timeout = 2 * HZ;
+	i2c->adap.timeout = 10 * HZ;
 	i2c->adap.retries = 1;
 
 	ret = mtk_i2c_parse_dt(pdev->dev.of_node, i2c);
