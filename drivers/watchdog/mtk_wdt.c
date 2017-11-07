@@ -180,6 +180,11 @@ static void toprgu_register_reset_controller(struct platform_device *pdev, int r
 		pr_err("could not register toprgu reset controller: %d\n", ret);
 }
 
+void mark_rootfs_corrupted(void)
+{
+	iowrite32(ioread32(toprgu_base + WDT_NONRST_REG2) | (1 << 3), toprgu_base + WDT_NONRST_REG2);
+}
+
 static int mtk_reset_handler(struct notifier_block *this, unsigned long mode,
 				void *cmd)
 {
@@ -212,6 +217,8 @@ static int mtk_reset_handler(struct notifier_block *this, unsigned long mode,
 		#ifdef CONFIG_MT6397_MISC
 		mtk_misc_mark_fast();
 		#endif
+	} else if (cmd && !strcmp(cmd, "dm-verity device corrupted")) {
+		mark_rootfs_corrupted();
 	}
 
 	while (1) {
