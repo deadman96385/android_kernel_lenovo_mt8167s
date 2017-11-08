@@ -884,7 +884,7 @@ void mtkfb_release_fence(unsigned int session_id, unsigned int layer_id, int fen
 		mutex_unlock(&layer_info->sync_lock);
 
 		if (ion_release_count != num_fence)
-			DISPERR("released %d fence but %d ion handle freed\n",
+			DISPPR_FENCE("released %d fence but %d ion handle freed\n",
 				num_fence, ion_release_count);
 	}
 }

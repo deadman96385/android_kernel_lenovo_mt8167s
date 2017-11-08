@@ -584,6 +584,7 @@ static int _build_path_decouple(void)
 	}
 
 	dpmgr_set_lcm_utils(pgc->dpmgr_handle, NULL);
+	dpmgr_map_event_to_irq(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC, DDP_IRQ_RDMA1_DONE);
 	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC);
 	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_DONE);
 
@@ -1165,7 +1166,7 @@ int ext_disp_wait_for_vsync(void *config, unsigned int session)
 	_ext_disp_path_unlock();
 
 	_ext_disp_vsync_lock(session);
-	ret = dpmgr_wait_event(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC);
+	ret = dpmgr_wait_event_timeout(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC, 60);
 
 	if (ret == -2) {
 		EXT_DISP_LOG("vsync for ext display path not enabled yet\n");
@@ -1177,7 +1178,7 @@ int ext_disp_wait_for_vsync(void *config, unsigned int session)
 	c->vsync_cnt++;
 
 	_ext_disp_vsync_unlock(session);
-	return ret;
+	return 0;
 }
 
 int ext_disp_suspend(unsigned int session)

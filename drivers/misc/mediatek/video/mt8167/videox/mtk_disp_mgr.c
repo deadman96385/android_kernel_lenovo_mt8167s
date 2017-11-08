@@ -1868,9 +1868,17 @@ int _ioctl_wait_vsync(unsigned long arg)
 			DISPERR("ioctl_wait_for_vsync ,primary_display fail, ret = %d.\n", ret);
 	}
 #else
+	if (DISP_SESSION_TYPE(vsync_config.session_id) == DISP_SESSION_PRIMARY) {
 		ret = primary_display_wait_for_vsync(&vsync_config);
-	if (ret != 0)
-		DISPERR("primary_display_wait_for_vsync fail, ret = %d.\n", ret);
+		if (ret != 0)
+			DISPERR("primary_display_wait_for_vsync fail, ret = %d.\n", ret);
+#if defined(CONFIG_MTK_HDMI_SUPPORT) || defined(CONFIG_MTK_EPD_SUPPORT)
+	} else if (DISP_SESSION_TYPE(vsync_config.session_id) == DISP_SESSION_EXTERNAL) {
+		ret = ext_disp_wait_for_vsync(&vsync_config, vsync_config.session_id);
+		if (ret != 0)
+			DISPERR("ext_disp_wait_for_vsync fail, ret = %d.\n", ret);
+#endif
+	}
 #endif
 	if (session_info)
 		dprec_done(&session_info->event_waitvsync, 0, 0);
