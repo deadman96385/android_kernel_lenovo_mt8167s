@@ -152,10 +152,10 @@
 		#size-cells = <2>;
 		ranges;
 
-		atf-reserved-memory@43000000 {
+		atf_reserved_memory: atf-reserved-memory {
 			compatible = "mediatek,mt8167-atf-reserved-memory";
 			no-map;
-			reg = <0 0x43000000 0 0x30000>;
+			reg = <0 0x54600000 0 0x30000>;
 		};
 
 		ram_console-reserved-memory {
