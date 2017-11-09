@@ -90,6 +90,14 @@ module_param(delay_time1, int, 0400);
 void mt_usb_set_vbus(struct musb *musb, int is_on)
 {
 	DBG(0, "mt65xx_usb20_vbus++,is_on=%d\r\n", is_on);
+
+#if defined(CONFIG_MTK_DUAL_INPUT_CHARGER_SUPPORT)
+	if (is_on)
+		set_diso_otg(true);
+	else
+		set_diso_otg(false);
+#endif
+
 #ifndef FPGA_PLATFORM
 	if (is_on) {
 		/* power on VBUS, implement later... */
