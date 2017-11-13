@@ -817,6 +817,16 @@ bool mt_gpucore_ready(void)
 }
 EXPORT_SYMBOL(mt_gpucore_ready);
 
+void MTKFWDump(void)
+{
+	PVRSRV_DEVICE_NODE *psDevNode = MTKGetRGXDevNode();
+
+	MTK_PVRSRVDebugRequestSetSilence(IMG_TRUE);
+	PVRSRVDebugRequest(psDevNode, DEBUG_REQUEST_VERBOSITY_MAX, NULL, NULL);
+	MTK_PVRSRVDebugRequestSetSilence(IMG_FALSE);
+}
+EXPORT_SYMBOL(MTKFWDump);
+
 module_param(gpu_debug_enable, uint, 0644);
 
 
