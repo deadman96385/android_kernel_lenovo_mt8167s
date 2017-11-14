@@ -223,6 +223,7 @@ struct musbfsh_csr_regs {
 };
 
 struct musbfsh_context_registers {
+	u8 ep0_func_addr;
 	u8 power;
 	u16 intrtxe, intrrxe;
 	u8 intrusbe;
@@ -233,6 +234,7 @@ struct musbfsh_context_registers {
 	u32 otg_interfsel;
 	u32 l1_int;
 
+	int speed;	/* 2: hs, 1: fs, 0: ls */
 	struct musbfsh_csr_regs index_regs[MUSBFSH_C_NUM_EPS];
 };
 
