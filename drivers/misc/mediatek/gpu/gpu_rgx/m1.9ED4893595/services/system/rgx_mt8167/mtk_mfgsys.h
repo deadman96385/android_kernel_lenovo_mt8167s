@@ -20,7 +20,11 @@
 #include <linux/regulator/consumer.h>
 
 /* Control SW APM is enabled or not  */
+#ifndef MTK_BRINGUP
 #define MTK_PM_SUPPORT 1
+#else
+#define MTK_PM_SUPPORT 0
+#endif
 
 struct mtk_mfg_base {
 	struct platform_device *pdev;
@@ -38,11 +42,10 @@ struct mtk_mfg_base {
 	struct notifier_block mfg_notifier;
 };
 
-/* extern to be used by PVRCore_Init in RGX DDK module.c */
 PVRSRV_ERROR MTKMFGSystemInit(void);
-
 void MTKMFGSystemDeInit(void);
 void MTKDisablePowerDomain(void);
+void MTKFWDump(void);
 
 /* below register interface in RGX sysconfig.c */
 PVRSRV_ERROR MTKDevPrePowerState(IMG_HANDLE hSysData, PVRSRV_DEV_POWER_STATE eNewPowerState,
@@ -57,12 +60,8 @@ PVRSRV_ERROR MTKSystemPrePowerState(PVRSRV_SYS_POWER_STATE eNewPowerState);
 
 PVRSRV_ERROR MTKSystemPostPowerState(PVRSRV_SYS_POWER_STATE eNewPowerState);
 
-int MTKRGXDeviceInit(void *pvOSDevice);
-
-#ifdef CONFIG_MTK_HIBERNATION
-extern void mt_irq_set_sens(unsigned int irq, unsigned int sens);
-extern void mt_irq_set_polarity(unsigned int irq, unsigned int polarity);
-#endif
+int MTKRGXDeviceInit(PVRSRV_DEVICE_CONFIG *psDevConfig);
+int MTKRGXDeviceDeInit(PVRSRV_DEVICE_CONFIG *psDevConfig);
 
 /* from gpu/ged/src/ged_dvfs.c */
 extern void (*ged_dvfs_cal_gpu_utilization_fp)(unsigned int *pui32Loading,
@@ -71,10 +70,14 @@ extern void (*ged_dvfs_cal_gpu_utilization_fp)(unsigned int *pui32Loading,
 extern void (*ged_dvfs_gpu_freq_commit_fp)(unsigned long ui32NewFreqID,
 										   GED_DVFS_COMMIT_TYPE eCommitType,
 										   int *pbCommited);
-/*****/
+
+#ifdef CONFIG_MTK_HIBERNATION
+extern void mt_irq_set_sens(unsigned int irq, unsigned int sens);
+extern void mt_irq_set_polarity(unsigned int irq, unsigned int polarity);
+int gpu_pm_restore_noirq(struct device *device);
+#endif
 
 #ifdef SUPPORT_PDVFS
-extern int (*ged_dvfs_vsync_trigger_fp)(int idx);
 extern unsigned int mt_gpufreq_get_volt_by_idx(unsigned int idx);
 #endif
 

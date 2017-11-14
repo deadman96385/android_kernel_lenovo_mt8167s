@@ -778,13 +778,13 @@ err_iounmap_reg_base:
 	return err;
 }
 
-int MTKRGXDeviceInit(void *pvOSDevice)
+int MTKRGXDeviceInit(PVRSRV_DEVICE_CONFIG *psDevConfig)
 {
 	struct platform_device *pdev;
 	struct mtk_mfg_base *mfg_base;
 	int err;
 
-	pdev = to_platform_device((struct device *)pvOSDevice);
+	pdev = to_platform_device((struct device *)psDevConfig->pvOSDevice);
 
 	sPVRLDMDev = pdev;
 	mfg_base = devm_kzalloc(&pdev->dev, sizeof(*mfg_base), GFP_KERNEL);
@@ -799,6 +799,11 @@ int MTKRGXDeviceInit(void *pvOSDevice)
 	pdev->dev.platform_data = mfg_base;
 
 	bCoreinitSucceeded = IMG_TRUE;
+	return 0;
+}
+
+int MTKRGXDeviceDeInit(PVRSRV_DEVICE_CONFIG *psDevConfig)
+{
 	return 0;
 }
 

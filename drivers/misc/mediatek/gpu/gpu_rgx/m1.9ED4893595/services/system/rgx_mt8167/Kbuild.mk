@@ -14,10 +14,10 @@
 PVRSRVKM_NAME = $(PVRSRV_MODNAME)
 
 $(PVRSRVKM_NAME)-y += \
-	services/system/$(PVR_SYSTEM)/ion_support.o \
+	services/system/rgx_mtk/ion_support.o \
+	services/system/rgx_mtk/mtk_pp.o \
+	services/system/rgx_mtk/sysconfig.o \
 	services/system/$(PVR_SYSTEM)/mtk_mfgsys.o \
-	services/system/$(PVR_SYSTEM)/mtk_pp.o \
-	services/system/$(PVR_SYSTEM)/sysconfig.o \
 	services/system/common/env/linux/interrupt_support.o \
 	services/system/common/env/linux/dma_support.o \
 	services/system/common/vz_physheap_generic.o \
