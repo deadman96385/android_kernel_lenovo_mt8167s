@@ -144,7 +144,7 @@ static void MTKWriteBackFreqToRGX(PVRSRV_DEVICE_NODE *psDevNode, IMG_UINT32 ui32
 	do {											\
 		if (clk) {									\
 			if (clk_prepare_enable(clk))						\
-				pr_alert("PVR_K: clk_prepare_enable failed when enabling " #clk);\
+				pr_debug("PVR_K: clk_prepare_enable failed when enabling " #clk);\
 		}										\
 	} while (0)
 
@@ -705,7 +705,7 @@ static int mtk_mfg_bind_device_resource(struct platform_device *pdev,
 	int len_clk = sizeof(struct clk *) * MAX_TOP_MFG_CLK;
 
 	if (!sMFGASYNCDev || !sMFG2DDev) {
-		dev_err(&pdev->dev, "Failed to get pm_domain\n");
+		PVR_DPF((PVR_DBG_ERROR, "%s: Failed to get pm_domain", __func__));
 		return -EPROBE_DEFER;
 	}
 
@@ -723,7 +723,7 @@ static int mtk_mfg_bind_device_resource(struct platform_device *pdev,
 
 	mfg_base->reg_base = of_iomap(pdev->dev.of_node, 1);
 	if (!mfg_base->reg_base) {
-		pr_err("Unable to ioremap registers pdev %p\n", pdev);
+		PVR_DPF((PVR_DBG_ERROR, "%s: Unable to ioremap registers pdev %p", __func__, pdev));
 		return -ENOMEM;
 	}
 
@@ -732,8 +732,8 @@ static int mtk_mfg_bind_device_resource(struct platform_device *pdev,
 					top_mfg_clk_sel_parent_name[i]);
 		if (IS_ERR(mfg_base->top_clk_sel_parent[i])) {
 			err = PTR_ERR(mfg_base->top_clk_sel_parent[i]);
-			dev_err(&pdev->dev, "devm_clk_get %s failed !!!\n",
-				top_mfg_clk_sel_parent_name[i]);
+			PVR_DPF((PVR_DBG_ERROR, "%s: devm_clk_get %s failed", __func__,
+				top_mfg_clk_sel_parent_name[i]));
 			goto err_iounmap_reg_base;
 		}
 	}
@@ -743,8 +743,7 @@ static int mtk_mfg_bind_device_resource(struct platform_device *pdev,
 						    top_mfg_clk_sel_name[i]);
 		if (IS_ERR(mfg_base->top_clk_sel[i])) {
 			err = PTR_ERR(mfg_base->top_clk_sel[i]);
-			dev_err(&pdev->dev, "devm_clk_get %s failed !!!\n",
-				top_mfg_clk_sel_name[i]);
+			PVR_DPF((PVR_DBG_ERROR, "%s: devm_clk_get %s failed", __func__, top_mfg_clk_sel_name[i]));
 			goto err_iounmap_reg_base;
 		}
 	}
@@ -754,8 +753,7 @@ static int mtk_mfg_bind_device_resource(struct platform_device *pdev,
 						    top_mfg_clk_name[i]);
 		if (IS_ERR(mfg_base->top_clk[i])) {
 			err = PTR_ERR(mfg_base->top_clk[i]);
-			dev_err(&pdev->dev, "devm_clk_get %s failed !!!\n",
-				top_mfg_clk_name[i]);
+			PVR_DPF((PVR_DBG_ERROR, "%s: devm_clk_get %s failed", __func__, top_mfg_clk_name[i]));
 			goto err_iounmap_reg_base;
 		}
 	}
@@ -842,7 +840,7 @@ static int mtk_mfg_async_probe(struct platform_device *pdev)
 #endif
 
 	if (!pdev->dev.pm_domain) {
-		dev_err(&pdev->dev, "Failed to get dev->pm_domain\n");
+		PVR_DPF((PVR_DBG_ERROR, "%s: Failed to get dev->pm_domain", __func__));
 		return -EPROBE_DEFER;
 	}
 
@@ -885,14 +883,14 @@ static int __init mtk_mfg_async_init(void)
 
 	ret = platform_driver_register(&mtk_mfg_async_driver);
 	if (ret != 0) {
-		pr_err("Failed to register mfg async driver\n");
+		PVR_DPF((PVR_DBG_ERROR, "%s: Failed to register mfg driver", __func__));
 		return ret;
 	}
 
 	if (sMFGASYNCDev)
 		pm_runtime_get_sync(&sMFGASYNCDev->dev);
 	else
-		pr_err("mtk_mfg_async_init enable async power domain failed\n");
+		PVR_DPF((PVR_DBG_ERROR, "%s: Enable power domain failed", __func__));
 
 	return ret;
 }
@@ -904,7 +902,7 @@ static int mtk_mfg_2d_probe(struct platform_device *pdev)
 #endif
 
 	if (!pdev->dev.pm_domain) {
-		dev_err(&pdev->dev, "Failed to get dev->pm_domain\n");
+		PVR_DPF((PVR_DBG_ERROR, "%s: Failed to get dev->pm_domain", __func__));
 		return -EPROBE_DEFER;
 	}
 
@@ -943,14 +941,14 @@ static int __init mtk_mfg_2d_init(void)
 
 	ret = platform_driver_register(&mtk_mfg_2d_driver);
 	if (ret != 0) {
-		pr_err("Failed to register mfg async driver\n");
+		PVR_DPF((PVR_DBG_ERROR, "%s: Failed to register mfg driver", __func__));
 		return ret;
 	}
 
 	if (sMFG2DDev)
 		pm_runtime_get_sync(&sMFG2DDev->dev);
 	else
-		pr_err("mtk_mfg_2d_init enable power domain failed\n");
+		PVR_DPF((PVR_DBG_ERROR, "%s: Enable power domain failed", __func__));
 
 	return ret;
 }

@@ -14,10 +14,6 @@
 PVRSRVKM_NAME = $(PVRSRV_MODNAME)
 
 $(PVRSRVKM_NAME)-y += \
-	services/system/rgx_mtk/ion_support.o \
-	services/system/rgx_mtk/mtk_pp.o \
-	services/system/rgx_mtk/sysconfig.o \
-	services/system/$(PVR_SYSTEM)/mtk_mfgsys.o \
 	services/system/common/env/linux/interrupt_support.o \
 	services/system/common/env/linux/dma_support.o \
 	services/system/common/vz_physheap_generic.o \
@@ -27,10 +23,20 @@ $(PVRSRVKM_NAME)-y += \
 	services/system/common/vz_vmm_pvz.o \
 	services/system/common/vz_vmm_vm.o \
 	services/system/common/vz_support.o \
-	services/system/common/vmm_type_stub.o
+	services/system/common/vmm_type_stub.o \
+	services/system/$(PVR_SYSTEM)/ion_support.o \
+	services/system/$(PVR_SYSTEM)/mtk_pp.o \
+	services/system/$(PVR_SYSTEM)/sysconfig.o \
+	services/system/$(PVR_SYSTEM)/$(MTK_PLATFORM)/mtk_mfgsys.o
+
+ifeq ($(MTK_PLATFORM),mt6739)
+$(PVRSRVKM_NAME)-y += \
+	services/system/$(MTK_PLATFORM)/mtk_mfg_counter.o
+endif
 
 ccflags-y += \
-	-I$(TOP)/include/system/rgx_mt8167 \
+	-I$(TOP)/services/system/$(PVR_SYSTEM) \
+	-I$(TOP)/services/system/$(PVR_SYSTEM)/$(MTK_PLATFORM) \
 	-I$(TOP)/services/system/common/env/linux \
 	-I$(TOP)/services/linux/include \
 	-I$(TOP)/kernel/drivers/staging/imgtec \
