@@ -9740,8 +9740,13 @@ wlanoidSetDefaultKey(IN P_ADAPTER_T prAdapter,
 	prCmdInfo->eCmdType = COMMAND_TYPE_NETWORK_IOCTL;
 	prCmdInfo->ucBssIndex = prAdapter->prAisBssInfo->ucBssIndex;
 	prCmdInfo->u2InfoBufLen = CMD_HDR_SIZE + sizeof(CMD_DEFAULT_KEY);
+#if CFG_SUPPORT_REPLAY_DETECTION
+	prCmdInfo->pfCmdDoneHandler = nicCmdEventSetAddKey;
+	prCmdInfo->pfCmdTimeoutHandler = nicOidCmdTimeoutSetAddKey;
+#else
 	prCmdInfo->pfCmdDoneHandler = nicCmdEventSetCommon;
 	prCmdInfo->pfCmdTimeoutHandler = nicOidCmdTimeoutCommon;
+#endif
 	prCmdInfo->fgIsOid = TRUE;
 	prCmdInfo->ucCID = CMD_ID_DEFAULT_KEY_ID;
 	prCmdInfo->fgSetQuery = TRUE;

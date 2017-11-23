@@ -3250,6 +3250,7 @@ BOOLEAN wlanProcessTxFrame(IN P_ADAPTER_T prAdapter, IN P_NATIVE_PACKET prPacket
 				}
 				if (secIsProtected1xFrame(prAdapter, prStaRec)) {
 					/* 1st 4way-handshake don't encrpted it */
+					/* gen3 default Un_protected, no need to set. */
 					if (!prBssInfo || !(prBssInfo->fgUnencryptedEapol)) {
 						GLUE_SET_PKT_FLAG(prPacket, ENUM_PKT_PROTECTED_1X);
 						DBGLOG(RSN, INFO, "This EAP Frame will be encrypyed\n");
