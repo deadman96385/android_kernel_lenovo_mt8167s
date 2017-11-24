@@ -1325,6 +1325,8 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg
 
 		if (copy_from_user(&var, argp, sizeof(var)))
 			return -EFAULT;
+		if (info->var.yres + var.yoffset > info->var.yres_virtual)
+			return -EFAULT;
 
 		info->var.yoffset = var.yoffset;
 		init_framebuffer(info);
