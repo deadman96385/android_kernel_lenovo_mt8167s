@@ -113,14 +113,14 @@ static DEFINE_SPINLOCK(kdsensor_drv_lock);
 #if (DEMO_BOARD_SUPPORT == 1)
 /* unsigned int GPIO_CAM_RST; */
 
-unsigned int is_mclk_enable;
-
 unsigned int GPIO_CAM0_RST;
 unsigned int GPIO_CAM1_RST;
 unsigned int GPIO_CAM0_PDN;
 unsigned int GPIO_CAM1_PDN;
 int CamUseSameRst;		/* whether RFC & FFC use the same RST PIN */
 #endif
+
+unsigned int is_mclk_enable;
 
 #if defined(CONFIG_MTK_LEGACY)
 static struct i2c_board_info i2c_devs1 __initdata = {
@@ -2731,9 +2731,7 @@ static inline int kdSetSensorMclk(int *pBuf)
 		return 0;
 	}
 	if (pSensorCtrl->on == 1) {
-#if (DEMO_BOARD_SUPPORT == 1)
 		is_mclk_enable = 1;
-#endif
 		clk_prepare_enable(g_camclk_mipi_26m);
 		clk_prepare_enable(g_camclk_camtg);
 		if (pSensorCtrl->freq == 1 /*CAM_PLL_48_GROUP */)
@@ -2741,13 +2739,11 @@ static inline int kdSetSensorMclk(int *pBuf)
 		else						/*CAM_PLL_52_GROUP */
 			clk_set_parent(g_camclk_camtg_sel, g_camclk_208m);
 	} else {
-#if (DEMO_BOARD_SUPPORT == 1)
 		if (is_mclk_enable) {
 			clk_disable_unprepare(g_camclk_mipi_26m);
 			clk_disable_unprepare(g_camclk_camtg);
 		}
 		is_mclk_enable = 0;
-#endif
 	}
 	return ret;
 /* #endif */
