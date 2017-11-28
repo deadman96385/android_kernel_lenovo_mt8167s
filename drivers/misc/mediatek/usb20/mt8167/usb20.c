@@ -178,7 +178,7 @@ static void musb_idle_work_func(struct work_struct *work)
 #ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
 		if (!mtk_usb_power) {
 			DBG(0, "musb already disable\n");
-			mt_usb_clock_prepare();
+			mt_usb_clock_prepare(musb);
 		}
 #endif
 
@@ -211,7 +211,7 @@ static void musb_idle_work_func(struct work_struct *work)
 #ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
 		if (!mtk_usb_power) {
 			DBG(0, "done\n");
-			mt_usb_clock_unprepare();
+			mt_usb_clock_unprepare(musb);
 		}
 #endif
 
@@ -267,6 +267,10 @@ static void mt_usb_enable(struct musb *musb)
 	if (musb->power == true)
 		return;
 
+	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+		mt_usb_clock_prepare(musb);
+	#endif
+
 	flags = musb_readl(musb->mregs, USB_L1INTM);
 
 	/* mask ID pin, so "open clock" and "set flag" won't be interrupted. ISR may call clock_disable.*/
@@ -280,9 +284,6 @@ static void mt_usb_enable(struct musb *musb)
 		*/
 
 	mdelay(10);
-	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-	mt_usb_clock_prepare();
-	#endif
 
 	usb_phy_recover();
 
@@ -310,7 +311,7 @@ static void mt_usb_disable(struct musb *musb)
 
 	usb_phy_savecurrent();
 	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-	mt_usb_clock_unprepare();
+		mt_usb_clock_unprepare(musb);
 	#endif
 
 	/* update musb->power & mtk_usb_power in the same time */
@@ -344,9 +345,13 @@ bool mt_usb_is_device(void)
 }
 
 #ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-void mt_usb_clock_prepare(void)
+int usb20_clk_prepared_cnt;
+void mt_usb_clock_prepare(struct musb *musb)
 {
 	int retval = 0;
+
+	++usb20_clk_prepared_cnt;
+	DBG(1, "prepared cnt:%d\n", usb20_clk_prepared_cnt);
 
 	DBG(1, "usb_power = %d\n", mtk_usb_power);
 	retval = clk_prepare(usbpll_clk);
@@ -361,8 +366,11 @@ void mt_usb_clock_prepare(void)
 		DBG(0, KERN_WARNING "prepare fail\n");
 }
 
-void mt_usb_clock_unprepare(void)
+void mt_usb_clock_unprepare(struct musb *musb)
 {
+	--usb20_clk_prepared_cnt;
+	DBG(1, "prepared cnt:%d\n", usb20_clk_prepared_cnt);
+
 	DBG(1, "usb_power = %d\n", mtk_usb_power);
 
 	clk_unprepare(usbmcu_clk);
@@ -1386,7 +1394,9 @@ static const struct musb_platform_ops mt_usb_ops = {
 	.set_vbus	= mt_usb_set_vbus,
 	.vbus_status = mt_usb_get_vbus_status,
 	.enable_clk =  mt_usb_enable_clk,
-	.disable_clk =  mt_usb_disable_clk
+	.disable_clk =  mt_usb_disable_clk,
+	.prepare_clk = mt_usb_clock_prepare,
+	.unprepare_clk = mt_usb_clock_unprepare,
 };
 
 static u64 mt_usb_dmamask = DMA_BIT_MASK(32);

@@ -332,6 +332,9 @@ static void musb_id_pin_work(struct work_struct *data)
 	u8 devctl = 0;
 	unsigned long flags;
 
+	/* need prepare clock because  musb_generic_disable may call prepare clock in atomic context */
+	mt_usb_clock_prepare(mtk_musb);
+
 	spin_lock_irqsave(&mtk_musb->lock, flags);
 	musb_generic_disable(mtk_musb);
 	spin_unlock_irqrestore(&mtk_musb->lock, flags);
@@ -427,6 +430,8 @@ static void musb_id_pin_work(struct work_struct *data)
 out:
 	DBG(0, "work end, is_host=%d\n", mtk_musb->is_host);
 	up(&mtk_musb->musb_lock);
+
+	mt_usb_clock_unprepare(mtk_musb);
 }
 
 #ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE

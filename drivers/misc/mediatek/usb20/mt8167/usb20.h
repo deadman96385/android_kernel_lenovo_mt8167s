@@ -30,8 +30,8 @@ extern void mt_usb_check_reconnect(void);
 extern void musb_id_pin_sw_work(bool host_mode);
 #endif
 #ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-extern void mt_usb_clock_prepare(void);
-extern void mt_usb_clock_unprepare(void);
+extern void mt_usb_clock_prepare(struct musb *musb);
+extern void mt_usb_clock_unprepare(struct musb *musb);
 #endif
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH

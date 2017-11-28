@@ -288,7 +288,7 @@ void usb_phy_switch_to_uart(void)
 		/*return;*/
 	DBG(0, "USB Port -> UART\n");
 	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-	mt_usb_clock_prepare();
+	mt_usb_clock_prepare(mtk_musb);
 	#endif
 	usb_enable_clock(true);
 	udelay(50);
@@ -331,7 +331,7 @@ void usb_phy_switch_to_uart(void)
 	usb_enable_clock(false);
 
 	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-	mt_usb_clock_unprepare();
+	mt_usb_clock_unprepare(mtk_musb);
 	#endif
 
 	/*set uart rx path*/
@@ -346,7 +346,7 @@ void usb_phy_switch_to_uart(void)
 void usb_phy_switch_to_usb(void)
 {
 #ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-	mt_usb_clock_prepare();
+	mt_usb_clock_prepare(mtk_musb);
 #endif
 	usb_enable_clock(true);
 	udelay(50);
@@ -635,7 +635,7 @@ void Charger_Detect_Init(void)
 
 	do_lock = 0;
 	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-	mt_usb_clock_prepare();
+	mt_usb_clock_prepare(mtk_musb);
 	#endif
 	if (mtk_musb) {
 		spin_lock_irqsave(&mtk_musb->lock, flags);
@@ -678,7 +678,7 @@ void Charger_Detect_Release(void)
 	if (do_lock)
 		spin_unlock_irqrestore(&mtk_musb->lock, flags);
 	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-	mt_usb_clock_unprepare();
+	mt_usb_clock_unprepare(mtk_musb);
 	#endif
 	DBG(0, "Charger_Detect_Release\n");
 }
