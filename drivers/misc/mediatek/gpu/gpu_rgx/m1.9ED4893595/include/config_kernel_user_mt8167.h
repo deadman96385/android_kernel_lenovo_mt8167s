@@ -9,7 +9,7 @@
 #define RGX_FW_HEAP_SHIFT  25
 #define RGX_FW_FILENAME "rgx.fw.signed"
 #define LINUX
-#define PVR_BUILD_DIR "mt8167_android"
+#define PVR_BUILD_DIR "mtk_android"
 #define PVR_BUILD_TYPE "release"
 #define PVRSRV_MODNAME "pvrsrvkm"
 #define SUPPORT_RGX 1
