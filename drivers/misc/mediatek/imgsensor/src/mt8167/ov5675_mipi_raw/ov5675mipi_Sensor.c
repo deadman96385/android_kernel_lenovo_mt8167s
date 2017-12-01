@@ -67,7 +67,7 @@ static void capture_setting(kal_uint16 currefps);
 static imgsensor_info_struct imgsensor_info = {
 	.sensor_id = OV5675MIPI_SENSOR_ID,	/* record sensor id defined in Kd_imgsensor.h */
 
-	.checksum_value = 0x6252c5ee,	/* checksum value for Camera Auto Test */
+	.checksum_value = 0x4d88fa8d,	/*0x6252c5ee,  checksum value for Camera Auto Test */
 
 	.pre = {
 		.pclk = 45000000,	/* 45000000      //record different mode's pclk */

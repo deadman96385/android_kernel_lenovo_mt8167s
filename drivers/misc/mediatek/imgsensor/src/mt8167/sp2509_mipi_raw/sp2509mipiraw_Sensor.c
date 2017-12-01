@@ -63,7 +63,7 @@ static DEFINE_SPINLOCK(imgsensor_drv_lock);
 static imgsensor_info_struct imgsensor_info = {
 	.sensor_id = SP2509_SENSOR_ID,
 
-	.checksum_value = 0x30a68313,	/* checksum value for Camera Auto Test */
+	.checksum_value = 0x3ca80b08,	/*0x30a68313, checksum value for Camera Auto Test */
 
 	.pre = {
 		.pclk = 36000000,	/* record different mode's pclk */
