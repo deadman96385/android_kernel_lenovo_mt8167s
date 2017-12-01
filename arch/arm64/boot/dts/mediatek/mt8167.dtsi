@@ -775,7 +775,7 @@
 			reg = <0 0x11007000 0 0x1000>, /* UART base */
 			      <0 0x11000980 0 0x80>, /* DMA Tx base */
 			      <0 0x11000a00 0 0x80>; /* DMA Rx base */
-			interrupts = <GIC_SPI 212 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
+			interrupts = <GIC_SPI 211 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
 				     <GIC_SPI 100 IRQ_TYPE_LEVEL_LOW>, /* DMA Tx IRQ */
 				     <GIC_SPI 101 IRQ_TYPE_LEVEL_LOW>; /* DMA Rx IRQ */
 
