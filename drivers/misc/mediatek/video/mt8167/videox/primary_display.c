@@ -6598,7 +6598,8 @@ int primary_display_memory_trigger(int blocking, void *callback, unsigned int us
 		} else {
 			_trigger_ovl_to_memory(pgc->ovl2mem_path_handle, pgc->cmdq_handle_ovl1to2_config,
 					       (fence_release_callback)_ovl_ext_fence_release_callback,
-					       DISP_SESSION_MEMORY, 0);
+					       DISP_SESSION_MEMORY, 1);
+			_ovl_ext_fence_release_callback(DISP_SESSION_MEMORY);
 		}
 	} else {
 		DISPMSG("Not support memory trigger using session_mode:%d\n", pgc->session_mode);
