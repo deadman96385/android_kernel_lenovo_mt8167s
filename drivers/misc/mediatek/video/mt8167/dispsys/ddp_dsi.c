@@ -351,7 +351,7 @@ enum DSI_STATUS DSI_DisableClk(enum DISP_MODULE_ENUM module, struct cmdqRecStruc
 
 void DSI_sw_clk_trail(int module_idx)
 {
-	DEFINE_SPINLOCK(s_lock);
+	static DEFINE_SPINLOCK(s_lock);
 	unsigned long flags;
 
 	register unsigned long *SW_CTRL_CON0_addr;
@@ -1464,7 +1464,6 @@ void DSI_PHY_TIMCONFIG(LCM_DSI_PARAMS *lcm_params)
 	timcon1.DA_HS_EXIT =
 	    (lcm_params->DA_HS_EXIT == 0) ? NS_TO_CYCLE((0x3c + 0x80 * ui),
 							    cycle_time) : lcm_params->DA_HS_EXIT;
-
 	timcon2.CLK_TRAIL =
 	    ((lcm_params->CLK_TRAIL == 0) ? NS_TO_CYCLE(0x64,
 				cycle_time) : lcm_params->CLK_TRAIL) + 0x0a;
@@ -1477,7 +1476,6 @@ void DSI_PHY_TIMCONFIG(LCM_DSI_PARAMS *lcm_params)
 	timcon2.CLK_ZERO =
 	    (lcm_params->CLK_ZERO == 0) ? NS_TO_CYCLE(0x190,
 							  cycle_time) : lcm_params->CLK_ZERO;
-
 	timcon3.CLK_HS_PRPR =
 	    (lcm_params->CLK_HS_PRPR == 0) ? NS_TO_CYCLE(0x40,
 							     cycle_time) : lcm_params->CLK_HS_PRPR;
@@ -1488,7 +1486,6 @@ void DSI_PHY_TIMCONFIG(LCM_DSI_PARAMS *lcm_params)
 	timcon3.CLK_HS_POST =
 	    (lcm_params->CLK_HS_POST == 0) ? NS_TO_CYCLE((0x3c + 0x80 * ui),
 							     cycle_time) : lcm_params->CLK_HS_POST;
-
 	DDPMSG("DSI_PHY, HS_TRAIL:%d, HS_ZERO:%d, HS_PRPR:%d, LPX:%d, TA_GET:%d, TA_SURE:%d\n",
 		       timcon0.HS_TRAIL, timcon0.HS_ZERO, timcon0.HS_PRPR, timcon0.LPX,
 		       timcon1.TA_GET, timcon1.TA_SURE);
@@ -1513,9 +1510,9 @@ void DSI_PHY_TIMCONFIG(LCM_DSI_PARAMS *lcm_params)
 	DSI_OUTREGBIT(NULL, struct DSI_PHY_TIMCON3_REG, DSI_REG[0]->DSI_PHY_TIMECON3, CLK_HS_PRPR, timcon3.CLK_HS_PRPR);
 	DSI_OUTREGBIT(NULL, struct DSI_PHY_TIMCON3_REG, DSI_REG[0]->DSI_PHY_TIMECON3, CLK_HS_POST, timcon3.CLK_HS_POST);
 	DSI_OUTREGBIT(NULL, struct DSI_PHY_TIMCON3_REG, DSI_REG[0]->DSI_PHY_TIMECON3, CLK_HS_EXIT, timcon3.CLK_HS_EXIT);
-	DDPMSG("%s, 0x%08x,0x%08x,0x%08x,0x%08x\n", __func__,
-		DISP_REG_GET(DSI_REG[0] + 0x110), DISP_REG_GET(DSI_REG[0] + 0x114),
-		DISP_REG_GET(DSI_REG[0] + 0x118), DISP_REG_GET(DSI_REG[0] + 0x11c));
+/*	DDPMSG("%s, 0x%08x,0x%08x,0x%08x,0x%08x\n", __func__, */
+/*		DISP_REG_GET(DSI_REG[0] + 0x110), DISP_REG_GET(DSI_REG[0] + 0x114), */
+/*		DISP_REG_GET(DSI_REG[0] + 0x118), DISP_REG_GET(DSI_REG[0] + 0x11c)); */
 }
 
 
