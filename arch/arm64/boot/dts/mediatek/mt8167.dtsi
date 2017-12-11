@@ -1069,7 +1069,7 @@
 			/* power domain always on */
 			clocks = <&topckgen CLK_TOP_MSDC2>,
 				 <&topckgen CLK_TOP_MSDC2_INFRA>;
-			clock-names = "sdio-bus", "sdio-src";
+			clock-names = "source", "hclk";
 			status = "disabled";
 		};
 
