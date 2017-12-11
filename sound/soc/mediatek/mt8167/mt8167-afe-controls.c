@@ -563,6 +563,45 @@ static int mt8167_afe_tdm_in_sgen_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int mt8167_mrgrx_volume_get(struct snd_kcontrol *kcontrol,
+				  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
+
+	ucontrol->value.integer.value[0] = afe->mrgrx_priv->mrgrx_volume;
+	return 0;
+}
+
+void mt8167_afe_set_hw_digital_gain(struct mtk_afe *afe, unsigned int gain, int gain_type)
+{
+	switch (gain_type) {
+	case MT8167_AFE_HW_DIGITAL_GAIN1:
+		regmap_update_bits(afe->regmap, AFE_GAIN1_CON1, 0xfffff, gain);
+		break;
+	case MT8167_AFE_HW_DIGITAL_GAIN2:
+		regmap_update_bits(afe->regmap, AFE_GAIN2_CON1, 0xfffff, gain);
+		break;
+	default:
+		pr_warn("%s with no match type\n", __func__);
+		break;
+	}
+}
+
+static int mt8167_mrgrx_volume_set(struct snd_kcontrol *kcontrol,
+				  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
+
+
+	afe->mrgrx_priv->mrgrx_volume = ucontrol->value.integer.value[0];
+
+	mt8167_afe_set_hw_digital_gain(afe, afe->mrgrx_priv->mrgrx_volume, MT8167_AFE_HW_DIGITAL_GAIN1);
+
+	return 0;
+}
+
 
 static const struct soc_enum mt8167_afe_soc_enums[] = {
 	[CTRL_SGEN_EN] = SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(sgen_func),
@@ -598,6 +637,11 @@ static const struct snd_kcontrol_new mt8167_afe_controls[] = {
 			    0,
 			    mt8167_afe_tdm_in_sgen_get,
 			    mt8167_afe_tdm_in_sgen_put),
+
+	SOC_SINGLE_EXT("Audio Mrgrx Volume",
+			SND_SOC_NOPM, 0, 0x80000, 0,
+			mt8167_mrgrx_volume_get,
+			mt8167_mrgrx_volume_set),
 };
 
 

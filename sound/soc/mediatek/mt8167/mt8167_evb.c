@@ -441,6 +441,32 @@ static struct snd_soc_dai_link mt8167_evb_dais[] = {
 		.dynamic = 1,
 		.dpcm_capture = 1,
 	},
+	{
+		.name = "VIRTUAL_MRG",
+		.stream_name = "MRGRX_PLayback",
+		.cpu_dai_name = "VIRTURL_MRG",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.trigger = {
+			SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST
+		},
+		.dynamic = 1,
+		.dpcm_playback = 1,
+	},
+	{
+		.name = "MRGRX_CAPTURE",
+		.cpu_dai_name = "AWB",
+		.stream_name = "MRGRX_CAPTURE",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.trigger = {
+			SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST
+		},
+		.dynamic = 1,
+		.dpcm_capture = 1,
+	},
 #ifdef CONFIG_SND_SOC_MTK_BTCVSD
 	{
 		.name = "BTCVSD_RX",

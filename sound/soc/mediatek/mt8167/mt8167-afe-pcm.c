@@ -479,6 +479,122 @@ static void mt8167_afe_set_adda_in_enable(struct mtk_afe *afe, bool enable)
 		mt8167_afe_disable_adda_on(afe);
 }
 
+static uint32_t mt8167_afe_rate_to_idx(uint32_t sample_rate)
+{
+	switch (sample_rate) {
+	case 8000:
+		return MT_AFE_I2S_SAMPLERATE_8K;
+	case 11025:
+		return MT_AFE_I2S_SAMPLERATE_11K;
+	case 12000:
+		return MT_AFE_I2S_SAMPLERATE_12K;
+	case 16000:
+		return MT_AFE_I2S_SAMPLERATE_16K;
+	case 22050:
+		return MT_AFE_I2S_SAMPLERATE_22K;
+	case 24000:
+		return MT_AFE_I2S_SAMPLERATE_24K;
+	case 32000:
+		return MT_AFE_I2S_SAMPLERATE_32K;
+	case 44100:
+		return MT_AFE_I2S_SAMPLERATE_44K;
+	case 48000:
+		return MT_AFE_I2S_SAMPLERATE_48K;
+	case 88000:
+		return MT_AFE_I2S_SAMPLERATE_88K;
+	case 96000:
+		return MT_AFE_I2S_SAMPLERATE_96K;
+	case 174000:
+		return MT_AFE_I2S_SAMPLERATE_174K;
+	case 192000:
+		return MT_AFE_I2S_SAMPLERATE_192K;
+	default:
+		break;
+	}
+	return MT_AFE_I2S_SAMPLERATE_44K;
+}
+
+void mt8167_afe_set_hw_digital_gain_mode(struct mtk_afe *afe, uint32_t gain_type, uint32_t sample_rate,
+				uint32_t sample_per_step)
+{
+	uint32_t value = sample_per_step << 8 | (mt8167_afe_rate_to_idx(sample_rate) << 4);
+
+	switch (gain_type) {
+	case MT8167_AFE_HW_DIGITAL_GAIN1:
+		regmap_update_bits(afe->regmap, AFE_GAIN1_CON0, 0xfff0, value);
+		break;
+	case MT8167_AFE_HW_DIGITAL_GAIN2:
+		regmap_update_bits(afe->regmap, AFE_GAIN2_CON0, 0xfff0, value);
+		break;
+	default:
+		break;
+	}
+}
+void mt8167_afe_set_hw_digital_gain_state(struct mtk_afe *afe, int gain_type, bool enable)
+{
+	switch (gain_type) {
+	case MT8167_AFE_HW_DIGITAL_GAIN1:
+		if (enable) {
+			/* Let current gain be 0 to ramp up */
+			regmap_update_bits(afe->regmap, AFE_GAIN1_CUR, 0xFFFFF, 0);
+		}
+		regmap_update_bits(afe->regmap, AFE_GAIN1_CON0, 0x1, enable);
+		break;
+	case MT8167_AFE_HW_DIGITAL_GAIN2:
+		if (enable) {
+			/* Let current gain be 0 to ramp up */
+			regmap_update_bits(afe->regmap, AFE_GAIN2_CUR, 0xFFFFF, 0);
+		}
+		regmap_update_bits(afe->regmap, AFE_GAIN2_CON0, 0x1, enable);
+		break;
+	default:
+		pr_warn("%s with no match type\n", __func__);
+		break;
+	}
+}
+
+static void mt8167_afe_enable_mrg_i2s(struct mtk_afe *afe)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&afe->afe_ctrl_lock, flags);
+	afe->mrgi2s_on_ref_cnt++;
+	spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
+
+	if (afe->mrgi2s_on_ref_cnt != 1)
+		return;
+
+	regmap_update_bits(afe->regmap, AFE_MRGIF_CON, 1 << 16, 1 << 16);
+	udelay(100);
+	regmap_update_bits(afe->regmap, AFE_MRGIF_CON, 0x1, 0x1);
+	udelay(100);
+}
+
+static void mt8167_afe_disable_mrg_i2s(struct mtk_afe *afe)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&afe->afe_ctrl_lock, flags);
+	afe->mrgi2s_on_ref_cnt--;
+	if (afe->mrgi2s_on_ref_cnt < 0)
+		afe->mrgi2s_on_ref_cnt = 0;
+	spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
+
+	if (afe->mrgi2s_on_ref_cnt != 0)
+		return;
+
+	regmap_update_bits(afe->regmap, AFE_MRGIF_CON, 1 << 16, 0x0);
+	regmap_update_bits(afe->regmap, AFE_MRGIF_CON, 0x1, 0x0);
+}
+
+static int mt8167_afe_set_mrg_i2s(struct mtk_afe *afe, unsigned int rate)
+{
+	unsigned int rate_idex = mt8167_afe_rate_to_idx(rate);
+
+	regmap_update_bits(afe->regmap, AFE_MRGIF_CON, 0xf00000, rate_idex << 20);
+	return 0;
+}
+
 static int mt8167_afe_set_mrg(struct mtk_afe *afe, unsigned int rate)
 {
 	unsigned int val = 0;
@@ -1234,6 +1350,80 @@ static int mt8167_afe_mrg_bt_trigger(struct snd_pcm_substream *substream, int cm
 	default:
 		return -EINVAL;
 	}
+}
+
+static int mt8167_afe_mrg_rx_startup(struct snd_pcm_substream *substream,
+				struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct mt8167_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+	int ret;
+
+	dev_dbg(afe->dev, "%s %s\n", __func__, memif->data->name);
+
+	snd_soc_set_runtime_hwparams(substream, &mt8167_afe_hardware);
+
+	ret = snd_pcm_hw_constraint_integer(runtime,
+					    SNDRV_PCM_HW_PARAM_PERIODS);
+	if (ret < 0) {
+		dev_err(afe->dev, "snd_pcm_hw_constraint_integer failed\n");
+		return ret;
+	}
+
+	memif->substream = substream;
+
+	mt8167_afe_enable_main_clk(afe);
+
+	return 0;
+}
+
+static void mt8167_afe_mrg_rx_shutdown(struct snd_pcm_substream *substream,
+				  struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct mt8167_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+
+	dev_dbg(afe->dev, "%s %s\n", __func__, memif->data->name);
+
+	if (memif->prepared) {
+		mt8167_afe_disable_afe_on(afe);
+		memif->prepared = false;
+	}
+
+	memif->substream = NULL;
+
+	mt8167_afe_disable_mrg_i2s(afe);
+
+	mt8167_afe_disable_main_clk(afe);
+}
+
+static int mt8167_afe_mrg_rx_hw_params(struct snd_pcm_substream *substream,
+			  struct snd_pcm_hw_params *params,
+			  struct snd_soc_dai *dai)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	int ret;
+
+	dev_dbg(afe->dev, "%s '%s' rate = %u\n", __func__,
+		snd_pcm_stream_str(substream), params_rate(params));
+
+	/*set hw gain*/
+	mt8167_afe_set_hw_digital_gain_mode(afe, MT8167_AFE_HW_DIGITAL_GAIN1, runtime->rate, 0x80);
+	mt8167_afe_set_hw_digital_gain_state(afe, MT8167_AFE_HW_DIGITAL_GAIN1, true);
+	mt8167_afe_set_hw_digital_gain(afe, afe->mrgrx_priv->mrgrx_volume, MT8167_AFE_HW_DIGITAL_GAIN1);
+
+	ret = mt8167_afe_set_mrg_i2s(afe, params_rate(params));
+	mt8167_afe_enable_mrg_i2s(afe);
+
+	if (ret)
+		return ret;
+
+	return 0;
 }
 
 static int mt8167_afe_pcm0_startup(struct snd_pcm_substream *substream,
@@ -2024,6 +2214,65 @@ static int mt8167_afe_dais_trigger(struct snd_pcm_substream *substream, int cmd,
 	}
 }
 
+static int mt8167_afe_hw_gain1_startup(struct snd_pcm_substream *substream,
+				struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+
+	mt8167_afe_enable_main_clk(afe);
+	return 0;
+}
+
+static void mt8167_afe_hw_gain1_shutdown(struct snd_pcm_substream *substream,
+				  struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
+	const unsigned int stream = substream->stream;
+
+	if (be->prepared[stream]) {
+		regmap_update_bits(afe->regmap, AFE_GAIN1_CON0, AFE_GAIN1_CON0_EN_MASK, 0);
+		be->prepared[stream] = false;
+	}
+	mt8167_afe_disable_main_clk(afe);
+}
+
+static int mt8167_afe_hw_gain1_prepare(struct snd_pcm_substream *substream,
+				struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_pcm_runtime * const runtime = substream->runtime;
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
+	const unsigned int rate = runtime->rate;
+	const unsigned int stream = substream->stream;
+	int fs;
+	unsigned int val1, val2;
+
+	if (be->prepared[stream]) {
+		dev_info(afe->dev, "%s '%s' prepared already\n", __func__, snd_pcm_stream_str(substream));
+		return 0;
+	}
+
+	if (be->prepared[stream])
+		regmap_update_bits(afe->regmap, AFE_GAIN1_CON0, AFE_GAIN1_CON0_EN_MASK, 0);
+
+	fs = mt8167_afe_i2s_fs(rate);
+	regmap_update_bits(afe->regmap, AFE_GAIN1_CON0, AFE_GAIN1_CON0_MODE_MASK, (unsigned int)fs<<4);
+
+	regmap_read(afe->regmap, AFE_GAIN1_CON1, &val1);
+	regmap_read(afe->regmap, AFE_GAIN1_CUR, &val2);
+	if ((val1 & AFE_GAIN1_CON1_MASK) != (val2 & AFE_GAIN1_CUR_MASK))
+		regmap_update_bits(afe->regmap, AFE_GAIN1_CUR, AFE_GAIN1_CUR_MASK, val1);
+
+	regmap_update_bits(afe->regmap, AFE_GAIN1_CON0, AFE_GAIN1_CON0_EN_MASK, 1);
+	be->prepared[stream] = true;
+
+	return 0;
+}
+
 /* FE DAIs */
 static const struct snd_soc_dai_ops mt8167_afe_dai_ops = {
 	.startup	= mt8167_afe_dais_startup,
@@ -2032,6 +2281,13 @@ static const struct snd_soc_dai_ops mt8167_afe_dai_ops = {
 	.hw_free	= mt8167_afe_dais_hw_free,
 	.prepare	= mt8167_afe_dais_prepare,
 	.trigger	= mt8167_afe_dais_trigger,
+};
+static const struct snd_soc_dai_ops mt8167_afe_dai_mrg_playback_ops = {
+	.startup	= mt8167_afe_mrg_rx_startup,
+	.shutdown	= mt8167_afe_mrg_rx_shutdown,
+	.hw_params	= mt8167_afe_mrg_rx_hw_params,
+	.hw_free	= mt8167_afe_dais_hw_free,
+	.prepare	= mt8167_afe_dais_prepare,
 };
 
 /* BE DAIs */
@@ -2084,6 +2340,12 @@ static const struct snd_soc_dai_ops mt8167_afe_tdm_in_ops = {
 	.prepare	= mt8167_afe_tdm_in_prepare,
 	.trigger	= mt8167_afe_tdm_in_trigger,
 	.set_fmt	= mt8167_afe_tdm_in_set_fmt,
+};
+
+static const struct snd_soc_dai_ops mt8167_afe_hw_gain1_ops = {
+	.startup	= mt8167_afe_hw_gain1_startup,
+	.shutdown	= mt8167_afe_hw_gain1_shutdown,
+	.prepare	= mt8167_afe_hw_gain1_prepare,
 };
 
 static int mt8167_afe_suspend(struct device *dev);
@@ -2315,6 +2577,34 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 		.ops = &mt8167_afe_mrg_bt_ops,
 		.symmetric_rates = 1,
 	}, {
+		.name = "VIRTURL_MRG",
+		.id = MT8167_AFE_MEMIF_VIRTUAL_MRG,
+		.suspend = mt8167_afe_dai_suspend,
+		.resume = mt8167_afe_dai_resume,
+		.playback = {
+			.stream_name = "VIRTUAL_MRG",
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = SNDRV_PCM_RATE_8000 |
+					SNDRV_PCM_RATE_16000 |
+					SNDRV_PCM_RATE_32000 |
+					SNDRV_PCM_RATE_44100 |
+					SNDRV_PCM_RATE_48000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+		},
+		.capture = {
+			.stream_name = "MRG RX Capture",
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = SNDRV_PCM_RATE_8000 |
+				 SNDRV_PCM_RATE_16000 |
+				 SNDRV_PCM_RATE_32000 |
+				 SNDRV_PCM_RATE_44100 |
+				 SNDRV_PCM_RATE_48000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+		},
+		.ops = &mt8167_afe_dai_mrg_playback_ops,
+	}, {
 	/* BE DAIs */
 		.name = "PCM0",
 		.id = MT8167_AFE_IO_PCM_BT,
@@ -2377,6 +2667,20 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &mt8167_afe_tdm_in_ops,
+	}, {
+	/* BE DAIs */
+		.name = "HW_GAIN1",
+		.id = MT8167_AFE_IO_HW_GAIN1,
+		.capture = {
+			.stream_name = "HW GAIN1 Capture",
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = SNDRV_PCM_RATE_8000_192000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
+		},
+		.ops = &mt8167_afe_hw_gain1_ops,
 	},
 };
 
@@ -2448,11 +2752,13 @@ static const struct snd_kcontrol_new mt8167_afe_o02_mix[] = {
 static const struct snd_kcontrol_new mt8167_afe_o03_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I05 Switch", AFE_CONN1, 21, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I07 Switch", AFE_CONN1, 23, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I10 Switch", AFE_GAIN1_CONN, 8, 1, 0),
 };
 
 static const struct snd_kcontrol_new mt8167_afe_o04_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I06 Switch", AFE_CONN2, 6, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I08 Switch", AFE_CONN2, 8, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I11 Switch", AFE_GAIN1_CONN, 10, 1, 0),
 };
 
 static const struct snd_kcontrol_new mt8167_afe_o05_mix[] = {
@@ -2460,6 +2766,7 @@ static const struct snd_kcontrol_new mt8167_afe_o05_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I03 Switch", AFE_CONN2, 18, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I05 Switch", AFE_CONN2, 19, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I07 Switch", AFE_CONN2, 20, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I15 Switch", AFE_CONN4, 6, 1, 0),
 };
 
 static const struct snd_kcontrol_new mt8167_afe_o06_mix[] = {
@@ -2467,6 +2774,7 @@ static const struct snd_kcontrol_new mt8167_afe_o06_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I04 Switch", AFE_CONN2, 23, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I06 Switch", AFE_CONN2, 24, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I08 Switch", AFE_CONN2, 25, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I16 Switch", AFE_CONN4, 8, 1, 0),
 };
 
 static const struct snd_kcontrol_new mt8167_afe_o09_mix[] = {
@@ -2482,6 +2790,17 @@ static const struct snd_kcontrol_new mt8167_afe_o10_mix[] = {
 static const struct snd_kcontrol_new mt8167_afe_o11_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I02 Switch", AFE_CONN3, 6, 1, 0),
 };
+
+static const struct snd_kcontrol_new mt8167_afe_o13_mix[] = {
+	SOC_DAPM_SINGLE_AUTODISABLE("I02 Switch", AFE_GAIN1_CONN2, 4, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I15 Switch", AFE_GAIN1_CONN2, 9, 1, 0),
+};
+
+static const struct snd_kcontrol_new mt8167_afe_o14_mix[] = {
+	SOC_DAPM_SINGLE_AUTODISABLE("I02 Switch", AFE_GAIN1_CONN2, 17, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I16 Switch", AFE_GAIN1_CONN2, 23, 1, 0),
+};
+
 
 static const char * const ain_text[] = {
 	"INT ADC", "EXT ADC"
@@ -2601,6 +2920,11 @@ static const struct snd_soc_dapm_widget mt8167_afe_pcm_widgets[] = {
 	SND_SOC_DAPM_MIXER("I07L", SND_SOC_NOPM, 0, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("I08L", SND_SOC_NOPM, 0, 0, NULL, 0),
 
+	SND_SOC_DAPM_MIXER("I15", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER("I16", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER("I10", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER("I11", SND_SOC_NOPM, 0, 0, NULL, 0),
+
 	SND_SOC_DAPM_MIXER("O00", SND_SOC_NOPM, 0, 0,
 			   mt8167_afe_o00_mix, ARRAY_SIZE(mt8167_afe_o00_mix)),
 	SND_SOC_DAPM_MIXER("O01", SND_SOC_NOPM, 0, 0,
@@ -2622,6 +2946,10 @@ static const struct snd_soc_dapm_widget mt8167_afe_pcm_widgets[] = {
 	SND_SOC_DAPM_MIXER("O11", SND_SOC_NOPM, 0, 0,
 			   mt8167_afe_o11_mix, ARRAY_SIZE(mt8167_afe_o11_mix)),
 
+	SND_SOC_DAPM_MIXER("O13", SND_SOC_NOPM, 0, 0,
+			   mt8167_afe_o13_mix, ARRAY_SIZE(mt8167_afe_o13_mix)),
+	SND_SOC_DAPM_MIXER("O14", SND_SOC_NOPM, 0, 0,
+			   mt8167_afe_o14_mix, ARRAY_SIZE(mt8167_afe_o14_mix)),
 	SND_SOC_DAPM_MUX("AIN Mux", SND_SOC_NOPM, 0, 0, &ain_mux),
 	SND_SOC_DAPM_MUX("DAIBT Mux", SND_SOC_NOPM, 0, 0, &daibt_mux),
 
@@ -2713,15 +3041,30 @@ static const struct snd_soc_dapm_route mt8167_afe_pcm_routes[] = {
 	{"O06", "I01 Switch", "I01"},
 	{"O05", "I03 Switch", "I03"},
 	{"O06", "I04 Switch", "I04"},
+
+	{"O05", "I15 Switch", "I15"},
+	{"O06", "I16 Switch", "I16"},
+
 	{"AWB", NULL, "O05"},
 	{"AWB", NULL, "O06"},
 
+	{"O13", "I15 Switch", "I15"},
+	{"O14", "I16 Switch", "I16"},
+	{"HW GAIN1 Capture", NULL, "O13"},
+	{"HW GAIN1 Capture", NULL, "O14"},
+	{"I10", NULL, "HW GAIN1 Capture"},
+	{"I11", NULL, "HW GAIN1 Capture"},
+	{"O03", "I10 Switch", "I10"},
+	{"O04", "I11 Switch", "I11"},
 	{"PCM0 Capture", NULL, "PCM0 In"},
 	{"MRG BT Capture", NULL, "MRG In"},
 	{"DAIBT Mux", "PCM", "PCM0 Capture"},
 	{"DAIBT Mux", "MRG", "MRG BT Capture"},
 	{"I02", NULL, "DAIBT Mux"},
 	{"O11", "I02 Switch", "I02"},
+	{"I15", NULL, "VIRTUAL_MRG"},
+	{"I16", NULL, "VIRTUAL_MRG"},
+	{"VIRTUAL_MRG", NULL, "MRG In"},
 	{"DAI", NULL, "O11"},
 
 	{"TDM_IN", NULL, "TDM IN Capture"},
@@ -2940,6 +3283,28 @@ static struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
 		.conn_format_mask = -1,
 		.prealloc_size = 0,
 		.buffer_align_bytes = 8,
+	}, {
+		.name = "VIRTURL_MRG",
+		.id = MT8167_AFE_MEMIF_VIRTUAL_MRG,
+		.reg_ofs_base = -1,
+		.reg_ofs_end = -1,
+		.reg_ofs_cur = -1,
+		.fs_shift = -1,
+		.mono_shift = -1,
+		.enable_shift = -1,
+		.irq_reg_cnt = -1,
+		.irq_cnt_shift = -1,
+		.irq_mode = -1,
+		.irq_fs_reg = -1,
+		.irq_fs_shift = -1,
+		.irq_clr_shift = 9,
+		.max_sram_size = 0,
+		.sram_offset = 0,
+		.format_reg = -1,
+		.format_shift = -1,
+		.conn_format_mask = -1,
+		.prealloc_size = 0,
+		.buffer_align_bytes = -1,
 	},
 };
 
@@ -3111,6 +3476,11 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 		afe->sram_phy_address = res->start;
 		afe->sram_size = resource_size(res);
 	}
+
+	afe->mrgrx_priv = devm_kzalloc(&pdev->dev, sizeof(struct mt8167_pcm_mrgrx_priv), GFP_KERNEL);
+	if (!(afe->mrgrx_priv))
+		return -ENOMEM;
+	afe->mrgrx_priv->mrgrx_volume = 0x10000;
 
 	/* initial audio related clock */
 	ret = mt8167_afe_init_audio_clk(afe);
