@@ -297,6 +297,8 @@ nicUpdateLinkQuality(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex, IN P_EVENT_
 
 VOID nicUpdateRSSI(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex, IN INT_8 cRssi, IN INT_8 cLinkQuality);
 
+VOID nicUpdateNoise(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex, IN INT_8 cNoise);
+
 VOID nicUpdateLinkSpeed(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex, IN UINT_16 u2LinkSpeed);
 
 #if CFG_SUPPORT_RDD_TEST_MODE

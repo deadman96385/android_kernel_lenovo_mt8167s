@@ -293,6 +293,7 @@ VOID nicRxFillRFB(IN P_ADAPTER_T prAdapter, IN OUT P_SW_RFB_T prSwRfb)
 	/* UINT_32 u4MacHeaderLen; */
 	UINT_32 u4HeaderOffset;
 	UINT_16 u2RxStatusOffset;
+	INT_8 cAntennaNoise;
 
 	DEBUGFUNC("nicRxFillRFB");
 
@@ -328,6 +329,17 @@ VOID nicRxFillRFB(IN P_ADAPTER_T prAdapter, IN OUT P_SW_RFB_T prSwRfb)
 	if (prSwRfb->ucGroupVLD & BIT(RX_GROUP_VLD_3)) {
 		prSwRfb->prRxStatusGroup3 = (P_HW_MAC_RX_STS_GROUP_3_T) ((P_UINT_8) prRxStatus + u2RxStatusOffset);
 		u2RxStatusOffset += sizeof(HW_MAC_RX_STS_GROUP_3_T);
+
+		if (prSwRfb->ucPacketType == RX_PKT_TYPE_RX_DATA) {
+			cAntennaNoise = ((((prSwRfb->prRxStatusGroup3)->u4RxVector[5]
+				& RX_VT_NF0_MASK) >> 1) - 127);
+
+			if (prSwRfb->prStaRec != NULL) {
+				nicUpdateNoise(prAdapter,
+					prSwRfb->prStaRec->ucBssIndex, cAntennaNoise);
+			}
+		}
+
 	}
 
 	prSwRfb->u2RxStatusOffst = u2RxStatusOffset;

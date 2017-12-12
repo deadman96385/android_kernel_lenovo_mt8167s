@@ -3654,6 +3654,44 @@ VOID nicUpdateRSSI(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex, IN INT_8 cRss
 
 /*----------------------------------------------------------------------------*/
 /*!
+* @brief This function is called to update Noise information
+*
+* @param prAdapter      Pointer of Adapter Data Structure
+*        ucBssIndex
+*        cNoise
+*
+* @return none
+*/
+/*----------------------------------------------------------------------------*/
+VOID nicUpdateNoise(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex, IN INT_8 cNoise)
+{
+	ASSERT(prAdapter);
+	ASSERT(ucBssIndex <= MAX_BSS_INDEX);
+
+	switch (GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex)->eNetworkType) {
+	case NETWORK_TYPE_AIS:
+		if (GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex)->eConnectionState == PARAM_MEDIA_STATE_CONNECTED) {
+			kalUpdateNoise(prAdapter->prGlueInfo,
+				      KAL_NETWORK_TYPE_AIS_INDEX,
+				      cNoise);
+		}
+
+		break;
+#if CFG_ENABLE_WIFI_DIRECT
+	case NETWORK_TYPE_P2P:
+		kalUpdateNoise(prAdapter->prGlueInfo, KAL_NETWORK_TYPE_P2P_INDEX, cNoise);
+		break;
+#endif
+	default:
+		break;
+
+	}
+
+	return;
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
 * @brief This function is called to update Link Quality information
 *
 * @param prAdapter      Pointer of Adapter Data Structure

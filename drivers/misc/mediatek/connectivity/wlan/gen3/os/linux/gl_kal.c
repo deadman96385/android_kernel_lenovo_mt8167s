@@ -3551,12 +3551,57 @@ kalUpdateRSSI(IN P_GLUE_INFO_T prGlueInfo,
 
 	if (pStats) {
 		pStats->qual.qual = cLinkQuality;
-		pStats->qual.noise = 0;
-		pStats->qual.updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_NOISE_UPDATED | IW_QUAL_DBM;
+		//pStats->qual.noise = 0;
+		pStats->qual.updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_DBM;
 		pStats->qual.level = 0x100 + cRssi;
 		pStats->qual.updated |= IW_QUAL_LEVEL_UPDATED;
 	}
 
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief update Noise to GLUE layer
+*
+* \param[in]
+*           prGlueInfo
+*           eNetTypeIdx
+*           cNoise
+*
+* \return
+*           None
+*/
+/*----------------------------------------------------------------------------*/
+VOID
+kalUpdateNoise(IN P_GLUE_INFO_T prGlueInfo,
+	      IN ENUM_KAL_NETWORK_TYPE_INDEX_T eNetTypeIdx, IN INT_8 cNoise)
+{
+	struct iw_statistics *pStats = (struct iw_statistics *)NULL;
+
+	ASSERT(prGlueInfo);
+
+	switch (eNetTypeIdx) {
+	case KAL_NETWORK_TYPE_AIS_INDEX:
+		pStats = (struct iw_statistics *)(&(prGlueInfo->rIwStats));
+		break;
+#if CFG_ENABLE_WIFI_DIRECT
+#if CFG_SUPPORT_P2P_RSSI_QUERY
+	case KAL_NETWORK_TYPE_P2P_INDEX:
+		pStats = (struct iw_statistics *)(&(prGlueInfo->rP2pIwStats));
+		break;
+#endif
+#endif
+	default:
+		break;
+
+	}
+
+	if (pStats) {
+		pStats->qual.noise = 0x100 + cNoise;
+		pStats->qual.updated |= IW_QUAL_NOISE_UPDATED;
+	}
+
+	return;
 }
 
 /*----------------------------------------------------------------------------*/

@@ -913,6 +913,10 @@ VOID
 kalUpdateRSSI(IN P_GLUE_INFO_T prGlueInfo,
 	      IN ENUM_KAL_NETWORK_TYPE_INDEX_T eNetTypeIdx, IN INT_8 cRssi, IN INT_8 cLinkQuality);
 
+VOID
+kalUpdateNoise(IN P_GLUE_INFO_T prGlueInfo,
+	      IN ENUM_KAL_NETWORK_TYPE_INDEX_T eNetTypeIdx, IN INT_8 cNoise);
+
 /*----------------------------------------------------------------------------*/
 /* I/O Buffer Pre-allocation                                                  */
 /*----------------------------------------------------------------------------*/
