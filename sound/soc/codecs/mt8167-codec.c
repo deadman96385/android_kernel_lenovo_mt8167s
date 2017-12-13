@@ -1871,6 +1871,10 @@ static void mt8167_codec_init_regs_volatile(
 	/* latch phase */
 	abb_afe_con9_val |=
 		(codec_data->dmic_ch_phase[DMIC_L_CH] << 13);
+	if ((codec_data->dmic_wire_mode == DMIC_ONE_WIRE) &&
+		(codec_data->dmic_ch_phase[DMIC_R_CH] != codec_data->dmic_ch_phase[DMIC_L_CH] + 4)) {
+		codec_data->dmic_ch_phase[DMIC_R_CH] = codec_data->dmic_ch_phase[DMIC_L_CH] + 4;
+	}
 	abb_afe_con9_val |=
 		(codec_data->dmic_ch_phase[DMIC_R_CH] << 10);
 
