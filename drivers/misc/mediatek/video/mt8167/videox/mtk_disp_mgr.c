@@ -622,7 +622,7 @@ int _ioctl_prepare_present_fence(unsigned long arg)
 	}
 
 	if (DISP_SESSION_TYPE(preset_fence_struct.session_id) != DISP_SESSION_PRIMARY) {
-		DISPERR("non-primary ask for present fence! session=0x%x\n",
+		DISPCHECK("non-primary ask for present fence! session=0x%x\n",
 			preset_fence_struct.session_id);
 		data.fence = MTK_FB_INVALID_FENCE_FD;
 		data.value = 0;

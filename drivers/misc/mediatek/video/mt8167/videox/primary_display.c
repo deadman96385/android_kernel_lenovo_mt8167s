@@ -900,7 +900,7 @@ int primary_display_set_secondary_display(int add, enum DISP_SESSION_TYPE type)
 
 #ifdef MTK_DISP_IDLE_LP
 		gSkipIdleDetect = 1;
-		_disp_primary_path_exit_idle(__func__, 0);
+		_disp_primary_path_exit_idle(__func__, 1);
 #endif
 	} else {
 		if (type == DISP_SESSION_MEMORY)
