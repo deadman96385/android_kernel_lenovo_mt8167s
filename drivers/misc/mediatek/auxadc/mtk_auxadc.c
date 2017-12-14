@@ -573,9 +573,9 @@ static long auxadc_cali_unlocked_ioctl(struct file *file, unsigned int cmd, unsi
 				*(auxadc_cali_slop + i) = 1000;
 		}
 		for (i = 0; i < ADC_CHANNEL_MAX; i++)
-			pr_debug("auxadc_cali_slop[%d] = %d\n", i, *(auxadc_cali_slop + i));
+			/*pr_debug("auxadc_cali_slop[%d] = %d\n", i, *(auxadc_cali_slop + i));*/
 
-		pr_debug("**** MT auxadc_cali ioctl : SET_ADC_CALI_Slop Done!\n");
+		/*pr_debug("**** MT auxadc_cali ioctl : SET_ADC_CALI_Slop Done!\n");*/
 		break;
 
 	case SET_ADC_CALI_Offset:
@@ -583,9 +583,9 @@ static long auxadc_cali_unlocked_ioctl(struct file *file, unsigned int cmd, unsi
 		ret = copy_from_user(auxadc_cali_offset, nvram_data_addr, 36);
 		g_AUXADC_Cali = false;
 		for (i = 0; i < ADC_CHANNEL_MAX; i++)
-			pr_debug("auxadc_cali_offset[%d] = %d\n", i, *(auxadc_cali_offset + i));
+			/*pr_debug("auxadc_cali_offset[%d] = %d\n", i, *(auxadc_cali_offset + i));*/
 
-		pr_debug("**** MT auxadc_cali ioctl : SET_ADC_CALI_Offset Done!\n");
+		/*pr_debug("**** MT auxadc_cali ioctl : SET_ADC_CALI_Offset Done!\n");*/
 		break;
 
 	case SET_ADC_CALI_Cal:
@@ -598,9 +598,9 @@ static long auxadc_cali_unlocked_ioctl(struct file *file, unsigned int cmd, unsi
 			g_AUXADC_Cali = false;
 
 		for (i = 0; i < 1; i++)
-			pr_debug("auxadc_cali_cal[%d] = %d\n", i, *(auxadc_cali_cal + i));
+			/*pr_debug("auxadc_cali_cal[%d] = %d\n", i, *(auxadc_cali_cal + i));*/
 
-		pr_debug("**** MT auxadc_cali ioctl : SET_ADC_CALI_Cal Done!\n");
+		/*pr_debug("**** MT auxadc_cali ioctl : SET_ADC_CALI_Cal Done!\n");*/
 		break;
 
 	case ADC_CHANNEL_READ:
@@ -608,10 +608,12 @@ static long auxadc_cali_unlocked_ioctl(struct file *file, unsigned int cmd, unsi
 		user_data_addr = (long *)arg;
 		ret = copy_from_user(auxadc_in_data, user_data_addr, 8);	/* 2*int = 2*4 */
 
-		pr_debug("this api is removed !!\n");
+		/*pr_debug("this api is removed !!\n");*/
 		ret = copy_to_user(user_data_addr, auxadc_out_data, 8);
+		/*
 		pr_debug("**** ioctl : AUXADC Channel %d * %d times = %d\n", auxadc_in_data[0],
 			 auxadc_in_data[1], auxadc_out_data[0]);
+			 */
 		break;
 
 	default:
