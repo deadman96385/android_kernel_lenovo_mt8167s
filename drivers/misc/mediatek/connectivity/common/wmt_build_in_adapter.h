@@ -15,6 +15,7 @@
 #define WMT_BUILD_IN_ADAPTER_H
 
 #include <mtk_wcn_cmb_stub.h>
+#include <linux/of_irq.h>
 
 
 /*******************************************************************************
@@ -39,5 +40,6 @@ extern void *mtk_wcn_cmb_sdio_pm_data;
 
 void wmt_export_mtk_wcn_cmb_sdio_disable_eirq(void);
 int wmt_export_mtk_wcn_sdio_irq_flag_set(int flag);
+irqreturn_t mtk_wcn_cmb_sdio_eirq_handler_stub(int irq, void *data);
 
 #endif /* WMT_BUILD_IN_ADAPTER_H */
