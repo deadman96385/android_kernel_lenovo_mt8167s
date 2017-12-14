@@ -144,23 +144,38 @@ int wmt_export_mtk_wcn_sdio_irq_flag_set(int flag)
 }
 EXPORT_SYMBOL(wmt_export_mtk_wcn_sdio_irq_flag_set);
 
-irqreturn_t mtk_wcn_cmb_sdio_eirq_handler_stub(int irq, void *data)
+static irqreturn_t mtk_wcn_cmb_sdio_eirq_handler_stub(int irq, void *data)
 {
 	if ((mtk_wcn_cmb_sdio_eirq_handler != NULL) && (atomic_read(&sdio_claim_irq_enable_flag) != 0))
 		mtk_wcn_cmb_sdio_eirq_handler(mtk_wcn_cmb_sdio_eirq_data);
 	return IRQ_HANDLED;
 }
-EXPORT_SYMBOL(mtk_wcn_cmb_sdio_eirq_handler_stub);
 
 static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler, void *data)
 {
 #ifdef CONFIG_OF
+	struct device_node *node;
+	int ret = -EINVAL;
 
 	CONNADP_INFO_FUNC("enter\n");
 	_mtk_wcn_sdio_irq_flag_set(0);
 	atomic_set(&irq_enable_flag, 1);
 	mtk_wcn_cmb_sdio_eirq_data = data;
 	mtk_wcn_cmb_sdio_eirq_handler = irq_handler;
+
+	node = (struct device_node *)of_find_compatible_node(NULL, NULL, "mediatek,connectivity-combo");
+	if (node) {
+		wifi_irq = irq_of_parse_and_map(node, 0);/* get wifi eint num */
+		ret = request_irq(wifi_irq, mtk_wcn_cmb_sdio_eirq_handler_stub, IRQF_TRIGGER_LOW,
+				"WIFI-eint", NULL);
+		CONNADP_DBG_FUNC("WIFI EINT irq %d !!\n", wifi_irq);
+
+		if (ret)
+			CONNADP_WARN_FUNC("WIFI EINT IRQ LINE NOT AVAILABLE!!\n");
+		else
+			mtk_wcn_cmb_sdio_disable_eirq();/*not ,chip state is power off*/
+	} else
+		CONNADP_WARN_FUNC("can't find connectivity compatible node\n");
 
 	CONNADP_INFO_FUNC("exit\n");
 #else
