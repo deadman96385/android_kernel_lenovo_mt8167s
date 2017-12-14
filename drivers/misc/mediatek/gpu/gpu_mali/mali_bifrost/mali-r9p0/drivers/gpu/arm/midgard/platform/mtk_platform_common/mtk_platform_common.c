@@ -538,3 +538,22 @@ int mtk_set_mt_gpufreq_target(int freq_id)
 
 	return 0;
 }
+
+int mtk_common_init(struct platform_device *pdev, struct kbase_device *kbdev)
+{
+	int ret = 0;
+
+	mtk_mfg_counter_init();
+
+	return ret;
+}
+
+int mtk_common_deinit(struct platform_device *pdev, struct kbase_device *kbdev)
+{
+	int ret = 0;
+
+	mtk_mfg_counter_destroy();
+
+	return ret;
+}
+
