@@ -703,7 +703,15 @@ static void musbfsh_shutdown(struct platform_device *pdev)
 	struct musbfsh *musbfsh = dev_to_musbfsh(&pdev->dev);
 	unsigned long flags;
 
-	INFO("++\n");
+	WARNING("++\n");
+
+	/* we prepare and enable usb clock first for avoiding schedule bug in stress tests
+	 *  because  musbfsh_generic_disable may call clock prepare.
+	 */
+	mt_usb11_clock_prepare();
+	mt65xx_usb11_clock_enable(true);
+	musbfsh_power = true;
+
 	spin_lock_irqsave(&musbfsh->lock, flags);
 	musbfsh_platform_disable(musbfsh);
 	musbfsh_generic_disable(musbfsh);
@@ -711,6 +719,9 @@ static void musbfsh_shutdown(struct platform_device *pdev)
 	musbfsh_platform_set_power(musbfsh, 0);
 	spin_unlock_irqrestore(&musbfsh->lock, flags);
 
+	mt65xx_usb11_clock_enable(false);
+	mt_usb11_clock_unprepare();
+	musbfsh_power = false;
 	/* FIXME power down */
 }
 
