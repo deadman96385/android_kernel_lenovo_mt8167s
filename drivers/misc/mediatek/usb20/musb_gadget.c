@@ -1736,6 +1736,8 @@ static int musb_gadget_dequeue(struct usb_ep *ep, struct usb_request *request)
 	if (!ep || !request || to_musb_request(request)->ep != musb_ep)
 		return -EINVAL;
 
+	musb_platform_prepare_clk(musb);
+
 	spin_lock_irqsave(&musb->lock, flags);
 
 	list_for_each_entry(r, &musb_ep->req_list, list) {
@@ -1781,6 +1783,9 @@ static int musb_gadget_dequeue(struct usb_ep *ep, struct usb_request *request)
 
 done:
 	spin_unlock_irqrestore(&musb->lock, flags);
+
+	musb_platform_unprepare_clk(musb);
+
 	return status;
 }
 
