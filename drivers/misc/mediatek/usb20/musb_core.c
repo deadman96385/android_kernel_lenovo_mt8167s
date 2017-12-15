@@ -99,6 +99,8 @@
 #include "mtk_musb.h"
 #endif
 
+#define DISABLE_DEBOUNCE
+
 static void (*usb_hal_dpidle_request_fptr)(int);
 void usb_hal_dpidle_request(int mode)
 {
@@ -1271,7 +1273,7 @@ void musb_start(struct musb *musb)
 {
 	void __iomem *regs = musb->mregs;
 	int vbusdet_retry = 5;
-
+	u8 value;
 	u8 intrusbe;
 
 	DBG(0, "start, is_host=%d is_active=%d\n", musb->is_host, musb->is_active);
@@ -1281,6 +1283,16 @@ void musb_start(struct musb *musb)
 
 	intrusbe = musb_readb(regs, MUSB_INTRUSBE);
 	if (musb->is_host) {
+	#ifdef DISABLE_DEBOUNCE
+		value = musb_readb(regs, MUSB_ULPI_BUSCONTROL1);
+		musb_writeb(regs, MUSB_ULPI_BUSCONTROL1, value | 0x40);
+
+		value = musb_readb(regs, OTG20_CSRH);
+		musb_writeb(regs, OTG20_CSRH, value | 0x1);
+		DBG(0, "Disable Debounce, 0x71: 0x%x, 0x731: 0x%x\n",
+			musb_readb(regs, MUSB_ULPI_BUSCONTROL1), musb_readb(regs, OTG20_CSRH));
+	#endif
+
 		musb->intrtxe = 0xffff;
 		musb_writew(regs, MUSB_INTRTXE, musb->intrtxe);
 		musb->intrrxe = 0xfffe;
