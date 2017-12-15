@@ -1141,9 +1141,14 @@ b_host:
 	 * only host sees babble; only peripheral sees bus reset.
 	 */
 	if (int_usb & MUSB_INTR_RESET) {
+		int otg_state;
 		handled = IRQ_HANDLED;
 
-		DBG(0, "%s:%d MUSB_INTR_RESET (%s)\n", __func__, __LINE__, otg_state_string(musb->xceiv->otg->state));
+		otg_state = musb->xceiv->otg->state;
+		if (otg_state == OTG_STATE_A_HOST)
+			DBG(2, "MUSB_INTR_RESET (%s)\n", otg_state_string(musb->xceiv->otg->state));
+		else
+			DBG(0, "MUSB_INTR_RESET (%s)\n", otg_state_string(musb->xceiv->otg->state));
 		if ((devctl & MUSB_DEVCTL_HM) != 0) {
 			/*
 			 * Looks like non-HS BABBLE can be ignored, but
@@ -1152,7 +1157,10 @@ b_host:
 			 * caused BABBLE. When HS BABBLE happens we can only
 			 * stop the session.
 			 */
-			DBG(0, "Babble\n");
+			if (otg_state == OTG_STATE_A_HOST)
+				DBG(2, "Babble\n");
+			else
+				DBG(0, "Babble\n");
 			if (devctl & (MUSB_DEVCTL_FSDEV | MUSB_DEVCTL_LSDEV))
 				DBG(2, "BABBLE devctl: %02x\n", devctl);
 			else {
