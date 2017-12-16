@@ -6348,6 +6348,12 @@ int primary_display_merge_session_cmd(struct disp_session_config *config)
 
 	pgc->dc_type = output_type;
 
+	if (config->type < DISP_SESSION_PRIMARY ||
+		config->type > DISP_SESSION_MEMORY) {
+		DISPERR("%s : config->type is invalid\n", __func__);
+		return 0;
+	}
+
 #ifdef CONFIG_ALL_IN_TRIGGER_STAGE
 	mutex_lock(&session_config_mutex);
 	session_input = &cached_session_input[config->type - 1];
