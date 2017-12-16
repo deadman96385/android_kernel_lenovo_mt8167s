@@ -466,8 +466,8 @@ static void msdc_track_cmd_data(struct msdc_host *host,
 				struct mmc_command *cmd, struct mmc_data *data)
 {
 	if (host->error)
-		dev_dbg(host->dev, "%s: cmd=%d arg=%08X; host->error=0x%08X\n",
-			__func__, cmd->opcode, cmd->arg, host->error);
+		dev_info(host->dev, "cmd=%d arg=%08X; err=0x%08X\n",
+			 cmd->opcode, cmd->arg, host->error);
 }
 
 static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
@@ -995,9 +995,6 @@ static void msdc_init_hw(struct msdc_host *host)
 	writel(0x403c0000, host->base + MSDC_PATCH_BIT0);
 	sdr_set_field(host->base + MSDC_PATCH_BIT0, MSDC_CKGEN_MSDC_DLY_SEL, 1);
 	writel(0xffff00c9, host->base + MSDC_PATCH_BIT1);
-
-	/* For SDIO3.0+ IP, this bit should be set to 0 */
-	sdr_clr_bits(host->base + MSDC_PATCH_BIT1, MSDC_PB1_SINGLE_BURST);
 
 	sdr_set_bits(host->base + EMMC50_CFG0, EMMC50_CFG_CFCSTS_SEL);
 
