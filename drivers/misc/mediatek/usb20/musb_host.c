@@ -2730,9 +2730,6 @@ static int musb_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 	int is_in = usb_pipein(urb->pipe);
 	int ret;
 
-	/* need prepare clock because  musb_generic_disable may call prepare clock in atomic context */
-	mt_usb_clock_prepare(musb);
-
 	spin_lock_irqsave(&musb->lock, flags);
 	DBG(0, "urb=%p, dev%d ep%d%s\n",
 			urb,
@@ -2832,8 +2829,6 @@ static int musb_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 	}
 done:
 	spin_unlock_irqrestore(&musb->lock, flags);
-
-	mt_usb_clock_unprepare(musb);
 
 	return ret;
 }
