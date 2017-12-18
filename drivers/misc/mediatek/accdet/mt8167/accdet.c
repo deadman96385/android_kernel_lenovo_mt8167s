@@ -1212,8 +1212,8 @@ static struct driver_attribute *accdet_attr_list[] = {
 static int accdet_create_attr(struct device_driver *driver)
 {
 	int idx, err = 0;
-	int num = (int)(ARRAY_SIZE(accdet_attr_list) / sizeof(accdet_attr_list[0]));
-
+	int num = (int)ARRAY_SIZE(accdet_attr_list);
+	/*int num = (int)(ARRAY_SIZE(accdet_attr_list) / sizeof(accdet_attr_list[0]));*/
 	if (driver == NULL)
 		return -EINVAL;
 	for (idx = 0; idx < num; idx++) {
