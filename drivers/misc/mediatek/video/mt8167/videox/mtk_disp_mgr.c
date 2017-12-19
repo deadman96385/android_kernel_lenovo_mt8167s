@@ -1203,7 +1203,11 @@ static int set_memory_buffer(struct disp_session_input_config *input)
 		if (input->config[i].layer_enable)
 			mtkfb_update_buf_info(input->session_id, input->config[i].layer_id,
 					      input->config[i].next_buff_idx, 0,
-					      input->config[i].frm_sequence);
+					      input->config[i].frm_sequence
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+					      , dst_mva, input->config[i].security
+#endif
+					      );
 
 
 		if (session_info)
@@ -1298,7 +1302,11 @@ static int set_external_buffer(struct disp_session_input_config *input)
 			mva_offset = (x + y * pitch) * Bpp;
 			mtkfb_update_buf_info(input->session_id, input->config[i].layer_id,
 					      input->config[i].next_buff_idx, mva_offset,
-					      input->config[i].frm_sequence);
+					      input->config[i].frm_sequence
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+					      , dst_mva, input->config[i].security
+#endif
+					      );
 #ifdef CONFIG_MTK_HDMI_3D_SUPPORT
 			mtkfb_update_buf_info_new(input->session_id, mva_offset,
 						  (struct disp_input_config *) input->config);
@@ -1434,7 +1442,11 @@ static int set_primary_buffer(struct disp_session_input_config *input)
 			mva_offset = (x + y * pitch) * Bpp;
 			mtkfb_update_buf_info(input->session_id, input->config[i].layer_id,
 					      input->config[i].next_buff_idx, mva_offset,
-					      input->config[i].frm_sequence);
+					      input->config[i].frm_sequence
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+					      , dst_mva, input->config[i].security
+#endif
+					      );
 			fence_msg_len += sprintf(fence_msg_buf + fence_msg_len,
 						 "S+/PL%d/e%d/id%d/%dx%d(%d,%d)(%d,%d)/%s/%d/0x%08lx/mva0x%08lx/sec%d\n",
 						 input->config[i].layer_id, input->config[i].layer_enable,
@@ -1676,7 +1688,11 @@ int _ioctl_set_output_buffer(unsigned long arg)
 		mtkfb_update_buf_info(session_output.session_id,
 				      disp_sync_get_output_interface_timeline_id(),
 				      session_output.config.buff_idx, 0,
-				      session_output.config.frm_sequence);
+				      session_output.config.frm_sequence
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+				      , dst_mva, session_output.config.security
+#endif
+				      );
 		if (session_info)
 			dprec_submit(&session_info->event_setoutput, session_output.config.buff_idx, dst_mva);
 
@@ -1725,7 +1741,11 @@ int _ioctl_set_output_buffer(unsigned long arg)
 
 		mtkfb_update_buf_info(session_output.session_id, disp_sync_get_output_timeline_id(),
 				      session_output.config.buff_idx, 0,
-				      session_output.config.frm_sequence);
+				      session_output.config.frm_sequence
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+				      , dst_mva, session_output.config.security
+#endif
+				      );
 
 		if (session_info)
 			dprec_submit(&session_info->event_setoutput, session_output.config.buff_idx, dst_mva);

@@ -667,7 +667,11 @@ unsigned int mtkfb_query_buf_info(unsigned int session_id, unsigned int layer_id
 
 
 bool mtkfb_update_buf_info(unsigned int session_id, unsigned int layer_id, unsigned int idx,
-		unsigned int mva_offset, unsigned int seq)
+		unsigned int mva_offset, unsigned int seq
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+		, unsigned int secure_handle, unsigned int isSecure
+#endif
+		)
 {
 	struct mtkfb_fence_buf_info *buf;
 	bool ret = false;
@@ -683,12 +687,27 @@ bool mtkfb_update_buf_info(unsigned int session_id, unsigned int layer_id, unsig
 
 	mutex_lock(&layer_info->sync_lock);
 	list_for_each_entry(buf, &layer_info->buf_list, list) {
-		if (buf->idx == idx) {
+		if (buf->idx == idx
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+			&& (!buf->secure_handle)
+#endif
+			) {
 			buf->mva_offset = mva_offset;
 			buf->seq = seq;
 			ret = true;
 			mmprofile_log_ex(ddp_mmp_get_events()->primary_seq_insert, MMPROFILE_FLAG_PULSE,
 					buf->mva + buf->mva_offset, buf->seq);
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+			buf->secure_handle = secure_handle;
+			buf->isScure = isSecure;
+			if (isSecure) {
+				TZ_RESULT res = KREE_ReferenceSecurechunkmem
+						(secure_memory_session_handle(), secure_handle);
+				if (res != TZ_RESULT_SUCCESS)
+					DISPERR("KREE_ReferenceSecurechunkmem failed (%s), sec_handle 0x%x\n",
+							TZ_GetErrorString(res), secure_handle);
+			}
+#endif
 			break;
 		}
 	}
@@ -861,6 +880,15 @@ void mtkfb_release_fence(unsigned int session_id, unsigned int layer_id, int fen
 					mtkfb_ion_free_handle(ion_client, buf->hnd);
 
 				ion_release_count++;
+#endif
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+				if (buf->isScure && buf->secure_handle) {
+					TZ_RESULT res = KREE_UnreferenceSecurechunkmem
+							(secure_memory_session_handle(), buf->secure_handle);
+					if (res != TZ_RESULT_SUCCESS)
+						DISPERR("KREE_UnreferenceSecurechunkmem failed (%s), sec_handle 0x%x\n",
+								TZ_GetErrorString(res), buf->secure_handle);
+				}
 #endif
 
 				/* we must use another mutex for buffer list*/
@@ -1159,6 +1187,10 @@ struct mtkfb_fence_buf_info *disp_sync_prepare_buf(struct disp_buffer_info *buf)
 	buf_info->trigger_ticket = 0;
 	buf_info->buf_state = create;
 	buf_info->cache_sync = buf->cache_sync;
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+	buf_info->secure_handle = 0;
+	buf_info->isScure = 0;
+#endif
 	mutex_lock(&layer_info->sync_lock);
 	list_add_tail(&buf_info->list, &layer_info->buf_list);
 	mutex_unlock(&layer_info->sync_lock);

@@ -91,7 +91,8 @@ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/m4u/$(MTK_PLATFORM) \
 ccflags-$(CONFIG_MTK_LCM) += -I$(srctree)/drivers/misc/mediatek/lcm/inc
 
 ccflags-y += -I$(srctree)/drivers/staging/android/ion \
-             -I$(srctree)/drivers/staging/android/ion/mtk
+             -I$(srctree)/drivers/staging/android/ion/mtk \
+             -I$(srctree)/drivers/misc/mediatek/include/mt-plat/trustzone
 
 ifeq ($(CONFIG_MTK_INTERNAL_HDMI_SUPPORT), y)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/hdmi/

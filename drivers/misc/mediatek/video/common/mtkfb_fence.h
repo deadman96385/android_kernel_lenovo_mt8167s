@@ -20,6 +20,13 @@
 #include "disp_drv_platform.h"
 #include "display_recorder.h"
 
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+#include "tz_cross/trustzone.h"
+#include "tz_cross/ta_mem.h"
+#include "trustzone/kree/system.h"
+#include "trustzone/kree/mem.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -70,6 +77,10 @@ struct mtkfb_fence_buf_info {
 	unsigned long long ts_period_keep;
 	unsigned int seq;
 	unsigned int layer_type;
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+	unsigned int secure_handle;
+	unsigned int isScure;
+#endif
 };
 
 struct mtkfb_fence_sync_info {
@@ -161,8 +172,15 @@ unsigned int mtkfb_query_release_idx(unsigned int session_id, unsigned int layer
 				     unsigned long phy_addr);
 unsigned int mtkfb_query_frm_seq_by_addr(unsigned int session_id, unsigned int layer_id,
 					 unsigned long phy_addr);
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+extern KREE_SESSION_HANDLE secure_memory_session_handle(void);
+#endif
 bool mtkfb_update_buf_info(unsigned int session_id, unsigned int layer_id, unsigned int idx,
-			   unsigned int mva_offset, unsigned int seq);
+		unsigned int mva_offset, unsigned int seq
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+		, unsigned int secure_handle, unsigned int isSecure
+#endif
+		);
 struct mtkfb_fence_buf_info *mtkfb_init_buf_info(struct mtkfb_fence_buf_info *buf);
 void mtkfb_release_fence(unsigned int session_id, unsigned int layer_id, int fence);
 int mtkfb_find_fence_by_ticket(unsigned int session_id, int layer_id, int ticket);

@@ -2109,7 +2109,7 @@ out:
 	cmdqRecDestroy(cmdq_wait_handle);
 }
 
-static KREE_SESSION_HANDLE secure_memory_session_handle(void)
+KREE_SESSION_HANDLE secure_memory_session_handle(void)
 {
 	static KREE_SESSION_HANDLE disp_secure_memory_session;
 
