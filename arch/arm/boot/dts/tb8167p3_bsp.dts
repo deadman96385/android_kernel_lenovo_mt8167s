@@ -25,7 +25,7 @@
 #include "mt6392.dtsi"
 #define ROOT_NODE /
 #endif
-#include "tb8167p3_64_bsp_bat_setting.dtsi"
+#include "tb8167p3_bsp_bat_setting.dtsi"
 #include <dt-bindings/gpio/gpio.h>
 
 ROOT_NODE {
