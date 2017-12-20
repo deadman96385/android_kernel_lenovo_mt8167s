@@ -29,14 +29,20 @@
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
 
+enum {
+	MTK_UART_RX_SET = 0,
+	MTK_UART_RX_CLEAR,
+	MTK_UART_TX_SET,
+	MTK_UART_TX_CLEAR,
+	MTK_UART_PIN_MAX_MODE,
+};
+
 struct pinctrl *ppinctrl_uart[UART_NR];
 /* pinctrl-names from dtsi.GPIO operations: rx set, rx clear, tx set, tx clear */
-char *uart_gpio_cmds[UART_NR][4] = {
+char *uart_gpio_cmds[UART_NR][MTK_UART_PIN_MAX_MODE] = {
 	{"uart0_rx_set", "uart0_rx_clear", "uart0_tx_set", "uart0_tx_clear"},
 	{"uart1_rx_set", "uart1_rx_clear", "uart1_tx_set", "uart1_tx_clear"},
-#if !defined(CONFIG_MTK_FPGA)
 	{"uart2_rx_set", "uart2_rx_clear", "uart2_tx_set", "uart2_tx_clear"},
-#endif				/* !defined (CONFIG_MTK_FPGA) */
 };
 
 void set_uart_pinctrl(int idx, struct pinctrl *ppinctrl)
@@ -2041,9 +2047,7 @@ void switch_uart_gpio(int uartport, int gpioopid)
 	struct pinctrl *ppinctrl = NULL;
 	struct pinctrl_state *pins_uart = NULL;
 
-	pr_debug("[UART%d][PinC]%s(%d, %d)+\n", uartport, __func__, uartport, gpioopid);
-
-	if ((uartport >= UART_NR) || (uartport > 3)) {
+	if (uartport >= UART_NR) {
 		pr_err("[UART%d][PinC]%s: port error!!\n", uartport, __func__);
 		return;
 	}
@@ -2066,234 +2070,65 @@ void switch_uart_gpio(int uartport, int gpioopid)
 	}
 
 	pinctrl_select_state(ppinctrl, pins_uart);
-
-	pr_debug("[UART%d][PinC]%s(%d, %d)- Succeeded!\n", uartport, __func__, uartport, gpioopid);
 }
 #endif /* !defined(CONFIG_MTK_LEGACY) && !defined(CONFIG_MTK_FPGA) */
 
 void mtk_uart_switch_tx_to_gpio(struct mtk_uart *uart)
 {
-#if defined(CONFIG_PM) && !defined(CONFIG_MTK_FPGA) && !defined(CONFIG_MTK_LEGACY)
-	int uart_gpio_op = 0;	/* URAT RX SET */
-#endif
 	int uartport = uart->nport;
 
-	pr_warn("[UART]%s port:0x%x\n", __func__, uartport);
-
-	if (uartport > 3) {
+	if (uartport >= UART_NR) {
 		pr_err("[UART%d] %s fail!! port:%d", uartport, __func__, uartport);
 		return;
 	}
 #if defined(CONFIG_PM) && !defined(CONFIG_MTK_FPGA)
-#if defined(CONFIG_MTK_LEGACY)
-	switch (uart->nport) {
-	case 0:
-#ifdef GPIO_UART_UTXD0_PIN
-		mt_set_gpio_out(GPIO_UART_UTXD0_PIN, GPIO_OUT_ONE);
-		mt_set_gpio_mode(GPIO_UART_UTXD0_PIN, GPIO_UART_UTXD0_PIN_M_GPIO);
-#else
-		pr_debug("GPIO_UART_UTXD0_PIN is not properly set\n");
-#endif
-		break;
-	case 1:
-#ifdef GPIO_UART_UTXD1_PIN
-		mt_set_gpio_out(GPIO_UART_UTXD1_PIN, GPIO_OUT_ONE);
-		mt_set_gpio_mode(GPIO_UART_UTXD1_PIN, GPIO_UART_UTXD1_PIN_M_GPIO);
-#else
-		pr_debug("GPIO_UART_UTXD1_PIN is not properly set\n");
-#endif
-		break;
-	case 2:
-#ifdef GPIO_UART_UTXD2_PIN
-		mt_set_gpio_out(GPIO_UART_UTXD2_PIN, GPIO_OUT_ONE);
-		mt_set_gpio_mode(GPIO_UART_UTXD2_PIN, GPIO_UART_UTXD2_PIN_M_GPIO);
-#else
-		pr_debug("GPIO_UART_UTXD2_PIN is not properly set\n");
-#endif
-		break;
-	case 3:
-#ifdef GPIO_UART_UTXD3_PIN
-		mt_set_gpio_out(GPIO_UART_UTXD3_PIN, GPIO_OUT_ONE);
-		mt_set_gpio_mode(GPIO_UART_UTXD3_PIN, GPIO_UART_UTXD3_PIN_M_GPIO);
-#else
-		pr_debug("GPIO_UART_UTXD3_PIN is not properly set\n");
-#endif
-		break;
-	default:
-		break;
-	}
-#else /* defined(CONFIG_MTK_LEGACY)*/
-	pr_debug("[UART%d][PinC]%s call switch_uart_gpio(%d, %d)\n", uartport, __func__, uartport, uart_gpio_op);
-	switch_uart_gpio(uartport, uart_gpio_op);
-#endif /* defined(CONFIG_MTK_LEGACY) */
+	pr_debug("[UART%d][PinC]%s call\n", uartport, __func__);
+	switch_uart_gpio(uartport, MTK_UART_TX_CLEAR);
 #endif
 }
 
 /*---------------------------------------------------------------------------*/
 void mtk_uart_switch_to_tx(struct mtk_uart *uart)
 {
-#if defined(CONFIG_PM) && !defined(CONFIG_MTK_FPGA) && !defined(CONFIG_MTK_LEGACY)
-	int uart_gpio_op = 0;	/* URAT RX SET */
-#endif
 	int uartport = uart->nport;
 
-	pr_debug("[UART]%s port:0x%x\n", __func__, uartport);
-
-	if (uartport > 3) {
+	if (uartport >= UART_NR) {
 		pr_err("[UART%d] %s fail!! port:%d", uartport, __func__, uartport);
 		return;
 	}
 #if defined(CONFIG_PM) && !defined(CONFIG_MTK_FPGA)
-#if defined(CONFIG_MTK_LEGACY)
-	switch (uart->nport) {
-	case 0:
-#ifdef GPIO_UART_UTXD0_PIN
-		mt_set_gpio_mode(GPIO_UART_UTXD0_PIN, GPIO_UART_UTXD0_PIN_M_UTXD);
-#else
-		pr_debug("GPIO_UART_UTXD0_PIN is not properly set p2\n");
-#endif
-		break;
-	case 1:
-#ifdef GPIO_UART_UTXD1_PIN
-		mt_set_gpio_mode(GPIO_UART_UTXD1_PIN, GPIO_UART_UTXD1_PIN_M_UTXD);
-#else
-		pr_debug("GPIO_UART_UTXD1_PIN is not properly set p2\n");
-#endif
-		break;
-	case 2:
-#ifdef GPIO_UART_UTXD2_PIN
-		mt_set_gpio_mode(GPIO_UART_UTXD2_PIN, GPIO_UART_UTXD2_PIN_M_UTXD);
-#else
-		pr_debug("GPIO_UART_UTXD2_PIN is not properly set p2\n");
-#endif
-		break;
-	case 3:
-#ifdef GPIO_UART_UTXD3_PIN
-		mt_set_gpio_mode(GPIO_UART_UTXD3_PIN, GPIO_UART_UTXD3_PIN_M_UTXD);
-#else
-		pr_debug("GPIO_UART_UTXD3_PIN is not properly set p3\n");
-#endif
-		break;
-	default:
-		break;
-	}
-#else /* defined(CONFIG_MTK_LEGACY) */
-	pr_debug("[UART%d][PinC]%s call switch_uart_gpio(%d, %d)\n", uartport, __func__, uartport, uart_gpio_op);
-	switch_uart_gpio(uartport, uart_gpio_op);
-#endif /* defined(CONFIG_MTK_LEGACY) */
+	pr_debug("[UART%d][PinC]%s call\n", uartport, __func__);
+	switch_uart_gpio(uartport, MTK_UART_TX_SET);
 #endif
 }
 
 /*---------------------------------------------------------------------------*/
 void mtk_uart_switch_rx_to_gpio(struct mtk_uart *uart)
 {
-#if defined(CONFIG_PM) && !defined(CONFIG_MTK_FPGA) && !defined(CONFIG_MTK_LEGACY)
-	int uart_gpio_op = 1;	/* URAT RX Clear */
-#endif
 	int uartport = uart->nport;
 
-	pr_debug("[UART]%s port:0x%x\n", __func__, uartport);
-
-	if (uartport > 3) {
+	if (uartport >= UART_NR) {
 		pr_err("[UART%d] %s fail!! port:%d", uartport, __func__, uartport);
 		return;
 	}
 #if defined(CONFIG_PM) && !defined(CONFIG_MTK_FPGA)
-#if defined(CONFIG_MTK_LEGACY)
-	switch (uart->nport) {
-	case 0:
-#ifdef GPIO_UART_URXD0_PIN
-		mt_set_gpio_mode(GPIO_UART_URXD0_PIN, GPIO_UART_URXD0_PIN_M_GPIO);
-#else
-		pr_debug("GPIO_UART_URXD0_PIN is not properly set\n");
-#endif
-		break;
-	case 1:
-#ifdef GPIO_UART_URXD1_PIN
-		mt_set_gpio_mode(GPIO_UART_URXD1_PIN, GPIO_UART_URXD1_PIN_M_GPIO);
-#else
-		pr_debug("GPIO_UART_URXD1_PIN is not properly set\n");
-#endif
-		break;
-	case 2:
-#ifdef GPIO_UART_URXD2_PIN
-		mt_set_gpio_mode(GPIO_UART_URXD2_PIN, GPIO_UART_URXD2_PIN_M_GPIO);
-#else
-		pr_debug("GPIO_UART_URXD2_PIN is not properly set\n");
-#endif
-		break;
-	case 3:
-#ifdef GPIO_UART_URXD3_PIN
-		mt_set_gpio_mode(GPIO_UART_URXD3_PIN, GPIO_UART_URXD3_PIN_M_GPIO);
-#else
-		pr_debug("GPIO_UART_URXD3_PIN is not properly set\n");
-#endif
-		break;
-	default:
-		break;
-	}
-#else /* defined(CONFIG_MTK_LEGACY) */
-	pr_debug("[UART%d][PinC]%s call switch_uart_gpio(%d, %d)\n", uartport, __func__, uartport, uart_gpio_op);
-	switch_uart_gpio(uartport, uart_gpio_op);
-#endif /* defined(CONFIG_MTK_LEGACY) */
+	pr_debug("[UART%d][PinC]%s call\n", uartport, __func__);
+	switch_uart_gpio(uartport, MTK_UART_RX_CLEAR);
 #endif
 }
 
 /*---------------------------------------------------------------------------*/
 void mtk_uart_switch_to_rx(struct mtk_uart *uart)
 {
-#if defined(CONFIG_PM) && !defined(CONFIG_MTK_FPGA) && !defined(CONFIG_MTK_LEGACY)
-	int uart_gpio_op = 0;	/* URAT RX SET */
-#endif
 	int uartport = uart->nport;
 
-	pr_debug("[UART]%s port:0x%x\n", __func__, uartport);
-
-	if (uartport > 3) {
+	if (uartport >= UART_NR) {
 		pr_err("[UART%d] %s fail!! port:%d", uartport, __func__, uartport);
 		return;
 	}
 #if defined(CONFIG_PM) && !defined(CONFIG_MTK_FPGA)
-#if defined(CONFIG_MTK_LEGACY)
-	switch (uartport) {
-	case 0:
-#ifdef GPIO_UART_URXD0_PIN
-		mt_set_gpio_mode(GPIO_UART_URXD0_PIN, GPIO_UART_URXD0_PIN_M_URXD);
-#else				/* GPIO_UART_URXD0_PIN */
-		pr_debug("GPIO_UART_URXD0_PIN is not properly set p2\n");
-#endif				/* GPIO_UART_URXD0_PIN */
-		break;
-
-	case 1:
-#ifdef GPIO_UART_URXD1_PIN
-		mt_set_gpio_mode(GPIO_UART_URXD1_PIN, GPIO_UART_URXD1_PIN_M_URXD);
-#else				/* GPIO_UART_URXD1_PIN */
-		pr_debug("GPIO_UART_URXD1_PIN is not properly set p2\n");
-#endif				/* GPIO_UART_URXD1_PIN */
-		break;
-
-	case 2:
-#ifdef GPIO_UART_URXD2_PIN
-		mt_set_gpio_mode(GPIO_UART_URXD2_PIN, GPIO_UART_URXD2_PIN_M_URXD);
-#else
-		pr_debug("GPIO_UART_URXD2_PIN is not properly set p2\n");
-#endif
-		break;
-
-	case 3:
-#ifdef GPIO_UART_URXD3_PIN
-		mt_set_gpio_mode(GPIO_UART_URXD3_PIN, GPIO_UART_URXD3_PIN_M_URXD);
-#else
-		pr_debug("GPIO_UART_URXD3_PIN is not properly set p2\n");
-#endif
-		break;
-	default:
-		break;
-	}
-#else /* defined(CONFIG_MTK_LEGACY) */
-	pr_debug("[UART%d][PinC]%s call switch_uart_gpio(%d, %d)\n", uartport, __func__, uartport, uart_gpio_op);
-	switch_uart_gpio(uartport, uart_gpio_op);
-#endif /* defined(CONFIG_MTK_LEGACY) */
+	pr_debug("[UART%d][PinC]%s call\n", uartport, __func__);
+	switch_uart_gpio(uartport, MTK_UART_RX_SET);
 #endif
 }
 
