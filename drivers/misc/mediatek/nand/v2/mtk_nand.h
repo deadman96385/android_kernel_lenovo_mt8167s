@@ -723,7 +723,7 @@ u32 micron_pairpage_mapping(u32 page, bool high_to_low);
 u32 sandisk_pairpage_mapping(u32 page, bool high_to_low);
 extern u64 part_get_startaddress(u64 byte_address, u32 *idx);
 extern bool raw_partition(u32 index);
-
+int mtk_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip, u8 *buf, int page);
 #define PMT							1
 
 #ifdef PMT

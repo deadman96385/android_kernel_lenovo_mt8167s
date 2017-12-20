@@ -33,6 +33,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/time.h>
+#include <linux/highmem.h>
 #include <linux/mm.h>
 /* #include <linux/xlog.h> */
 #include <linux/io.h>
@@ -80,6 +81,8 @@
 #include <linux/regulator/consumer.h>
 #endif
 
+#include <mtk_meminfo.h>
+
 #ifdef CONFIG_MNTL_SUPPORT
 #include "mtk_nand_ops.h"
 #endif
@@ -95,7 +98,7 @@ static const flashdev_info_t gen_FlashTable_p[] = {
 	  NAND_FLASH_TLC, {FALSE, FALSE, TRUE, TRUE, 0xA2, 0xFF, TRUE, 68, 8, 0}, false,
 	  {30, 500, 2, 5} },
 	{{0x98, 0x3A, 0x98, 0xA3, 0x76, 0x00}, 5, 5, IO_8BIT, 0x10F2000, 6144, 16384, 1952, 0x10401011,
-	 0xC03222, 0x101, 80, VEND_SANDISK, 1024, "TC58TEG7THLBA09 ", MULTI_PLANE,
+	 0xC03222, 0x101, 80, VEND_SANDISK, 1024, "TC58TEG7THLBA09 ", 0,
 	 {PPTBL_NONE,
 	  {0xEF, 0xEE, 0x5D, 46, 0x11, 0, 0, RTYPE_SANDISK_TLC_1ZNM, {0x80, 0x00}, {0x80, 0x01} },
 	  {RAND_TYPE_SAMSUNG, {0x2D2D, 1, 1, 1, 1, 1} } },
@@ -7175,7 +7178,7 @@ static int mtk_nand_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip
  * Read a page to a logical address
  *
  *****************************************************************************/
-static int mtk_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip, u8 *buf, int page)
+int mtk_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip, u8 *buf, int page)
 {
 	int page_per_block = devinfo.blocksize * 1024 / devinfo.pagesize;
 	u32 block;
@@ -7615,8 +7618,8 @@ int mtk_nand_erase_hw(struct mtd_info *mtd, int page)
 		(devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
 		||
 #endif
-		(devinfo.NAND_FLASH_TYPE == NAND_FLASH_MLC_HYBER))
-		&&(devinfo.tlcControl.slcopmodeEn)) {
+		(devinfo.NAND_FLASH_TYPE == NAND_FLASH_MLC_HYBER)) &&
+		(devinfo.tlcControl.slcopmodeEn)) {
 #if MLC_MICRON_SLC_MODE
 			if (devinfo.vendor == VEND_MICRON) {
 				feature[0] = 0x02;
@@ -8967,8 +8970,7 @@ int mtk_nand_cache_read_page(struct mtd_info *mtd, u32 u4RowAddr, u32 u4PageSize
 			if (bRet == ERR_RTN_BCH_FAIL)
 				break;
 		}
-	}
-	else
+	} else
 		dma_unmap_sg(mtk_dev, &mtk_sg, 1, mtk_dir);
 
 		mtk_nand_turn_off_randomizer();
@@ -11143,6 +11145,12 @@ static struct platform_driver mtk_nand_driver = {
  ******************************************************************************/
 static int __init mtk_nand_init(void)
 {
+#ifdef CONFIG_MNTL_SUPPORT
+	int err;
+	void __iomem *va;
+	u64 base, size;
+#endif
+
 	g_i4Interrupt = 1;
 	if (g_i4Interrupt)
 		pr_debug("Enable IRQ for NFI module!\n");
@@ -11167,7 +11175,21 @@ static int __init mtk_nand_init(void)
 
 	mtk_nand_fs_init();
 
-	return platform_driver_register(&mtk_nand_driver);
+	err = platform_driver_register(&mtk_nand_driver);
+
+#ifdef CONFIG_MNTL_SUPPORT
+	get_mntl_buf(&base, &size);
+	if (base != 0) {
+		va = ioremap_wc(base, size);
+		if (va) {
+			pr_info("load ko %p\n", va);
+			init_module_mem((void *)va, size);
+		} else
+			pr_err("remap ko memory fail\n");
+	} else
+		pr_err("mntl mem buffer is NULL\n");
+#endif
+	return err;
 }
 
 /******************************************************************************

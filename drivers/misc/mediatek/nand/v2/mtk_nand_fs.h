@@ -16,6 +16,8 @@
 
 #define PROCNAME	"driver/nand"
 
+extern int g_i4Homescreen;
+extern int init_module_mem(void *buf, int size);
 int mtk_nand_fs_init(void);
 
 void mtk_nand_fs_exit(void);

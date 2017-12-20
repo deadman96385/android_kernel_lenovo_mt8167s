@@ -20,6 +20,8 @@
 #include "bmt.h"
 #include "mtk_nand_ops_test.h"
 #include "mtk_nand_fs.h"
+#define ALL_SLC_BUFFER 1
+int g_i4Homescreen;
 
 struct mtk_nand_data_info *data_info;
 
@@ -38,7 +40,6 @@ static bool should_close_block(void);
 
 static bool is_ewrite_block(struct mtk_nand_chip_info *info,
 		struct worklist_ctrl *list_ctrl, unsigned int block);
-
 /*********	MTK Nand Driver Related Functnions *********/
 
 /* mtk_isbad_block
@@ -72,12 +73,12 @@ void mtk_nand_release_device(struct mtd_info *mtd)
 {
 	struct nand_chip *chip = mtd->priv;
 
-	/* Release the controller and the chip */
-	spin_lock(&chip->controller->lock);
-	chip->controller->active = NULL;
 	if (chip->state != FL_READY && chip->state != FL_PM_SUSPENDED)
 		nand_disable_clock();
 
+	/* Release the controller and the chip */
+	spin_lock(&chip->controller->lock);
+	chip->controller->active = NULL;
 	chip->state = FL_READY;
 	wake_up(&chip->controller->wq);
 	spin_unlock(&chip->controller->lock);
@@ -99,6 +100,9 @@ static int mtk_nand_read_pages(struct mtk_nand_chip_info *info,
 	unsigned int col_addr, sect_read;
 	unsigned int backup_corrected;
 	int ret = 0;
+#ifdef ALL_SLC_BUFFER
+	bool block_type;
+#endif
 
 	nand_debug("block:%d page:%d offset:%d size:%d\n", block, page, offset, size);
 
@@ -108,7 +112,27 @@ static int mtk_nand_read_pages(struct mtk_nand_chip_info *info,
 	chip->select_chip(mtd, 0);
 
 	backup_corrected = mtd->ecc_stats.corrected;
+#ifdef ALL_SLC_BUFFER
+	block_type = is_slc_block(info, block);
 
+	if ((devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
+		&& block_type)
+		page_addr = (block+data_info->bmt.start_block)*info->data_page_num+page*MTK_TLC_DIV;
+	else
+		page_addr = (block+data_info->bmt.start_block)*info->data_page_num+page;
+
+	/* For log area access */
+	if (!block_type) {
+		devinfo.tlcControl.slcopmodeEn = FALSE;
+		page_size = info->data_page_size;
+		oob_size = info->log_oob_size;
+	} else {
+		/* nand_debug("Read SLC mode"); */
+		devinfo.tlcControl.slcopmodeEn = TRUE;
+		page_size = info->log_page_size;
+		oob_size = info->log_oob_size;
+	}
+#else
 	if ((devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
 		&& (block >= info->data_block_num))
 		page_addr = (block+data_info->bmt.start_block)*info->data_page_num+page*MTK_TLC_DIV;
@@ -127,7 +151,7 @@ static int mtk_nand_read_pages(struct mtk_nand_chip_info *info,
 		page_size = info->log_page_size;
 		oob_size = info->log_oob_size;
 	}
-
+#endif
 	if (fdm_buf == NULL) {
 		fdm_buf = kmalloc(1024, GFP_KERNEL);
 		if (fdm_buf == NULL) {
@@ -146,8 +170,8 @@ static int mtk_nand_read_pages(struct mtk_nand_chip_info *info,
 		start_sect  = offset/(1<<info->sector_size_shift);
 		col_addr = start_sect*((1<<info->sector_size_shift)+mtd->oobsize/sect_num);
 		sect_read = size/(1<<info->sector_size_shift);
-		/* nand_debug("Sector read col_addr:0x%x sect_read:%d, sect_num:%d, start_sect:%d", */
-			/* col_addr, sect_read, sect_num, start_sect); */
+		nand_debug("Sector read col_addr:0x%x sect_read:%d, sect_num:%d, start_sect:%d\n",
+			col_addr, sect_read, sect_num, start_sect);
 #ifdef MTK_FORCE_READ_FULL_PAGE
 		if (page_buf == NULL) {
 			page_buf = kmalloc(page_size, GFP_KERNEL);
@@ -246,6 +270,13 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 
 	if (ops1 != NULL) {
 		/* Check both in data or log area */
+#ifdef ALL_SLC_BUFFER
+		if (is_slc_block(info, ops1->block) != is_slc_block(info, ops0->block)) {
+			nand_pr_err("do not in same area ops0->block:0x%x ops1->block:0x%x ",
+				ops0->block, ops1->block);
+			return -EINVAL;
+		}
+#else
 		if (((ops0->block < info->data_block_num)
 				&& (ops1->block >= info->data_block_num))
 			|| ((ops0->block >= info->data_block_num)
@@ -254,9 +285,20 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 				ops0->block, ops1->block);
 			return -EINVAL;
 		}
+#endif
 		if (mtk_isbad_block(ops1->block)) {
 			page_addr1 = 0;
 		} else {
+#ifdef ALL_SLC_BUFFER
+			if ((devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
+				&& is_slc_block(info, ops1->block)) {
+				page_addr1 = (ops1->block+data_info->bmt.start_block)*info->data_page_num
+						+ ops1->page*MTK_TLC_DIV;
+			} else {
+				page_addr1 = (ops1->block+data_info->bmt.start_block)*info->data_page_num
+					+ ops1->page;
+			}
+#else
 			if ((devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
 				&& (ops1->block >= info->data_block_num)) {
 				page_addr1 = (ops1->block+data_info->bmt.start_block)*info->data_page_num
@@ -265,6 +307,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 				page_addr1 = (ops1->block+data_info->bmt.start_block)*info->data_page_num
 					+ ops1->page;
 			}
+#endif
 		}
 	} else {
 		page_addr1 = 0;
@@ -277,6 +320,15 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 	if (ret)
 		return ret;
 #endif
+#ifdef ALL_SLC_BUFFER
+	if ((devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
+		&& is_slc_block(info, ops0->block))
+		page_addr0 = (ops0->block+data_info->bmt.start_block)*info->data_page_num
+				+ ops0->page*MTK_TLC_DIV;
+	else
+		page_addr0 = (ops0->block+data_info->bmt.start_block)*info->data_page_num
+				+ ops0->page;
+#else
 
 	if ((devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
 		&& (ops0->block >= info->data_block_num))/* Log block*/
@@ -285,10 +337,28 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 	else
 		page_addr0 = (ops0->block+data_info->bmt.start_block)*info->data_page_num
 				+ ops0->page;
-
+#endif
 	nand_debug("page_addr0= 0x%x page_addr1=0x%x",
 		page_addr0, page_addr1);
-
+#ifdef ALL_SLC_BUFFER
+	if (!is_slc_block(info, ops0->block)) {
+		page_size = info->data_page_size;
+		devinfo.tlcControl.slcopmodeEn = FALSE;
+		oob_size = info->data_oob_size;
+		if (page_addr1)
+			host->wb_cmd = PROGRAM_LEFT_PLANE_CMD;
+		else
+			host->wb_cmd = ((ops0->page % 3 == WL_HIGH_PAGE) ||
+				(devinfo.NAND_FLASH_TYPE == NAND_FLASH_MLC_HYBER)) ?
+				NAND_CMD_PAGEPROG : PROGRAM_RIGHT_PLANE_CMD;
+	} else {
+		nand_debug("write SLC mode");
+		page_size = info->log_page_size;
+		devinfo.tlcControl.slcopmodeEn = TRUE;
+		host->wb_cmd = page_addr1 ? PROGRAM_LEFT_PLANE_CMD : NAND_CMD_PAGEPROG;
+		oob_size = info->log_oob_size;
+	}
+#else
 	/* For log area access */
 	if (ops0->block < info->data_block_num) {
 		page_size = info->data_page_size;
@@ -307,7 +377,7 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 		host->wb_cmd = page_addr1 ? PROGRAM_LEFT_PLANE_CMD : NAND_CMD_PAGEPROG;
 		oob_size = info->log_oob_size;
 	}
-
+#endif
 	sect_num = page_size/(1<<info->sector_size_shift);
 
 	fdm_buf = kmalloc(1024, GFP_KERNEL);
@@ -394,10 +464,17 @@ static int mtk_nand_write_pages(struct mtk_nand_chip_operation *ops0,
 					&& ((devinfo.advancedmode & MULTI_PLANE) && page_addr1)) {
 				nand_debug("write Multi_plane mode page_addr0:0x%x page_addr1:0x%x",
 					page_addr0, page_addr1);
+#ifdef ALL_SLC_BUFFER
+				if (ops1->page % 3 == WL_HIGH_PAGE || is_slc_block(info, ops1->block))
+					host->wb_cmd = NAND_CMD_PAGEPROG;
+				else
+					host->wb_cmd = PROGRAM_RIGHT_PLANE_CMD;
+#else
 				if (ops1->page % 3 == WL_HIGH_PAGE || (ops1->block >= info->data_block_num))
 					host->wb_cmd = NAND_CMD_PAGEPROG;
 				else
 					host->wb_cmd = PROGRAM_RIGHT_PLANE_CMD;
+#endif
 				memcpy(fdm_buf, ops1->oob_buffer, oob_size);
 
 				temp_page_buf = ops1->data_buffer;
@@ -481,6 +558,13 @@ static int mtk_nand_erase_blocks(struct mtk_nand_chip_operation *ops0,
 
 	if (ops1 != NULL) {
 		/* Check both in data or log area */
+#ifdef ALL_SLC_BUFFER
+		if (is_slc_block(info, ops1->block) != is_slc_block(info, ops0->block)) {
+			nand_pr_err("do not in same area ops0->block:0x%x ops1->block:0x%x ",
+				ops0->block, ops1->block);
+			return -EINVAL;
+		}
+#else
 		if (((ops0->block < info->data_block_num)
 				&& (ops1->block >= info->data_block_num))
 			|| ((ops0->block >= info->data_block_num)
@@ -489,6 +573,7 @@ static int mtk_nand_erase_blocks(struct mtk_nand_chip_operation *ops0,
 				ops0->block, ops1->block);
 			return -EINVAL;
 		}
+#endif
 		if (mtk_isbad_block(ops1->block))
 			page_addr1 = 0;
 		else
@@ -501,11 +586,27 @@ static int mtk_nand_erase_blocks(struct mtk_nand_chip_operation *ops0,
 
 	/* Grab the lock and see if the device is available */
 	nand_get_device(mtd, FL_ERASING);
+
 	if (should_close_block() && !is_slc_block(info, ops0->block)) {
 		open_block_add(&data_info->open, ops0->block);
 		if (ops1 != NULL)
 			open_block_add(&data_info->open, ops1->block);
 	}
+
+#ifdef ALL_SLC_BUFFER
+	if (!is_slc_block(info, ops0->block)) {
+		devinfo.tlcControl.slcopmodeEn = FALSE;
+		if (ops1 != NULL && is_slc_block(info, ops0->block))
+			nand_pr_err("Error!!!Invalid argu ops0->block:%d, ops1->block:%d\n",
+				ops0->block, ops1->block);
+	} else {
+		nand_debug("erase SLC mode");
+		devinfo.tlcControl.slcopmodeEn = TRUE;
+		if (ops1 != NULL && !is_slc_block(info, ops0->block))
+			nand_pr_err("Error!!!Invalid argu ops0->block:%d, ops1->block:%d\n",
+				ops0->block, ops1->block);
+	}
+#else
 
 	if (ops0->block < info->data_block_num) {
 		devinfo.tlcControl.slcopmodeEn = FALSE;
@@ -519,7 +620,7 @@ static int mtk_nand_erase_blocks(struct mtk_nand_chip_operation *ops0,
 			nand_pr_err("Error!!!Invalid argu ops0->block:%d, ops1->block:%d",
 				ops0->block, ops1->block);
 	}
-
+#endif
 	chip->select_chip(mtd, 0);
 
 	status = mtk_chip_erase_blocks(mtd, page_addr0, page_addr1);
@@ -670,6 +771,7 @@ static inline int add_list_node(struct worklist_ctrl *list_ctrl,
 	int ret = 0;
 
 	lock_list(list_ctrl);
+
 	ops = &get_list_work(node)->ops;
 	if (ops->types == MTK_NAND_OP_WRITE &&
 		is_ewrite_block(ops->info, list_ctrl, ops->block)) {
@@ -678,6 +780,7 @@ static inline int add_list_node(struct worklist_ctrl *list_ctrl,
 		ret = -ENANDWRITE;
 		goto OUT;
 	}
+
 	tail = get_list_tail(&list_ctrl->head);
 	tail->next = node;
 	list_ctrl->total_num++;
@@ -708,7 +811,19 @@ bool is_tlc_nand(void)
 
 bool is_slc_block(struct mtk_nand_chip_info *info, unsigned int block)
 {
+#ifdef ALL_SLC_BUFFER
+	int index, bit;
+
+	index = block / 8;
+	bit = block % 8;
+
+	if ((info->block_type_bitmap[index] >> bit) & 1)
+		return FALSE;
+
+	return TRUE;
+#else
 	return block >= info->data_block_num;
+#endif
 }
 
 static bool is_multi_plane(struct mtk_nand_chip_info *info)
@@ -817,6 +932,7 @@ static void call_tlc_page_group_callback(
 			item = item->next->next;
 	}
 }
+
 
 static unsigned int callback_and_free_ewrite(struct worklist_ctrl *list_ctrl,
 				int ecount)
@@ -1054,6 +1170,7 @@ static unsigned int do_mlc_multi_plane_write(struct mtk_nand_chip_info *info,
 	unsigned int ret;
 
 	ret = count;
+
 	nand_debug("do_mlc_multi_plane_write enter");
 	if (count != info->max_keep_pages) {
 		nand_pr_err("error:count:%d max:%d", count, info->max_keep_pages);
@@ -1403,6 +1520,15 @@ static inline bool block_page_num_is_valid(
 	if (page < 0)
 		return false;
 
+#ifdef ALL_SLC_BUFFER
+	if ((!is_slc_block(info, block) &&
+		page < info->data_page_num) ||
+		(is_slc_block(info, block) &&
+		page < info->log_page_num))
+		return true;
+	else
+		return false;
+#else
 	if ((block < info->data_block_num &&
 		page < info->data_page_num) ||
 		(block >= info->data_block_num &&
@@ -1410,6 +1536,7 @@ static inline bool block_page_num_is_valid(
 		return true;
 	else
 		return false;
+#endif
 }
 static int open_block_init(struct open_block *open)
 {
@@ -2042,13 +2169,21 @@ int mtk_nand_chip_write_page(struct mtk_nand_chip_info *info,
 			block, page);
 		return -EINVAL;
 	}
-
+#ifdef ALL_SLC_BUFFER
+	list_ctrl = is_slc_block(info, block) ?
+			(&data_info->swlist_ctrl) : (&data_info->wlist_ctrl);
+#else
 	list_ctrl = (block < info->data_block_num) ?
 			(&data_info->wlist_ctrl) : (&data_info->swlist_ctrl);
+#endif
 	total_num = get_list_work_cnt(list_ctrl);
+#ifdef ALL_SLC_BUFFER
+	max_keep_pages = is_slc_block(info, block) ?
+			info->plane_num : info->max_keep_pages;
+#else
 	max_keep_pages = (block < info->data_block_num) ?
 			info->max_keep_pages : info->plane_num;
-
+#endif
 	while (total_num >= max_keep_pages) {
 		nand_debug("total_num:%d", total_num);
 		mtk_nand_process_list(info,
@@ -2079,9 +2214,14 @@ int mtk_nand_chip_write_page(struct mtk_nand_chip_info *info,
 	ret = add_list_node(list_ctrl, &work->list);
 	if (ret)
 		return 0;
+#ifdef ALL_SLC_BUFFER
+	page_num = is_slc_block(info, block) ? info->log_page_num :
+						info->data_page_num;
+#else
 
 	page_num = (block < info->data_block_num) ? info->data_page_num :
 						info->log_page_num;
+#endif
 	total_num = get_list_work_cnt(list_ctrl);
 	if (total_num >= max_keep_pages || (page == page_num - 1))
 		complete(&data_info->ops_ctrl);
@@ -2251,7 +2391,7 @@ int mtk_nand_ops_init(struct mtd_info *mtd, struct nand_chip *chip)
 	data_info->mtd = mtd;
 	info = &data_info->chip_info;
 
-	ret = get_data_partition_info(&data_info->partition_info);
+	ret = get_data_partition_info(&data_info->partition_info, &data_info->chip_info);
 	if (ret) {
 		nand_pr_err("Get FTL partition info failed");
 		goto err_out;
@@ -2308,3 +2448,213 @@ int mtk_nand_ops_init(struct mtd_info *mtd, struct nand_chip *chip)
 err_out:
 	return ret;
 }
+void mtk_nand_update_call_trace(unsigned int *address, char type, unsigned int block, unsigned int page)
+{
+#ifdef __REPLAY_CALL__
+	if (mntl_record_en) {
+		if (call_idx == 0) {
+			call_trace[call_idx].call_address = address;
+			call_trace[call_idx].op_type = type;
+			call_trace[call_idx].block = block;
+			call_trace[call_idx].page = page;
+			call_trace[call_idx].times++;
+			call_idx = (call_idx + 1) % 4096;
+		} else {
+			if (call_trace[call_idx - 1].op_type == type && call_trace[call_idx - 1].block == block) {
+				call_trace[call_idx - 1].times++;
+			} else {
+				call_trace[call_idx].call_address = address;
+				call_trace[call_idx].op_type = type;
+				call_trace[call_idx].block = block;
+				call_trace[call_idx].page = page;
+				call_trace[call_idx].times++;
+				call_idx = (call_idx + 1) % 4096;
+			}
+		}
+	}
+#endif
+}
+EXPORT_SYMBOL(mtk_nand_update_call_trace);
+
+void dump_block_bit_map(u8 *array)
+{
+	int i, j;
+	int num;
+	bool check;
+
+	pr_info("dump_block_bit_map\n");
+	for (i = 0; i < 250; i++) {
+		num = array[i];
+		if (num) {
+			for (j = 0; j < 8; j++) {
+				if (num & (1 << j)) {
+					check = is_slc_block(&data_info->chip_info, ((i * 8) + j));
+					pr_info("block %d is tlc check = %d\n", ((i * 8) + j), check);
+				}
+			}
+		}
+	}
+}
+
+int mtk_nand_update_block_type(int num, unsigned int *blk)
+{
+	struct mtd_info *mtd = data_info->mtd;
+	struct mtk_nand_chip_info *info = &data_info->chip_info;
+	int page_addr0, page_addr1;
+	int i, status;
+
+	page_addr1 = 0;
+	nand_get_device(mtd, FL_ERASING);
+	devinfo.tlcControl.slcopmodeEn = TRUE;
+	for (i = 0; i < num; i++) {
+		page_addr0 = (blk[i]+data_info->bmt.start_block)*info->data_page_num;
+			status = mtk_chip_erase_blocks(mtd, page_addr0, page_addr1);
+
+		if (!(status & NAND_STATUS_READY))
+			nand_pr_err("SR[6] is not ready state, status:0x%x", status);
+	}
+	nand_release_device(mtd);
+
+	return mntl_update_part_tab(mtd, &data_info->chip_info, num, blk);
+}
+EXPORT_SYMBOL(mtk_nand_update_block_type);
+
+int os_mvg_enabled(void)
+{
+#if defined(CONFIG_PWR_LOSS_MTK_SPOH)
+	return 1;
+#else
+	return 0;
+#endif
+}
+EXPORT_SYMBOL(os_mvg_enabled);
+
+int init_case_trigger;
+
+int os_mvg_on_group_case(const char *gname, const char *cname)
+{
+#if defined(CONFIG_PWR_LOSS_MTK_SPOH)
+	int trigger = mvg_trigger_get();
+
+	if (trigger != 0 && trigger != -1)
+		init_case_trigger = trigger;
+
+	if (mvg_on_group_case(gname, cname)) {
+		if (mvg_trigger()) {
+			/* pr_info("[MVG_TEST]: random reset on case %s: %s\n", gname, cname); */
+			mvg_set_trigger(-1);
+		}
+	} else {
+		mvg_set_trigger(init_case_trigger);
+	}
+#endif
+	return 0;
+}
+EXPORT_SYMBOL(os_mvg_on_group_case);
+#if defined(CONFIG_PWR_LOSS_MTK_SPOH)
+static void push_case(const char *gname, const char *cname)
+{
+	struct mvg_case_stack *case_stack = kmalloc(sizeof(struct mvg_case_stack), GFP_KERNEL);
+
+	strcpy(case_stack->gname, gname);
+	strcpy(case_stack->cname, cname);
+	case_stack->next = cstack;
+	cstack = case_stack;
+}
+
+static void pop_case(void)
+{
+	struct mvg_case_stack *case_stack = cstack;
+
+	cstack = cstack->next;
+	kfree(case_stack);
+}
+
+int mvg_current_case_check(void)
+{
+	if (cstack)
+		return mvg_on_group_case(cstack->gname, cstack->cname);
+	return 0;
+}
+
+
+#endif
+
+int mvg_set_current_case(const char *gname, const char *cname)
+{
+#if defined(CONFIG_PWR_LOSS_MTK_SPOH)
+	if (mvg_on_group_case(gname, cname)) {
+		if (cstack) {
+			pr_info("[MVG] set case reentry on %s-%s\n", gname, cname);
+			return -EINVAL;
+		}
+		push_case(gname, cname);
+	} else {
+		if (cstack)
+			push_case(gname, cname);
+	}
+#endif
+	return 0;
+}
+EXPORT_SYMBOL(mvg_set_current_case);
+int mvg_case_exit(const char *gname, const char *cname)
+{
+#if defined(CONFIG_PWR_LOSS_MTK_SPOH)
+	int s1, s2;
+
+	if (!cstack)
+		return 0;
+	s1 = strcmp(cstack->gname, gname);
+	s2 = strcmp(cstack->cname, cname);
+
+	if (s1 || s2) {
+		pr_info("[MVG] case exit un-balance current %s-%s, exit %s-%s\n",
+			cstack->gname, cstack->cname, gname, cname);
+		return -EINVAL;
+	}
+
+	pop_case();
+#endif
+	return 0;
+}
+EXPORT_SYMBOL(mvg_case_exit);
+
+char *os_get_task_comm(char *buf, struct task_struct *tsk)
+{
+	return get_task_comm(buf, tsk);
+}
+EXPORT_SYMBOL(os_get_task_comm);
+
+unsigned long long os_sched_clock(void)
+{
+	return sched_clock();
+}
+EXPORT_SYMBOL(os_sched_clock);
+
+/* mtk_is_hs
+ * Return 1 if it is in home screen now.
+ */
+int mtk_is_hs(void)
+{
+	return g_i4Homescreen;
+}
+EXPORT_SYMBOL(mtk_is_hs);
+
+void os_mutex_destroy(struct mutex *lock)
+{
+	mutex_destroy(lock);
+}
+EXPORT_SYMBOL(os_mutex_destroy);
+
+void __sched
+os_mutex_lock(struct mutex *lock)
+{
+	mutex_lock(lock);
+}
+EXPORT_SYMBOL(os_mutex_lock);
+
+void dump_nfi_op(void)
+{
+	/* dump_record(); */
+}
+EXPORT_SYMBOL(dump_nfi_op);
