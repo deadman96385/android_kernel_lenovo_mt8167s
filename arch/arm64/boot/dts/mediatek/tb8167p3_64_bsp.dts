@@ -743,10 +743,6 @@ ROOT_NODE {
 	status="okay";
 };
 
-&uart1 {
-	status="okay";
-};
-
 &usb0 {
 	pinctrl-names = "iddig_irq_init", "drvvbus_init", "drvvbus_low", "drvvbus_high";
 	pinctrl-0 = <&usb0_iddig>;

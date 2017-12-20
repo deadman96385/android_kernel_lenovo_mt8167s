@@ -210,12 +210,6 @@
 			#clock-cells = <0>;
 			clock-frequency = <32000>;
 		};
-
-		uart_clk: dummy26m {
-			compatible = "fixed-clock";
-			clock-frequency = <26000000>;
-			#clock-cells = <0>;
-		};
 	};
 
 	timer {
@@ -316,10 +310,20 @@
 			/* UART GPIO Settings - Start */
 			/* UART0: rx set, rx clear, tx clear, tx clear*/
 			uart0_gpio_def_cfg:uart0gpiodefault {
+				pins_rx {
+					pinmux = <MT8167_PIN_62_URXD0__FUNC_URXD0>;
+					input-enable;
+					bias-pull-up;
+				};
+				pins_tx {
+					pinmux = <MT8167_PIN_63_UTXD0__FUNC_UTXD0>;
+				};
 			};
 			uart0_rx_set_cfg:uart0_rx_set {
 				pins_cmd_dat {
 					pinmux = <MT8167_PIN_62_URXD0__FUNC_URXD0>;
+					input-enable;
+					bias-pull-up;
 				};
 			};
 			uart0_rx_clr_cfg:uart0_rx_clear  {
@@ -387,7 +391,7 @@
 			};
 			uart2_tx_set_cfg:uart2_tx_set {
 				pins_cmd_dat {
-					pins = <MT8167_PIN_35_UTXD2__FUNC_UTXD2>;
+					pinmux = <MT8167_PIN_35_UTXD2__FUNC_UTXD2>;
 				};
 			};
 			uart2_tx_clr_cfg:uart2_tx_clear {
@@ -720,24 +724,21 @@
 			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
 				     <GIC_SPI 96 IRQ_TYPE_LEVEL_LOW>, /* DMA Tx IRQ */
 				     <GIC_SPI 97 IRQ_TYPE_LEVEL_LOW>; /* DMA Rx IRQ */
-
 			clock-frequency = <26000000>;
 			clock-div = <1>;
 			clocks = <&topckgen CLK_TOP_UART0>, <&topckgen CLK_TOP_APDMA>;
 			clock-names = "uart0-main", "uart-apdma";
-			pinctrl-names = "uart0_gpio_default",
+			pinctrl-names = "default",
 					"uart0_rx_set",
 					"uart0_rx_clear",
 					"uart0_tx_set",
 					"uart0_tx_clear";
-
 			pinctrl-0 = <&uart0_gpio_def_cfg>;
 			pinctrl-1 = <&uart0_rx_set_cfg>;
 			pinctrl-2 = <&uart0_rx_clr_cfg>;
 			pinctrl-3 = <&uart0_tx_set_cfg>;
 			pinctrl-4 = <&uart0_tx_clr_cfg>;
-
-			status = "disable";
+			status = "disabled";
 		};
 
 		uart1: uart1@11006000 {
@@ -750,24 +751,21 @@
 			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
 				     <GIC_SPI 98 IRQ_TYPE_LEVEL_LOW>, /* DMA Tx IRQ */
 				     <GIC_SPI 99 IRQ_TYPE_LEVEL_LOW>; /* DMA Rx IRQ */
-
 			clock-frequency = <26000000>;
 			clock-div = <1>;
 			clocks = <&topckgen CLK_TOP_UART1>;
 			clock-names = "uart1-main";
-			pinctrl-names = "uart1_gpio_default",
+			pinctrl-names = "default",
 					"uart1_rx_set",
 					"uart1_rx_clear",
 					"uart1_tx_set",
 					"uart1_tx_clear";
-
 			pinctrl-0 = <&uart1_gpio_def_cfg>;
 			pinctrl-1 = <&uart1_rx_set_cfg>;
 			pinctrl-2 = <&uart1_rx_clr_cfg>;
 			pinctrl-3 = <&uart1_tx_set_cfg>;
 			pinctrl-4 = <&uart1_tx_clr_cfg>;
-
-			status = "disable";
+			status = "disabled";
 		};
 
 		uart2: uart2@11007000 {
@@ -779,24 +777,21 @@
 			interrupts = <GIC_SPI 211 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
 				     <GIC_SPI 100 IRQ_TYPE_LEVEL_LOW>, /* DMA Tx IRQ */
 				     <GIC_SPI 101 IRQ_TYPE_LEVEL_LOW>; /* DMA Rx IRQ */
-
 			clock-frequency = <26000000>;
 			clock-div = <1>;
 			clocks = <&topckgen CLK_TOP_UART2>;
 			clock-names = "uart2-main";
-			pinctrl-names = "uart2_gpio_default",
+			pinctrl-names = "default",
 					"uart2_rx_set",
 					"uart2_rx_clear",
 					"uart2_tx_set",
 					"uart2_tx_clear";
-
 			pinctrl-0 = <&uart2_gpio_def_cfg>;
 			pinctrl-1 = <&uart2_rx_set_cfg>;
 			pinctrl-2 = <&uart2_rx_clr_cfg>;
 			pinctrl-3 = <&uart2_tx_set_cfg>;
 			pinctrl-4 = <&uart2_tx_clr_cfg>;
-
-			status = "disable";
+			status = "disabled";
 		};
 
 		pwm: pwm@11008000 {
