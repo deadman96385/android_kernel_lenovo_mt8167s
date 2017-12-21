@@ -47,13 +47,14 @@ unsigned int hdmi_ddc_read(unsigned short u2Reg)
 	internal_ddc_read(hdmi_reg[HDMI_DDC] + u2Reg, &u4Data);
 
 	HDMI_DDC_LOG("[R]ddc = 0x%04x, data = 0x%08x\n", u2Reg, u4Data);
+	udelay(10);
 	return u4Data;
 }
 
 void hdmi_ddc_write(unsigned short u2Reg, unsigned int u4Data)
 {
 	internal_ddc_write(hdmi_reg[HDMI_DDC] + u2Reg, u4Data);
-
+	udelay(10);
 	HDMI_DDC_LOG("[W]ddc = 0x%04x, data = 0x%08x\n", u2Reg, u4Data);
 }
 

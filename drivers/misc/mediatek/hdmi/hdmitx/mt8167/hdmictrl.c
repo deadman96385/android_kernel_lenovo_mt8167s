@@ -370,12 +370,14 @@ unsigned int hdmi_pll_read(unsigned short u2Reg)
 
 	internal_hdmi_read(hdmi_ref_reg[AP_CCIF0] + u2Reg, &u4Data);
 	HDMI_PLL_LOG("[R]addr = 0x%04x, data = 0x%08x\n", u2Reg, u4Data);
+	udelay(10);
 	return u4Data;
 }
 
 void hdmi_pll_write(unsigned short u2Reg, unsigned int u4Data)
 {
 	HDMI_PLL_LOG("[W]addr= 0x%04x, data = 0x%08x\n", u2Reg, u4Data);
+	udelay(10);
 	internal_hdmi_write(hdmi_ref_reg[AP_CCIF0] + u2Reg, u4Data);
 }
 
