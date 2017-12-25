@@ -2355,8 +2355,8 @@ static int mt8167_afe_dai_suspend(struct snd_soc_dai *dai)
 {
 	struct mtk_afe *afe = snd_soc_dai_get_drvdata(dai);
 
-	dev_dbg(afe->dev, "%s id %d suspended %d\n",
-		__func__, dai->id, afe->suspended);
+	/* dev_dbg(afe->dev, "%s id %d suspended %d\n", */
+		/* __func__, dai->id, afe->suspended); */
 
 	if (afe->suspended)
 		return 0;
@@ -2368,8 +2368,8 @@ static int mt8167_afe_dai_resume(struct snd_soc_dai *dai)
 {
 	struct mtk_afe *afe = snd_soc_dai_get_drvdata(dai);
 
-	dev_dbg(afe->dev, "%s id %d suspended %d\n",
-		__func__, dai->id, afe->suspended);
+	/* dev_dbg(afe->dev, "%s id %d suspended %d\n", */
+		/* __func__, dai->id, afe->suspended); */
 
 	if (!afe->suspended)
 		return 0;
@@ -3363,7 +3363,7 @@ static int mt8167_afe_suspend(struct device *dev)
 	struct mtk_afe *afe = dev_get_drvdata(dev);
 	int i;
 
-	dev_info(dev, "%s >>\n", __func__);
+	/* dev_info(dev, "%s >>\n", __func__); */
 
 	mt8167_afe_enable_main_clk(afe);
 
@@ -3375,7 +3375,7 @@ static int mt8167_afe_suspend(struct device *dev)
 
 	afe->suspended = true;
 
-	dev_info(dev, "%s <<\n", __func__);
+	/* dev_info(dev, "%s <<\n", __func__); */
 
 	return 0;
 }
@@ -3385,7 +3385,7 @@ static int mt8167_afe_resume(struct device *dev)
 	struct mtk_afe *afe = dev_get_drvdata(dev);
 	int i;
 
-	dev_info(dev, "%s >>\n", __func__);
+	/* dev_info(dev, "%s >>\n", __func__); */
 
 	mt8167_afe_enable_main_clk(afe);
 
@@ -3400,7 +3400,7 @@ static int mt8167_afe_resume(struct device *dev)
 
 	afe->suspended = false;
 
-	dev_info(dev, "%s <<\n", __func__);
+	/* dev_info(dev, "%s <<\n", __func__); */
 
 	return 0;
 }
