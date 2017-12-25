@@ -3275,7 +3275,6 @@ static void msdc_pm(pm_message_t state, void *data)
 		host->suspend = 0;
 		host->mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;
 		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
-		host->mmc->caps &= ~MMC_CAP_NONREMOVABLE;
 		mmc_add_host(host->mmc);
 		host->mmc->rescan_entered = 0;
 	}
@@ -3426,6 +3425,8 @@ static int msdc_drv_probe(struct platform_device *pdev)
 	pm_runtime_enable(host->dev);
 
 	host->mmc->caps |= MMC_CAP_NONREMOVABLE;
+	host->mmc->pm_caps |= MMC_PM_KEEP_POWER;
+	host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
 	/* In SDIO irq mode, DATA1 always need to be detected */
 	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
 		pm_runtime_get_sync(host->dev);
