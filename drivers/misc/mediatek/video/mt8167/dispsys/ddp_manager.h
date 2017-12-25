@@ -150,6 +150,7 @@ int dpmgr_path_remove_memout(disp_path_handle dp_handle, void *cmdq_handle);
 */
 int dpmgr_path_get_mutex(disp_path_handle dp_handle);
 
+void dpmgr_path_update_mutexid_by_scenario(disp_path_handle dp_handle);
 
 /* query current dst module.
  * return module enum.

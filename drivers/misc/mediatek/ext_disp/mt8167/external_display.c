@@ -507,6 +507,7 @@ static int _build_path_ovl_to_wdma(void)
 	ext_init_decouple_buffers();
 
 	if (is_path_exist) {
+		dpmgr_path_update_mutexid_by_scenario(ovl2mem_path_handle);
 		pgc->ovl2mem_path_handle = ovl2mem_path_handle;
 		goto build_end;
 	}
