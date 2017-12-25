@@ -309,7 +309,6 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 	struct disp_session_input_config *session_input;
 	struct disp_input_config input;
 	int layer_id;
-	enum MFC_STATUS r;
 
 	DISPFUNC();
 
@@ -369,26 +368,26 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 
 		captured_session_input[DISP_SESSION_PRIMARY - 1].config[input.layer_id] = input;
 		ret = primary_display_config_input_multiple(session_input);
-	}
 
-	va_start(args, fmt);
-	i = vsprintf(dal_print_buffer, fmt, args);
-	WARN_ON(i >= ARRAY_SIZE(dal_print_buffer));
-	va_end(args);
+		va_start(args, fmt);
+		i = vsprintf(dal_print_buffer, fmt, args);
+		WARN_ON(i >= ARRAY_SIZE(dal_print_buffer));
+		va_end(args);
 
-	r = MFC_Print(mfc_handle, dal_print_buffer);
-	if (r != MFC_STATUS_OK) {
-		pr_debug("DISP/DAL: Warning: call MFC_XXX function failed in %s(), line: %d, ret: %x\n",
-			__func__, __LINE__, r);
-		ret = DAL_STATUS_FATAL_ERROR;
-	} else {
-		/*flush_cache_all();*/
-		if (!dal_shown)
-			dal_shown = true;
+		r = MFC_Print(mfc_handle, dal_print_buffer);
+		if (r != MFC_STATUS_OK) {
+			pr_debug("DISP/DAL: Warning: call MFC_XXX function failed in %s(), line: %d, ret: %x\n",
+					__func__, __LINE__, r);
+			ret = DAL_STATUS_FATAL_ERROR;
+		} else {
+			/*flush_cache_all();*/
+			if (!dal_shown)
+				dal_shown = true;
 
-		mutex_lock(&disp_trigger_lock);
-		ret = primary_display_trigger(0, NULL, 0);
-		mutex_unlock(&disp_trigger_lock);
+			mutex_lock(&disp_trigger_lock);
+			ret = primary_display_trigger(0, NULL, 0);
+			mutex_unlock(&disp_trigger_lock);
+		}
 	}
 
 	mmprofile_log_ex(ddp_mmp_get_events()->dal_printf, MMPROFILE_FLAG_END, 0, 0);
