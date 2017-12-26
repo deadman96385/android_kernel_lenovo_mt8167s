@@ -4763,7 +4763,7 @@ static long ISP_ioctl(struct file *pFile, MUINT32 Cmd, unsigned long Param)
 		}
 	case ISP_DUMP_REG:
 		{
-			Ret = ISP_DumpReg();
+			/*Ret = ISP_DumpReg();*/
 			break;
 		}
 	case ISP_DEBUG_FLAG:
