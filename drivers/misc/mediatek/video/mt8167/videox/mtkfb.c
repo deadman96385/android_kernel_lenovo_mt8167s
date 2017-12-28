@@ -992,7 +992,7 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg
 	DISPFUNC();
 	/* M: dump debug mmprofile log info */
 	mmprofile_log_ex(MTKFB_MMP_Events.IOCtrl, MMPROFILE_FLAG_PULSE, _IOC_NR(cmd), arg);
-	pr_debug("mtkfb_ioctl, info=%p, cmd nr=0x%08x, cmd size=0x%08x\n", info,
+	MTKFB_LOG_DBG("mtkfb_ioctl, info=%p, cmd nr=0x%08x, cmd size=0x%08x\n", info,
 		 (unsigned int)_IOC_NR(cmd), (unsigned int)_IOC_SIZE(cmd));
 
 	switch (cmd) {
