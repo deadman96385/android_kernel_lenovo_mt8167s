@@ -163,7 +163,6 @@ static void ion_fb_heap_free(struct ion_buffer *buffer)
 {
 	struct ion_heap *heap = buffer->heap;
 	struct ion_fb_buffer_info *buffer_info = (struct ion_fb_buffer_info *)buffer->priv_virt;
-	struct sg_table *table = buffer->sg_table;
 
 	if (!buffer_info) {
 		IONMSG("[ion_fb_heap_free]: Error: buffer_info is NULL.\n");
