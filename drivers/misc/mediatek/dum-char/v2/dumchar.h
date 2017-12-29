@@ -21,6 +21,8 @@
 #include <linux/mtd/mtd.h>
 #include <linux/semaphore.h>
 
+#include "partition_define.h"
+
 /*#include <linux/mmc/sd_misc.h>*/
 
 #define DUMCHAR_MAJOR        0	/* dynamic major by default */
@@ -60,7 +62,10 @@ struct file_obj {
 
 #ifdef CONFIG_MTK_MTD_NAND
 extern u64 mtd_partition_start_address(struct mtd_info *mtd);
+extern struct mtd_info *__mtd_next_device(int i);
+extern void env_init(loff_t env_part_addr, int mtd_number);
 #endif
+
 
 #define mtd_for_each_device(mtd)			\
 	for ((mtd) = __mtd_next_device(0);		\
@@ -88,11 +93,6 @@ extern int init_pmt(void);
 extern void msdc_get_cache_region(void);
 #endif
 
-#endif
-
-#ifdef CONFIG_MTK_MTD_NAND
-extern struct mtd_info *__mtd_next_device(int i);
-extern void env_init(loff_t env_part_addr, int mtd_number);
 #endif
 
 #endif /*__DUMCHAR_H__ */
