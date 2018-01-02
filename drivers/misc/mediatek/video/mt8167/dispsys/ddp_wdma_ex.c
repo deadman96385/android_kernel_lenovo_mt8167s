@@ -429,6 +429,7 @@ static int wdma_check_input_param(struct WDMA_CONFIG_STRUCT *config)
 	if (config->dstAddress == 0 || config->srcWidth == 0 || config->srcHeight == 0) {
 		DDPERR("wdma parameter invalidate, addr=0x%lx, w=%d, h=%d\n",
 		       config->dstAddress, config->srcWidth, config->srcHeight);
+		dump_stack();
 		return -1;
 	}
 	return 0;
