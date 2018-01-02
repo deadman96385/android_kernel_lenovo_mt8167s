@@ -72,7 +72,7 @@
  * Enable idle screen low power mode.
  * turned off for FPGA and bringup
  */
-#define MTK_DISP_IDLE_LP
+/* #define MTK_DISP_IDLE_LP */
 
 /**
  * Enable Multipass support.
