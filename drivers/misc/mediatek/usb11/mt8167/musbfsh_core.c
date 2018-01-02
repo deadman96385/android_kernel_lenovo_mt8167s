@@ -1624,7 +1624,6 @@ static void dump_op_state(const char *msg)
 	for (i = 0; i < 4; i++)
 		DBG(5, "\t0x%x = 0x%x\n", 0x640 + i * 4, musbfsh_readl(g_musbfsh->mregs, 0x640 + i * 4));
 }
-#endif
 
 static void musbfsh_force_utmi(struct musbfsh *musbfsh)
 {
@@ -1808,6 +1807,9 @@ static void musbfsh_force_host_release_utmi(struct musbfsh *musbfsh)
 	musbfsh_writeb(musbfsh->mregs, MUSBFSH_TESTMODE, 0x00);	/*Clear Test Mode */
 	DBG(5, "0x630 = %x\n", musbfsh_readl(musbfsh->mregs, 0x630));
 }
+#endif
+
+#ifdef MUSBFSH_ENABLE_BUS_SUSPEND
 
 static void musbfsh_save_context(struct musbfsh *musbfsh)
 {
@@ -1899,6 +1901,54 @@ static void musbfsh_save_context(struct musbfsh *musbfsh)
 	DBG(5, "musbfsh->context.speed:%d\n", musbfsh->context.speed);
 }
 
+#else
+
+static void musbfsh_save_context_default(struct musbfsh *musbfsh)
+{
+	int i;
+	void __iomem *musbfsh_base = musbfsh->mregs;
+	void __iomem *epio;
+#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	mtk11_dma_burst_setting = musbfsh_readl(musbfsh->mregs, 0x204);
+	mtk11_qmu_ioc_setting = musbfsh_readl((musbfsh->mregs + MUSBFSH_QISAR), 0x30);
+#endif
+	musbfsh->context.power = musbfsh_readb(musbfsh_base, MUSBFSH_POWER);
+	musbfsh->context.intrtxe = musbfsh_readw(musbfsh_base, MUSBFSH_INTRTXE);
+	musbfsh->context.intrrxe = musbfsh_readw(musbfsh_base, MUSBFSH_INTRRXE);
+	musbfsh->context.intrusbe = musbfsh_readb(musbfsh_base, MUSBFSH_INTRUSBE);
+	musbfsh->context.index = musbfsh_readb(musbfsh_base, MUSBFSH_INDEX);
+	musbfsh->context.devctl = musbfsh_readb(musbfsh_base, MUSBFSH_DEVCTL);
+	musbfsh->context.l1_int = musbfsh_readl(musbfsh_base, USB11_L1INTM);
+	for (i = 0; i < MUSBFSH_C_NUM_EPS - 1; ++i) {
+		struct musbfsh_hw_ep *hw_ep;
+
+		hw_ep = &musbfsh->endpoints[i];
+		if (!hw_ep)
+			continue;
+		epio = hw_ep->regs;
+		if (!epio)
+			continue;
+		musbfsh_writeb(musbfsh_base, MUSBFSH_INDEX, i);
+		musbfsh->context.index_regs[i].txmaxp = musbfsh_readw(epio, MUSBFSH_TXMAXP);
+		musbfsh->context.index_regs[i].txcsr = musbfsh_readw(epio, MUSBFSH_TXCSR);
+		musbfsh->context.index_regs[i].rxmaxp = musbfsh_readw(epio, MUSBFSH_RXMAXP);
+		musbfsh->context.index_regs[i].rxcsr = musbfsh_readw(epio, MUSBFSH_RXCSR);
+		if (musbfsh->dyn_fifo) {
+			musbfsh->context.index_regs[i].txfifoadd =
+			    musbfsh_read_txfifoadd(musbfsh_base);
+			musbfsh->context.index_regs[i].rxfifoadd =
+			    musbfsh_read_rxfifoadd(musbfsh_base);
+			musbfsh->context.index_regs[i].txfifosz =
+			    musbfsh_read_txfifosz(musbfsh_base);
+			musbfsh->context.index_regs[i].rxfifosz =
+			    musbfsh_read_rxfifosz(musbfsh_base);
+		}
+	}
+}
+
+#endif
+
+#ifdef MUSBFSH_ENABLE_BUS_SUSPEND
 static void musbfsh_restore_context(struct musbfsh *musbfsh)
 {
 #ifdef MUSBFSH_ENABLE_BUS_SUSPEND
@@ -2018,13 +2068,68 @@ static void musbfsh_restore_context(struct musbfsh *musbfsh)
 	DBG(5, "after set, MUSBFSH_INTRUSBE:0x%x\n", reg);
 	/* Restore MAC End */
 #endif
-
 }
+
+#else
+
+static void musbfsh_restore_context_default(struct musbfsh *musbfsh)
+{
+	int i;
+	void __iomem *musbfsh_base = musbfsh->mregs;
+	void __iomem *epio;
+#ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
+	musbfsh_writel(musbfsh->mregs, 0x204, mtk11_dma_burst_setting);
+	musbfsh_writel((musbfsh->mregs + MUSBFSH_QISAR), 0x30, mtk11_qmu_ioc_setting);
+#endif
+	musbfsh_writeb(musbfsh_base, MUSBFSH_POWER, musbfsh->context.power);
+	musbfsh_writew(musbfsh_base, MUSBFSH_INTRTXE, musbfsh->context.intrtxe);
+	musbfsh_writew(musbfsh_base, MUSBFSH_INTRRXE, musbfsh->context.intrrxe);
+	musbfsh_writeb(musbfsh_base, MUSBFSH_INTRUSBE, musbfsh->context.intrusbe);
+	musbfsh_writeb(musbfsh_base, MUSBFSH_DEVCTL, musbfsh->context.devctl);
+	for (i = 0; i < MUSBFSH_C_NUM_EPS - 1; ++i) {
+		struct musbfsh_hw_ep *hw_ep;
+
+		hw_ep = &musbfsh->endpoints[i];
+		if (!hw_ep)
+			continue;
+		epio = hw_ep->regs;
+		if (!epio)
+			continue;
+		musbfsh_writeb(musbfsh_base, MUSBFSH_INDEX, i);
+		musbfsh_writew(epio, MUSBFSH_TXMAXP, musbfsh->context.index_regs[i].txmaxp);
+		musbfsh_writew(epio, MUSBFSH_TXCSR, musbfsh->context.index_regs[i].txcsr);
+		musbfsh_writew(epio, MUSBFSH_RXMAXP, musbfsh->context.index_regs[i].rxmaxp);
+		musbfsh_writew(epio, MUSBFSH_RXCSR, musbfsh->context.index_regs[i].rxcsr);
+		if (musbfsh->dyn_fifo) {
+			musbfsh_write_txfifosz(musbfsh_base,
+					       musbfsh->context.index_regs[i].txfifosz);
+			musbfsh_write_rxfifosz(musbfsh_base,
+					       musbfsh->context.index_regs[i].rxfifosz);
+			musbfsh_write_txfifoadd(musbfsh_base,
+						musbfsh->context.index_regs[i].txfifoadd);
+			musbfsh_write_rxfifoadd(musbfsh_base,
+						musbfsh->context.index_regs[i].rxfifoadd);
+		}
+	}
+	musbfsh_writeb(musbfsh_base, MUSBFSH_INDEX, musbfsh->context.index);
+	mb();/* */
+	/* Enable all interrupts at DMA
+	 * Caution: The DMA Reg type is WRITE to SET or CLEAR
+	 */
+	musbfsh_writel(musbfsh->mregs, MUSBFSH_HSDMA_INTR,
+		       0xFF | (0xFF << MUSBFSH_DMA_INTR_UNMASK_SET_OFFSET));
+	musbfsh_writel(musbfsh_base, USB11_L1INTM, musbfsh->context.l1_int);
+}
+
+#endif
+
 static bool is_usb11_clk_prepared;
+static int usb11_clk_prepare_cnt;
 int mt_usb11_clock_prepare(void)
 {
 	int retval = 0;
 
+	/* WARNING("prepared: %d\n", ++usb11_clk_prepare_cnt); */
 	if (is_usb11_clk_prepared)
 		return 0;
 
@@ -2056,6 +2161,7 @@ exit:
 
 void mt_usb11_clock_unprepare(void)
 {
+	/* WARNING("prepared: %d\n", --usb11_clk_prepare_cnt); */
 	if (!is_usb11_clk_prepared)
 		return;
 
@@ -2093,14 +2199,21 @@ static int musbfsh_suspend(struct device *dev)
 
 #endif
 	spin_lock_irqsave(&musbfsh->lock, flags);
+
+#ifdef MUSBFSH_ENABLE_BUS_SUSPEND
 	musbfsh_save_context(musbfsh);
+#else
+	musbfsh_save_context_default(musbfsh);
+#endif
 
 #ifdef MUSBFSH_ENABLE_BUS_SUSPEND
 	musbfsh_force_utmi(musbfsh);
 #endif
 
+#ifdef MUSBFSH_ENABLE_BUS_SUSPEND
 	/* disable interrupts */
 	musbfsh_generic_disable(musbfsh);
+#endif
 
 #if (defined(CONFIG_MUSBFSH_VBUS) && !defined(CONFIG_MUSBFSH_IDDIG))
 	pinctrl_select_state(mt_pinctrl, pinctrl_drvvbus1_low);
@@ -2174,7 +2287,11 @@ static int musbfsh_resume(struct device *dev)
 	musbfsh_platform_set_power(musbfsh, 1);
 #endif
 
+#ifdef MUSBFSH_ENABLE_BUS_SUSPEND
 	musbfsh_restore_context(musbfsh);
+#else
+	musbfsh_restore_context_default(musbfsh);
+#endif
 
 #ifdef MUSBFSH_ENABLE_BUS_SUSPEND
 	musbfsh_force_host_release_utmi(musbfsh);
