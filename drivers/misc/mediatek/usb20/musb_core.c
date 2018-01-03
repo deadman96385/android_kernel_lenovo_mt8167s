@@ -134,7 +134,7 @@ module_param(musb_host_dynamic_fifo_usage_msk, int, 0400);
 #ifdef CONFIG_MTK_MUSB_QMU_SUPPORT
 int mtk_host_qmu_concurrent = 1;
 int mtk_host_qmu_pipe_msk = (PIPE_ISOCHRONOUS + 1) /* | (PIPE_BULK + 1) | (PIPE_INTERRUPT+ 1) */;
-int mtk_host_qmu_force_isoc_restart = 1;
+int mtk_host_qmu_force_isoc_restart;
 int mtk_host_active_dev_cnt;
 module_param(mtk_host_qmu_concurrent, int, 0400);
 module_param(mtk_host_qmu_pipe_msk, int, 0400);
