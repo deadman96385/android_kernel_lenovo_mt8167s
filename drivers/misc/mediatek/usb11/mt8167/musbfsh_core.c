@@ -2124,7 +2124,7 @@ static void musbfsh_restore_context_default(struct musbfsh *musbfsh)
 #endif
 
 static bool is_usb11_clk_prepared;
-static int usb11_clk_prepare_cnt;
+/* static int usb11_clk_prepare_cnt; */
 int mt_usb11_clock_prepare(void)
 {
 	int retval = 0;
