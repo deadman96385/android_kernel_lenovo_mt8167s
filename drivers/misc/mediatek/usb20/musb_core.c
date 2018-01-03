@@ -1143,12 +1143,13 @@ b_host:
 	 * only host sees babble; only peripheral sees bus reset.
 	 */
 	if (int_usb & MUSB_INTR_RESET) {
+		static DEFINE_RATELIMIT_STATE(ratelimit, 1 * HZ, 5);
 		int otg_state;
 		handled = IRQ_HANDLED;
 
 		otg_state = musb->xceiv->otg->state;
-		if (otg_state == OTG_STATE_A_HOST)
-			DBG(2, "MUSB_INTR_RESET (%s)\n", otg_state_string(musb->xceiv->otg->state));
+		if (otg_state == OTG_STATE_A_HOST && __ratelimit(&ratelimit))
+			DBG(0, "MUSB_INTR_RESET (%s)\n", otg_state_string(musb->xceiv->otg->state));
 		else
 			DBG(0, "MUSB_INTR_RESET (%s)\n", otg_state_string(musb->xceiv->otg->state));
 		if ((devctl & MUSB_DEVCTL_HM) != 0) {
@@ -1159,8 +1160,8 @@ b_host:
 			 * caused BABBLE. When HS BABBLE happens we can only
 			 * stop the session.
 			 */
-			if (otg_state == OTG_STATE_A_HOST)
-				DBG(2, "Babble\n");
+			if (otg_state == OTG_STATE_A_HOST && __ratelimit(&ratelimit))
+				DBG(0, "Babble\n");
 			else
 				DBG(0, "Babble\n");
 			if (devctl & (MUSB_DEVCTL_FSDEV | MUSB_DEVCTL_LSDEV))
