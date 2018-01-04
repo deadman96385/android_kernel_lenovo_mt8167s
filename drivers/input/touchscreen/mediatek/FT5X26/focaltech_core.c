@@ -881,7 +881,7 @@ static void tpd_down(int x, int y, int p, int id)
 	y = warp;
 
 	/* x=800-x; */
-	y = 1280 - y;
+	y = tpd_dts_data.tpd_resolution[1] - y;
 	/*Neostra modify for TP Coordinate adjustment 20161220 end*/
 #ifdef TPD_SOLVE_CHARGING_ISSUE
 	if (x != 0) {
