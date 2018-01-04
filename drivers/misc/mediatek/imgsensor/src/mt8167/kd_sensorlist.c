@@ -3653,7 +3653,7 @@ static long CAMERA_HW_Ioctl(struct file *a_pstFile,
 		break;
 
 	case KDIMGSENSORIOC_X_SET_SHUTTER_GAIN_WAIT_DONE:
-		i4RetValue = kdSensorSetExpGainWaitDone((int *)pBuff);
+		/*i4RetValue = kdSensorSetExpGainWaitDone((int *)pBuff);*/
 		break;
 
 	case KDIMGSENSORIOC_X_SET_CURRENT_SENSOR:
