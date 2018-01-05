@@ -35,8 +35,8 @@ static struct nandx_device_info nandx_device_table[] = {
 
 	/* Number: 3, Author: xx, Date: 2017/11/14 */
 	{"MT29F64G08CBCGB", {0x2c, 0x64, 0x44, 0x32, 0xa5, 0x00}, NAND_VMLC,
-		IO_8BIT, ADDR_CYCLE5, 1, 1, 1,
-		1088, MB(8), KB(16), 2144,
+		IO_8BIT, ADDR_CYCLE5, 1, 1, 2,
+		544, MB(8), KB(16), 2144,
 		MODE_SLC_DA, PROGRAM_ORDER_NONE, ADDRESSING_K,
 		BAD_BLOCK_READ_OOB, RR_MLC_MICRON, INTERFACE_ONFI,
 		SDR_TIMING_MICRON_VMLC, ONFI_TIMING_MICRON_VMLC,
