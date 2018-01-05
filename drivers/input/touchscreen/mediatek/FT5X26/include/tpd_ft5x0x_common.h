@@ -36,8 +36,13 @@
 #define FT_GESTRUE_MODE_SWITCH_REG 0xD0
 #define FT_GESTRUE_GETID_REG 0xD3
 
+#ifdef CONFIG_TOUCHSCREEN_FT5X26_WUXGA
+#define TPD_RES_X		1200
+#define TPD_RES_Y		1920
+#else
 #define TPD_RES_X		800
 #define TPD_RES_Y		1280
+#endif
 
 /* #define CONFIG_TPD_HAVE_CALIBRATION */
 /* #define TPD_CALIBRATION_MATRIX	{962, 0, 0, 0, 1600, 0, 0, 0}; */
