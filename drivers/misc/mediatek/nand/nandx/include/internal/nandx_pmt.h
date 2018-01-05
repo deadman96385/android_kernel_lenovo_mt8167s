@@ -55,7 +55,7 @@ struct pt_resident {
  * struct pmt_handler - partition table handler
  * @info: struct nandx_chip_info which contains nand device info
  * @pmt: partition table buffer
- * @block_map: block type bitmap buffer for mntl
+ * @block_bitmap: block type bitmap buffer for mntl
  * @start_blk: start block of partition region
  * @pmt_page: the latest pmt page number in pmt block
  * @part_num: partition number of current pmt
@@ -65,7 +65,7 @@ struct pt_resident {
 struct pmt_handler {
 	struct nandx_chip_info *info;
 	struct pt_resident *pmt;
-	u8 *block_map;
+	u32 *block_bitmap;
 	u32 start_blk;
 	u32 pmt_page;
 	u32 part_num;

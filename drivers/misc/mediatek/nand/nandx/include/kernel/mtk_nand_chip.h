@@ -91,7 +91,7 @@ struct mtk_nand_chip_info {
 	/*	bit[5]: Support different offset/size for multi-page read */
 	/*	bit[6]: Support different page for multi-page read */
 	/*      bit[7~31]: Reserved  */
-	unsigned char block_type_bitmap[500];
+	unsigned int *block_type_bitmap;
 };
 
 /*

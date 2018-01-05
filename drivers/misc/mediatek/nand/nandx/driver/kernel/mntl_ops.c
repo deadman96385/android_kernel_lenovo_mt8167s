@@ -68,8 +68,8 @@ static bool is_slc_block(struct mtk_nand_chip_info *info, unsigned int block)
 #ifdef ALL_SLC_BUFFER
 	int index, bit;
 
-	index = block / 8;
-	bit = block % 8;
+	index = block / 32;
+	bit = block % 32;
 
 	if ((info->block_type_bitmap[index] >> bit) & 1)
 		return FALSE;

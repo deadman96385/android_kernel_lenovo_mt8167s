@@ -46,7 +46,8 @@ int nandx_pmt_init(struct nandx_chip_info *info, u32 start_blk)
 	struct nandx_ops ops;
 	u32 ppb = info->block_size / info->page_size;
 	u32 i, temp;
-	u8 *buf, *block_map;
+	u8 *buf;
+	u32 *block_bitmap;
 	bool pmt_found = false;
 	int ret;
 
@@ -63,13 +64,14 @@ int nandx_pmt_init(struct nandx_chip_info *info, u32 start_blk)
 	/* restore pt to do pmt release later */
 	handler->pmt = pt;
 
-	block_map = mem_alloc(500/*div_up(info->block_num, 8)*/, sizeof(u8));
-	if (block_map == NULL) {
+	temp = div_up(info->block_num, 32);
+	block_bitmap = mem_alloc(temp, sizeof(u32));
+	if (block_bitmap == NULL) {
 		ret = -ENOMEM;
 		goto freept;
 	}
-	memset(block_map, 0xff, 500/*div_up(info->block_num, 8)*/);
-	handler->block_map = block_map;
+	memset(block_bitmap, 0xff, temp * sizeof(u32));
+	handler->block_bitmap = block_bitmap;
 
 	buf = mem_alloc(1, info->page_size);
 	if (buf == NULL) {
@@ -110,8 +112,8 @@ int nandx_pmt_init(struct nandx_chip_info *info, u32 start_blk)
 			memcpy(pt, buf + temp,
 				PART_MAX_COUNT * sizeof(struct pt_resident));
 			temp += PART_MAX_COUNT * sizeof(struct pt_resident);
-			/* TODO: div_up(info->block_num, 8) */
-			memcpy(block_map, buf + temp, 500);
+			memcpy(block_bitmap, buf + temp,
+				div_up(info->block_num, 32) * sizeof(u32));
 		} else if (pmt_found) {
 			pr_info("find the latest %spt at page %d\n",
 				   is_valid_pt(buf) ? "" : "m", ops.row - 1);
@@ -142,7 +144,7 @@ int nandx_pmt_init(struct nandx_chip_info *info, u32 start_blk)
 freebuf:
 	mem_free(buf);
 freeblock:
-	mem_free(block_map);
+	mem_free(block_bitmap);
 freept:
 	mem_free(pt);
 freehandler:
@@ -153,7 +155,7 @@ freehandler:
 
 void nandx_pmt_exit(void)
 {
-	mem_free(handler->block_map);
+	mem_free(handler->block_bitmap);
 	mem_free(handler->pmt);
 	mem_free(handler);
 }
@@ -183,8 +185,8 @@ int nandx_pmt_update(void)
 	memcpy(buf + len, handler->pmt,
 	       PART_MAX_COUNT * sizeof(struct pt_resident));
 	len += PART_MAX_COUNT * sizeof(struct pt_resident);
-	/* TODO: div_up(info->block_num, 8)*/
-	memcpy(buf + len, handler->block_map, 500);
+	memcpy(buf + len, handler->block_bitmap,
+		div_up(info->block_num, 32) * sizeof(u32));
 
 	/* erase and write together */
 	nandx_get_device(FL_WRITING);

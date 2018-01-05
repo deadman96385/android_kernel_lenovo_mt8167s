@@ -291,9 +291,7 @@ int get_data_partition_info(struct nand_ftl_partition_info *info,
 
 	handler = nandx_get_pmt_handler();
 	dev = handler->info;
-
-	memcpy(cinfo->block_type_bitmap, handler->block_map,
-	       500/*div_up(info->block_num, 8)*/);
+	cinfo->block_type_bitmap = handler->block_bitmap;
 
 	for (i = 0; i < handler->part_num; i++) {
 		if (!strcmp(part->name, FTL_PARTITION_NAME)) {
@@ -313,7 +311,7 @@ int get_data_partition_info(struct nand_ftl_partition_info *info,
 	return -1;
 }
 
-static void update_block_map(struct mtk_nand_chip_info *info, int num, u32 *blk)
+static void update_block_bitmap(struct mtk_nand_chip_info *info, int num, u32 *blk)
 {
 	struct pmt_handler *handler;
 	int i, byte, bit;
@@ -321,14 +319,11 @@ static void update_block_map(struct mtk_nand_chip_info *info, int num, u32 *blk)
 	handler = nandx_get_pmt_handler();
 
 	for (i = 0; i < num; i++) {
-		byte = *blk / 8;
-		bit = *blk % 8;
+		byte = *blk / 32;
+		bit = *blk % 32;
 		info->block_type_bitmap[byte] |= (1 << bit);
 		blk++;
 	}
-
-	memcpy(handler->block_map, info->block_type_bitmap,
-	       500/*div_up(info->block_num, 8)*/);
 }
 
 int mntl_update_part_tab(struct mtk_nand_chip_info *info, int num, u32 *blk)
@@ -338,7 +333,7 @@ int mntl_update_part_tab(struct mtk_nand_chip_info *info, int num, u32 *blk)
 	if (num <= 0 || blk == NULL)
 		return -EINVAL;
 
-	update_block_map(info, num, blk);
+	update_block_bitmap(info, num, blk);
 
 	ret = nandx_pmt_update();
 
