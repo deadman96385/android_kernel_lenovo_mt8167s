@@ -640,8 +640,10 @@ static void mtk_iommu_get_dm_regions(struct device *dev, struct list_head *list)
 		return;
 
 	INIT_LIST_HEAD(&region->list);
+#ifdef CONFIG_MTK_FB
 	region->start = mtkfb_get_fb_base();
 	region->length = mtkfb_get_fb_size();
+#endif
 	region->prot = IOMMU_READ | IOMMU_WRITE;
 	list_add_tail(&region->list, list);
 
