@@ -480,7 +480,7 @@ int nandx_ops_erase(struct nandx_core *ncore, long long offs,
 		erase_size /= info->wl_page_num;
 
 	if (reminder(offs, erase_size) || reminder(size, erase_size)) {
-		pr_debug("%s: invalid offs 0x%llx 0x%x\n",
+		pr_debug("%s: invalid offs 0x%llx 0x%zx\n",
 			    __func__, offs, size);
 		return -EINVAL;
 	}
