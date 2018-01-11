@@ -309,6 +309,7 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 	struct disp_session_input_config *session_input;
 	struct disp_input_config input;
 	int layer_id;
+	enum MFC_STATUS r;
 
 	DISPFUNC();
 
@@ -341,7 +342,9 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 				__func__, __LINE__, r);
 			return DAL_STATUS_FATAL_ERROR;
 		}
+	}
 
+	{
 		session_input = &captured_session_input[DISP_SESSION_PRIMARY - 1];
 		session_input->setter = SESSION_USER_AEE;
 		session_input->config_layer_num = 4;
