@@ -70,6 +70,7 @@
 		mediatek,dmic-wire-mode = <1>; /* 0(ONE_WIRE) 1(TWO_WIRE) */
 		mediatek,headphone-cap-sel = <1>; /* 0(10UF) 1(22UF) 2(33UF) 3(47UF) */
 		mediatek,dmic-rate-mode = <1>; /* 0(1.625M) 1(3.25M) */
+		mediatek,micbias0-settle-time-us = <50000>;
 	};
 
 	sound: sound {

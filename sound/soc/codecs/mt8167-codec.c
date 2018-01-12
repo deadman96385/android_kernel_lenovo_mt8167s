@@ -99,6 +99,7 @@ struct mt8167_codec_priv {
 	uint32_t loopback_type;
 	uint32_t ul_lr_swap_en;
 	uint32_t aif_tx_mux_sel;
+	uint32_t micbias0_settle_time_us;
 	struct clk *clk;
 #ifdef TIMESTAMP_INFO
 	uint64_t latency_cali_ldac_to_op;
@@ -636,6 +637,25 @@ static int mt8167_codec_ul_vref24_event(struct snd_soc_dapm_widget *w,
 			AUDIO_CODEC_CON00_AUDULL_VREF24_EN, 0x0);
 		snd_soc_update_bits(codec, AUDIO_CODEC_CON00,
 			AUDIO_CODEC_CON00_AUDULR_VREF24_EN, 0x0);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int mt8167_codec_micbias0_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
+	struct mt8167_codec_priv *codec_data = snd_soc_codec_get_drvdata(codec);
+
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		if (codec_data->micbias0_settle_time_us > 0)
+			usleep_range(codec_data->micbias0_settle_time_us,
+				     codec_data->micbias0_settle_time_us + 50);
 		break;
 	default:
 		break;
@@ -1554,8 +1574,8 @@ static const struct snd_soc_dapm_widget mt8167_codec_dapm_widgets[] = {
 	SND_SOC_DAPM_SUPPLY_S("DAC_CLK", 4, AUDIO_CODEC_CON02, 27, 0, NULL, 0),
 	SND_SOC_DAPM_SUPPLY_S("DL_VCM1", 4, AUDIO_CODEC_CON01, 13, 0, NULL, 0),
 	SND_SOC_DAPM_SUPPLY_S("DL_VCM2", 4, AUDIO_CODEC_CON02, 17, 0, NULL, 0),
-	SND_SOC_DAPM_SUPPLY_S("AU_MICBIAS0", 5,
-			AUDIO_CODEC_CON03, 17, 0, NULL, 0),
+	SND_SOC_DAPM_SUPPLY_S("AU_MICBIAS0", 5, AUDIO_CODEC_CON03, 17, 0,
+			mt8167_codec_micbias0_event, SND_SOC_DAPM_POST_PMU),
 	SND_SOC_DAPM_SUPPLY_S("AU_MICBIAS1", 5,
 			AUDIO_CODEC_CON03, 6, 0, NULL, 0),
 
@@ -2066,6 +2086,12 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 		(codec_data->headphone_cap_sel != HP_CAP_47UF)) {
 		codec_data->headphone_cap_sel = HP_CAP_22UF;
 	}
+
+	ret = of_property_read_u32(dev->of_node,
+				   "mediatek,micbias0-settle-time-us",
+				   &codec_data->micbias0_settle_time_us);
+	if (ret)
+		codec_data->micbias0_settle_time_us = 0;
 
 	return ret;
 }
