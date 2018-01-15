@@ -40,11 +40,38 @@ struct pt_resident *nandx_pmt_get_partition(u64 addr)
 	return NULL;
 }
 
+static int nandx_read_pmt_table(struct nandx_chip_info *info,
+				struct nandx_ops *ops)
+{
+	int ret;
+	u8 *buf = ops->data;
+	u32 temp;
+
+	ret = nandx_core_read(ops, 1, MODE_SLC);
+	if (ret < 0)
+		return ret;
+
+	if (!is_valid_pt(buf) && !is_valid_mpt(buf))
+		return 0;
+
+	temp = *((u32 *)buf + 1);
+	handler->sys_slc_ratio = (temp >> 16) & 0xFF;
+	handler->usr_slc_ratio = (temp) & 0xFF;
+	temp = /*PT_SIG_SIZE*/8;
+	memcpy(handler->pmt, buf + temp,
+		PART_MAX_COUNT * sizeof(struct pt_resident));
+	temp += PART_MAX_COUNT * sizeof(struct pt_resident);
+	memcpy(handler->block_bitmap, buf + temp,
+		div_up(info->block_num, 32) * sizeof(u32));
+
+	return 1;
+}
+
 int nandx_pmt_init(struct nandx_chip_info *info, u32 start_blk)
 {
 	struct pt_resident *pt;
 	struct nandx_ops ops;
-	u32 ppb = info->block_size / info->page_size;
+	u32 ppb, sppb;
 	u32 i, temp;
 	u8 *buf;
 	u32 *block_bitmap;
@@ -63,6 +90,9 @@ int nandx_pmt_init(struct nandx_chip_info *info, u32 start_blk)
 	memset(pt, 0, PART_MAX_COUNT * sizeof(struct pt_resident));
 	/* restore pt to do pmt release later */
 	handler->pmt = pt;
+
+	ppb = info->block_size / info->page_size;
+	sppb = ppb / info->wl_page_num;
 
 	temp = div_up(info->block_num, 32);
 	block_bitmap = mem_alloc(temp, sizeof(u32));
@@ -86,41 +116,50 @@ int nandx_pmt_init(struct nandx_chip_info *info, u32 start_blk)
 	nandx_get_device(FL_READING);
 
 	/* go to find valid pmt */
-	ops.row = start_blk * ppb;
 	ops.col = 0;
 	ops.len = info->page_size;
 	ops.data = buf;
 	ops.oob = NULL;
-	for (i = 0; i < PMT_POOL_SIZE * ppb; i++) {
-		if ((ops.row % ppb) == 0) {
-			ops.row = nandx_bmt_get_mapped_block(ops.row / ppb);
-			ops.row *= ppb;
+	ops.row = nandx_bmt_get_mapped_block(start_blk);
+	ops.row *= ppb;
+
+	for (i = 0; i < sppb; i++) {
+		ret = nandx_read_pmt_table(info, &ops);
+		if (ret < 0) {
+			ops.row++;
+			continue;
 		}
 
-		ret = nandx_core_read(&ops, 1, MODE_SLC);
-		if (ret < 0)
-			continue;
-
-		if (is_valid_pt(buf) || is_valid_mpt(buf)) {
+		if (ret > 0) {
 			pmt_found = true;
-			handler->pmt_page = is_valid_pt(buf) ? ops.row : 0;
-			handler->pmt_page %= ppb;
-			temp = *((u32 *)buf + 1);
-			handler->sys_slc_ratio = (temp >> 16) & 0xFF;
-			handler->usr_slc_ratio = (temp) & 0xFF;
-			temp = /*PT_SIG_SIZE*/8;
-			memcpy(pt, buf + temp,
-				PART_MAX_COUNT * sizeof(struct pt_resident));
-			temp += PART_MAX_COUNT * sizeof(struct pt_resident);
-			memcpy(block_bitmap, buf + temp,
-				div_up(info->block_num, 32) * sizeof(u32));
+			handler->pmt_page = i;
 		} else if (pmt_found) {
-			pr_info("find the latest %spt at page %d\n",
-				   is_valid_pt(buf) ? "" : "m", ops.row - 1);
 			break;
 		}
 
 		ops.row++;
+	}
+
+	if (!pmt_found) {
+		/* Not found main pmt, try to find mirror pmt */
+		ops.row = start_blk + 1;
+		ops.row = nandx_bmt_get_mapped_block(ops.row) * ppb;
+		ret = nandx_read_pmt_table(info, &ops);
+		if (ret > 0) {
+			pmt_found = true;
+			pr_info("find the latest mpt at page %d\n",
+				ops.row);
+			/* recovery main pmt from mirror pmt */
+			ops.row = nandx_bmt_get_mapped_block(start_blk) * ppb;
+			ret = nandx_core_erase(&ops.row, 1, MODE_SLC);
+			if (ret == 0) {
+				ret = nandx_core_write(&ops, 1, MODE_SLC);
+				if (ret == 0)
+					handler->pmt_page = 0;
+			}
+		}
+	} else {
+		pr_info("find the latest pt at page %d\n", ops.row - 1);
 	}
 
 	nandx_release_device();
@@ -165,11 +204,12 @@ int nandx_pmt_update(void)
 	struct nandx_chip_info *info;
 	struct nandx_ops ops;
 	u8 *buf;
-	u32 ppb, len = 0;
+	u32 ppb, sppb, len = 0;
 	int ret;
 
 	info = handler->info;
 	ppb = info->block_size / info->page_size;
+	sppb = ppb / info->wl_page_num;
 
 	buf = mem_alloc(1, info->page_size);
 	if (buf == NULL)
@@ -195,9 +235,9 @@ int nandx_pmt_update(void)
 	ops.len = info->page_size;
 	ops.data = buf;
 	ops.oob = NULL;
-	if (handler->pmt_page == (ppb - 1)) {
-		ops.row = nandx_bmt_get_mapped_block(handler->start_blk + 1);
-		ops.row *= ppb;
+	if (handler->pmt_page == sppb - 1) {
+		ops.row = handler->start_blk + 1;
+		ops.row = nandx_bmt_get_mapped_block(ops.row) * ppb;
 		ret = nandx_core_erase(&ops.row, 1, MODE_SLC);
 		if (ret) {
 			pr_err("erase mpt failed!\n");
@@ -208,24 +248,27 @@ int nandx_pmt_update(void)
 				pr_err("write mpt fail\n");
 		}
 
-		ops.row = nandx_bmt_get_mapped_block(handler->start_blk) * ppb;
+		ops.row = handler->start_blk;
+		ops.row = nandx_bmt_get_mapped_block(ops.row) * ppb;
 		ret = nandx_core_erase(&ops.row, 1, MODE_SLC);
 		if (ret) {
 			pr_err("erase pt block failed!\n");
 			goto release_device;
 		}
+
+		handler->pmt_page = 0;
+	} else {
+		handler->pmt_page++;
 	}
 
-	handler->pmt_page++;
-	handler->pmt_page %= ppb;
-
 	*(u32 *)buf = PT_SIG;
-	ops.row = nandx_bmt_get_mapped_block(handler->start_blk) * ppb;
+	ops.row = handler->start_blk;
+	ops.row = nandx_bmt_get_mapped_block(ops.row) * ppb;
 	ops.row += handler->pmt_page;
 	ret = nandx_core_write(&ops, 1, MODE_SLC);
 	if (ret)
 		pr_err("write pt failed at page %d!\n",
-			    ops.row);
+			ops.row);
 
 release_device:
 	nandx_release_device();
