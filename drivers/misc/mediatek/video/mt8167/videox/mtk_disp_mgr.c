@@ -536,9 +536,11 @@ int _ioctl_trigger_session(unsigned long arg)
 			mmprofile_log_ex(ddp_mmp_get_events()->present_fence_set, MMPROFILE_FLAG_PULSE,
 				       config.present_fence_idx, 0);
 		}
-		dprec_trigger(&session_info->event_trigger, 5, 0);
+		if (session_info)
+			dprec_trigger(&session_info->event_trigger, 5, 0);
 		primary_display_merge_session_cmd(&config);
-		dprec_trigger(&session_info->event_trigger, 5, 10);
+		if (session_info)
+			dprec_trigger(&session_info->event_trigger, 5, 10);
 		primary_display_trigger(0, NULL, 0);
 	} else if (DISP_SESSION_TYPE(session_id) == DISP_SESSION_EXTERNAL) {
 #if defined(CONFIG_MTK_HDMI_SUPPORT) || defined(CONFIG_MTK_EPD_SUPPORT)
