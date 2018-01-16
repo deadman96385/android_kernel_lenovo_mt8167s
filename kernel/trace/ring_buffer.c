@@ -1173,7 +1173,7 @@ static int __rb_allocate_pages(long nr_pages, struct list_head *pages, int cpu)
 			goto free_pages;
 #else
 		page = alloc_pages_node(cpu_to_node(cpu),
-					GFP_KERNEL | __GFP_NORETRY, 0);
+				__GFP_IO | __GFP_FS | __GFP_NORETRY, 0);
 		if (!page)
 			goto free_pages;
 		bpage->page = page_address(page);
