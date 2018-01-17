@@ -2010,13 +2010,12 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 				__func__, modules_dt_regmap_str[i]);
 			devm_kfree(dev, codec_data);
 			ret = -EPROBE_DEFER;
-			break;
+			return ret;
 		}
 	}
 
-	ret = of_property_read_u32(dev->of_node, "mediatek,dmic-wire-mode",
-				&codec_data->dmic_wire_mode);
-	if (ret) {
+	if (of_property_read_u32(dev->of_node, "mediatek,dmic-wire-mode",
+				&codec_data->dmic_wire_mode)) {
 		dev_warn(dev, "%s fail to read dmic-wire-mode in node %s\n",
 			__func__, dev->of_node->full_name);
 		codec_data->dmic_wire_mode = DMIC_ONE_WIRE;
@@ -2043,9 +2042,8 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 		(codec_data->dmic_rate_mode != DMIC_RATE_D3P25M))
 		codec_data->dmic_rate_mode = DMIC_RATE_D1P625M;
 
-	ret = of_property_read_u32(dev->of_node, "mediatek,headphone-cap-sel",
-				&codec_data->headphone_cap_sel);
-	if (ret) {
+	if (of_property_read_u32(dev->of_node, "mediatek,headphone-cap-sel",
+				&codec_data->headphone_cap_sel)) {
 		dev_warn(dev, "%s fail to read headphone-cap-sel in node %s\n",
 			__func__, dev->of_node->full_name);
 		codec_data->headphone_cap_sel = HP_CAP_22UF;
@@ -2056,10 +2054,9 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 		codec_data->headphone_cap_sel = HP_CAP_22UF;
 	}
 
-	ret = of_property_read_u32(dev->of_node,
+	if (of_property_read_u32(dev->of_node,
 				   "mediatek,micbias0-settle-time-us",
-				   &codec_data->micbias0_settle_time_us);
-	if (ret)
+				   &codec_data->micbias0_settle_time_us))
 		codec_data->micbias0_settle_time_us = 0;
 
 	return ret;
