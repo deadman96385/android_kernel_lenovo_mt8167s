@@ -1952,6 +1952,7 @@ void ged_kpi_set_game_hint(int mode)
 /* ----------------------------------------------------------------------------- */
 void ged_kpi_set_target_FPS(u64 ulID, int target_FPS)
 {
+#ifdef MTK_GED_KPI
 	GED_KPI_HEAD *psHead;
 
 	psHead = (GED_KPI_HEAD *)ged_hashtable_find(gs_hashtable, (unsigned long)ulID);
@@ -1962,6 +1963,7 @@ void ged_kpi_set_target_FPS(u64 ulID, int target_FPS)
 #ifdef GED_KPI_DEBUG
 	else
 		GED_LOGE("%s: no such renderer for BQ_ID: %llu\n", __func__, ulID);
+#endif
 #endif
 }
 EXPORT_SYMBOL(ged_kpi_set_target_FPS);
