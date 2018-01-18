@@ -2041,7 +2041,7 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 				__func__, modules_dt_regmap_str[i]);
 			devm_kfree(dev, codec_data);
 			ret = -EPROBE_DEFER;
-			break;
+			return ret;
 		}
 	}
 
@@ -2093,7 +2093,7 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 	if (ret)
 		codec_data->micbias0_settle_time_us = 0;
 
-	return ret;
+	return 0;
 }
 
 static int mt8167_codec_probe(struct snd_soc_codec *codec)
