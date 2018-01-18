@@ -313,6 +313,9 @@ typedef struct _RGXFWIF_HWRTDATA_
 #else
 	RGXFWIF_DEV_VIRTADDR				pui32OwnerTANotUsedByHost;
 #endif
+#if defined(FIX_HW_BRN_65101)
+	IMG_BOOL							bNeedBRN65101Blit;
+#endif
 } UNCACHED_ALIGN RGXFWIF_HWRTDATA;
 
 typedef enum
