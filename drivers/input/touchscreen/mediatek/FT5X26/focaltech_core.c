@@ -879,15 +879,12 @@ static void tpd_down(int x, int y, int p, int id)
 #else
 	{
 #endif
-#if defined(CONFIG_MTK_LCM_PHYSICAL_ROTATION) \
-	&& defined(CONFIG_TOUCHSCREEN_FT5X26_WUXGA) \
-	&& defined(CONFIG_ARCH_MTK_PROJECT)
-		if ((strncmp(CONFIG_MTK_LCM_PHYSICAL_ROTATION, "270", 3) == 0)
-			&& (strncmp(CONFIG_ARCH_MTK_PROJECT, "tb8167p5_64_bsp", 15) == 0)) {
+#if defined(CONFIG_TOUCHSCREEN_FT5X26_WUXGA) && defined(CONFIG_ARCH_MTK_PROJECT)
+		if (strncmp(CONFIG_ARCH_MTK_PROJECT, "tb8167p5_64_bsp", 15) == 0) {
 			/* check resolution before rotate */
 			TPD_RES_X = tpd_dts_data.tpd_resolution[0];
 			TPD_RES_Y = tpd_dts_data.tpd_resolution[1];
-			tpd_rotate_270(&x, &y);
+			tpd_rotate_90(&x, &y);
 		}
 #endif
 		input_report_abs(tpd->dev, ABS_MT_TRACKING_ID, id);
@@ -895,7 +892,7 @@ static void tpd_down(int x, int y, int p, int id)
 		input_report_abs(tpd->dev, ABS_MT_TOUCH_MAJOR, 1);
 		input_report_abs(tpd->dev, ABS_MT_POSITION_X, x);
 		input_report_abs(tpd->dev, ABS_MT_POSITION_Y, y);
-		FTS_DBG("fts report zuobiao %s x:%d y:%d p:%d\n", __func__, x, y, p);
+		FTS_DBG("fts report coordinate %s x:%d y:%d p:%d\n", __func__, x, y, p);
 		input_mt_sync(tpd->dev);
 
 	}
