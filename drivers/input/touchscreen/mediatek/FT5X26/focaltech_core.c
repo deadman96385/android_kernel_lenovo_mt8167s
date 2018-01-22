@@ -475,6 +475,12 @@ void tpd_rotate_270(int *x, int *y)
 	tpd_swap_xy(x, y);
 }
 
+void tpd_vertical_to_landscape(int *x, int *y)
+{
+	*x = (*x * TPD_RES_Y) / TPD_RES_X;
+	*y = (*y * TPD_RES_X) / TPD_RES_Y;
+}
+
 struct touch_info {
 	int y[TPD_SUPPORT_POINTS];
 	int x[TPD_SUPPORT_POINTS];
@@ -885,6 +891,7 @@ static void tpd_down(int x, int y, int p, int id)
 			TPD_RES_X = tpd_dts_data.tpd_resolution[0];
 			TPD_RES_Y = tpd_dts_data.tpd_resolution[1];
 			tpd_rotate_90(&x, &y);
+			tpd_vertical_to_landscape(&x, &y);
 		}
 #endif
 		input_report_abs(tpd->dev, ABS_MT_TRACKING_ID, id);
