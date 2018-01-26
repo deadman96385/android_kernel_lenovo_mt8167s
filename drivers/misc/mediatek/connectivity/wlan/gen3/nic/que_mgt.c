@@ -6326,9 +6326,12 @@ BOOLEAN qmHandleRxReplay(P_ADAPTER_T prAdapter, P_SW_RFB_T prSwRfb)
 	/* BMC only need check CCMP and TKIP Cipher suite */
 	prRxStatus = prSwRfb->prRxStatus;
 	ucSecMode = HAL_RX_STATUS_GET_SEC_MODE(prRxStatus);
-	if (ucSecMode != CIPHER_SUITE_CCMP
-		&& ucSecMode != CIPHER_SUITE_TKIP) {
-		DBGLOG_LIMITED(QM, TRACE, "SecMode: %d and CipherGroup: %d, no need check replay\n",
+
+	prGlueInfo = prAdapter->prGlueInfo;
+	prWpaInfo = &prGlueInfo->rWpaInfo;
+
+	if (ucSecMode != CIPHER_SUITE_CCMP && ucSecMode != CIPHER_SUITE_TKIP) {
+		DBGLOG_LIMITED(QM, LOUD, "SecMode: %d and CipherGroup: %d, no need check replay\n",
 				ucSecMode, prWpaInfo->u4CipherGroup);
 		return FALSE;
 	}
@@ -6339,8 +6342,6 @@ BOOLEAN qmHandleRxReplay(P_ADAPTER_T prAdapter, P_SW_RFB_T prSwRfb)
 		return TRUE;
 	}
 
-	prGlueInfo = prAdapter->prGlueInfo;
-	prWpaInfo = &prGlueInfo->rWpaInfo;
 	prDetRplyInfo = &prGlueInfo->prDetRplyInfo;
 	/* TODO : Need check fw rekey while fw rekey event. */
 	if (ucKeyID != prDetRplyInfo->ucCurKeyId) {
