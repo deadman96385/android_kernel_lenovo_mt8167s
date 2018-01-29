@@ -2039,7 +2039,6 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 		if (!codec_data->regmap_modules[i]) {
 			dev_err(dev, "%s failed to get %s\n",
 				__func__, modules_dt_regmap_str[i]);
-			devm_kfree(dev, codec_data);
 			ret = -EPROBE_DEFER;
 			return ret;
 		}
