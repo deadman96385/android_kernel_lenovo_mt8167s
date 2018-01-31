@@ -1173,7 +1173,7 @@ static int __rb_allocate_pages(long nr_pages, struct list_head *pages, int cpu)
 			goto free_pages;
 #else
 		page = alloc_pages_node(cpu_to_node(cpu),
-				__GFP_IO | __GFP_FS | __GFP_NORETRY, 0);
+				GFP_KERNEL | __GFP_NORETRY, 0);
 		if (!page)
 			goto free_pages;
 		bpage->page = page_address(page);
@@ -1697,7 +1697,8 @@ int ring_buffer_resize(struct ring_buffer *buffer, unsigned long size,
 		nr_pages = 2;
 
 	size = nr_pages * BUF_PAGE_SIZE;
-
+	if (nr_pages > 2097152)
+		return  -ENOMEM;
 	/*
 	 * Don't succeed if resizing is disabled, as a reader might be
 	 * manipulating the ring buffer and is expecting a sane state while
