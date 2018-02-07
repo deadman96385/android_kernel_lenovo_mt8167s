@@ -129,7 +129,8 @@ int nandx_chip_calibration(struct nandx_chip *chip);
 
 
 int setup_read_retry(struct nandx_chip *chip, int count);
-int nandx_chip_read_retry(struct nandx_chip *chip, struct nandx_ops *ops);
+int nandx_chip_read_retry(struct nandx_chip *chip,
+				struct nandx_ops *ops, int *count);
 int nandx_bad_block_check(struct nandx_chip *chip, u32 row,
 				enum BAD_BLOCK_TYPE type);
 struct read_retry_ops *get_read_retry_ops(struct nandx_device_info *dev_info);

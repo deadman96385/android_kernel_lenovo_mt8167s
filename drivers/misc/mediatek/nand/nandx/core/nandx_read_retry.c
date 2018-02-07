@@ -986,14 +986,14 @@ int setup_read_retry(struct nandx_chip *chip, int count)
 	return 0;
 }
 
-int nandx_chip_read_retry(struct nandx_chip *chip, struct nandx_ops *ops)
+int nandx_chip_read_retry(struct nandx_chip *chip,
+				struct nandx_ops *ops, int *count)
 {
 	int ret = 0, num;
-	u16 count, rr_loop_count;
+	u16 rr_loop_count;
 	u8 param[RR_MAX_PARAM_NUM] = {0};
 	struct read_retry_ops *rr_ops = chip->rr_ops;
 
-	pr_debug("%s: in\n", __func__);
 	if (!rr_ops) {
 		ops->status = -ENANDREAD;
 		return -ENANDREAD;
@@ -1004,22 +1004,24 @@ int nandx_chip_read_retry(struct nandx_chip *chip, struct nandx_ops *ops)
 
 	rr_ops->entry(chip);
 
-	for (count = 0; count <= rr_loop_count; count++) {
+	for (*count = 0; *count <= rr_loop_count; (*count)++) {
 		rr_ops->get_parameters(chip, param);
 		rr_ops->set_parameters(chip, param);
 		rr_ops->enable(chip);
-		if (count == 0) {
+		if (*count == 0) {
 			nandx_chip_read_page(chip, ops->row);
 			continue;
 		}
-		if (count == rr_loop_count)
+		if (*count == rr_loop_count)
 			nandx_chip_cache_read_last_page(chip);
 		else
 			nandx_chip_cache_read_page(chip, ops->row);
 		if (chip->randomize)
 			nandx_chip_enable_randomizer(chip, ops->row, false);
+
 		nandx_chip_random_output(chip, ops->row, ops->col);
 		ret = nandx_chip_read_data(chip, num, ops->data, ops->oob);
+
 		if (chip->randomize)
 			nandx_chip_disable_randomizer(chip);
 		if (ret != -ENANDREAD) {
@@ -1029,6 +1031,8 @@ int nandx_chip_read_retry(struct nandx_chip *chip, struct nandx_ops *ops)
 	}
 
 	rr_ops->exit(chip);
+
+	pr_info("nandx-rr2 %d %d\n", *count, ret);
 
 	ops->status = ret;
 	return ret;

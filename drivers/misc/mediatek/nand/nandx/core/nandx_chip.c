@@ -16,18 +16,27 @@
 #include "nandx_chip.h"
 #include "nandx_chip_common.h"
 
-static int nandx_chip_get_status(struct nandx_chip *chip, int status)
+static int nandx_chip_get_status(struct nandx_chip *chip,
+				int status, int count)
 {
-	int threshold;
+	int threshold, rr_count;
 	struct nandx_device_info *dev_info = chip->dev_info;
+	struct read_retry_ops *rr_ops = chip->rr_ops;
 
 	if (status <= 0)
 		return status;
 
-	threshold = chip->slc_mode ? dev_info->slc_life.bitflips_threshold :
-		    dev_info->xlc_life.bitflips_threshold;
+	threshold = dev_info->xlc_life.bitflips_threshold;
+	rr_count = rr_ops->loop_count >> 1;
+	if (chip->slc_mode) {
+		threshold = dev_info->slc_life.bitflips_threshold;
+		rr_count = rr_ops->slc_loop_count >> 1;
+	}
 
 	if (status >= threshold)
+		return -ENANDFLIPS;
+
+	if (count >= rr_count)
 		return -ENANDFLIPS;
 
 	return NAND_OK;
@@ -64,8 +73,10 @@ retry:
 			rr_count++;
 			goto retry;
 		}
+		pr_err("nandx-rr1 %d %d\n", rr_count, ret);
 		setup_read_retry(chip, -1);
 	} else if (rr_count > 0) {
+		pr_info("nandx-rr1 %d %d\n", rr_count, ret);
 		setup_read_retry(chip, -1);
 	}
 
@@ -82,7 +93,7 @@ retry:
 		chip->calibration = false;
 	}
 
-	ops->status = nandx_chip_get_status(chip, ret);
+	ops->status = nandx_chip_get_status(chip, ret, rr_count);
 	return ops->status;
 }
 
@@ -92,7 +103,7 @@ static int nandx_chip_cache_read(struct nandx_chip_dev *chip_dev,
 {
 	int ret = NAND_OK, status = NAND_OK;
 	bool last_rr = false;
-	int i, num, col;
+	int i, num, col, rr_count;
 	u32 row;
 	void *data, *oob;
 	struct nandx_chip *chip;
@@ -135,7 +146,7 @@ calibration:
 			/* read read retry */
 			nandx_chip_cache_read_last_page(chip);
 			/* need to delay? or read status? */
-			ret = nandx_chip_read_retry(chip, ops_list[i - 1]);
+			ret = nandx_chip_read_retry(chip, ops_list[i - 1], &rr_count);
 			if (ret == -ENANDREAD)
 				break;
 			if (i == count)
@@ -146,7 +157,7 @@ calibration:
 			row = ops_list[i]->row;
 			nandx_chip_read_page(chip, row);
 		}
-		ops_list[i - 1]->status = nandx_chip_get_status(chip, ret);
+		ops_list[i - 1]->status = nandx_chip_get_status(chip, ret, rr_count);
 		status = MIN(ops_list[i - 1]->status, status);
 	}
 
@@ -169,8 +180,8 @@ calibration:
 static int nandx_chip_multi_read(struct nandx_chip_dev *chip_dev,
 				 struct nandx_ops **ops_list, int count)
 {
-	int ret, col;
-	int i, j, num;
+	int ret, col, status;
+	int i, j, num, rr_count;
 	u32 row;
 	void *data, *oob;
 	struct nandx_chip *chip;
@@ -206,10 +217,13 @@ calibration:
 			ret = nandx_chip_read_data(chip, num, data, oob);
 			if (ret == -ENANDREAD)
 				ret = nandx_chip_read_retry(chip,
-							ops_list[i + j]);
+							ops_list[i + j], &rr_count);
+			ops_list[i + j]->status =
+				nandx_chip_get_status(chip, ret, rr_count);
+			status = MIN(ops_list[i + j]->status, status);
 		}
 
-		if (ret == -ENANDREAD)
+		if (status == -ENANDREAD)
 			break;
 	}
 
@@ -226,15 +240,15 @@ calibration:
 		chip->calibration = false;
 	}
 
-	return ret;
+	return status;
 }
 
 
 static int nandx_chip_multi_cache_read(struct nandx_chip_dev *chip_dev,
 				       struct nandx_ops **ops_list, int count)
 {
-	int ret, col;
-	int i, j, num;
+	int ret, col, status;
+	int i, j, num, rr_count;
 	u32 row;
 	void *data, *oob;
 	struct nandx_chip *chip;
@@ -276,14 +290,16 @@ calibration:
 			ret = nandx_chip_read_data(chip, num, data, oob);
 			if (ret == -ENANDREAD) {
 				ops = ops_list[i + j];
-				ret = nandx_chip_read_retry(chip, ops);
+				ret = nandx_chip_read_retry(chip, ops, &rr_count);
 				if (ret == -ENANDREAD)
 					break;
 				/* break cache read ? */
 			}
+			ops->status = nandx_chip_get_status(chip, ret, rr_count);
+			status = MIN(ops->status, status);
 		}
 
-		if (ret == -ENANDREAD)
+		if (status == -ENANDREAD)
 			break;
 	}
 
@@ -300,7 +316,7 @@ calibration:
 		chip->calibration = false;
 	}
 
-	return ret;
+	return status;
 }
 
 static int nandx_chip_program(struct nandx_chip_dev *chip_dev,
@@ -591,6 +607,7 @@ static int nandx_chip_multi_cache_program(struct nandx_chip_dev *chip_dev,
 
 	return ret;
 }
+
 
 static int nandx_chip_erase(struct nandx_chip_dev *chip_dev, u32 row)
 {
