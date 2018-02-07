@@ -770,7 +770,7 @@ u8 nfc_read_byte(struct nfc_handler *handler)
 		 * set to max sector to allow the HW to continue reading over
 		 * unaligned accesses
 		 */
-		reg = (MTK_MAX_SECTOR << CON_SEC_SHIFT) | CON_BRD;
+		reg = (MTK_MAX_SECTOR << CON_SEC_SHIFT) | CON_BRD | CON_BWR;
 		nfi_writel(info, reg, NFI_CON);
 
 		/* trigger to fetch data */
@@ -793,7 +793,7 @@ void nfc_write_byte(struct nfc_handler *handler, u8 data)
 		reg = nfi_readw(info, NFI_CNFG) | CNFG_BYTE_RW;
 		nfi_writew(info, reg, NFI_CNFG);
 
-		reg = MTK_MAX_SECTOR << CON_SEC_SHIFT | CON_BWR;
+		reg = MTK_MAX_SECTOR << CON_SEC_SHIFT | CON_BWR | CON_BRD;
 		nfi_writel(info, reg, NFI_CON);
 
 		nfi_writew(info, STAR_EN, NFI_STRDATA);
@@ -872,7 +872,7 @@ int nfc_read_sectors(struct nfc_handler *handler, int num, u8 *data,
 		nfi_writew(info, INTR_AHB_DONE_EN, NFI_INTR_EN);
 	}
 
-	reg = nfi_readl(info, NFI_CON) | CON_BRD;
+	reg = nfi_readl(info, NFI_CON) | CON_BRD | CON_BWR;
 	nfi_writel(info, reg, NFI_CON);
 	/* trigger to read */
 	nfi_writew(info, STAR_EN, NFI_STRDATA);
@@ -1052,7 +1052,7 @@ int nfc_write_page(struct nfc_handler *handler, u8 *data, u8 *fdm)
 		nfi_writew(info, INTR_AHB_DONE_EN, NFI_INTR_EN);
 	}
 
-	reg = nfi_readl(info, NFI_CON) | CON_BWR;
+	reg = nfi_readl(info, NFI_CON) | CON_BWR | CON_BRD;
 	nfi_writel(info, reg, NFI_CON);
 	/* trigger to write */
 	nfi_writew(info, STAR_EN, NFI_STRDATA);
