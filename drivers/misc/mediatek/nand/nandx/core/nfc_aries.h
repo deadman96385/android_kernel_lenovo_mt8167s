@@ -90,6 +90,7 @@
 #define		BYPASS_MASTER_EN	BIT(15)
 #define NFI_MASTER_STA		(0x224)
 #define		MASTER_STA_MASK		(0x0FFF)
+#define		MASTER_BUS_BUSY		(0x3)
 #define NFI_SECCUS_SIZE		(0x22c)
 #define		SECCUS_SIZE_EN		BIT(17)
 #define NFI_RANDOM_CNFG		(0x238)
@@ -236,6 +237,7 @@ struct nfc_info {
 	/* irq done event */
 	void *nfi_done;
 	void *ecc_done;
+	bool ahb_irq_en; /* whether enable ahb done irq */
 
 	/* nfc capacities */
 	struct nfc_resource *res;

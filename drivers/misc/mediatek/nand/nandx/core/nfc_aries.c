@@ -821,10 +821,13 @@ int nfc_read_sectors(struct nfc_handler *handler, int num, u8 *data,
 	struct nfc_info *info = handler_to_info(handler);
 	u32 reg, dma_addr = 0, len = num * handler->sector_size;
 	u32 data_len, j, k;
-	bool autofmt = false, byterw;
+	bool autofmt = false, irq_en, byterw;
 	u8 *buf = data, *data_phy = data;
 	int i, err_sector = 0, ret = 0, bitflips = 0;
 	void *nfi_regs = info->res->nfi_regs;
+
+	/* enable irq if ahb_irq_en, irq_en and dma_en are all on */
+	irq_en = info->ahb_irq_en && info->mode.irq_en && info->mode.dma_en;
 
 	reg = nfi_readw(info, NFI_CNFG);
 	reg |= CNFG_READ_EN;
@@ -866,8 +869,7 @@ int nfc_read_sectors(struct nfc_handler *handler, int num, u8 *data,
 	/* setup read sector number */
 	nfi_writel(info, num << CON_SEC_SHIFT, NFI_CON);
 
-	/* enable irq if irq_en and dma_en are both on */
-	if (info->mode.irq_en && info->mode.dma_en) {
+	if (irq_en) {
 		nand_event_init(info->nfi_done);
 		nfi_writew(info, INTR_AHB_DONE_EN, NFI_INTR_EN);
 	}
@@ -918,7 +920,7 @@ int nfc_read_sectors(struct nfc_handler *handler, int num, u8 *data,
 			goto err;
 	}
 
-	if (info->mode.irq_en && info->mode.dma_en) {
+	if (irq_en) {
 		ret = nand_event_wait_complete(info->nfi_done, MTK_TIMEOUT);
 		if (!ret) {
 			pr_err("read dma done timeout!\n");
@@ -931,6 +933,10 @@ int nfc_read_sectors(struct nfc_handler *handler, int num, u8 *data,
 
 	ret = readl_poll_timeout_atomic(nfi_regs + NFI_BYTELEN, reg,
 				 ADDRCNTR_SEC(reg) >= (u32)num, 2, MTK_TIMEOUT);
+	/* HW issue: if not wait ahb done, need polling bus busy extra */
+	if (ret == 0 && !irq_en)
+		ret = readl_poll_timeout_atomic(nfi_regs + NFI_MASTER_STA,
+				reg, !(reg & MASTER_BUS_BUSY), 2, MTK_TIMEOUT);
 	if (ret) {
 		pr_err("wait bytelen timeout %d\n",
 			   nfi_readl(info, NFI_BYTELEN));
@@ -1000,11 +1006,14 @@ int nfc_write_page(struct nfc_handler *handler, u8 *data, u8 *fdm)
 	u32 sectors = info->format.page_size / handler->sector_size;
 	u32 reg, data_len, dma_addr = 0, i;
 	u32 len = info->format.page_size;
-	bool autofmt = false, byterw;
+	bool autofmt = false, irq_en, byterw;
 	u8 *buf = data, *data_phy = data;
 	u32 *buf32 = (u32 *)buf;
 	int ret;
 	void *nfi_regs = info->res->nfi_regs;
+
+	/* enable irq if ahb_irq_en, irq_en and dma_en are all on */
+	irq_en = info->ahb_irq_en && info->mode.irq_en && info->mode.dma_en;
 
 	if (info->mode.ecc_en) {
 		/* If ecc is enabled, set AUTO_FORMAT */
@@ -1046,8 +1055,7 @@ int nfc_write_page(struct nfc_handler *handler, u8 *data, u8 *fdm)
 
 	nfi_writel(info, sectors << CON_SEC_SHIFT, NFI_CON);
 
-	/* enable irq if irq_en and dma_en are both on */
-	if (info->mode.irq_en && info->mode.dma_en) {
+	if (irq_en) {
 		nand_event_init(info->nfi_done);
 		nfi_writew(info, INTR_AHB_DONE_EN, NFI_INTR_EN);
 	}
@@ -1080,7 +1088,7 @@ int nfc_write_page(struct nfc_handler *handler, u8 *data, u8 *fdm)
 		}
 	}
 
-	if (info->mode.irq_en && info->mode.dma_en) {
+	if (irq_en) {
 		ret = nand_event_wait_complete(info->nfi_done, MTK_TIMEOUT);
 		if (!ret) {
 			pr_err("%s: dma timeout!\n",
@@ -1577,6 +1585,7 @@ struct nfc_handler *nfc_setup_hw(struct nfc_resource *res)
 	info->mode.ecc_en = true;
 	info->mode.dma_en = true;
 	info->mode.irq_en = false;
+	info->ahb_irq_en = false;
 
 	/* setup hw according to pdata */
 	info->res = res;
