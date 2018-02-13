@@ -40,6 +40,8 @@ static bool should_close_block(void);
 static bool is_ewrite_block(struct mtk_nand_chip_info *info,
 		struct worklist_ctrl *list_ctrl, u32 block);
 
+static void dump_block_bitmap(void);
+
 /*********	MTK Nand Driver Related Functnions *********/
 
 /* mtk_isbad_block
@@ -1224,7 +1226,7 @@ static void mtk_nand_dump_chip_info(struct mtk_nand_chip_info *chip_info)
 static void mtk_nand_dump_partition_info(
 		struct nand_ftl_partition_info *partition_info)
 {
-	pr_debug("nand_ftl_partition_info dump info here\n");
+	pr_debug("nand_ftl_partition_info dump:\n");
 	pr_debug("start_block: %d\n", partition_info->start_block);
 	pr_debug("total_block: %d\n", partition_info->total_block);
 	pr_debug("slc_ratio: %d\n", partition_info->slc_ratio);
@@ -1235,7 +1237,7 @@ static void mtk_nand_dump_bmt_info(struct data_bmt_struct *data_bmt)
 {
 	u32 i;
 
-	pr_debug("nand_ftl_partition_info dump info here\n");
+	pr_debug("nand_ftl_bmt_info dump:\n");
 	pr_debug("bad_count: %d\n", data_bmt->bad_count);
 	pr_debug("start_block: %d\n", data_bmt->start_block);
 	pr_debug("end_block: %d\n", data_bmt->end_block);
@@ -1307,6 +1309,7 @@ int mtk_nand_chip_read_page(struct mtk_nand_chip_info *info,
 	if (!block_page_num_is_valid(info, block, page)) {
 		pr_err("%s: block or page is invalid:block:%d, page:%d\n",
 			    __func__, block, page);
+		dump_block_bitmap();
 		dump_stack();
 		return -EINVAL;
 	}
@@ -1420,6 +1423,7 @@ int mtk_nand_chip_write_page(struct mtk_nand_chip_info *info,
 	if (!block_page_num_is_valid(info, block, page)) {
 		pr_err("%s: block or page is invalid:block:%d, page:%d\n",
 			    __func__, block, page);
+		dump_block_bitmap();
 		return -EINVAL;
 	}
 
@@ -1489,6 +1493,7 @@ int mtk_nand_chip_erase_block(struct mtk_nand_chip_info *info,
 
 	if (!block_num_is_valid(info, block)) {
 		pr_err("block num is invalid:block:%d\n", block);
+		dump_block_bitmap();
 		return -EINVAL;
 	}
 
@@ -1713,6 +1718,24 @@ void mtk_nand_update_call_trace(unsigned int *address, char type,
 }
 EXPORT_SYMBOL(mtk_nand_update_call_trace);
 
+
+static void dump_block_bitmap(void)
+{
+	int i, num;
+	struct mtk_nand_chip_info *info = &data_info->chip_info;
+
+	num = info->data_block_num + info->log_block_num;
+	num = div_up(num, 32) * info->plane_num;
+
+	for (i = 0; i < num; i++) {
+		pr_info("%08x ", info->block_type_bitmap[i]);
+		if ((i + 1) % 16 == 0)
+			pr_info("\n");
+	}
+	pr_info("\n");
+}
+
+#if 0
 void dump_block_bit_map(u8 *array)
 {
 	int i, j;
@@ -1736,6 +1759,7 @@ void dump_block_bit_map(u8 *array)
 		}
 	}
 }
+#endif
 
 int mtk_nand_update_block_type(int num, unsigned int *blk)
 {
@@ -1745,7 +1769,7 @@ int mtk_nand_update_block_type(int num, unsigned int *blk)
 
 	nandx_get_device(FL_ERASING);
 	for (i = 0; i < num; i++) {
-		pr_debug("%s: erase block %d\n",
+		pr_info("%s: erase block %d\n",
 			    __func__, blk[i]);
 		row = (blk[i] + data_info->bmt.start_block) *
 			info->data_page_num;
