@@ -23,6 +23,9 @@ static int nandx_chip_get_status(struct nandx_chip *chip,
 	struct nandx_device_info *dev_info = chip->dev_info;
 	struct read_retry_ops *rr_ops = chip->rr_ops;
 
+	if (status == -ETIMEDOUT)
+		return -ENANDREAD;
+
 	if (status <= 0)
 		return status;
 
