@@ -283,7 +283,7 @@ static int nandx_ops_rw(struct nandx_core *ncore,
 		 *	erase_size = info->block_size / info->wl_page_num;
 		 */
 		nandx_ops_addr_transfer(ncore, addr, &block, &map_block);
-		map_addr = map_block * info->block_size +
+		map_addr = (long long)map_block * info->block_size +
 			   reminder(addr, erase_size);
 
 		wrap.offs = map_addr;
