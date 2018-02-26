@@ -1033,9 +1033,6 @@ int nfc_write_page(struct nfc_handler *handler, u8 *data, u8 *fdm)
 	}
 
 	if (info->mode.dma_en) {
-		if (!virt_addr_valid(data))
-			data_phy = info->buf;
-
 		reg = nfi_readw(info, NFI_CNFG);
 		reg |= CNFG_DMA_BURST_EN | CNFG_AHB;
 		nfi_writew(info, reg, NFI_CNFG);
@@ -1043,6 +1040,12 @@ int nfc_write_page(struct nfc_handler *handler, u8 *data, u8 *fdm)
 		/* dma address mapping */
 		if (!info->mode.ecc_en)
 			len += sectors * handler->spare_size;
+
+		if (!virt_addr_valid(data)) {
+			data_phy = info->buf;
+			memcpy(data_phy, data, len);
+		}
+
 		/* dma address mapping */
 		dma_addr = nand_dma_map(info->res->dev, (void *)data_phy,
 					(u64)len, NDMA_TO_DEV);
@@ -1101,12 +1104,9 @@ int nfc_write_page(struct nfc_handler *handler, u8 *data, u8 *fdm)
 		nfc_dump_register(info);
 	}
 
-	if (info->mode.dma_en) {
+	if (info->mode.dma_en)
 		nand_dma_unmap(info->res->dev, data_phy, dma_addr, (u64)len,
 			       NDMA_TO_DEV);
-		if (data_phy != data)
-			memcpy(data, data_phy, len);
-	}
 
 	/* disable nfi */
 	nfi_writel(info, 0, NFI_CON);
@@ -1437,8 +1437,10 @@ int nfc_calculate_ecc(struct nfc_handler *handler, u8 *data, u8 *ecc, u32 len,
 	int ret;
 
 	if (info->mode.dma_en) {
-		if (!virt_addr_valid(data))
+		if (!virt_addr_valid(data)) {
 			data_phy = info->buf;
+			memcpy(data_phy, data, len);
+		}
 
 		/* dma address mapping */
 		dma_addr = nand_dma_map(info->res->dev, (void *)data_phy,
@@ -1475,12 +1477,9 @@ int nfc_calculate_ecc(struct nfc_handler *handler, u8 *data, u8 *ecc, u32 len,
 
 	ecc_wait_idle(info, ECC_ENCODE);
 
-	if (info->mode.dma_en) {
+	if (info->mode.dma_en)
 		nand_dma_unmap(info->res->dev, data_phy, dma_addr, (u64)len,
 			       NDMA_TO_DEV);
-		if (data_phy != data)
-			memcpy(data, data_phy, len);
-	}
 
 	/* get ecc parity data */
 	ecc_len = (ecc_strength * ECC_PARITY_BITS + 7) >> 3;
@@ -1512,8 +1511,11 @@ int nfc_correct_ecc(struct nfc_handler *handler, u8 *data, u32 len,
 	int ret;
 
 	if (info->mode.dma_en) {
-		if (!virt_addr_valid(data))
+		if (!virt_addr_valid(data)) {
 			data_phy = info->buf;
+			memcpy(data_phy, data, len);
+		}
+
 		/* dma address mapping */
 		dma_addr = nand_dma_map(info->res->dev, (void *)data,
 					(u64)len, NDMA_TO_DEV);
@@ -1548,8 +1550,6 @@ int nfc_correct_ecc(struct nfc_handler *handler, u8 *data, u32 len,
 		ret = ecc_wait_done(info);
 		nand_dma_unmap(info->res->dev, data, dma_addr, (u64)len,
 			       NDMA_TO_DEV);
-		if (data_phy != data)
-			memcpy(data, data_phy, len);
 	}
 
 	ecc_disable(info);
