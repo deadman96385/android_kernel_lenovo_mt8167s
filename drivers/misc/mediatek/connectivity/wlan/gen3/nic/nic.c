@@ -1485,6 +1485,7 @@ WLAN_STATUS nicDeactivateNetwork(IN P_ADAPTER_T prAdapter, IN UINT_8 ucBssIndex)
 
 	rCmdActivateCtrl.ucBssIndex = ucBssIndex;
 	rCmdActivateCtrl.ucActive = 0;
+	rCmdActivateCtrl.ucNetworkType = (UINT_8) prBssInfo->eNetworkType;
 	/* rCmdActivateCtrl.ucBMCWlanIndex = prBssInfo->ucBMCWlanIndex; */
 
 #if DBG
