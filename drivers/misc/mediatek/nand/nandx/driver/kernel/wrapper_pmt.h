@@ -58,7 +58,9 @@ struct DM_PARTITION_INFO_PACKET {
 	struct DM_PARTITION_INFO part_info[PART_MAX_COUNT];
 };
 
+#ifdef CONFIG_DUM_CHAR_V2
 extern struct excel_info PartInfo[];
+#endif
 
 int nandx_pmt_register(struct mtd_info *mtd);
 void nandx_pmt_unregister(void);

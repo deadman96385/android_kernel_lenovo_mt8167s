@@ -221,11 +221,13 @@ int nandx_pmt_register(struct mtd_info *mtd)
 			name[j] = tolower(pt->name[j]);
 		}
 
+#ifdef CONFIG_DUM_CHAR_V2
 		/* setup PartInfo */
 		PartInfo[i].name = name;
 		PartInfo[i].type = NAND;
 		PartInfo[i].start_address = offset;
 		PartInfo[i].size = size;
+#endif
 
 		/* setup eraseregions */
 		mtd->eraseregions[i].offset = offset;
