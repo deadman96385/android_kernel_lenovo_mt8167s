@@ -176,7 +176,7 @@ static int do_ops_read(struct nandx_chip_dev *chip,
 		oops_t.data = mem_alloc(1, oops_t.len);
 		if (!oops_t.data) {
 			ret = -ENOMEM;
-			goto err_h;
+			goto err;
 		}
 		oops_t.oob = pops_t->oob;
 		ops_list[count - 1] = &oops_t;
@@ -185,8 +185,6 @@ static int do_ops_read(struct nandx_chip_dev *chip,
 	}
 
 	ret = do_chip_read_page(chip, ops_list, count, multi, cache);
-	if (ret < 0 && ret != -ENANDFLIPS)
-		goto err_t;
 
 	if (pops_h) {
 		memcpy(pops_h->data, oops_h.data + pops_h->col - oops_h.col,
@@ -198,10 +196,9 @@ static int do_ops_read(struct nandx_chip_dev *chip,
 		pops_t->status = oops_t.status;
 	}
 
-err_t:
+err:
 	if (pops_t)
 		mem_free(oops_t.data);
-err_h:
 	if (pops_h)
 		mem_free(oops_h.data);
 

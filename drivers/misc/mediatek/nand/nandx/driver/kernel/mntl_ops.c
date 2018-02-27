@@ -541,9 +541,9 @@ static u32 do_mlc_multi_plane_write(struct mtk_nand_chip_info *info,
 
 	nandx_get_device(FL_WRITING);
 
-	if (count != info->max_keep_pages) {
-		pr_err("%s: count:%d max:%d\n",
-			  __func__, count, info->max_keep_pages);
+	if (count != info->max_keep_pages && count != info->plane_num) {
+		pr_err("%s: count:%d max:%d(or %d)\n",
+			  __func__, count, info->max_keep_pages, info->plane_num);
 		goto err;
 	}
 
@@ -568,6 +568,8 @@ static u32 do_mlc_multi_plane_write(struct mtk_nand_chip_info *info,
 		work = get_list_work(item);
 		ops = &work->ops;
 		item = item->next;
+		if (i == 0)
+			mode |= is_slc_block(info, ops->block) ? MODE_SLC : 0;
 		block_num = ops->block + data_info->bmt.start_block;
 		ops_table[i].row = block_num * info->data_page_num + ops->page;
 		ops_table[i].col = 0;
@@ -616,9 +618,9 @@ static u32 do_tlc_write(struct mtk_nand_chip_info *info,
 
 	nandx_get_device(FL_WRITING);
 
-	if (count != info->max_keep_pages) {
-		pr_err("%s: count:%d max:%d\n",
-			  __func__, count, info->max_keep_pages);
+	if (count != info->max_keep_pages && count != info->plane_num) {
+		pr_err("%s: count:%d max:%d(or %d)\n",
+			  __func__, count, info->max_keep_pages, info->plane_num);
 		goto err;
 	}
 
@@ -633,6 +635,8 @@ static u32 do_tlc_write(struct mtk_nand_chip_info *info,
 		work = get_list_work(item);
 		ops = &work->ops;
 		item = item->next;
+		if (i == 0)
+			mode |= is_slc_block(info, ops->block) ? MODE_SLC : 0;
 		block_num = ops->block + data_info->bmt.start_block;
 		ops_table[i].row = block_num * info->data_page_num + ops->page;
 		ops_table[i].col = 0;
@@ -748,6 +752,34 @@ static u32 complete_slc_write_count(struct mtk_nand_chip_info *info,
 static u32 complete_write_count(struct mtk_nand_chip_info *info,
 				struct worklist_ctrl *list_ctrl, int total)
 {
+	struct list_node *head;
+	struct nand_work *work0, *work1;
+	bool multi_op;
+
+	if (!total)
+		return 0;
+
+	head = &list_ctrl->head;
+	work0 = get_list_work(head->next);
+	if (!is_slc_block(info, work0->ops.block))
+		goto non_slc;
+
+	if (!is_multi_plane(info))
+		return 1;
+
+	if (total < info->plane_num)
+		return 0;
+
+	work1 = get_list_work(head->next->next);
+	if (!is_slc_block(info, work1->ops.block)) {
+		pr_err("%s: block0 %d is slc, but block1 %d is not\n",
+			__func__, work0->ops.block, work1->ops.block);
+		return 0;
+	}
+	multi_op = can_ops_multi_plane(&work0->ops, &work1->ops);
+	return multi_op ? 2 : 1;
+
+non_slc:
 	return (total >= info->max_keep_pages) ? info->max_keep_pages : 0;
 }
 
@@ -1427,8 +1459,8 @@ int mtk_nand_chip_write_page(struct mtk_nand_chip_info *info,
 		return -EINVAL;
 	}
 
-	list_ctrl = is_slc_block(info, block) ?
-			&data_info->swlist_ctrl : &data_info->wlist_ctrl;
+	list_ctrl = (block < info->data_block_num) ?
+			&data_info->wlist_ctrl : &data_info->swlist_ctrl;
 	total_num = get_list_work_cnt(list_ctrl);
 	max_keep_pages = is_slc_block(info, block) ?
 			info->plane_num : info->max_keep_pages;
