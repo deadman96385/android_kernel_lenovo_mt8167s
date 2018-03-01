@@ -23,8 +23,6 @@
 #include "wrapper_pmt.h"
 #include "mntl_ops.h"
 
-#define ALL_SLC_BUFFER 1
-
 int g_i4Homescreen;
 struct nandx_ops *ops_table;
 struct mtk_nand_data_info *data_info;
@@ -65,10 +63,12 @@ bool mtk_isbad_block(u32 block)
 	return FALSE;
 }
 
-static bool is_slc_block(struct mtk_nand_chip_info *info, unsigned int block)
+static bool is_slc_block(struct mtk_nand_chip_info *info, u32 block)
 {
-#ifdef ALL_SLC_BUFFER
 	int index, bit;
+
+	if (info->types != MTK_NAND_FLASH_TLC)
+		return block >= info->data_block_num;
 
 	index = block / 32;
 	bit = block % 32;
@@ -77,9 +77,6 @@ static bool is_slc_block(struct mtk_nand_chip_info *info, unsigned int block)
 		return FALSE;
 
 	return TRUE;
-#else
-	return block >= info->data_block_num;
-#endif
 }
 
 static int mtk_nand_read_pages(struct mtk_nand_chip_info *info,
