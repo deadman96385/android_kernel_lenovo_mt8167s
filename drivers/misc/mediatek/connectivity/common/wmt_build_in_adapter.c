@@ -207,11 +207,11 @@ static void mtk_wcn_cmb_sdio_enable_eirq(void)
 static void mtk_wcn_cmb_sdio_disable_eirq(void)
 {
 	if (!atomic_read(&irq_enable_flag))
-		CONNADP_DBG_FUNC("wifi eint has been disabled!\n");
+		CONNADP_INFO_FUNC("wifi eint has been disabled!\n");
 	else {
 		if (wifi_irq != 0xfffffff) {
 			disable_irq_nosync(wifi_irq);
-			CONNADP_DBG_FUNC("disable WIFI EINT irq %d !!\n", wifi_irq);
+			CONNADP_INFO_FUNC("disable WIFI EINT irq %d !!\n", wifi_irq);
 		}
 		atomic_set(&irq_enable_flag, 0);
 	}

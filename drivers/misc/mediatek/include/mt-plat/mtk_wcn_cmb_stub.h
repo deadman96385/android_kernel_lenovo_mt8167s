@@ -164,6 +164,8 @@ extern void mtk_wcn_wmt_set_chipid(int chipid);
  * Return 0 if success, else -1
  */
 extern unsigned int mtk_uart_pdn_enable(char *port, int enable);
+extern int wmt_plat_set_stub_log_level(int level);
+
 /*******************************************************************************
 *                              F U N C T I O N S
 ********************************************************************************
