@@ -557,9 +557,9 @@ update_cfg_file_failed:
 #endif
 
 #if (defined(CONFIG_GTP_AUTO_UPDATE) \
-	&& (!defined(CONFIG_GTP_HEADER_FW_UPDATE)) \
-	&&  (!defined(CONFIG_GTP_REQUEST_FW_UPDATE)) \
-	|| defined(CONFIG_GTP_AUTO_UPDATE_CFG)))
+	&& defined(CONFIG_GTP_HEADER_FW_UPDATE) \
+	&& defined(CONFIG_GTP_AUTO_UPDATE_CFG) \
+	&& defined(CONFIG_GTP_REQUEST_FW_UPDATE))
 static void gup_search_file(s32 search_type)
 {
 	s32 i = 0;
