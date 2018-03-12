@@ -99,6 +99,8 @@
 #include "external_display.h"
 #include "compat_mtk_disp_mgr.h"
 
+#include "ddp_debug.h"
+
 static dev_t mtk_disp_mgr_devno;
 static struct cdev *mtk_disp_mgr_cdev;
 static struct class *mtk_disp_mgr_class;
@@ -409,6 +411,14 @@ int _ioctl_create_session(unsigned long arg)
 		return -EFAULT;
 	}
 
+#ifdef OVL_TIME_SHARING
+	if (config.type == DISP_SESSION_MEMORY) {
+		/* need into secure world when wfd connect */
+		force_ovl_sec = 1;
+		DISPMSG("force_ovl_sec = 1\n");
+	}
+#endif
+
 #ifdef CONFIG_MTK_GMO_RAM_OPTIMIZE
 	if (config.type == DISP_SESSION_MEMORY) {
 		if (init_ext_decouple_buffers() < 0) {
@@ -463,6 +473,14 @@ int _ioctl_destroy_session(unsigned long arg)
 		DISPMSG("[FB]: copy_from_user failed! line:%d\n", __LINE__);
 		return -EFAULT;
 	}
+
+#ifdef OVL_TIME_SHARING
+	if (config.type == DISP_SESSION_MEMORY) {
+		/* need into normal world when wfd disconnect */
+		force_ovl_sec = 0;
+		DISPMSG("force_ovl_sec = 0\n");
+	}
+#endif
 
 #ifdef CONFIG_MTK_GMO_RAM_OPTIMIZE
 	if (config.type == DISP_SESSION_MEMORY) {
