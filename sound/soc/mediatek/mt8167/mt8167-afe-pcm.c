@@ -450,6 +450,80 @@ static int mt8167_afe_set_adda_in(struct mtk_afe *afe, unsigned int rate)
 		return -EINVAL;
 	}
 
+	if (afe->apply_6db_gain_in_ul_src) {
+		switch (rate) {
+		case 8000:
+		case 16000:
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_02_01,
+				0xFFEE002C);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_04_03,
+				0xFE2CFEFC);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_06_05,
+				0x00AEFEE0);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_08_07,
+				0xFF840134);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_10_09,
+				0xFE4EFFFC);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_12_11,
+				0x00D2022A);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_14_13,
+				0xFE0CFD88);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_16_15,
+				0x03640274);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_18_17,
+				0xFAF6FE14);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_20_19,
+				0x06CE00B2);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_22_21,
+				0xF7760184);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_24_23,
+				0x0A18FADC);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_26_25,
+				0xF4AC0B48);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_28_27,
+				0x0C1EE800);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_30_29,
+				0x739C5068);
+			regmap_update_bits(afe->regmap, AFE_ADDA_UL_SRC_CON0,
+				1 << 31, 1 << 31);
+			break;
+		case 32000:
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_02_01,
+				0x02A600B2);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_04_03,
+				0xFEF6010C);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_06_05,
+				0x00EEFE94);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_08_07,
+				0xFF840204);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_10_09,
+				0xFFB0FD52);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_12_11,
+				0x0180033A);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_14_13,
+				0xFCF0FC84);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_16_15,
+				0x04EE0342);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_18_17,
+				0xF904FDA6);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_20_19,
+				0x09100088);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_22_21,
+				0xF510028A);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_24_23,
+				0x0C40F896);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_26_25,
+				0xF3DA0F72);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_28_27,
+				0x0604E0C8);
+			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_30_29,
+				0x7A6E526A);
+			regmap_update_bits(afe->regmap, AFE_ADDA_UL_SRC_CON0,
+				1 << 31, 1 << 31);
+			break;
+		}
+	}
+
 	regmap_update_bits(afe->regmap, AFE_ADDA_UL_SRC_CON0, 0x001e0000, val);
 
 	regmap_update_bits(afe->regmap, AFE_ADDA_NEWIF_CFG1, 0xc00, val2);
@@ -3544,6 +3618,9 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 
 	of_property_read_u32(np, "mediatek,spdif-in-port",
 			     &afe->spdif_in_state.port);
+
+	if (of_property_read_bool(np, "mediatek,apply-6db-gain-in-ul-src"))
+		afe->apply_6db_gain_in_ul_src = true;
 
 	ret = snd_soc_register_platform(&pdev->dev, &mt8167_afe_pcm_platform);
 	if (ret)

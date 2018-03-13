@@ -267,6 +267,7 @@ struct mtk_afe {
 	unsigned int dl2_irq_mode;
 	unsigned int dai_irq_mode;
 	struct mt8167_spdif_in_state spdif_in_state;
+	bool apply_6db_gain_in_ul_src;
 	/* locks */
 	spinlock_t afe_ctrl_lock;
 	struct mutex afe_clk_mutex;
