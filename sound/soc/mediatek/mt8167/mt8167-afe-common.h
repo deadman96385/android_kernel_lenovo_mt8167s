@@ -215,6 +215,7 @@ struct mtk_afe {
 	unsigned int i2s_clk_modes[MT8167_AFE_I2S_SETS];
 	unsigned int awb_irq_mode;
 	unsigned int dai_irq_mode;
+	bool apply_6db_gain_in_ul_src;
 	/* locks */
 	spinlock_t afe_ctrl_lock;
 	struct mutex afe_clk_mutex;
