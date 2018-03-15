@@ -143,6 +143,7 @@
 	mediatek,tdm-out-mode = <1>;
 	/* 0(IRQ1) 1(IRQ2) 4(IRQ7) */
 	mediatek,awb-irq-mode = <4>;
+	mediatek,apply-6db-gain-in-ul-src;
 };
 
 &bat_comm {
