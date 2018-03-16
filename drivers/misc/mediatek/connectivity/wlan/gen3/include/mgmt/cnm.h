@@ -114,9 +114,10 @@ typedef struct _CNM_INFO_T {
 	BOOLEAN fgChGranted;
 	UINT_8 ucBssIndex;
 	UINT_8 ucTokenID;
-
 	UINT_16 u2ReturnMID;
+	UINT_8 ucReqChnPrivilegeCnt;
 	TIMER_T rReqChnlUtilTimer;
+	TIMER_T rReqChnTimeoutTimer;
 } CNM_INFO_T, *P_CNM_INFO_T;
 
 #if CFG_ENABLE_WIFI_DIRECT
@@ -159,6 +160,8 @@ VOID cnmChMngrRequestPrivilege(P_ADAPTER_T prAdapter, P_MSG_HDR_T prMsgHdr);
 VOID cnmChMngrAbortPrivilege(P_ADAPTER_T prAdapter, P_MSG_HDR_T prMsgHdr);
 
 VOID cnmChMngrHandleChEvent(P_ADAPTER_T prAdapter, P_WIFI_EVENT_T prEvent);
+
+VOID cnmChReqPrivilegeTimeout(IN P_ADAPTER_T prAdapter, ULONG ulParamPtr);
 
 BOOLEAN
 cnmPreferredChannel(P_ADAPTER_T prAdapter, P_ENUM_BAND_T prBand, PUINT_8 pucPrimaryChannel, P_ENUM_CHNL_EXT_T prBssSCO);
