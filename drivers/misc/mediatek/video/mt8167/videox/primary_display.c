@@ -33,6 +33,8 @@
 #include "m4u.h"
 #endif
 
+#include "ddp_gamma.h"
+
 /*#include "mt_idle.h"*/
 /*#include "mt_spm_idle.h"*/
 /*#include "mt_spm.h" *//* for sodi reg addr define */
@@ -7122,6 +7124,9 @@ int primary_display_config_input_multiple(struct disp_session_input_config *sess
 	int ret = 0;
 	disp_path_handle disp_handle;
 	struct cmdqRecStruct *cmdq_handle;
+	struct disp_ccorr_config m_ccorr_config;
+
+	memcpy(&m_ccorr_config, &(session_input->ccorr_config), sizeof(m_ccorr_config));
 
 	if (gTriggerDispMode > 0)
 		return 0;
@@ -7157,6 +7162,13 @@ int primary_display_config_input_multiple(struct disp_session_input_config *sess
 		_config_ovl_input(session_input, disp_handle, cmdq_handle);
 	else
 		_config_rdma_input(session_input, disp_handle);
+
+	/* set ccorr matrix */
+	if (m_ccorr_config.is_dirty) {
+		disp_ccorr_set_color_matrix(cmdq_handle,
+			m_ccorr_config.color_matrix,
+			m_ccorr_config.mode);
+	}
 
 done:
 	_primary_path_unlock(__func__);

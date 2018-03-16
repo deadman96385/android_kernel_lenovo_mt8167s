@@ -1499,6 +1499,8 @@ static int set_primary_buffer(struct disp_session_input_config *input)
 
 		} else {
 			captured_session_input[DISP_SESSION_PRIMARY - 1].config[layer_id] = input->config[i];
+			memcpy(&(captured_session_input[DISP_SESSION_PRIMARY - 1].ccorr_config),
+					&(input->ccorr_config), sizeof(input->ccorr_config));
 		}
 		up(&dal_sem);
 #endif
@@ -1514,6 +1516,7 @@ static int set_primary_buffer(struct disp_session_input_config *input)
 #ifndef CONFIG_ALL_IN_TRIGGER_STAGE
 	primary_display_config_input_multiple(input);
 #endif
+
 	return 0;
 
 }
