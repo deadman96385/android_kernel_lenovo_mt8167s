@@ -664,7 +664,7 @@ static void sensor_init(void)
 	write_cmos_sensor(0x3c96, 0x00);
 	write_cmos_sensor(0x3d8c, 0x71);
 	write_cmos_sensor(0x3d8d, 0xE7);
-/* write_cmos_sensor(0x0100,0x01); */
+	write_cmos_sensor(0x0100, 0x00);
 
 	mDELAY(10);
 
