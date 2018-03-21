@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 
 #ifndef __NANDX_CHIP_COMMON_H__
 #define __NANDX_CHIP_COMMON_H__
@@ -19,20 +12,16 @@
 #include "nandx_chip.h"
 #include "nfc_core.h"
 
-
 #define STATUS_FAIL(x)		((x) & 1)
 #define STATUS_SLC_FAIL(x)	(((x) >> 2) & 1)
 
-
 struct nandx_chip;
 
-
-typedef void (*rr_entry_t)(struct nandx_chip *chip);
-typedef void (*rr_get_parameters_t)(struct nandx_chip *chip, u8 *param);
-typedef void (*rr_set_parameters_t)(struct nandx_chip *chip, u8 *param);
-typedef void (*rr_enable_t)(struct nandx_chip *chip);
-typedef void (*rr_exit_t)(struct nandx_chip *chip);
-
+typedef void (*rr_entry_t) (struct nandx_chip *chip);
+typedef void (*rr_get_parameters_t) (struct nandx_chip *chip, u8 *param);
+typedef void (*rr_set_parameters_t) (struct nandx_chip *chip, u8 *param);
+typedef void (*rr_enable_t) (struct nandx_chip *chip);
+typedef void (*rr_exit_t) (struct nandx_chip *chip);
 
 struct read_retry_ops {
 	u16 loop_count;
@@ -53,7 +42,6 @@ struct slc_mode_ops {
 	void (*entry)(struct nandx_chip *chip);
 	void (*exit)(struct nandx_chip *chip);
 };
-
 
 struct nandx_chip {
 	struct nandx_chip_dev chip_dev;
@@ -92,49 +80,49 @@ void nandx_chip_read_id(struct nandx_chip *chip, u8 *id, int num);
 u8 nandx_chip_read_status(struct nandx_chip *chip);
 u8 nandx_chip_read_enhance_status(struct nandx_chip *chip, u32 row);
 void nandx_chip_set_feature(struct nandx_chip *chip, u8 addr, u8 *param,
-				int num);
+			    int num);
 void nandx_chip_get_feature(struct nandx_chip *chip, u8 addr, u8 *param,
-				int num);
+			    int num);
 void nandx_chip_set_feature_with_check(struct nandx_chip *chip, u8 addr,
-						u8 *param, u8 *back, int num);
+				       u8 *param, u8 *back, int num);
 void nandx_chip_set_lun_feature(struct nandx_chip *chip, u8 lun, u8 addr,
-					u8 *param, int num);
+				u8 *param, int num);
 void nandx_chip_get_lun_feature(struct nandx_chip *chip, u8 lun, u8 addr,
-					u8 *param, int num);
+				u8 *param, int num);
 void nandx_chip_set_lun_feature_with_check(struct nandx_chip *chip, u8 lun,
-					u8 addr, u8 *param, u8 *back, int num);
+					   u8 addr, u8 *param, u8 *back,
+					   int num);
 void nandx_chip_erase_block(struct nandx_chip *chip, u32 row);
 void nandx_chip_multi_erase_block(struct nandx_chip *chip, u32 *rows);
 void nandx_chip_read_parameters_page(struct nandx_chip *chip, u8 *data,
-						int size);
+				     int size);
 void nandx_chip_enable_randomizer(struct nandx_chip *chip, u32 row,
-					bool encode);
+				  bool encode);
 void nandx_chip_disable_randomizer(struct nandx_chip *chip);
 int nandx_chip_read_data(struct nandx_chip *chip, int sector_num, void *data,
-				void *fdm);
+			 void *fdm);
 void nandx_chip_read_page(struct nandx_chip *chip, u32 row);
 void nandx_chip_cache_read_page(struct nandx_chip *chip, u32 row);
 void nandx_chip_cache_read_last_page(struct nandx_chip *chip);
 void nandx_chip_multi_read_page(struct nandx_chip *chip, u32 row);
 void nandx_chip_random_output(struct nandx_chip *chip, u32 row, u32 col);
 int nandx_chip_program_page(struct nandx_chip *chip, u32 row, void *data,
-					void *fdm);
-int nandx_chip_cache_program_page(struct nandx_chip *chip, u32 row, void *data,
-						void *fdm);
+			    void *fdm);
+int nandx_chip_cache_program_page(struct nandx_chip *chip, u32 row,
+				  void *data, void *fdm);
 int nandx_chip_multi_program_1stpage(struct nandx_chip *chip, u32 row,
-						void *data, void *fdm);
+				     void *data, void *fdm);
 int nandx_chip_multi_program_2ndpage(struct nandx_chip *chip, u32 row,
-						void *data, void *fdm);
+				     void *data, void *fdm);
 int nandx_chip_calibration(struct nandx_chip *chip);
-
 
 int setup_read_retry(struct nandx_chip *chip, int count);
 int nandx_chip_read_retry(struct nandx_chip *chip,
-				struct nandx_ops *ops, int *count);
+			  struct nandx_ops *ops, int *count);
 int nandx_bad_block_check(struct nandx_chip *chip, u32 row,
-				enum BAD_BLOCK_TYPE type);
+			  enum BAD_BLOCK_TYPE type);
 struct read_retry_ops *get_read_retry_ops(struct nandx_device_info *dev_info);
 struct pair_page_ops *get_pair_page_ops(u32 mode_type);
 struct slc_mode_ops *get_slc_mode_ops(u32 mode_type);
 
-#endif /* __NANDX_CHIP_H__ */
+#endif				/* __NANDX_CHIP_H__ */

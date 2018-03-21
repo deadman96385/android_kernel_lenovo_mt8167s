@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #include <linux/device.h>
 #include <mt-plat/mtk_meminfo.h>
 
@@ -27,16 +20,15 @@ int g_i4Homescreen;
 struct nandx_ops *ops_table;
 struct mtk_nand_data_info *data_info;
 
-static inline bool block_page_num_is_valid(
-		struct mtk_nand_chip_info *info, u32 block,
-		u32 page);
+static inline bool block_page_num_is_valid(struct mtk_nand_chip_info *info,
+					   u32 block, u32 page);
 
 static int open_block_delete(struct open_block *open, int block);
 
 static bool should_close_block(void);
 
 static bool is_ewrite_block(struct mtk_nand_chip_info *info,
-		struct worklist_ctrl *list_ctrl, u32 block);
+			    struct worklist_ctrl *list_ctrl, u32 block);
 
 static void dump_block_bitmap(void);
 
@@ -54,8 +46,7 @@ bool mtk_isbad_block(u32 block)
 	chip_bbt = &data_info->chip_bbt;
 	for (i = 0; i < chip_bbt->bad_block_num; i++) {
 		if (block == chip_bbt->bad_block_table[i]) {
-			pr_debug("Check block:0x%x is bad\n",
-				    block);
+			pr_debug("Check block:0x%x is bad\n", block);
 			return TRUE;
 		}
 	}
@@ -80,9 +71,8 @@ static bool is_slc_block(struct mtk_nand_chip_info *info, u32 block)
 }
 
 static int mtk_nand_read_pages(struct mtk_nand_chip_info *info,
-		u8 *data_buffer, u8 *oob_buffer,
-		u32 block, u32 page,
-		u32 offset, u32 size)
+			       u8 *data_buffer, u8 *oob_buffer,
+			       u32 block, u32 page, u32 offset, u32 size)
 {
 	static u8 *fdm_buf;
 #ifdef MTK_FORCE_READ_FULL_PAGE
@@ -97,7 +87,8 @@ static int mtk_nand_read_pages(struct mtk_nand_chip_info *info,
 
 	nandx_get_device(FL_READING);
 
-	page_addr = (block+data_info->bmt.start_block)*info->data_page_num+page;
+	page_addr =
+	    (block + data_info->bmt.start_block) * info->data_page_num + page;
 
 	/* For log area access */
 	if (is_slc_block(info, block)) {
@@ -119,10 +110,10 @@ static int mtk_nand_read_pages(struct mtk_nand_chip_info *info,
 
 	if (size < page_size) {
 		/* Sector read case */
-		sect_num = page_size/(1<<info->sector_size_shift);
-		start_sect  = offset/(1<<info->sector_size_shift);
-		col_addr = start_sect*(1<<info->sector_size_shift);
-		sect_read = size/(1<<info->sector_size_shift);
+		sect_num = page_size / (1 << info->sector_size_shift);
+		start_sect = offset / (1 << info->sector_size_shift);
+		col_addr = start_sect * (1 << info->sector_size_shift);
+		sect_read = size / (1 << info->sector_size_shift);
 #ifdef MTK_FORCE_READ_FULL_PAGE
 		if (page_buf == NULL) {
 			page_buf = kmalloc(page_size, GFP_KERNEL);
@@ -161,8 +152,7 @@ static int mtk_nand_read_pages(struct mtk_nand_chip_info *info,
 	if (ret < 0) {
 		ret = ops.status;
 		if (ret == -ENANDFLIPS)
-			pr_err("bitflip @ b:%d p:%d\n",
-				    block, page);
+			pr_err("bitflip @ b:%d p:%d\n", block, page);
 	} else {
 		ret = 0;
 	}
@@ -170,7 +160,7 @@ static int mtk_nand_read_pages(struct mtk_nand_chip_info *info,
 exit:
 	if (ret)
 		pr_err("read err:%d, b:%d p:%d off:%d size:%d\n",
-			ret, block, page, offset, size);
+		       ret, block, page, offset, size);
 
 	nandx_release_device();
 
@@ -179,7 +169,8 @@ exit:
 }
 
 static int mtk_nand_read_multi_pages(struct mtk_nand_chip_info *info,
-			int page_num, struct mtk_nand_chip_read_param *param)
+				     int page_num,
+				     struct mtk_nand_chip_read_param *param)
 {
 	u32 mode = 0, ppb;
 	int i, ret;
@@ -201,7 +192,6 @@ static int mtk_nand_read_multi_pages(struct mtk_nand_chip_info *info,
 	if (info->plane_num > 1)
 		mode |= MODE_MULTI;
 
-
 	for (i = 0; i < page_num; i++) {
 		ops[i].row = param[i].block * ppb + param[i].page;
 		ops[i].col = param[i].offset;
@@ -217,8 +207,8 @@ err:
 	return ret;
 }
 
-static inline struct list_node *get_list_item_prev(
-	struct list_node *head, struct list_node *cur)
+static inline struct list_node *get_list_item_prev(struct list_node *head,
+						   struct list_node *cur)
 {
 	struct list_node *item;
 
@@ -234,8 +224,7 @@ static inline struct list_node *get_list_item_prev(
 	return item;
 }
 
-static inline struct list_node *get_list_tail(
-	struct list_node *head)
+static inline struct list_node *get_list_tail(struct list_node *head)
 {
 	struct list_node *item;
 
@@ -246,14 +235,12 @@ static inline struct list_node *get_list_tail(
 	return item;
 }
 
-static inline struct nand_work *get_list_work(
-	struct list_node *node)
+static inline struct nand_work *get_list_work(struct list_node *node)
 {
 	return containerof(node, struct nand_work, list);
 }
 
-static struct list_node *seek_list_item(
-	struct list_node *cur, u32 offset)
+static struct list_node *seek_list_item(struct list_node *cur, u32 offset)
 {
 	struct list_node *item;
 	int i;
@@ -267,14 +254,12 @@ static struct list_node *seek_list_item(
 	return item;
 }
 
-static inline void lock_list(
-	struct worklist_ctrl *list_ctrl)
+static inline void lock_list(struct worklist_ctrl *list_ctrl)
 {
 	spin_lock(&list_ctrl->list_lock);
 }
 
-static inline void unlock_list(
-	struct worklist_ctrl *list_ctrl)
+static inline void unlock_list(struct worklist_ctrl *list_ctrl)
 {
 	spin_unlock(&list_ctrl->list_lock);
 }
@@ -289,9 +274,10 @@ static inline int add_list_node(struct worklist_ctrl *list_ctrl,
 	lock_list(list_ctrl);
 	ops = &get_list_work(node)->ops;
 	if (ops->types == MTK_NAND_OP_WRITE &&
-		is_ewrite_block(ops->info, list_ctrl, ops->block)) {
+	    is_ewrite_block(ops->info, list_ctrl, ops->block)) {
 		ops->callback(ops->info, ops->data_buffer, ops->oob_buffer,
-			ops->block, ops->page, -ENANDWRITE, ops->userdata);
+			      ops->block, ops->page, -ENANDWRITE,
+			      ops->userdata);
 		ret = -ENANDWRITE;
 		goto OUT;
 	}
@@ -305,8 +291,7 @@ OUT:
 	return ret;
 }
 
-static inline int get_list_work_cnt(
-	struct worklist_ctrl *list_ctrl)
+static inline int get_list_work_cnt(struct worklist_ctrl *list_ctrl)
 {
 	int cnt = 0;
 
@@ -328,24 +313,22 @@ static bool is_multi_plane(struct mtk_nand_chip_info *minfo)
 
 static bool is_multi_read_support(struct mtk_nand_chip_info *info)
 {
-	return is_multi_plane(info) /*&& (devinfo.vendor == VEND_MICRON)*/;
+	return is_multi_plane(info) /*&& (devinfo.vendor == VEND_MICRON) */;
 }
 
-static bool are_on_diff_planes(u32 block0,
-	u32 block1)
+static bool are_on_diff_planes(u32 block0, u32 block1)
 {
 	return (block0 + block1) & 0x1;
 }
 
-static bool can_multi_plane(u32 block0, u32 page0,
-				u32 block1, u32 page1)
+static bool can_multi_plane(u32 block0, u32 page0, u32 block1, u32 page1)
 {
 
 	return ((block0 + block1) & 0x1) && (page0 == page1);
 }
 
 static bool can_ops_multi_plane(struct mtk_nand_chip_operation *ops0,
-		struct mtk_nand_chip_operation *ops1)
+				struct mtk_nand_chip_operation *ops1)
 {
 	struct mtk_nand_chip_info *info = ops0->info;
 
@@ -353,11 +336,11 @@ static bool can_ops_multi_plane(struct mtk_nand_chip_operation *ops0,
 		return false;
 
 	return can_multi_plane(ops0->block, ops0->page, ops1->block,
-				ops1->page);
+			       ops1->page);
 }
 
-static void call_multi_work_callback(
-	struct list_node *cur, int count, int status)
+static void call_multi_work_callback(struct list_node *cur, int count,
+				     int status)
 {
 	int i;
 	struct list_node *item;
@@ -365,7 +348,7 @@ static void call_multi_work_callback(
 	struct mtk_nand_chip_operation *ops;
 
 	item = cur;
-	for (i = 0; i < count; i++)  {
+	for (i = 0; i < count; i++) {
 		if (item == NULL) {
 			pr_err("%s: NULL item\n", __func__);
 			return;
@@ -373,17 +356,17 @@ static void call_multi_work_callback(
 		work = get_list_work(item);
 		ops = &work->ops;
 		ops->callback(ops->info, ops->data_buffer,
-			ops->oob_buffer, ops->block,
-			ops->page, status, ops->userdata);
+			      ops->oob_buffer, ops->block,
+			      ops->page, status, ops->userdata);
 		if (i >= count)
 			break;
 		item = item->next;
 	}
 }
 
-static void call_tlc_page_group_callback(
-	struct list_node *base_node, int start, int end,
-	bool multi_plane, int status)
+static void call_tlc_page_group_callback(struct list_node *base_node,
+					 int start, int end, bool multi_plane,
+					 int status)
 {
 	struct list_node *item;
 	int i;
@@ -391,8 +374,7 @@ static void call_tlc_page_group_callback(
 
 	item = seek_list_item(base_node, start * count);
 	for (i = 0; i < end - start + 1; i++) {
-		call_multi_work_callback(
-			item, count, status);
+		call_multi_work_callback(item, count, status);
 
 		if (i >= end - start)
 			break;
@@ -404,7 +386,7 @@ static void call_tlc_page_group_callback(
 }
 
 static u32 callback_and_free_ewrite(struct worklist_ctrl *list_ctrl,
-				int ecount)
+				    int ecount)
 {
 	int *ewrite;
 	int i;
@@ -428,8 +410,8 @@ static u32 callback_and_free_ewrite(struct worklist_ctrl *list_ctrl,
 		else if (ops->block != ewrite[i % ecount])
 			break;
 		ops->callback(ops->info, ops->data_buffer, ops->oob_buffer,
-				ops->block, ops->page, -ENANDWRITE,
-				ops->userdata);
+			      ops->block, ops->page, -ENANDWRITE,
+			      ops->userdata);
 		list_ctrl->total_num--;
 		item = item->next;
 		kfree(work);
@@ -441,7 +423,7 @@ static u32 callback_and_free_ewrite(struct worklist_ctrl *list_ctrl,
 }
 
 static bool is_ewrite_block(struct mtk_nand_chip_info *info,
-		struct worklist_ctrl *list_ctrl, u32 block)
+			    struct worklist_ctrl *list_ctrl, u32 block)
 {
 	int i;
 
@@ -452,10 +434,10 @@ static bool is_ewrite_block(struct mtk_nand_chip_info *info,
 	return false;
 }
 
-static struct list_node *free_multi_work(
-	struct worklist_ctrl *list_ctrl,
-	struct list_node *head,
-	struct list_node *start_node, int count)
+static struct list_node *free_multi_work(struct worklist_ctrl *list_ctrl,
+					 struct list_node *head,
+					 struct list_node *start_node,
+					 int count)
 {
 	int i;
 	struct list_node *item, *prev, *next;
@@ -469,7 +451,7 @@ static struct list_node *free_multi_work(
 		pr_err("prev is NULL!!\n");
 		return NULL;
 	}
-	for (i = 0; i < count; i++)  {
+	for (i = 0; i < count; i++) {
 		if (item == NULL) {
 			pr_err("%s: NULL item\n", __func__);
 			return NULL;
@@ -485,33 +467,35 @@ static struct list_node *free_multi_work(
 	return item;
 }
 
-static struct list_node *free_multi_write_work(
-	struct worklist_ctrl *list_ctrl,
-	struct list_node *start_node, int count)
+static struct list_node *free_multi_write_work(struct worklist_ctrl
+					       *list_ctrl,
+					       struct list_node *start_node,
+					       int count)
 {
 	struct list_node *head, *next;
 
 	head = &list_ctrl->head;
-	next = free_multi_work(list_ctrl,
-			head, start_node, count);
+	next = free_multi_work(list_ctrl, head, start_node, count);
 	return next;
 }
 
-static struct list_node *free_multi_erase_work(
-	struct worklist_ctrl *list_ctrl,
-	struct list_node *start_node, int count)
+static struct list_node *free_multi_erase_work(struct worklist_ctrl
+					       *list_ctrl,
+					       struct list_node *start_node,
+					       int count)
 {
 	struct list_node *head, *next;
 
 	head = &list_ctrl->head;
-	next = free_multi_work(list_ctrl,
-			head, start_node, count);
+	next = free_multi_work(list_ctrl, head, start_node, count);
 	return next;
 }
-static struct list_node *free_tlc_page_group_work(
-	struct worklist_ctrl *list_ctrl,
-	struct list_node *base_node, int start,
-	int end, bool multi_plane)
+
+static struct list_node *free_tlc_page_group_work(struct worklist_ctrl
+						  *list_ctrl,
+						  struct list_node *base_node,
+						  int start, int end,
+						  bool multi_plane)
 {
 	struct list_node *start_node;
 	int i;
@@ -519,15 +503,15 @@ static struct list_node *free_tlc_page_group_work(
 
 	start_node = seek_list_item(base_node, start * count);
 	for (i = 0; i < end - start + 1; i++) {
-		start_node = free_multi_write_work(
-			list_ctrl, start_node, count);
+		start_node =
+		    free_multi_write_work(list_ctrl, start_node, count);
 	}
 	return start_node;
 }
 
 static u32 do_mlc_multi_plane_write(struct mtk_nand_chip_info *info,
-	struct worklist_ctrl *list_ctrl, struct list_node *start_node,
-	int count)
+				    struct worklist_ctrl *list_ctrl,
+				    struct list_node *start_node, int count)
 {
 	u32 ret = 0, mode = 0;
 	int i, status = 0;
@@ -540,13 +524,13 @@ static u32 do_mlc_multi_plane_write(struct mtk_nand_chip_info *info,
 
 	if (count != info->max_keep_pages && count != info->plane_num) {
 		pr_err("%s: count:%d max:%d(or %d)\n",
-			  __func__, count, info->max_keep_pages, info->plane_num);
+		       __func__, count, info->max_keep_pages,
+		       info->plane_num);
 		goto err;
 	}
 
 	if (start_node == NULL) {
-		pr_err("%s: start node is NULL!\n",
-			  __func__);
+		pr_err("%s: start node is NULL!\n", __func__);
 		goto err;
 	}
 
@@ -568,7 +552,8 @@ static u32 do_mlc_multi_plane_write(struct mtk_nand_chip_info *info,
 		if (i == 0)
 			mode |= is_slc_block(info, ops->block) ? MODE_SLC : 0;
 		block_num = ops->block + data_info->bmt.start_block;
-		ops_table[i].row = block_num * info->data_page_num + ops->page;
+		ops_table[i].row =
+		    block_num * info->data_page_num + ops->page;
 		ops_table[i].col = 0;
 		ops_table[i].len = info->data_page_size;
 		ops_table[i].data = ops->data_buffer;
@@ -617,7 +602,8 @@ static u32 do_tlc_write(struct mtk_nand_chip_info *info,
 
 	if (count != info->max_keep_pages && count != info->plane_num) {
 		pr_err("%s: count:%d max:%d(or %d)\n",
-			  __func__, count, info->max_keep_pages, info->plane_num);
+		       __func__, count, info->max_keep_pages,
+		       info->plane_num);
 		goto err;
 	}
 
@@ -635,7 +621,8 @@ static u32 do_tlc_write(struct mtk_nand_chip_info *info,
 		if (i == 0)
 			mode |= is_slc_block(info, ops->block) ? MODE_SLC : 0;
 		block_num = ops->block + data_info->bmt.start_block;
-		ops_table[i].row = block_num * info->data_page_num + ops->page;
+		ops_table[i].row =
+		    block_num * info->data_page_num + ops->page;
 		ops_table[i].col = 0;
 		ops_table[i].len = info->data_page_size;
 		ops_table[i].data = ops->data_buffer;
@@ -715,14 +702,15 @@ static u32 complete_erase_count(struct mtk_nand_chip_info *info,
 	work0 = get_list_work(head->next);
 	if (!head->next->next)
 		pr_err("%s: second NULL, total:%d, work0->block:%d\n",
-			__func__, total, work0->ops.block);
+		       __func__, total, work0->ops.block);
 	work1 = get_list_work(head->next->next);
 	is2p = are_on_diff_planes(work0->ops.block, work1->ops.block);
 	return is2p ? info->plane_num : 1;
 }
 
 static u32 complete_slc_write_count(struct mtk_nand_chip_info *info,
-				struct worklist_ctrl *list_ctrl, int total)
+				    struct worklist_ctrl *list_ctrl,
+				    int total)
 {
 	struct list_node *head;
 	struct nand_work *work0, *work1;
@@ -770,7 +758,7 @@ static u32 complete_write_count(struct mtk_nand_chip_info *info,
 	work1 = get_list_work(head->next->next);
 	if (!is_slc_block(info, work1->ops.block)) {
 		pr_err("%s: block0 %d is slc, but block1 %d is not\n",
-			__func__, work0->ops.block, work1->ops.block);
+		       __func__, work0->ops.block, work1->ops.block);
 		return 0;
 	}
 	multi_op = can_ops_multi_plane(&work0->ops, &work1->ops);
@@ -781,9 +769,10 @@ non_slc:
 }
 
 static int init_list_ctrl(struct mtk_nand_chip_info *info,
-		struct worklist_ctrl *list_ctrl, enum worklist_type type,
-		get_ready_count get_ready_count_func,
-		process_list_data process_data_func)
+			  struct worklist_ctrl *list_ctrl,
+			  enum worklist_type type,
+			  get_ready_count get_ready_count_func,
+			  process_list_data process_data_func)
 {
 	int i;
 
@@ -796,24 +785,22 @@ static int init_list_ctrl(struct mtk_nand_chip_info *info,
 	list_ctrl->process_data_func = process_data_func;
 
 	list_ctrl->ewrite = kmalloc_array(info->plane_num, sizeof(int),
-						GFP_KERNEL);
+					  GFP_KERNEL);
 	for (i = 0; i < info->plane_num; i++)
 		list_ctrl->ewrite[i] = -1;
 
 	return 0;
 }
 
-static inline bool block_num_is_valid(
-	struct mtk_nand_chip_info *info,
-	u32 block)
+static inline bool block_num_is_valid(struct mtk_nand_chip_info *info,
+				      u32 block)
 {
 	return (block >= 0 && block <
 		(info->data_block_num + info->log_block_num));
 }
 
-static inline bool block_page_num_is_valid(
-	struct mtk_nand_chip_info *info,
-	u32 block, u32 page)
+static inline bool block_page_num_is_valid(struct mtk_nand_chip_info *info,
+					   u32 block, u32 page)
 {
 	if (!block_num_is_valid(info, block))
 		return false;
@@ -822,9 +809,8 @@ static inline bool block_page_num_is_valid(
 		return false;
 
 	if ((!is_slc_block(info, block) &&
-		page < info->data_page_num) ||
-		(is_slc_block(info, block) &&
-		page < info->log_page_num))
+	     page < info->data_page_num) ||
+	    (is_slc_block(info, block) && page < info->log_page_num))
 		return true;
 	else
 		return false;
@@ -896,7 +882,7 @@ static bool should_close_block(void)
 }
 
 static u32 mtk_nand_do_erase(struct mtk_nand_chip_info *info,
-		struct worklist_ctrl *list_ctrl, int count)
+			     struct worklist_ctrl *list_ctrl, int count)
 {
 	struct list_node *item;
 	int i, status, op_cnt, ret = 0;
@@ -938,7 +924,7 @@ static u32 mtk_nand_do_erase(struct mtk_nand_chip_info *info,
 		block_num = ops->block + data_info->bmt.start_block;
 		rows[i] = block_num * info->data_page_num + ops->page;
 		pr_debug("%s: ops_block %d, page %d, row %d\n",
-				__func__, ops->block, ops->page, rows[i]);
+			 __func__, ops->block, ops->page, rows[i]);
 		item = item->next;
 		i++;
 	}
@@ -956,8 +942,8 @@ static u32 mtk_nand_do_erase(struct mtk_nand_chip_info *info,
 	i = 0;
 	item = list_ctrl->head.next;
 	while ((i < count) && item) {
-		op_cnt = ((count-i) > info->plane_num) ? info->plane_num :
-			 (count-i);
+		op_cnt = ((count - i) > info->plane_num) ? info->plane_num :
+		    (count - i);
 		pr_debug(" i:%d, op_cnt:%d\n", i, op_cnt);
 		call_multi_work_callback(item, op_cnt, status);
 		item = free_multi_erase_work(list_ctrl, item, op_cnt);
@@ -973,7 +959,7 @@ err:
 }
 
 static u32 mtk_nand_do_slc_write(struct mtk_nand_chip_info *info,
-		struct worklist_ctrl *list_ctrl, int count)
+				 struct worklist_ctrl *list_ctrl, int count)
 {
 	int i, status, ret = 0;
 	struct nand_work *work;
@@ -999,7 +985,8 @@ static u32 mtk_nand_do_slc_write(struct mtk_nand_chip_info *info,
 		ops = &work->ops;
 		item = item->next;
 		block_num = ops->block + data_info->bmt.start_block;
-		ops_table[i].row = block_num * info->data_page_num + ops->page;
+		ops_table[i].row =
+		    block_num * info->data_page_num + ops->page;
 		ops_table[i].col = 0;
 		ops_table[i].len = info->log_page_size;
 		ops_table[i].data = ops->data_buffer;
@@ -1025,9 +1012,8 @@ err:
 	return ret;
 }
 
-
 static u32 mtk_nand_do_write(struct mtk_nand_chip_info *info,
-		struct worklist_ctrl *list_ctrl, int count)
+			     struct worklist_ctrl *list_ctrl, int count)
 {
 	struct list_node *node;
 
@@ -1043,7 +1029,8 @@ static u32 mtk_nand_do_write(struct mtk_nand_chip_info *info,
 }
 
 static int mtk_nand_process_list(struct mtk_nand_chip_info *info,
-		struct worklist_ctrl *list_ctrl, int sync_num)
+				 struct worklist_ctrl *list_ctrl,
+				 int sync_num)
 {
 	u32 total, ready_cnt;
 	u32 process_cnt = 0, left_cnt;
@@ -1058,12 +1045,12 @@ static int mtk_nand_process_list(struct mtk_nand_chip_info *info,
 	left_cnt = total - process_cnt;
 	do {
 		ready_cnt = list_ctrl->get_ready_count_func(info, list_ctrl,
-								left_cnt);
+							    left_cnt);
 		if (!ready_cnt)
 			break;
 
 		process_cnt += list_ctrl->process_data_func(info, list_ctrl,
-								ready_cnt);
+							    ready_cnt);
 		left_cnt = total - process_cnt;
 	} while (left_cnt);
 
@@ -1083,7 +1070,6 @@ out:
 	mutex_unlock(&list_ctrl->sync_lock);
 	return process_cnt;
 }
-
 
 static int mtk_nand_work_thread(void *u)
 {
@@ -1112,8 +1098,7 @@ static void mtk_nand_dump_bbt_info(struct mtk_nand_chip_bbt_info *chip_bbt)
 	u32 i;
 
 	pr_info("%s: bad_block_num:%d, initial_bad_num:%d\n",
-		   __func__, chip_bbt->bad_block_num,
-		   chip_bbt->initial_bad_num);
+		__func__, chip_bbt->bad_block_num, chip_bbt->initial_bad_num);
 	for (i = 0; i < chip_bbt->bad_block_num; i++)
 		pr_info("bad_index:%d\n", chip_bbt->bad_block_table[i]);
 }
@@ -1143,7 +1128,7 @@ int mtk_chip_bbt_init(struct data_bmt_struct *data_bmt)
 
 	for (i = 0; i < data_bmt->bad_count; i++) {
 		bad_block = data_bmt->entry[i].bad_index -
-				data_bmt->start_block;
+		    data_bmt->start_block;
 		if (data_bmt->entry[i].flag != FTL_MARK_BAD) {
 			chip_bbt->bad_block_table[initial_bad] = bad_block;
 			initial_bad++;
@@ -1171,9 +1156,9 @@ static int mtk_chip_info_init(struct mtk_nand_chip_info *chip_info)
 	page_per_block = info->block_size / info->page_size;
 
 	chip_info->data_block_num = data_info->partition_info.total_block *
-			(100 - data_info->partition_info.slc_ratio) / 100;
+	    (100 - data_info->partition_info.slc_ratio) / 100;
 	chip_info->log_block_num = data_info->partition_info.total_block -
-				   chip_info->data_block_num;
+	    chip_info->data_block_num;
 
 	chip_info->data_page_num = page_per_block;
 	chip_info->data_page_size = info->page_size;
@@ -1218,7 +1203,7 @@ static int mtk_chip_info_init(struct mtk_nand_chip_info *chip_info)
 
 	if (info->plane_num > 1)
 		chip_info->option = MTK_NAND_PLANE_MODE_SUPPORT |
-				MTK_NAND_MULTI_READ_DIFFERENT_OFFSET;
+		    MTK_NAND_MULTI_READ_DIFFERENT_OFFSET;
 
 	/* Todo: export PE cycle from device info!! */
 	chip_info->data_pe = 2000;
@@ -1252,8 +1237,8 @@ static void mtk_nand_dump_chip_info(struct mtk_nand_chip_info *chip_info)
 	pr_debug("option: 0x%x\n", chip_info->option);
 }
 
-static void mtk_nand_dump_partition_info(
-		struct nand_ftl_partition_info *partition_info)
+static void mtk_nand_dump_partition_info(struct nand_ftl_partition_info
+					 *partition_info)
 {
 	pr_debug("nand_ftl_partition_info dump:\n");
 	pr_debug("start_block: %d\n", partition_info->start_block);
@@ -1274,12 +1259,10 @@ static void mtk_nand_dump_bmt_info(struct data_bmt_struct *data_bmt)
 
 	for (i = 0; i < data_bmt->bad_count; i++) {
 		pr_debug("bad_index: %d, flag: %d\n",
-			data_bmt->entry[i].bad_index,
-			data_bmt->entry[i].flag);
+			 data_bmt->entry[i].bad_index,
+			 data_bmt->entry[i].flag);
 	}
 }
-
-
 
 /* API for nand Wrapper */
 
@@ -1313,8 +1296,8 @@ EXPORT_SYMBOL(mtk_nand_chip_init);
  * return : 0 on success, On error, return error num.
  */
 int mtk_nand_chip_read_page(struct mtk_nand_chip_info *info,
-		u8 *data_buffer, u8 *oob_buffer, u32 block,
-		u32 page, u32 offset, u32 size)
+			    u8 *data_buffer, u8 *oob_buffer, u32 block,
+			    u32 page, u32 offset, u32 size)
 {
 	int ret = 0;
 
@@ -1329,15 +1312,15 @@ int mtk_nand_chip_read_page(struct mtk_nand_chip_info *info,
 	}
 
 	if ((offset % (1 << info->sector_size_shift) != 0)
-		|| (size % (1 << info->sector_size_shift) != 0)) {
+	    || (size % (1 << info->sector_size_shift) != 0)) {
 		pr_err("offset or size is invalid:offset:%d, size:%d\n",
-			offset, size);
+		       offset, size);
 		return -EINVAL;
 	}
 
 	if (!block_page_num_is_valid(info, block, page)) {
 		pr_err("%s: block or page is invalid:block:%d, page:%d\n",
-			    __func__, block, page);
+		       __func__, block, page);
 		dump_block_bitmap();
 		dump_stack();
 		return -EINVAL;
@@ -1347,11 +1330,11 @@ int mtk_nand_chip_read_page(struct mtk_nand_chip_info *info,
 		return -ENANDBAD;
 
 	ret = mtk_nand_read_pages(info, data_buffer,
-		oob_buffer, block, page, offset, size);
+				  oob_buffer, block, page, offset, size);
 
 	if (ret) {
 		pr_err("read err:%d block:%d page:%d offset:%d size:%d\n",
-			ret, block, page, offset, size);
+		       ret, block, page, offset, size);
 	}
 
 	return ret;
@@ -1376,8 +1359,8 @@ EXPORT_SYMBOL(mtk_nand_chip_read_page);
  *          On first page read error, return error number.
  */
 int mtk_nand_chip_read_multi_pages(struct mtk_nand_chip_info *info,
-			int page_num, struct mtk_nand_chip_read_param *param)
-
+				   int page_num,
+				   struct mtk_nand_chip_read_param *param)
 {
 	struct mtk_nand_chip_read_param *p = param;
 	int ret;
@@ -1390,13 +1373,15 @@ int mtk_nand_chip_read_multi_pages(struct mtk_nand_chip_info *info,
 
 	if (page_num == 1 || !is_multi_read_support(info)) {
 		ret = mtk_nand_chip_read_page(info, p->data_buffer,
-			p->oob_buffer, p->block, p->page, p->offset, p->size);
+					      p->oob_buffer, p->block,
+					      p->page, p->offset, p->size);
 		return ret ? ret : 1;
 	}
 
 	if (!can_multi_plane(p->block, p->page, p[1].block, p[1].page)) {
 		ret = mtk_nand_chip_read_page(info, p->data_buffer,
-			p->oob_buffer, p->block, p->page, p->offset, p->size);
+					      p->oob_buffer, p->block,
+					      p->page, p->offset, p->size);
 		return ret ? ret : 1;
 	}
 
@@ -1426,9 +1411,9 @@ EXPORT_SYMBOL(mtk_nand_chip_read_multi_pages);
  * return : 0 on success, On error, return error num casted by ERR_PTR
  */
 int mtk_nand_chip_write_page(struct mtk_nand_chip_info *info,
-		u8 *data_buffer, u8 *oob_buffer,
-		u32 block, u32 page, bool more_page,
-		mtk_nand_callback_func callback, void *userdata)
+			     u8 *data_buffer, u8 *oob_buffer,
+			     u32 block, u32 page, bool more_page,
+			     mtk_nand_callback_func callback, void *userdata)
 {
 	/* Add to worklist here */
 	struct worklist_ctrl *list_ctrl;
@@ -1451,20 +1436,19 @@ int mtk_nand_chip_write_page(struct mtk_nand_chip_info *info,
 
 	if (!block_page_num_is_valid(info, block, page)) {
 		pr_err("%s: block or page is invalid:block:%d, page:%d\n",
-			    __func__, block, page);
+		       __func__, block, page);
 		dump_block_bitmap();
 		return -EINVAL;
 	}
 
 	list_ctrl = (block < info->data_block_num) ?
-			&data_info->wlist_ctrl : &data_info->swlist_ctrl;
+	    &data_info->wlist_ctrl : &data_info->swlist_ctrl;
 	total_num = get_list_work_cnt(list_ctrl);
 	max_keep_pages = is_slc_block(info, block) ?
-			info->plane_num : info->max_keep_pages;
+	    info->plane_num : info->max_keep_pages;
 
 	while (total_num >= max_keep_pages) {
-		mtk_nand_process_list(info,
-				list_ctrl, max_keep_pages);
+		mtk_nand_process_list(info, list_ctrl, max_keep_pages);
 		total_num = get_list_work_cnt(list_ctrl);
 	};
 
@@ -1490,7 +1474,7 @@ int mtk_nand_chip_write_page(struct mtk_nand_chip_info *info,
 		return 0;
 
 	page_num = is_slc_block(info, block) ? info->log_page_num :
-					info->data_page_num;
+	    info->data_page_num;
 	total_num = get_list_work_cnt(list_ctrl);
 	if (total_num >= max_keep_pages || (page == page_num - 1))
 		complete(&data_info->ops_ctrl);
@@ -1510,8 +1494,8 @@ EXPORT_SYMBOL(mtk_nand_chip_write_page);
  * return : 0 on success, On error, return error num casted by ERR_PTR
  */
 int mtk_nand_chip_erase_block(struct mtk_nand_chip_info *info,
-		u32 block, u32 more_block,
-		mtk_nand_callback_func callback, void *userdata)
+			      u32 block, u32 more_block,
+			      mtk_nand_callback_func callback, void *userdata)
 {
 	struct worklist_ctrl *list_ctrl;
 	struct nand_work *work;
@@ -1530,8 +1514,7 @@ int mtk_nand_chip_erase_block(struct mtk_nand_chip_info *info,
 	total_num = get_list_work_cnt(list_ctrl);
 
 	while (total_num >= info->max_keep_pages) {
-		mtk_nand_process_list(info,
-				list_ctrl, info->max_keep_pages);
+		mtk_nand_process_list(info, list_ctrl, info->max_keep_pages);
 		list_ctrl = &data_info->elist_ctrl;
 		total_num = get_list_work_cnt(list_ctrl);
 	};
@@ -1598,8 +1581,9 @@ EXPORT_SYMBOL(mtk_nand_chip_set_blk_thread);
  * @info: NAND handler
  * Return FTL partition's bad block table for nand wrapper.
  */
-const struct mtk_nand_chip_bbt_info *
-mtk_nand_chip_bmt(struct mtk_nand_chip_info *info)
+const struct mtk_nand_chip_bbt_info *mtk_nand_chip_bmt(struct
+						       mtk_nand_chip_info
+						       *info)
 {
 	if (&data_info->chip_bbt != NULL)
 		return &data_info->chip_bbt;
@@ -1627,7 +1611,7 @@ void mtk_chip_mark_bad_block(struct mtk_nand_chip_info *info, u32 block)
 	chip_bbt->bad_block_table[chip_bbt->bad_block_num++] = block;
 
 	success = nandx_bmt_update(block + data_info->bmt.start_block,
-					FTL_MARK_BAD);
+				   FTL_MARK_BAD);
 	if (!success)
 		pr_err("mark block(%d) as bad fail!!!\n", block);
 }
@@ -1655,7 +1639,7 @@ int nandx_mntl_ops_init(void)
 	info = &data_info->chip_info;
 
 	ret = get_data_partition_info(&data_info->partition_info,
-					&data_info->chip_info);
+				      &data_info->chip_info);
 	if (ret) {
 		pr_err("Get FTL partition info failed\n");
 		goto err_out;
@@ -1693,15 +1677,15 @@ int nandx_mntl_ops_init(void)
 	}
 
 	init_list_ctrl(info, &data_info->elist_ctrl, LIST_ERASE,
-			complete_erase_count, mtk_nand_do_erase);
+		       complete_erase_count, mtk_nand_do_erase);
 	init_list_ctrl(info, &data_info->swlist_ctrl, LIST_SLC_WRITE,
-			complete_slc_write_count, mtk_nand_do_slc_write);
+		       complete_slc_write_count, mtk_nand_do_slc_write);
 	init_list_ctrl(info, &data_info->wlist_ctrl, LIST_NS_WRITE,
-			complete_write_count, mtk_nand_do_write);
+		       complete_write_count, mtk_nand_do_write);
 
 	init_completion(&data_info->ops_ctrl);
 	data_info->nand_bgt = kthread_run(mtk_nand_work_thread,
-				data_info, "nand_bgt");
+					  data_info, "nand_bgt");
 
 	if (IS_ERR(data_info->nand_bgt)) {
 		ret = PTR_ERR(data_info->nand_bgt);
@@ -1747,7 +1731,6 @@ void mtk_nand_update_call_trace(unsigned int *address, char type,
 }
 EXPORT_SYMBOL(mtk_nand_update_call_trace);
 
-
 static void dump_block_bitmap(void)
 {
 	int i, num;
@@ -1782,9 +1765,9 @@ void dump_block_bit_map(u8 *array)
 				continue;
 
 			check = is_slc_block(&data_info->chip_info,
-						((i * 8) + j));
+					     ((i * 8) + j));
 			pr_info("block %d is tlc check = %d\n",
-						((i * 8) + j), check);
+				((i * 8) + j), check);
 		}
 	}
 }
@@ -1798,14 +1781,12 @@ int mtk_nand_update_block_type(int num, unsigned int *blk)
 
 	nandx_get_device(FL_ERASING);
 	for (i = 0; i < num; i++) {
-		pr_info("%s: erase block %d\n",
-			    __func__, blk[i]);
+		pr_info("%s: erase block %d\n", __func__, blk[i]);
 		row = (blk[i] + data_info->bmt.start_block) *
-			info->data_page_num;
+		    info->data_page_num;
 		ret = nandx_core_erase(&row, 1, MODE_SLC);
 		if (ret)
-			pr_err("erase block %d failed\n",
-				    blk[i]);
+			pr_err("erase block %d failed\n", blk[i]);
 	}
 	nandx_release_device();
 
@@ -1879,7 +1860,7 @@ int mvg_set_current_case(const char *gname, const char *cname)
 	if (mvg_on_group_case(gname, cname)) {
 		if (cstack) {
 			pr_info("[MVG] set case reentry on %s-%s\n",
-				    gname, cname);
+				gname, cname);
 			return -EINVAL;
 		}
 		push_case(gname, cname);
@@ -1942,8 +1923,7 @@ void os_mutex_destroy(struct mutex *lock)
 }
 EXPORT_SYMBOL(os_mutex_destroy);
 
-void __sched
-os_mutex_lock(struct mutex *lock)
+void __sched os_mutex_lock(struct mutex *lock)
 {
 	mutex_lock(lock);
 }

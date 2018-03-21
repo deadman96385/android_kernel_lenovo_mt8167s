@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #ifndef __NANDX_CORE_H__
 #define __NANDX_CORE_H__
 
@@ -24,10 +17,9 @@
 
 struct nandx_chip_dev;
 struct wl_order_program;
-typedef int (*order_program_cb)(struct nandx_chip_dev *,
-			struct wl_order_program *,
-			struct nandx_ops *,
-			int, bool, bool);
+typedef int (*order_program_cb) (struct nandx_chip_dev *,
+				 struct wl_order_program *,
+				 struct nandx_ops *, int, bool, bool);
 
 struct wl_order_program {
 	u32 wl_num;
@@ -45,21 +37,18 @@ struct nandx_core {
 
 struct nandx_ops *alloc_ops_table(int count);
 void free_ops_table(struct nandx_ops *ops_table);
-int nandx_core_read(struct nandx_ops *ops_table,
-			int count, u32 mode);
-int nandx_core_write(struct nandx_ops *ops_table,
-			int count, u32 mode);
+int nandx_core_read(struct nandx_ops *ops_table, int count, u32 mode);
+int nandx_core_write(struct nandx_ops *ops_table, int count, u32 mode);
 int nandx_core_erase(u32 *rows, int count, u32 mode);
 bool nandx_core_is_bad(u32 row);
 int nandx_core_mark_bad(u32 row);
 
 int nandx_core_suspend(void);
 int nandx_core_resume(void);
-struct nandx_core *
-nandx_core_init(struct platform_data *pdata, u32 mode);
+struct nandx_core *nandx_core_init(struct platform_data *pdata, u32 mode);
 int nandx_core_exit(void);
 void nandx_core_free(void);
 struct nandx_chip_info *get_chip_info(void);
 struct nandx_core *get_nandx_core(void);
 
-#endif	/* __NANDX_CORE_H__ */
+#endif				/* __NANDX_CORE_H__ */

@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 
 #ifndef __NANDX_DEVICE_INFO_H__
 #define __NANDX_DEVICE_INFO_H__
@@ -44,7 +37,6 @@ enum IO_WIDTH {
 	IO_16BIT
 };
 
-
 enum MODE_TYPE {
 	MODE_SLC_A2 = 1,
 	MODE_SLC_DA = 2,
@@ -53,7 +45,6 @@ enum MODE_TYPE {
 	MODE_LOWER_PAGE_MICRON = 16,
 	MODE_SLC_FEATURE_MICRON = 32
 };
-
 
 enum ADDR_CYCLE {
 	ADDR_CYCLE5 = 5,
@@ -75,8 +66,8 @@ enum FEATURE_ADDRESS {
 };
 
 enum INTERFACE_FEATURE_VALUE {
-	INFTYPE,	/* interface type bit */
-	TMODE,		/* timing mode bit */
+	INFTYPE,		/* interface type bit */
+	TMODE,			/* timing mode bit */
 };
 
 enum ADDRESS_TABLE {
@@ -110,7 +101,6 @@ enum ADDRESSING_INDEX {
 	ADDR_LUN_LEN,
 	ADDR_INDEX_NUM
 };
-
 
 enum BASIC_CMD_SETS {
 	CMD_RESET,
@@ -156,7 +146,6 @@ enum REPLACE_CMD_TYPE {
 	RCMD_MULTI2_PROGRAM_1ST,
 	REPLACE_CMD_TYPE_NUM
 };
-
 
 enum DRIVE_STRENGTH_LEVEL {
 	DRIVE_LEVEL_DEFAULT,
@@ -222,7 +211,6 @@ enum TOGGLE_TIMING_TYPE {
 	TOGGLE_TIMING_TYPE_NUM
 };
 
-
 struct nand_life_info {
 	u32 pe_cycle;
 	u32 ecc_required;
@@ -277,7 +265,7 @@ struct nandx_toggle_timing {
 struct nand_timing {
 	struct nandx_legacy_timing *legacy;
 	union {
-		struct nandx_onfi_timing	*onfi;
+		struct nandx_onfi_timing *onfi;
 		struct nandx_toggle_timing *toggle;
 	} ddr;
 };
@@ -292,28 +280,27 @@ struct nand_timing {
 struct nandx_device_info {
 	char name[NAME_MAX_LEN];
 	u8 id[ID_MAX_NUM];
-	u8 type; /* enum NAND_TYPE */
-	u8 io_width; /* enum IO_WIDTH */
+	u8 type;		/* enum NAND_TYPE */
+	u8 io_width;		/* enum IO_WIDTH */
 	u8 addr_cycle;
 	u8 target_num;
 	u8 lun_num;
 	u8 plane_num;
-	u32 block_num; /* single plane */
+	u32 block_num;		/* single plane */
 	u32 block_size;
 	u32 page_size;
 	u32 spare_size;
-	u32 mode_type; /* enum MODE_TYPE, bitmap */
-	u8 program_order_type; /* enum PROGRAM_ORDER */
-	u8 address_table_type; /* enum ADDRESS_TABLE */
-	u8 bad_block_type; /* enum BAD_BLOCK_TYPE */
-	u8 read_retry_type; /* enum READ_RETRY_TYPE */
-	u8 interface_type; /* enum INTERFACE_TYPE */
-	u8 sdr_timing_type; /* enum SDR_TIMING_TYPE */
-	u8 ddr_timing_type; /* enum ONFI_TIMING_TYPE enum TOGGLE_TIMING_TYPE */
+	u32 mode_type;		/* enum MODE_TYPE, bitmap */
+	u8 program_order_type;	/* enum PROGRAM_ORDER */
+	u8 address_table_type;	/* enum ADDRESS_TABLE */
+	u8 bad_block_type;	/* enum BAD_BLOCK_TYPE */
+	u8 read_retry_type;	/* enum READ_RETRY_TYPE */
+	u8 interface_type;	/* enum INTERFACE_TYPE */
+	u8 sdr_timing_type;	/* enum SDR_TIMING_TYPE */
+	u8 ddr_timing_type;	/* enum ONFI_TIMING_TYPE TOGGLE_TIMING_TYPE */
 	struct nand_life_info slc_life;
 	struct nand_life_info xlc_life;
 };
-
 
 /*
  ********************************
@@ -333,4 +320,4 @@ void *get_nandx_timing(enum INTERFACE_TYPE type, u8 timing_type);
 u8 get_nandx_interface_value(enum VENDOR_TYPE vtype, u8 timing_mode,
 			     enum INTERFACE_TYPE itype);
 
-#endif /* __NANDX_DEVICE_INFO_H__ */
+#endif				/* __NANDX_DEVICE_INFO_H__ */

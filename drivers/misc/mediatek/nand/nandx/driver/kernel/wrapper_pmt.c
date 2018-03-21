@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #include "nandx_util.h"
 #include "nandx_errno.h"
 #include <linux/ctype.h>
@@ -42,14 +35,14 @@ static struct mtd_erase_region_info *mtderase;
 static int nandx_pmt_open(struct inode *inode, struct file *filp)
 {
 	pr_debug("[%s]:(MAJOR)%d:(MINOR)%d\n", __func__,
-		   MAJOR(inode->i_rdev), MINOR(inode->i_rdev));
+		 MAJOR(inode->i_rdev), MINOR(inode->i_rdev));
 	return 0;
 }
 
 static int nandx_pmt_release(struct inode *inode, struct file *filp)
 {
 	pr_debug("[%s]:(MAJOR)%d:(MINOR)%d\n", __func__,
-		   MAJOR(inode->i_rdev), MINOR(inode->i_rdev));
+		 MAJOR(inode->i_rdev), MINOR(inode->i_rdev));
 	return 0;
 }
 
@@ -64,13 +57,13 @@ static int nandx_pmt_write(void __user *uarg)
 	handler = nandx_get_pmt_handler();
 	pt = handler->pmt;
 
-	packet = (struct DM_PARTITION_INFO_PACKET *)mem_alloc(1,
-		 sizeof(struct DM_PARTITION_INFO_PACKET));
+	packet = (struct DM_PARTITION_INFO_PACKET *)
+	    mem_alloc(1, sizeof(struct DM_PARTITION_INFO_PACKET));
 	if (packet == NULL)
 		return -ENOMEM;
 
 	if (copy_from_user(packet, uarg,
-	    sizeof(struct DM_PARTITION_INFO_PACKET))) {
+			   sizeof(struct DM_PARTITION_INFO_PACKET))) {
 		ret = -EFAULT;
 		goto freepacket;
 	}
@@ -88,7 +81,7 @@ static int nandx_pmt_write(void __user *uarg)
 		pt->size = packet->part_info[i].part_len;
 		pt->mask_flags = 0;
 		pr_debug("%s: new_pt %s size %llx\n",
-			    __func__, pt->name, pt->size);
+			 __func__, pt->name, pt->size);
 		if (!strcmp(pt->name, "BMTPOOL"))
 			break;
 		pt++;
@@ -116,7 +109,7 @@ static long nandx_pmt_ioctl(struct file *file, u32 cmd, unsigned long arg)
 	switch (cmd) {
 	case PMT_READ:
 		if (copy_to_user(uarg, handler->pmt,
-		    sizeof(struct pt_resident) * PART_MAX_COUNT))
+				 sizeof(struct pt_resident) * PART_MAX_COUNT))
 			ret = -EFAULT;
 		break;
 	case PMT_WRITE:
@@ -128,14 +121,14 @@ static long nandx_pmt_ioctl(struct file *file, u32 cmd, unsigned long arg)
 		break;
 	case PMT_UPDATE:
 		if (copy_from_user(handler->pmt, uarg,
-		    sizeof(struct pt_resident) * PART_MAX_COUNT))
+				   sizeof(struct pt_resident) *
+				   PART_MAX_COUNT))
 			ret = -EFAULT;
 		if (ret == 0)
 			ret = nandx_pmt_update();
 		break;
 	default:
-		pr_err("%s: type %d invalid\n",
-			    __func__, cmd);
+		pr_err("%s: type %d invalid\n", __func__, cmd);
 		ret = -EINVAL;
 	}
 
@@ -197,7 +190,7 @@ int nandx_pmt_register(struct mtd_info *mtd)
 	part = mtdpart;
 
 	mtd->eraseregions = mem_alloc(handler->part_num,
-			    sizeof(struct mtd_erase_region_info));
+				      sizeof(struct mtd_erase_region_info));
 	if (mtd->eraseregions == NULL)
 		return -ENOMEM;
 	mtderase = mtd->eraseregions;
@@ -207,7 +200,7 @@ int nandx_pmt_register(struct mtd_info *mtd)
 	for (i = 0; i < handler->part_num; i++) {
 		if (i == (handler->part_num - 1)) {
 			offset = (u64)info->block_size *
-				 (info->block_num - bmt_block);
+			    (info->block_num - bmt_block);
 			size = (u64)bmt_block * info->block_size;
 		} else {
 			offset = pt->offset;
@@ -298,12 +291,12 @@ int get_data_partition_info(struct nand_ftl_partition_info *info,
 	for (i = 0; i < handler->part_num; i++) {
 		if (!strcmp(part->name, FTL_PARTITION_NAME)) {
 			info->total_block = (u32)div_down(part->size,
-					    dev->block_size);
+							  dev->block_size);
 
 			info->start_block = (u32)div_down(part->offset,
-					    dev->block_size);
+							  dev->block_size);
 
-			info->slc_ratio = 8/*handler->usr_slc_ratio*/;
+			info->slc_ratio = 8 /*handler->usr_slc_ratio */;
 
 			return 0;
 		}
@@ -313,7 +306,8 @@ int get_data_partition_info(struct nand_ftl_partition_info *info,
 	return -1;
 }
 
-static void update_block_bitmap(struct mtk_nand_chip_info *info, int num, u32 *blk)
+static void update_block_bitmap(struct mtk_nand_chip_info *info, int num,
+				u32 *blk)
 {
 	struct pmt_handler *handler;
 	int i, byte, bit;

@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #ifndef __NANDX_BMT_H__
 #define __NANDX_BMT_H__
 
@@ -19,7 +12,6 @@
 #ifdef CONFIG_MNTL_SUPPORT
 #include "mntl_ops.h"
 #endif
-
 
 enum UPDATE_REASON {
 	UPDATE_ERASE_FAIL,
@@ -32,7 +24,6 @@ enum UPDATE_REASON {
 	FTL_MARK_BAD = 64,
 };
 
-
 int nandx_bmt_init(struct nandx_chip_info *dev_info, u32 block_num);
 u32 nandx_bmt_update(u32 bad_block, enum UPDATE_REASON reason);
 void nandx_bmt_update_oob(u32 block, u8 *oob);
@@ -43,5 +34,4 @@ int nandx_bmt_get_data_bmt(struct data_bmt_struct *data_bmt);
 
 #endif
 
-
-#endif /* #ifndef __NANDX_BMT_H__ */
+#endif				/* #ifndef __NANDX_BMT_H__ */

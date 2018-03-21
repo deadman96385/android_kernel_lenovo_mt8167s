@@ -1,14 +1,8 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
 
 #include "nandx_util.h"
@@ -69,9 +63,10 @@ static void dump_ops(struct nandx_ops *ops_table, int count,
 
 	ops = ops_table;
 	for (i = 0; i < count; i++) {
-		pr_debug("%s: ops[%s][%d] - row %u col %u len %u data %p oob %p\n",
-			  __func__, name, i, ops->row, ops->col, ops->len,
-			  ops->data, ops->oob);
+		pr_debug
+		    ("%s: ops[%s][%d] - row %u col %u len %u data %p oob %p\n",
+		     __func__, name, i, ops->row, ops->col, ops->len,
+		     ops->data, ops->oob);
 		ops++;
 	}
 #endif
@@ -87,8 +82,8 @@ static inline void ops_arrange(struct nandx_ops **src, struct nandx_ops **dst,
 }
 
 static int do_chip_read_page(struct nandx_chip_dev *chip,
-			struct nandx_ops **ops_list,
-			int count, bool multi, bool cache)
+			     struct nandx_ops **ops_list,
+			     int count, bool multi, bool cache)
 {
 	int i, ret;
 	struct nandx_ops **ops;
@@ -119,17 +114,19 @@ static int do_chip_read_page(struct nandx_chip_dev *chip,
 }
 
 static int do_chip_write_page(struct nandx_chip_dev *chip,
-			struct nandx_ops **ops_list,
-			int count, bool multi, bool cache)
+			      struct nandx_ops **ops_list,
+			      int count, bool multi, bool cache)
 {
 	if (!multi) {
 		if (!cache)
 			return chip->program_page(chip, ops_list, count);
 		else
-			return chip->cache_program_page(chip, ops_list, count);
+			return chip->cache_program_page(chip, ops_list,
+							count);
 	} else {
 		if (!cache)
-			return chip->multi_program_page(chip, ops_list, count);
+			return chip->multi_program_page(chip, ops_list,
+							count);
 		else
 			return chip->multi_cache_program_page(chip, ops_list,
 							      count);
@@ -137,8 +134,8 @@ static int do_chip_write_page(struct nandx_chip_dev *chip,
 }
 
 static int do_ops_read(struct nandx_chip_dev *chip,
-			struct nandx_ops **ops_list,
-			int count, bool multi, bool cache)
+		       struct nandx_ops **ops_list,
+		       int count, bool multi, bool cache)
 {
 	int ret;
 	u32 page_size, sec_size;
@@ -158,8 +155,9 @@ static int do_ops_read(struct nandx_chip_dev *chip,
 	    (pops_h->col == 0 && pops_h->len < page_size)) {
 		oops_h.row = pops_h->row;
 		oops_h.col = div_round_down(pops_h->col, sec_size);
-		oops_h.len = div_round_up(pops_h->col + pops_h->len, sec_size) -
-			     oops_h.col;
+		oops_h.len =
+		    div_round_up(pops_h->col + pops_h->len,
+				 sec_size) - oops_h.col;
 		oops_h.data = mem_alloc(1, oops_h.len);
 		if (!oops_h.data)
 			return -ENOMEM;
@@ -205,8 +203,7 @@ err:
 	return ret;
 }
 
-int nandx_core_read(struct nandx_ops *ops_table,
-			int count, u32 mode)
+int nandx_core_read(struct nandx_ops *ops_table, int count, u32 mode)
 {
 	int ret, ret_tmp, plane_num;
 	bool do_cache, do_multi;
@@ -250,8 +247,8 @@ err:
 }
 
 static void ops_order_arrange(struct nandx_ops *from, struct nandx_ops **to,
-			int cycle_count, int program_count,
-			int page_count, bool revesal)
+			      int cycle_count, int program_count,
+			      int page_count, bool revesal)
 {
 	int i, max_count;
 	int dst_index;
@@ -272,9 +269,9 @@ static void ops_order_arrange(struct nandx_ops *from, struct nandx_ops **to,
 }
 
 static int tlc_order_program(struct nandx_chip_dev *chip,
-			struct wl_order_program *program,
-			struct nandx_ops *ops_table,
-			int count, bool multi, bool cache)
+			     struct wl_order_program *program,
+			     struct nandx_ops *ops_table,
+			     int count, bool multi, bool cache)
 {
 	u32 plane_num, max_keep_page_num;
 	u32 wl_page_num, multi_wl_page_num;
@@ -294,8 +291,8 @@ static int tlc_order_program(struct nandx_chip_dev *chip,
 	page_num = ops->row % block_page_num;
 	if (page_num != program->wl_num * multi_wl_page_num) {
 		pr_err("%s: input %u, record %u\n",
-			    __func__, page_num,
-			    program->wl_num * multi_wl_page_num);
+		       __func__, page_num,
+		       program->wl_num * multi_wl_page_num);
 		return -EIO;
 	}
 
@@ -323,32 +320,32 @@ static int tlc_order_program(struct nandx_chip_dev *chip,
 		}
 	}
 
-	return do_chip_write_page(chip, program->ops_list, count * wl_page_num,
-				  multi, cache);
+	return do_chip_write_page(chip, program->ops_list,
+				  count * wl_page_num, multi, cache);
 }
 
 static int
 vtlc_toshiba_order_program(struct nandx_chip_dev *chip,
-			struct wl_order_program *program,
-			struct nandx_ops *ops_table, int count,
-			bool multi, bool cache)
+			   struct wl_order_program *program,
+			   struct nandx_ops *ops_table, int count,
+			   bool multi, bool cache)
 {
 	return 0;
 }
 
 static int
 vtlc_micron_order_program(struct nandx_chip_dev *chip,
-			struct wl_order_program *program,
-			struct nandx_ops *ops_table,
-			int count, bool multi, bool cache)
+			  struct wl_order_program *program,
+			  struct nandx_ops *ops_table,
+			  int count, bool multi, bool cache)
 {
 	return 0;
 }
 
 static int do_order_program(struct nandx_chip_dev *chip,
-			struct wl_order_program *program,
-			struct nandx_ops *ops_table,
-			int count, bool multi, bool cache)
+			    struct wl_order_program *program,
+			    struct nandx_ops *ops_table,
+			    int count, bool multi, bool cache)
 {
 	struct nandx_ops *ops;
 	struct nandx_chip_info *info;
@@ -361,14 +358,12 @@ static int do_order_program(struct nandx_chip_dev *chip,
 	max_keep_page_num = multi_wl_page_num * TLC_WL_PROGRAM_COUNT;
 
 	if (count % max_keep_page_num) {
-		pr_err("%s: invalid ops count = %d\n",
-				__func__, count);
+		pr_err("%s: invalid ops count = %d\n", __func__, count);
 		return -EINVAL;
 	}
 
 	if (ops->row % info->wl_page_num) {
-		pr_err("%s: invalid ops row = %u\n",
-				__func__, ops->row);
+		pr_err("%s: invalid ops row = %u\n", __func__, ops->row);
 		return -EINVAL;
 	}
 
@@ -378,7 +373,7 @@ static int do_order_program(struct nandx_chip_dev *chip,
 		program->wl_num = 0;
 	} else if (page_num != info->wl_page_num * program->wl_num) {
 		pr_err("%s: invalid input page_num = %u\n",
-				__func__, page_num);
+		       __func__, page_num);
 		return -EINVAL;
 	}
 
@@ -394,9 +389,8 @@ static int do_order_program(struct nandx_chip_dev *chip,
 }
 
 static int non_order_program(struct nandx_chip_dev *chip,
-			struct nandx_ops *ops_table,
-			int count, int slc_mode,
-			bool multi, bool cache)
+			     struct nandx_ops *ops_table,
+			     int count, int slc_mode, bool multi, bool cache)
 {
 	int ret = 0, ret_tmp, multi_wl_page_num, max_keep_page_num;
 	struct nandx_chip_info *info;
@@ -415,14 +409,12 @@ static int non_order_program(struct nandx_chip_dev *chip,
 	}
 
 	if (count % max_keep_page_num) {
-		pr_err("%s: invalid ops count = %d\n",
-				__func__, count);
+		pr_err("%s: invalid ops count = %d\n", __func__, count);
 		return -EINVAL;
 	}
 
 	if (ops->row % info->wl_page_num) {
-		pr_err("%s: invalid ops row = %u\n",
-				__func__, ops->row);
+		pr_err("%s: invalid ops row = %u\n", __func__, ops->row);
 		return -EINVAL;
 	}
 
@@ -445,8 +437,7 @@ err:
 	return ret;
 }
 
-int nandx_core_write(struct nandx_ops *ops_table,
-			int count, u32 mode)
+int nandx_core_write(struct nandx_ops *ops_table, int count, u32 mode)
 {
 	int ret;
 	bool slc_mode, do_cache, do_multi;
@@ -484,8 +475,7 @@ static void dump_erase_rows(u32 *rows, int count)
 	int i;
 
 	for (i = 0; i < count; i++)
-		pr_debug("%s: row[%d] %u\n",
-			    __func__, i, rows[i]);
+		pr_debug("%s: row[%d] %u\n", __func__, i, rows[i]);
 #endif
 }
 
@@ -566,8 +556,7 @@ static order_program_cb order_program_table[] = {
 	vtlc_micron_order_program
 };
 
-static struct nandx_core *
-nandx_core_alloc(struct nandx_chip_dev *chip)
+static struct nandx_core *nandx_core_alloc(struct nandx_chip_dev *chip)
 {
 	struct nandx_chip_info *info;
 	struct wl_order_program *program;
@@ -590,7 +579,7 @@ nandx_core_alloc(struct nandx_chip_dev *chip)
 	program = &ncore->program;
 	type = chip->program_order_type;
 	program->total_wl_num = (info->block_size / info->page_size) *
-				info->wl_page_num;
+	    info->wl_page_num;
 	program->order_program_func = order_program_table[type];
 
 	return ncore;
@@ -634,8 +623,7 @@ int nandx_core_resume(void)
 	return ret;
 }
 
-struct nandx_core *
-nandx_core_init(struct platform_data *pdata, u32 mode)
+struct nandx_core *nandx_core_init(struct platform_data *pdata, u32 mode)
 {
 	int ret;
 	struct nandx_chip_dev *chip;
@@ -651,20 +639,22 @@ nandx_core_init(struct platform_data *pdata, u32 mode)
 	}
 
 	chip->change_mode(chip, OPS_MODE_DMA,
-			(mode & MODE_DMA) == MODE_DMA, NULL);
+			  (mode & MODE_DMA) == MODE_DMA, NULL);
 	chip->change_mode(chip, OPS_MODE_IRQ,
-			(mode & MODE_IRQ) == MODE_IRQ, NULL);
+			  (mode & MODE_IRQ) == MODE_IRQ, NULL);
 	chip->change_mode(chip, OPS_MODE_ECC,
-			(mode & MODE_ECC) == MODE_ECC, NULL);
+			  (mode & MODE_ECC) == MODE_ECC, NULL);
 	chip->change_mode(chip, OPS_MODE_RANDOMIZE,
-			(mode & MODE_RANDOMIZE) == MODE_RANDOMIZE, NULL);
+			  (mode & MODE_RANDOMIZE) == MODE_RANDOMIZE, NULL);
 	chip->change_mode(chip, OPS_MODE_CALIBRATION,
-			(mode & MODE_CALIBRATION) == MODE_CALIBRATION, NULL);
+			  (mode & MODE_CALIBRATION) == MODE_CALIBRATION,
+			  NULL);
 
 	/* ret EOPNOTSUPP, EIO, OK */
 	ret = -EOPNOTSUPP;
 	if ((mode & MODE_DDR) == MODE_DDR)
-		ret = chip->change_mode(chip, OPS_MODE_DDR, true, &pdata->freq);
+		ret =
+		    chip->change_mode(chip, OPS_MODE_DDR, true, &pdata->freq);
 	if (ret == -EOPNOTSUPP)
 		ret = chip->change_mode(chip, OPS_MODE_DDR, false,
 					&pdata->freq);

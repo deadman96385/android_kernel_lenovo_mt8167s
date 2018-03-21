@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #ifndef __MNTL_OPS_H__
 #define __MNTL_OPS_H__
 
@@ -68,7 +61,6 @@ extern int init_module_mem(void *buf, int size);
 #define NULL  (0)
 #endif
 
-
 #define MTK_TLC_DIV	3
 #define MTK_MLC_DIV	2
 
@@ -84,16 +76,16 @@ extern int init_module_mem(void *buf, int size);
 #define BAD_BLOCK_WRITE_FAILED	(3)
 
 struct data_bmt_entry {
-	u16 bad_index;	/* bad block index */
+	u16 bad_index;		/* bad block index */
 	u8 flag;		/* mapping block index in the replace pool */
 };
 
 struct data_bmt_struct {
 	struct data_bmt_entry entry[DATA_MAX_BMT_COUNT];
-	unsigned int  version;
-	unsigned int bad_count;		/* bad block count */
+	unsigned int version;
+	unsigned int bad_count;	/* bad block count */
 	unsigned int start_block;	/* data partition start block addr */
-	unsigned int end_block;		/* data partition start block addr */
+	unsigned int end_block;	/* data partition start block addr */
 	unsigned int checksum;
 };
 
@@ -102,10 +94,10 @@ struct data_bmt_struct {
 #define FTL_PARTITION_NAME	"userdata"
 
 struct nand_ftl_partition_info {
-	unsigned int start_block;		/* Number of data blocks */
-	unsigned int total_block;		/* Number of block */
-	unsigned int slc_ratio;		/* FTL SLC ratio here */
-	unsigned int slc_block;		/* FTL SLC ratio here */
+	unsigned int start_block;	/* Number of data blocks */
+	unsigned int total_block;	/* Number of block */
+	unsigned int slc_ratio;	/* FTL SLC ratio here */
+	unsigned int slc_block;	/* FTL SLC ratio here */
 };
 
 enum operation_types {
@@ -122,9 +114,9 @@ struct list_node {
 	((type *)((unsigned long)(ptr) - __builtin_offsetof(type, member)))
 
 struct mtk_nand_chip_operation {
-	struct mtk_nand_chip_info *info; /* Data info */
+	struct mtk_nand_chip_info *info;	/* Data info */
 	enum operation_types types;
-	/* Operation type, 0: Read, 1: write, 2:Erase*/
+	/* Operation type, 0: Read, 1: write, 2:Erase */
 	int block;
 	int page;
 	int offset;
@@ -144,16 +136,18 @@ struct nand_work {
 enum worklist_type {
 	LIST_ERASE = 0,
 	LIST_SLC_WRITE,
-	LIST_NS_WRITE, /* none slc write list: mlc or tlc */
+	LIST_NS_WRITE,		/* none slc write list: mlc or tlc */
 };
 
 struct worklist_ctrl;
 
-typedef unsigned int (*get_ready_count)(struct mtk_nand_chip_info *info,
-		struct worklist_ctrl *list_ctrl, int total);
+typedef unsigned int (*get_ready_count) (struct mtk_nand_chip_info *info,
+					 struct worklist_ctrl *list_ctrl,
+					 int total);
 
-typedef unsigned int (*process_list_data)(struct mtk_nand_chip_info *info,
-		struct worklist_ctrl *list_ctrl, int count);
+typedef unsigned int (*process_list_data) (struct mtk_nand_chip_info *info,
+					   struct worklist_ctrl *list_ctrl,
+					   int count);
 
 struct worklist_ctrl {
 	struct mutex sync_lock;
@@ -161,14 +155,15 @@ struct worklist_ctrl {
 	enum worklist_type type;
 	struct list_node head;
 	int total_num;
-	int *ewrite;/* last write error block list, the num is plane_num*/
+	/* last write error block list, the num is plane_num */
+	int *ewrite;
 	get_ready_count get_ready_count_func;
 	process_list_data process_data_func;
 };
 
 struct err_para {
 	int rate;
-	int count;/*max count*/
+	int count;		/*max count */
 	int block;
 	int page;
 };
@@ -223,7 +218,7 @@ int nandx_mntl_ops_init(void);
 int nandx_mntl_data_info_alloc(void);
 void nandx_mntl_data_info_free(void);
 u32 get_ftl_row_addr(struct mtk_nand_chip_info *info,
-		unsigned int block, unsigned int page);
+		     unsigned int block, unsigned int page);
 int init_mntl_module(void);
 
-#endif	/* __MNTL_OPS_H__ */
+#endif				/* __MNTL_OPS_H__ */

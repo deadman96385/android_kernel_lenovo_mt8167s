@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #include <linux/clk.h>
 #include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
@@ -72,14 +65,14 @@ static int nandx_platform_get_clock_sets(struct platform_data *pdata)
 	clk_sets->nfi_hclk = devm_clk_get(&pdev->dev, "nfi_hclk");
 	if (IS_ERR(clk_sets->nfi_hclk)) {
 		pr_debug("gert nfihclk err %ld!\n",
-			   PTR_ERR(clk_sets->nfi_hclk));
+			 PTR_ERR(clk_sets->nfi_hclk));
 		return PTR_ERR(clk_sets->nfi_hclk);
 	}
 	clk_sets->nfiecc_bclk = devm_clk_get(&pdev->dev, "nfiecc_bclk");
 	clk_sets->nfi_bclk = devm_clk_get(&pdev->dev, "nfi_bclk");
 	clk_sets->nfi_2xclk = devm_clk_get(&pdev->dev, "nfi_2xclk");
-	clk_sets->nfi_1xpad_clk  = devm_clk_get(&pdev->dev, "nfi_1xclk");
-	clk_sets->nfi_rgecc  = devm_clk_get(&pdev->dev, "nfi_rgecc");
+	clk_sets->nfi_1xpad_clk = devm_clk_get(&pdev->dev, "nfi_1xclk");
+	clk_sets->nfi_rgecc = devm_clk_get(&pdev->dev, "nfi_rgecc");
 	clk_sets->nfi_1xclk_sel = devm_clk_get(&pdev->dev, "nfi_1xpad_sel");
 	clk_sets->nfi_2xclk_sel = devm_clk_get(&pdev->dev, "nfi_2xpad_sel");
 	clk_sets->nfiecc_sel = devm_clk_get(&pdev->dev, "nfiecc_sel");
@@ -118,7 +111,7 @@ static void nandx_platform_enable_nfi_clock(struct platform_data *pdata,
 }
 
 static void nandx_platform_prepare_nfi_clock(struct platform_data *pdata,
-					    bool high_speed_en)
+					     bool high_speed_en)
 {
 	struct nandx_clock_sets *clock_sets;
 	struct nfc_frequency *freq = &pdata->freq;
@@ -164,7 +157,7 @@ static void nandx_platform_disable_nfi_clock(struct platform_data *pdata,
 }
 
 static void nandx_platform_unprepare_nfi_clock(struct platform_data *pdata,
-					     bool high_speed_en)
+					       bool high_speed_en)
 {
 	struct nandx_clock_sets *clock_sets;
 
@@ -240,7 +233,7 @@ void nandx_platform_enable_clock(struct platform_data *pdata,
 }
 
 void nandx_platform_prepare_clock(struct platform_data *pdata,
-				 bool high_speed_en, bool ecc_clk_en)
+				  bool high_speed_en, bool ecc_clk_en)
 {
 	nandx_platform_prepare_nfi_clock(pdata, high_speed_en);
 
@@ -258,7 +251,7 @@ void nandx_platform_disable_clock(struct platform_data *pdata,
 }
 
 void nandx_platform_unprepare_clock(struct platform_data *pdata,
-				  bool high_speed_en, bool ecc_clk_en)
+				    bool high_speed_en, bool ecc_clk_en)
 {
 	nandx_platform_unprepare_nfi_clock(pdata, high_speed_en);
 
@@ -275,7 +268,7 @@ int nandx_platform_power_on(struct platform_data *pdata)
 	nandx_regulator = devm_regulator_get(&pdev->dev, "vmch");
 	if (IS_ERR(nandx_regulator)) {
 		pr_debug("get regulator err %ld!\n",
-			   PTR_ERR(nandx_regulator));
+			 PTR_ERR(nandx_regulator));
 		return PTR_ERR(nandx_regulator);
 	}
 	ret = regulator_set_voltage(nandx_regulator, 3300000, 3300000);

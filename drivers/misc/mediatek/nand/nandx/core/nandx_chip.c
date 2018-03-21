@@ -1,23 +1,16 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 
 #include "nandx_errno.h"
 #include "nandx_chip.h"
 #include "nandx_chip_common.h"
 
 static int nandx_chip_get_status(struct nandx_chip *chip,
-				int status, int count)
+				 int status, int count)
 {
 	int threshold, rr_count;
 	struct nandx_device_info *dev_info = chip->dev_info;
@@ -44,7 +37,6 @@ static int nandx_chip_get_status(struct nandx_chip *chip,
 
 	return NAND_OK;
 }
-
 
 static int nandx_chip_read(struct nandx_chip_dev *chip_dev,
 			   struct nandx_ops *ops)
@@ -100,7 +92,6 @@ retry:
 	return ops->status;
 }
 
-
 static int nandx_chip_cache_read(struct nandx_chip_dev *chip_dev,
 				 struct nandx_ops **ops_list, int count)
 {
@@ -149,7 +140,9 @@ calibration:
 			/* read read retry */
 			nandx_chip_cache_read_last_page(chip);
 			/* need to delay? or read status? */
-			ret = nandx_chip_read_retry(chip, ops_list[i - 1], &rr_count);
+			ret =
+			    nandx_chip_read_retry(chip, ops_list[i - 1],
+						  &rr_count);
 			if (ret == -ENANDREAD)
 				break;
 			if (i == count)
@@ -160,7 +153,8 @@ calibration:
 			row = ops_list[i]->row;
 			nandx_chip_read_page(chip, row);
 		}
-		ops_list[i - 1]->status = nandx_chip_get_status(chip, ret, rr_count);
+		ops_list[i - 1]->status =
+		    nandx_chip_get_status(chip, ret, rr_count);
 		status = MIN(ops_list[i - 1]->status, status);
 	}
 
@@ -195,7 +189,7 @@ static int nandx_chip_multi_read(struct nandx_chip_dev *chip_dev,
 
 calibration:
 	pr_debug("%s: count %d, slc_mode %d\n",
-		    __func__, count, chip->slc_mode);
+		 __func__, count, chip->slc_mode);
 	if (chip->slc_mode)
 		slc_ops->entry(chip);
 
@@ -211,7 +205,8 @@ calibration:
 			row = ops_list[i + j]->row;
 			col = ops_list[i + j]->col;
 			if (chip->randomize)
-				nandx_chip_enable_randomizer(chip, row, false);
+				nandx_chip_enable_randomizer(chip, row,
+							     false);
 
 			nandx_chip_random_output(chip, row, col);
 
@@ -220,9 +215,10 @@ calibration:
 			ret = nandx_chip_read_data(chip, num, data, oob);
 			if (ret == -ENANDREAD)
 				ret = nandx_chip_read_retry(chip,
-							ops_list[i + j], &rr_count);
+							    ops_list[i + j],
+							    &rr_count);
 			ops_list[i + j]->status =
-				nandx_chip_get_status(chip, ret, rr_count);
+			    nandx_chip_get_status(chip, ret, rr_count);
 			status = MIN(ops_list[i + j]->status, status);
 		}
 
@@ -245,7 +241,6 @@ calibration:
 
 	return status;
 }
-
 
 static int nandx_chip_multi_cache_read(struct nandx_chip_dev *chip_dev,
 				       struct nandx_ops **ops_list, int count)
@@ -272,7 +267,8 @@ calibration:
 	for (i = 2; i <= count; i += 2) {
 		if (i < count - 1) {
 			nandx_chip_multi_read_page(chip, ops_list[i]->row);
-			nandx_chip_cache_read_page(chip, ops_list[i + 1]->row);
+			nandx_chip_cache_read_page(chip,
+						   ops_list[i + 1]->row);
 		} else {
 			nandx_chip_cache_read_last_page(chip);
 		}
@@ -284,7 +280,8 @@ calibration:
 			row = ops->row;
 			col = ops->col;
 			if (chip->randomize)
-				nandx_chip_enable_randomizer(chip, row, false);
+				nandx_chip_enable_randomizer(chip, row,
+							     false);
 
 			nandx_chip_random_output(chip, row, col);
 
@@ -293,12 +290,15 @@ calibration:
 			ret = nandx_chip_read_data(chip, num, data, oob);
 			if (ret == -ENANDREAD) {
 				ops = ops_list[i + j];
-				ret = nandx_chip_read_retry(chip, ops, &rr_count);
+				ret =
+				    nandx_chip_read_retry(chip, ops,
+							  &rr_count);
 				if (ret == -ENANDREAD)
 					break;
 				/* break cache read ? */
 			}
-			ops->status = nandx_chip_get_status(chip, ret, rr_count);
+			ops->status =
+			    nandx_chip_get_status(chip, ret, rr_count);
 			status = MIN(ops->status, status);
 		}
 
@@ -378,9 +378,8 @@ static int nandx_chip_program(struct nandx_chip_dev *chip_dev,
 	return ret;
 }
 
-
 static int nandx_chip_cache_program(struct nandx_chip_dev *chip_dev,
-					struct nandx_ops **ops_list, int count)
+				    struct nandx_ops **ops_list, int count)
 {
 	int ret;
 	int i, j, status, cycle;
@@ -424,10 +423,11 @@ static int nandx_chip_cache_program(struct nandx_chip_dev *chip_dev,
 			oob = ops->oob;
 			if (i + j == count - 1)
 				ret = nandx_chip_program_page(chip,
-							row, data, oob);
+							      row, data, oob);
 			else
 				ret = nandx_chip_cache_program_page(chip,
-							row, data, oob);
+								    row, data,
+								    oob);
 		}
 	}
 
@@ -444,7 +444,7 @@ static int nandx_chip_cache_program(struct nandx_chip_dev *chip_dev,
 }
 
 static int nandx_chip_multi_program(struct nandx_chip_dev *chip_dev,
-				struct nandx_ops **ops_list, int count)
+				    struct nandx_ops **ops_list, int count)
 {
 	int ret;
 	int i, j, status, step, cycle;
@@ -487,8 +487,9 @@ static int nandx_chip_multi_program(struct nandx_chip_dev *chip_dev,
 			if (chip->randomize)
 				nandx_chip_enable_randomizer(chip, row, true);
 
-			ret = nandx_chip_multi_program_1stpage(chip, row, data,
-								oob);
+			ret =
+			    nandx_chip_multi_program_1stpage(chip, row, data,
+							     oob);
 
 			if (!chip->slc_mode &&
 			    order_type == PROGRAM_ORDER_TLC) {
@@ -505,10 +506,12 @@ static int nandx_chip_multi_program(struct nandx_chip_dev *chip_dev,
 
 			if (j == wl_page_num - 1)
 				ret = nandx_chip_program_page(chip, row,
-								data, oob);
+							      data, oob);
 			else
 				ret = nandx_chip_multi_program_2ndpage(chip,
-								row, data, oob);
+								       row,
+								       data,
+								       oob);
 		}
 	}
 
@@ -526,7 +529,8 @@ static int nandx_chip_multi_program(struct nandx_chip_dev *chip_dev,
 
 /* Todo: refine for 2D MLC later. */
 static int nandx_chip_multi_cache_program(struct nandx_chip_dev *chip_dev,
-					struct nandx_ops **ops_list, int count)
+					  struct nandx_ops **ops_list,
+					  int count)
 {
 	int ret;
 	int i, j, status, step, cycle;
@@ -568,8 +572,9 @@ static int nandx_chip_multi_cache_program(struct nandx_chip_dev *chip_dev,
 
 			if (chip->randomize)
 				nandx_chip_enable_randomizer(chip, row, true);
-			ret = nandx_chip_multi_program_1stpage(chip, row, data,
-								oob);
+			ret =
+			    nandx_chip_multi_program_1stpage(chip, row, data,
+							     oob);
 
 			if (!chip->slc_mode &&
 			    order_type == PROGRAM_ORDER_TLC) {
@@ -588,14 +593,17 @@ static int nandx_chip_multi_cache_program(struct nandx_chip_dev *chip_dev,
 			/* last program and last page */
 			if (j == wl_page_num - 1 && i == count - step)
 				ret = nandx_chip_program_page(chip, row, data,
-								oob);
+							      oob);
 			/* last page of plane1 wl */
 			else if (j == wl_page_num - 1)
 				ret = nandx_chip_cache_program_page(chip, row,
-								data, oob);
+								    data,
+								    oob);
 			else
 				ret = nandx_chip_multi_program_2ndpage(chip,
-								row, data, oob);
+								       row,
+								       data,
+								       oob);
 		}
 	}
 
@@ -610,7 +618,6 @@ static int nandx_chip_multi_cache_program(struct nandx_chip_dev *chip_dev,
 
 	return ret;
 }
-
 
 static int nandx_chip_erase(struct nandx_chip_dev *chip_dev, u32 row)
 {
@@ -655,7 +662,7 @@ static int nandx_chip_multi_erase(struct nandx_chip_dev *chip_dev, u32 *rows)
 }
 
 static int nandx_chip_multi_plane_check(struct nandx_chip_dev *chip_dev,
-						u32 *rows)
+					u32 *rows)
 {
 	u32 block, plane;
 	u32 page_per_block, i;
@@ -684,7 +691,8 @@ static bool nandx_chip_block_is_bad(struct nandx_chip_dev *chip_dev, u32 row)
 
 	chip = container_of(chip_dev, struct nandx_chip, chip_dev);
 
-	ret = nandx_bad_block_check(chip, row, chip->dev_info->bad_block_type);
+	ret =
+	    nandx_bad_block_check(chip, row, chip->dev_info->bad_block_type);
 
 	return ret == NAND_OK ? false : true;
 }
@@ -696,8 +704,8 @@ static int nandx_interface_change(struct nandx_chip *chip, bool enable,
 	struct nfc_handler *nfc = chip->nfc;
 	enum INTERFACE_TYPE type;
 	u8 reg = chip->feature[FEATURE_INTERFACE_CHANGE];
-	u8 feature[4] = {0};
-	u8 timing_mode = 4; /* force mode 4 now for TSOP package */
+	u8 feature[4] = { 0 };
+	u8 timing_mode = 4;	/* force mode 4 now for TSOP package */
 	int ret;
 
 	if (!chip->interface_ddr && enable)
@@ -708,7 +716,7 @@ static int nandx_interface_change(struct nandx_chip *chip, bool enable,
 
 	type = enable ? info->interface_type : INTERFACE_LEGACY;
 	feature[0] = get_nandx_interface_value(chip->vendor_type, timing_mode,
-						type);
+					       type);
 	nandx_chip_set_feature(chip, reg, feature, 4);
 	ret = nfc->change_interface(nfc, type, &chip->timing, arg);
 	chip->ddr_enable = enable;
@@ -717,8 +725,8 @@ static int nandx_interface_change(struct nandx_chip *chip, bool enable,
 }
 
 static int nandx_chip_change_mode(struct nandx_chip_dev *chip_dev,
-					enum OPS_MODE_TYPE mode,
-					bool enable, void *arg)
+				  enum OPS_MODE_TYPE mode,
+				  bool enable, void *arg)
 {
 	int ret = NAND_OK;
 	struct nandx_chip *chip;
@@ -752,9 +760,8 @@ static int nandx_chip_change_mode(struct nandx_chip_dev *chip_dev,
 	return ret;
 }
 
-
 static bool nandx_chip_get_mode(struct nandx_chip_dev *chip_dev,
-					enum OPS_MODE_TYPE mode)
+				enum OPS_MODE_TYPE mode)
 {
 	bool ret = false;
 	struct nandx_chip *chip;
@@ -840,7 +847,8 @@ static void nandx_chip_dev_alloc(struct nandx_chip_dev *chip_dev)
 	info->block_num *= dev_info->plane_num * dev_info->block_num;
 	info->block_size = dev_info->block_size;
 	info->page_size = dev_info->page_size;
-	info->oob_size = dev_info->page_size / nfc->sector_size * nfc->fdm_size;
+	info->oob_size =
+	    dev_info->page_size / nfc->sector_size * nfc->fdm_size;
 	info->sector_size = chip->nfc->sector_size;
 	info->ecc_strength = chip->nfc->ecc_strength;
 
@@ -894,7 +902,6 @@ static void nandx_chip_dev_alloc(struct nandx_chip_dev *chip_dev)
 	chip_dev->resume = nandx_chip_resume;
 }
 
-
 static void nandx_chip_vendor_info_alloc(struct nandx_chip *chip, u8 id)
 {
 	u8 *str = NULL;
@@ -912,7 +919,8 @@ static void nandx_chip_vendor_info_alloc(struct nandx_chip *chip, u8 id)
 		str = get_nandx_drive_strength_table(DRIVE_STRENGTH_TOSHIBA);
 		if (chip->dev_info->type == NAND_TLC) {
 			chip->pre_cmd = EXTEND_TLC_PRE_CMD;
-			chip->program_order_cmd = EXTEND_TLC_PROGRAM_ORDER_CMD;
+			chip->program_order_cmd =
+			    EXTEND_TLC_PROGRAM_ORDER_CMD;
 		}
 		break;
 
@@ -920,7 +928,8 @@ static void nandx_chip_vendor_info_alloc(struct nandx_chip *chip, u8 id)
 		str = get_nandx_drive_strength_table(DRIVE_STRENGTH_TOSHIBA);
 		if (chip->dev_info->type == NAND_TLC) {
 			chip->pre_cmd = EXTEND_TLC_PRE_CMD;
-			chip->program_order_cmd = EXTEND_TLC_PROGRAM_ORDER_CMD;
+			chip->program_order_cmd =
+			    EXTEND_TLC_PROGRAM_ORDER_CMD;
 		}
 		break;
 
@@ -941,7 +950,7 @@ static void nandx_chip_vendor_info_alloc(struct nandx_chip *chip, u8 id)
 
 struct nandx_chip_dev *nandx_chip_alloc(struct nfc_resource *res)
 {
-	u8 id[ID_MAX_NUM] = {0};
+	u8 id[ID_MAX_NUM] = { 0 };
 	struct nandx_chip *chip;
 	struct nandx_device_info *dev_info;
 	struct nfc_format format;
@@ -990,10 +999,11 @@ struct nandx_chip_dev *nandx_chip_alloc(struct nfc_resource *res)
 	if (intf_type == INTERFACE_ONFI)
 		chip->timing.ddr.onfi = get_nandx_timing(intf_type, ddr_type);
 	else if (intf_type == INTERFACE_TOGGLE)
-		chip->timing.ddr.toggle = get_nandx_timing(intf_type, ddr_type);
+		chip->timing.ddr.toggle =
+		    get_nandx_timing(intf_type, ddr_type);
 
 	chip->interface_ddr = intf_type == INTERFACE_ONFI ||
-			      intf_type == INTERFACE_TOGGLE;
+	    intf_type == INTERFACE_TOGGLE;
 	chip->slc_mode = false;
 	chip->ddr_enable = false;
 	chip->calibration = false;
@@ -1003,7 +1013,6 @@ struct nandx_chip_dev *nandx_chip_alloc(struct nfc_resource *res)
 	/* Todo for new chip dev */
 	return &chip->chip_dev;
 }
-
 
 void nandx_chip_free(struct nandx_chip_dev *chip_dev)
 {

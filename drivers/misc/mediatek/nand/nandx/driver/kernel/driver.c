@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -72,7 +65,7 @@ struct nand_ecclayout nand_oob_128 = {
 	.oobfree = {
 		    {1, 7}, {9, 7}, {17, 7}, {25, 7},
 		    {33, 7}, {41, 7}, {49, 7}, {57, 6}
-		   }
+		    }
 };
 
 struct nfc_compatible {
@@ -100,9 +93,9 @@ static const struct nfc_compatible nfc_compats_mt8167 = {
 };
 
 static const struct of_device_id ic_of_match[] = {
-	{ .compatible = "mediatek,mt8127-nfi", .data = &nfc_compats_mt8127},
-	{ .compatible = "mediatek,mt8163-nfi", .data = &nfc_compats_mt8163},
-	{ .compatible = "mediatek,mt8167-nfi", .data = &nfc_compats_mt8167},
+	{.compatible = "mediatek,mt8127-nfi", .data = &nfc_compats_mt8127},
+	{.compatible = "mediatek,mt8163-nfi", .data = &nfc_compats_mt8163},
+	{.compatible = "mediatek,mt8167-nfi", .data = &nfc_compats_mt8167},
 	{}
 };
 
@@ -112,7 +105,8 @@ static void release_platform_data(struct platform_data *pdata)
 	mem_free(pdata);
 }
 
-static struct platform_data *config_platform_data(struct platform_device *pdev)
+static struct platform_data *config_platform_data(struct platform_device
+						  *pdev)
 {
 	u32 nfi_irq, ecc_irq;
 	void __iomem *nfi_base, *nfiecc_base, *top_base = NULL;
@@ -143,13 +137,13 @@ static struct platform_data *config_platform_data(struct platform_device *pdev)
 
 	compat = (struct nfc_compatible *)of_id->data;
 	nfiecc_node = of_find_compatible_node(NULL, NULL,
-		      compat->ecc_compatible);
+					      compat->ecc_compatible);
 	nfiecc_base = of_iomap(nfiecc_node, 0);
 	ecc_irq = irq_of_parse_and_map(nfiecc_node, 0);
 
 	if (compat->top_compatible) {
 		top_node = of_find_compatible_node(NULL, NULL,
-			   compat->top_compatible);
+						   compat->top_compatible);
 		top_base = of_iomap(top_node, 0);
 	}
 
@@ -176,9 +170,8 @@ freepdata:
 	return NULL;
 }
 
-static struct mtd_info *
-mtd_info_create(struct platform_device *pdev,
-		struct nandx_core *ncore)
+static struct mtd_info *mtd_info_create(struct platform_device *pdev,
+					struct nandx_core *ncore)
 {
 	struct mtd_info *mtd;
 
@@ -356,7 +349,8 @@ static int nand_remove(struct platform_device *pdev)
 	mtd_device_unregister(mtd);
 	high_speed_en = pdata->freq.sel_2x_idx >= 0;
 	ecc_clk_en = pdata->freq.sel_ecc_idx >= 0;
-	nandx_platform_unprepare_clock(ncore->pdata, high_speed_en, ecc_clk_en);
+	nandx_platform_unprepare_clock(ncore->pdata, high_speed_en,
+				       ecc_clk_en);
 	nandx_platform_power_down(pdata);
 	release_platform_data(pdata);
 	mtd_info_release(mtd);
@@ -385,7 +379,8 @@ static int nand_suspend(struct platform_device *pdev, pm_message_t state)
 	ret = nandx_core_suspend();
 
 	nandx_platform_disable_clock(ncore->pdata, high_speed_en, ecc_clk_en);
-	nandx_platform_unprepare_clock(ncore->pdata, high_speed_en, ecc_clk_en);
+	nandx_platform_unprepare_clock(ncore->pdata, high_speed_en,
+				       ecc_clk_en);
 
 	nandx_platform_power_down(pdata);
 
@@ -430,10 +425,10 @@ static struct platform_driver nand_driver = {
 	.suspend = nand_suspend,
 	.resume = nand_resume,
 	.driver = {
-		.name = "mtk-nand",
-		.owner = THIS_MODULE,
-		.of_match_table = ic_of_match,
-	},
+		   .name = "mtk-nand",
+		   .owner = THIS_MODULE,
+		   .of_match_table = ic_of_match,
+		   },
 };
 
 #define PROCNAND	"driver/nand"
@@ -476,7 +471,6 @@ static void __exit nand_exit(void)
 {
 	platform_driver_unregister(&nand_driver);
 }
-
 module_init(nand_init);
 module_exit(nand_exit);
 

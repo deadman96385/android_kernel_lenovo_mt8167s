@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 
 #include "nandx_chip_common.h"
 
@@ -42,7 +35,7 @@ static u32 nandx_chip_addressing(struct nandx_chip *chip, u32 row)
 
 	plane = block % dev_info->plane_num;
 	lun = (block % (dev_info->plane_num * dev_info->lun_num)) %
-	      dev_info->lun_num;
+	    dev_info->lun_num;
 
 	return get_physical_row_address(chip->addressing, lun, plane, block,
 					wl);
@@ -61,8 +54,7 @@ static void nandx_chip_set_precmd(struct nandx_chip *chip, int cycle)
 		nfc->send_command(nfc, cmd);
 }
 
-void nandx_chip_set_program_order_cmd(struct nandx_chip *chip,
-						int cycle)
+void nandx_chip_set_program_order_cmd(struct nandx_chip *chip, int cycle)
 {
 	u8 cmd = NONE;
 	struct nfc_handler *nfc = chip->nfc;
@@ -140,7 +132,7 @@ u8 nandx_chip_read_enhance_status(struct nandx_chip *chip, u32 row)
 }
 
 void nandx_chip_set_feature(struct nandx_chip *chip, u8 addr, u8 *param,
-				int num)
+			    int num)
 {
 	int i, temp_num, ret;
 	struct nfc_handler *nfc = chip->nfc;
@@ -175,7 +167,7 @@ void nandx_chip_set_feature(struct nandx_chip *chip, u8 addr, u8 *param,
 }
 
 void nandx_chip_get_feature(struct nandx_chip *chip, u8 addr, u8 *param,
-				int num)
+			    int num)
 {
 	int i, temp_num, ret;
 	struct nfc_handler *nfc = chip->nfc;
@@ -210,7 +202,7 @@ void nandx_chip_get_feature(struct nandx_chip *chip, u8 addr, u8 *param,
 }
 
 void nandx_chip_set_feature_with_check(struct nandx_chip *chip, u8 addr,
-						u8 *param, u8 *back, int num)
+				       u8 *param, u8 *back, int num)
 {
 	int i;
 
@@ -222,7 +214,7 @@ void nandx_chip_set_feature_with_check(struct nandx_chip *chip, u8 addr,
 }
 
 void nandx_chip_set_lun_feature(struct nandx_chip *chip, u8 lun, u8 addr,
-					u8 *param, int num)
+				u8 *param, int num)
 {
 	int i, temp_num, ret;
 	struct nfc_handler *nfc = chip->nfc;
@@ -258,7 +250,7 @@ void nandx_chip_set_lun_feature(struct nandx_chip *chip, u8 lun, u8 addr,
 }
 
 void nandx_chip_get_lun_feature(struct nandx_chip *chip, u8 lun, u8 addr,
-					u8 *param, int num)
+				u8 *param, int num)
 {
 	int i, temp_num, ret;
 	struct nfc_handler *nfc = chip->nfc;
@@ -295,7 +287,8 @@ void nandx_chip_get_lun_feature(struct nandx_chip *chip, u8 lun, u8 addr,
 }
 
 void nandx_chip_set_lun_feature_with_check(struct nandx_chip *chip, u8 lun,
-					u8 addr, u8 *param, u8 *back, int num)
+					   u8 addr, u8 *param, u8 *back,
+					   int num)
 {
 	int i;
 
@@ -305,7 +298,6 @@ void nandx_chip_set_lun_feature_with_check(struct nandx_chip *chip, u8 lun,
 	for (i = 0; i < num; i++)
 		NANDX_ASSERT(param[i] == back[i]);
 }
-
 
 void nandx_chip_erase_block(struct nandx_chip *chip, u32 row)
 {
@@ -345,7 +337,7 @@ void nandx_chip_multi_erase_block(struct nandx_chip *chip, u32 *rows)
 }
 
 void nandx_chip_read_parameters_page(struct nandx_chip *chip, u8 *data,
-						int size)
+				     int size)
 {
 	int i;
 	struct nfc_handler *nfc = chip->nfc;
@@ -357,7 +349,8 @@ void nandx_chip_read_parameters_page(struct nandx_chip *chip, u8 *data,
 		data[i] = nfc->read_byte(nfc);
 }
 
-void nandx_chip_enable_randomizer(struct nandx_chip *chip, u32 row, bool encode)
+void nandx_chip_enable_randomizer(struct nandx_chip *chip, u32 row,
+				  bool encode)
 {
 	struct nfc_handler *nfc = chip->nfc;
 
@@ -374,7 +367,7 @@ void nandx_chip_disable_randomizer(struct nandx_chip *chip)
 }
 
 int nandx_chip_read_data(struct nandx_chip *chip, int sector_num, void *data,
-				void *fdm)
+			 void *fdm)
 {
 	int ret;
 	struct nfc_handler *nfc = chip->nfc;
@@ -473,7 +466,7 @@ void nandx_chip_random_output(struct nandx_chip *chip, u32 row, u32 col)
 }
 
 int nandx_chip_program_page(struct nandx_chip *chip, u32 row, void *data,
-					void *fdm)
+			    void *fdm)
 {
 	int ret;
 	struct nfc_handler *nfc = chip->nfc;
@@ -498,8 +491,8 @@ err:
 	return ret;
 }
 
-int nandx_chip_cache_program_page(struct nandx_chip *chip, u32 row, void *data,
-						void *fdm)
+int nandx_chip_cache_program_page(struct nandx_chip *chip, u32 row,
+				  void *data, void *fdm)
 {
 	int ret;
 	struct nfc_handler *nfc = chip->nfc;
@@ -525,7 +518,7 @@ err:
 }
 
 int nandx_chip_multi_program_1stpage(struct nandx_chip *chip, u32 row,
-						void *data, void *fdm)
+				     void *data, void *fdm)
 {
 	int ret;
 	struct nfc_handler *nfc = chip->nfc;
@@ -551,7 +544,7 @@ err:
 }
 
 int nandx_chip_multi_program_2ndpage(struct nandx_chip *chip, u32 row,
-						void *data, void *fdm)
+				     void *data, void *fdm)
 {
 	int ret;
 	struct nfc_handler *nfc = chip->nfc;
@@ -576,7 +569,6 @@ err:
 	return ret;
 }
 
-
 int nandx_chip_calibration(struct nandx_chip *chip)
 {
 	int ret = 0;
@@ -593,7 +585,7 @@ int nandx_chip_calibration(struct nandx_chip *chip)
 	}
 
 	strength = &chip->drive_strength[drive_level];
-	nandx_chip_set_feature_with_check(chip,	feature, strength, &back, 1);
+	nandx_chip_set_feature_with_check(chip, feature, strength, &back, 1);
 
 	return ret;
 }

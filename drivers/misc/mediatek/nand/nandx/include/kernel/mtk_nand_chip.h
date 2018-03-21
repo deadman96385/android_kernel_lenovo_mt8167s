@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #ifndef __MTK_NAND_CHIP_H__
 #define __MTK_NAND_CHIP_H__
 
@@ -50,20 +43,20 @@ struct mtk_nand_chip_bbt_info {
 
 struct mtk_nand_chip_info {
 	int info_version;
-	int data_block_num;		/* Number of data blocks */
-	int data_page_num;		/* Number of page in a data block */
-	int data_page_size;		/* Data page size */
-	int data_oob_size;		/* Data OOB size in a page in bytes */
-	int data_block_size;		/* Data block size */
-	int data_pe;			/* Data block pe_cycle*/
+	int data_block_num;	/* Number of data blocks */
+	int data_page_num;	/* Number of page in a data block */
+	int data_page_size;	/* Data page size */
+	int data_oob_size;	/* Data OOB size in a page in bytes */
+	int data_block_size;	/* Data block size */
+	int data_pe;		/* Data block pe_cycle */
 
-	int log_block_num;		/* Number of log blocks */
-	int log_page_num;		/* Number of page in a log block */
-	int log_page_size;		/* Log page size */
-	int log_oob_size;		/* Log OOB size in a page in bytes */
-	int log_block_size;		/* Log block size */
-	int log_pe;				/* Log block pe_cycle*/
-	unsigned int slc_ratio;		/* FTL SLC ratio here */
+	int log_block_num;	/* Number of log blocks */
+	int log_page_num;	/* Number of page in a log block */
+	int log_page_size;	/* Log page size */
+	int log_oob_size;	/* Log OOB size in a page in bytes */
+	int log_block_size;	/* Log block size */
+	int log_pe;		/* Log block pe_cycle */
+	unsigned int slc_ratio;	/* FTL SLC ratio here */
 	unsigned int start_block;	/* FTL partition start block number */
 	unsigned int sector_size_shift;	/* Minimum Data size shift */
 	/*      (1<<sector_size_shift) is sector size */
@@ -77,8 +70,8 @@ struct mtk_nand_chip_info {
 	unsigned int plane_mask;	/* Plane mask information */
 	unsigned int plane_num;	/* Plane number */
 	/*      1: Single plane, 2: Multi-plane, 4: Quad plane */
-	unsigned int chip_num;       /* Chip number, 1/2/4 or more */
-	unsigned int option;            /* Chip ability information */
+	unsigned int chip_num;	/* Chip number, 1/2/4 or more */
+	unsigned int option;	/* Chip ability information */
 	/*      bit[0]: FDM partial read */
 	/*              0: Not support, 1: Support(Next Gen IP) */
 	/*      bit[1]: Plane mode, 0: Not support, 1: Support */
@@ -88,8 +81,8 @@ struct mtk_nand_chip_info {
 	/*              0: Not support, 1: support, next gen IP  */
 	/*      bit[4]: Multi-chip mode */
 	/*              0: Not support, 1: Support */
-	/*	bit[5]: Support different offset/size for multi-page read */
-	/*	bit[6]: Support different page for multi-page read */
+	/*      bit[5]: Support different offset/size for multi-page read */
+	/*      bit[6]: Support different page for multi-page read */
 	/*      bit[7~31]: Reserved  */
 	unsigned int *block_type_bitmap;
 };
@@ -116,9 +109,10 @@ struct mtk_nand_chip_info *mtk_nand_chip_init(void);
  * return : 0 on success, On error, return error number.
  */
 int mtk_nand_chip_read_page(struct mtk_nand_chip_info *info,
-		unsigned char *data_buffer, unsigned char *oob_buffer,
-		unsigned int block, unsigned int page,
-		unsigned int offset, unsigned int size);
+			    unsigned char *data_buffer,
+			    unsigned char *oob_buffer, unsigned int block,
+			    unsigned int page, unsigned int offset,
+			    unsigned int size);
 
 /*
  * mtk_nand_chip_read_param
@@ -159,7 +153,8 @@ struct mtk_nand_chip_read_param {
  *          On first page read error, return error number.
  */
 int mtk_nand_chip_read_multi_pages(struct mtk_nand_chip_info *info,
-		int page_num, struct mtk_nand_chip_read_param *param);
+				   int page_num,
+				   struct mtk_nand_chip_read_param *param);
 
 /*
  * mtk_nand_callback_func
@@ -171,10 +166,11 @@ int mtk_nand_chip_read_multi_pages(struct mtk_nand_chip_info *info,
  * @* userdata : userdata for callback.
  * return : On success, return 0. On error, return error number
  */
-typedef int (*mtk_nand_callback_func)(struct mtk_nand_chip_info *info,
-		unsigned char *data_buffer, unsigned char *oob_buffer,
-		unsigned int block, unsigned int page, int status,
-		void *userdata);
+typedef int (*mtk_nand_callback_func) (struct mtk_nand_chip_info *info,
+				       unsigned char *data_buffer,
+				       unsigned char *oob_buffer,
+				       unsigned int block, unsigned int page,
+				       int status, void *userdata);
 
 /*
  * mtk_nand_chip_write_page
@@ -198,9 +194,10 @@ typedef int (*mtk_nand_callback_func)(struct mtk_nand_chip_info *info,
  * return : 0 on success, On error, return error number casted by ERR_PTR
  */
 int mtk_nand_chip_write_page(struct mtk_nand_chip_info *info,
-		unsigned char *data_buffer, unsigned char *oob_buffer,
-		unsigned int block, unsigned int page, bool more_page,
-		mtk_nand_callback_func callback, void *userdata);
+			     unsigned char *data_buffer,
+			     unsigned char *oob_buffer, unsigned int block,
+			     unsigned int page, bool more_page,
+			     mtk_nand_callback_func callback, void *userdata);
 
 /*
  * mtk_nand_chip_erase_block
@@ -213,9 +210,9 @@ int mtk_nand_chip_write_page(struct mtk_nand_chip_info *info,
  * return : 0 on success, On error, return error number casted by ERR_PTR
  */
 int mtk_nand_chip_erase_block(struct mtk_nand_chip_info *info,
-		unsigned int block, unsigned int more_block,
-		mtk_nand_callback_func callback, void *userdata);
-
+			      unsigned int block, unsigned int more_block,
+			      mtk_nand_callback_func callback,
+			      void *userdata);
 
 /*
  * mtk_nand_chip_sync
@@ -230,8 +227,9 @@ int mtk_nand_chip_sync(struct mtk_nand_chip_info *info);
  * @info: NAND handler
  * Return FTL partition's bad block table for nand wrapper.
  */
-const struct mtk_nand_chip_bbt_info *mtk_nand_chip_bmt(
-		struct mtk_nand_chip_info *info);
+const struct mtk_nand_chip_bbt_info *mtk_nand_chip_bmt(struct
+						       mtk_nand_chip_info
+						       *info);
 
 /*
  * mtk_chip_mark_bad_block
@@ -239,6 +237,6 @@ const struct mtk_nand_chip_bbt_info *mtk_nand_chip_bmt(
  * @block: block address to markbad
  */
 void mtk_chip_mark_bad_block(struct mtk_nand_chip_info *info,
-				   unsigned int block);
+			     unsigned int block);
 
 #endif

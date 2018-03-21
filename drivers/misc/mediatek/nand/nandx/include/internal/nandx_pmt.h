@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #ifndef __NANDX_PMT_H__
 #define __NANDX_PMT_H__
 
@@ -23,8 +16,8 @@
 #define REGION_FULL_PAGE	0x46554C4C
 #define REGION_SLC_MODE		0x00534C43
 #define REGION_TLC_MODE		0x00544C43
-#define PT_SIG			0x50547633 /* "PTv3" */
-#define MPT_SIG			0x4D505433 /* "MPT3" */
+#define PT_SIG			0x50547633	/* "PTv3" */
+#define MPT_SIG			0x4D505433	/* "MPT3" */
 #define PT_SIG_SIZE		4
 #define PT_TLCRATIO_SIZE	4
 #define is_valid_pt(buf)	(!memcmp(buf, "3vTP", 4))
@@ -41,13 +34,13 @@ struct extension {
 
 struct pt_resident {
 	char name[MAX_PARTITION_NAME_LEN];	/* partition name */
-	unsigned long long size;		/* partition size */
+	unsigned long long size;	/* partition size */
 	union {
 		unsigned long long part_id;
 		struct extension ext;
 	};
-	unsigned long long offset;		/* partition start */
-	unsigned long long mask_flags;		/* partition flags */
+	unsigned long long offset;	/* partition start */
+	unsigned long long mask_flags;	/* partition flags */
 
 };
 

@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #ifndef __NANDX_INFO_H__
 #define __NANDX_INFO_H__
 
@@ -118,17 +111,17 @@ struct nandx_ops {
 };
 
 struct nandx_chip_info {
-	u8 plane_num; /* operation unit plane num */
+	u8 plane_num;		/* operation unit plane num */
 	u8 wl_page_num;
-	u32 block_num; /* total block num */
+	u32 block_num;		/* total block num */
 	u32 block_size;
 	u32 slc_block_size;
 	u32 page_size;
-	u32 oob_size; /* fdm size */
+	u32 oob_size;		/* fdm size */
 	u32 sector_size;
-	u32 ecc_strength; /* calc ecc */
+	u32 ecc_strength;	/* calc ecc */
 };
 
 bool nandx_get_mode(enum OPS_MODE_TYPE mode);
 
-#endif /* __NANDX_INFO_H__ */
+#endif				/* __NANDX_INFO_H__ */

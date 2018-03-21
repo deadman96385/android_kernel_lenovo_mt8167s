@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #ifndef __NANDX_OS_H__
 #define __NANDX_OS_H__
 
@@ -103,12 +96,12 @@ static inline void nand_lock_destroy(void *lock)
 
 static inline void nand_lock(void *lock)
 {
-	spin_lock((spinlock_t *)lock);
+	spin_lock((spinlock_t *) lock);
 }
 
 static inline void nand_unlock(void *lock)
 {
-	spin_unlock((spinlock_t *)lock);
+	spin_unlock((spinlock_t *) lock);
 }
 
 static inline irqreturn_t nfi_interrupt_handler(int irq, void *id)
@@ -164,9 +157,10 @@ static inline int nand_event_wait_complete(void *event, u32 timeout)
 
 /* @data for different register function */
 static inline int nand_irq_register(u32 irq_id, void *irq_handler,
-				      const char *name, void *data)
+				    const char *name, void *data)
 {
-	return request_irq(irq_id, irq_handler, IRQF_TRIGGER_NONE, name, data);
+	return request_irq(irq_id, irq_handler, IRQF_TRIGGER_NONE, name,
+			   data);
 }
 
 static inline u64 get_current_time_us(void)
@@ -186,4 +180,4 @@ static inline bool is_support_mntl(void)
 	return IS_ENABLED(CONFIG_MNTL_SUPPORT);
 }
 
-#endif /* __NANDX_OS_H__ */
+#endif				/* __NANDX_OS_H__ */

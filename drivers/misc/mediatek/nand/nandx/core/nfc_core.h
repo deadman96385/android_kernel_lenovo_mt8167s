@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #ifndef __NFC_CORE_H__
 #define __NFC_CORE_H__
 
@@ -50,9 +43,9 @@ struct nfc_handler {
 	int (*read_sectors)(struct nfc_handler *, int, u8 *, u8 *);
 	u8 (*read_byte)(struct nfc_handler *);
 	int (*change_interface)(struct nfc_handler *, enum INTERFACE_TYPE,
-				struct nand_timing *, void *);
+				 struct nand_timing *, void *);
 	int (*change_mode)(struct nfc_handler *, enum OPS_MODE_TYPE, bool,
-			   void *);
+			    void *);
 	bool (*get_mode)(struct nfc_handler *, enum OPS_MODE_TYPE);
 	void (*select_chip)(struct nfc_handler *, int);
 	void (*set_format)(struct nfc_handler *, struct nfc_format *);

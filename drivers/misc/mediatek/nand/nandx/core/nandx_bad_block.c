@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 
 #include "nandx_errno.h"
 #include "nandx_device_info.h"
@@ -29,7 +22,8 @@ static int nandx_bad_block_read(struct nandx_chip *chip, u32 row, bool oob)
 
 	ecc_enable = chip_dev->get_mode(chip_dev, OPS_MODE_ECC);
 	if (!ecc_enable) {
-		ret = chip_dev->change_mode(chip_dev, OPS_MODE_ECC, true, NULL);
+		ret =
+		    chip_dev->change_mode(chip_dev, OPS_MODE_ECC, true, NULL);
 		goto freebuf;
 	}
 	nandx_chip_read_page(chip, row);
@@ -59,7 +53,6 @@ freebuf:
 	return ret;
 }
 
-
 static int nandx_bad_block_slc_program(struct nandx_chip *chip, u32 row)
 {
 	int status;
@@ -71,7 +64,6 @@ static int nandx_bad_block_slc_program(struct nandx_chip *chip, u32 row)
 
 	return STATUS_SLC_FAIL(status) ? -ENANDBAD : NAND_OK;
 }
-
 
 static int nandx_bad_block_read_upper_page(struct nandx_chip *chip, u32 row)
 {
@@ -97,13 +89,13 @@ static int nandx_bad_block_read_upper_page(struct nandx_chip *chip, u32 row)
 	return ret;
 }
 
-
 int nandx_bad_block_check(struct nandx_chip *chip, u32 row,
 			  enum BAD_BLOCK_TYPE type)
 {
 	int page_per_block;
 
-	page_per_block = chip->dev_info->block_size / chip->dev_info->page_size;
+	page_per_block =
+	    chip->dev_info->block_size / chip->dev_info->page_size;
 	row = row / page_per_block * page_per_block;
 
 	switch (type) {

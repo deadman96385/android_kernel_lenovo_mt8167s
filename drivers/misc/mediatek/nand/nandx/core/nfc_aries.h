@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #ifndef __NFC_ARIES_H__
 #define __NFC_ARIES_H__
 
@@ -232,19 +225,22 @@ struct nfc_info {
 	u32 version;
 	u32 nfi_clk_freq;
 	u32 interface_type;
-	u8 *buf; /* temp buffer for virtual to physical transform */
+	/* temp buffer for virtual to physical transform */
+	u8 *buf;
 
 	/* irq done event */
 	void *nfi_done;
 	void *ecc_done;
-	bool ahb_irq_en; /* whether enable ahb done irq */
+	/* whether enable ahb done irq */
+	bool ahb_irq_en;
 
 	/* nfc capacities */
 	struct nfc_resource *res;
 	u8 max_cs;
 	u8 nfi_clk_div;
 	bool pg_irq_sel;
-	bool ecc_clk_en; /* some IPs have individual ecc clk source */
+	/* some IPs have individual ecc clk source */
+	bool ecc_clk_en;
 	const u8 *ecc_strength;
 	u8 ecc_strength_num;
 
@@ -351,6 +347,7 @@ static inline u32 ecc_decel_reg(struct nfc_info *info, u32 index)
 
 	return reg;
 }
+
 /* inline function define - */
 
 /* randomizer define + */
@@ -381,6 +378,7 @@ static u16 ss_randomizer_seed[SS_SEED_NUM] = {
 	0x3A5A, 0x2BAC, 0x743A, 0x5E74, 0x3B2E, 0x7EC7, 0x4FD2, 0x5D28,
 	0x751F, 0x3EF8, 0x39B1, 0x4E49, 0x746B, 0x6EF6, 0x44BE, 0x6DB7
 };
+
 /* randomizer define - */
 
 #endif

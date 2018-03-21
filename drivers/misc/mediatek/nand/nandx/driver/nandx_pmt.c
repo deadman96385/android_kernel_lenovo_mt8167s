@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #include "nandx_util.h"
 #include "nandx_errno.h"
 #include "nandx_info.h"
@@ -57,12 +50,12 @@ static int nandx_read_pmt_table(struct nandx_chip_info *info,
 	temp = *((u32 *)buf + 1);
 	handler->sys_slc_ratio = (temp >> 16) & 0xFF;
 	handler->usr_slc_ratio = (temp) & 0xFF;
-	temp = /*PT_SIG_SIZE*/8;
+	temp = /*PT_SIG_SIZE */ 8;
 	memcpy(handler->pmt, buf + temp,
-		PART_MAX_COUNT * sizeof(struct pt_resident));
+	       PART_MAX_COUNT * sizeof(struct pt_resident));
 	temp += PART_MAX_COUNT * sizeof(struct pt_resident);
 	memcpy(handler->block_bitmap, buf + temp,
-		div_up(info->block_num, 32) * sizeof(u32));
+	       div_up(info->block_num, 32) * sizeof(u32));
 
 	return 1;
 }
@@ -147,8 +140,7 @@ int nandx_pmt_init(struct nandx_chip_info *info, u32 start_blk)
 		ret = nandx_read_pmt_table(info, &ops);
 		if (ret > 0) {
 			pmt_found = true;
-			pr_info("find the latest mpt at page %d\n",
-				ops.row);
+			pr_info("find the latest mpt at page %d\n", ops.row);
 			/* recovery main pmt from mirror pmt */
 			ops.row = nandx_bmt_get_mapped_block(start_blk) * ppb;
 			ret = nandx_core_erase(&ops.row, 1, MODE_SLC);
@@ -226,7 +218,7 @@ int nandx_pmt_update(void)
 	       PART_MAX_COUNT * sizeof(struct pt_resident));
 	len += PART_MAX_COUNT * sizeof(struct pt_resident);
 	memcpy(buf + len, handler->block_bitmap,
-		div_up(info->block_num, 32) * sizeof(u32));
+	       div_up(info->block_num, 32) * sizeof(u32));
 
 	/* erase and write together */
 	nandx_get_device(FL_WRITING);
@@ -267,8 +259,7 @@ int nandx_pmt_update(void)
 	ops.row += handler->pmt_page;
 	ret = nandx_core_write(&ops, 1, MODE_SLC);
 	if (ret)
-		pr_err("write pt failed at page %d!\n",
-			ops.row);
+		pr_err("write pt failed at page %d!\n", ops.row);
 
 release_device:
 	nandx_release_device();
@@ -285,7 +276,7 @@ u64 nandx_pmt_get_start_address(struct pt_resident *pt)
 
 bool nandx_pmt_is_raw_partition(struct pt_resident *pt)
 {
-	/* TODO: || (pt->ext.type == REGION_SLC_MODE)*/
+	/* TODO: || (pt->ext.type == REGION_SLC_MODE) */
 	return pt->ext.type == REGION_LOW_PAGE ? true : false;
 }
 
@@ -348,7 +339,7 @@ int nandx_pmt_addr_to_row(u64 addr, u32 *blk, u32 *page)
 
 	len = addr - start;
 	*blk = (u32)div_down(start, info->block_size) +
-	       (u32)div_down(len, info->block_size / div);
+	    (u32)div_down(len, info->block_size / div);
 	*page = (u32)div_down(len, info->page_size) % (ppb / div);
 
 	return 0;

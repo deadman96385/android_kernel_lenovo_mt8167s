@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #include "nandx_util.h"
 #include "nandx_errno.h"
 #include "nandx_info.h"
@@ -26,7 +19,6 @@
 #define OOB_INDEX_OFFSET	(29)
 #define OOB_INDEX_SIZE		(2)
 #define FAKE_INDEX		(0xAAAA)
-
 
 struct bmt_header {
 	char signature[SIGNATURE_SIZE];
@@ -59,7 +51,6 @@ struct bmt_handler {
 	u8 *oob;
 	struct bmt_data_info data_info;
 };
-
 
 static const char MAIN_SIGNATURE[] = "BMT";
 static const char OOB_SIGNATURE[] = "bmt";
@@ -132,7 +123,6 @@ static bool bmt_block_is_bad(struct bmt_handler *bmt, u32 block)
 #endif
 }
 
-
 static bool bmt_mark_block_bad(struct bmt_handler *bmt, u32 block)
 {
 	int ret;
@@ -146,7 +136,6 @@ static bool bmt_mark_block_bad(struct bmt_handler *bmt, u32 block)
 	return ret < 0 ? false : true;
 }
 
-
 static void bmt_dump_info(struct bmt_data_info *data_info)
 {
 	int i;
@@ -155,8 +144,8 @@ static void bmt_dump_info(struct bmt_data_info *data_info)
 		data_info->header.version, data_info->header.mapped_count);
 	for (i = 0; i < data_info->header.mapped_count; i++) {
 		pr_info("block[%d] map to block[%d]\n",
-			    data_info->table[i].bad_index,
-			    data_info->table[i].mapped_index);
+			data_info->table[i].bad_index,
+			data_info->table[i].mapped_index);
 	}
 }
 
@@ -164,7 +153,7 @@ static bool bmt_match_signature(struct bmt_handler *bmt)
 {
 
 	return memcmp(bmt->data + MAIN_SIGNATURE_OFFSET, MAIN_SIGNATURE,
-	    SIGNATURE_SIZE) ? false : true;
+		      SIGNATURE_SIZE) ? false : true;
 }
 
 static u8 bmt_calculate_checksum(struct bmt_handler *bmt)
@@ -202,34 +191,31 @@ static bool bmt_data_is_valid(struct bmt_handler *bmt)
 	struct bmt_entry *table = data_info->table;
 	struct nandx_chip_info *dev_info = bmt->dev_info;
 
-
 	checksum = bmt_calculate_checksum(bmt);
 
 	/* checksum correct? */
 	if (data_info->header.checksum != checksum) {
 		pr_err("BMT Data checksum error: %x %x\n",
-			    data_info->header.checksum, checksum);
+		       data_info->header.checksum, checksum);
 		return false;
 	}
 
-	pr_debug("BMT Checksum is: 0x%x\n",
-		    data_info->header.checksum);
+	pr_debug("BMT Checksum is: 0x%x\n", data_info->header.checksum);
 
 	/* block index correct? */
 	for (i = 0; i < data_info->header.mapped_count; i++) {
-		if (table->bad_index >= dev_info->block_num
-			|| table->mapped_index >= dev_info->block_num
-			|| table->mapped_index <  bmt->start_block) {
+		if (table->bad_index >= dev_info->block_num ||
+		    table->mapped_index >= dev_info->block_num ||
+		    table->mapped_index < bmt->start_block) {
 			pr_err("err: bad_%d, mapped %d\n",
-				    table->bad_index, table->mapped_index);
+			       table->bad_index, table->mapped_index);
 			return false;
 		}
 		table++;
 	}
 
 	/* pass check, valid bmt. */
-	pr_debug("Valid BMT, version v%d\n",
-		    data_info->header.version);
+	pr_debug("Valid BMT, version v%d\n", data_info->header.version);
 
 	return true;
 }
@@ -258,19 +244,16 @@ static int bmt_load_data(struct bmt_handler *bmt)
 	u32 row_addr;
 	u32 bmt_index = bmt->start_block + bmt->block_count - 1;
 
-
 	for (; bmt_index >= bmt->start_block; bmt_index--) {
 		if (bmt_block_is_bad(bmt, bmt_index)) {
-			pr_err("Skip bad block: %d\n",
-				    bmt_index);
+			pr_err("Skip bad block: %d\n", bmt_index);
 			continue;
 		}
 
 		row_addr = dev_info->block_size / dev_info->page_size;
 		row_addr = bmt_index * row_addr;
 		if (!bmt_read_page(bmt, row_addr)) {
-			pr_err("read block %d error\n",
-				    bmt_index);
+			pr_err("read block %d error\n", bmt_index);
 			continue;
 		}
 
@@ -280,19 +263,16 @@ static int bmt_load_data(struct bmt_handler *bmt)
 		if (!bmt_match_signature(bmt))
 			continue;
 
-		pr_info("Match bmt signature @ block 0x%x\n",
-			    bmt_index);
+		pr_info("Match bmt signature @ block 0x%x\n", bmt_index);
 
 		if (!bmt_data_is_valid(bmt)) {
-			pr_err("BMT data not correct %d\n",
-				    bmt_index);
+			pr_err("BMT data not correct %d\n", bmt_index);
 			continue;
 		}
 
 		bmt_dump_info(&bmt->data_info);
 		return bmt_index;
 	}
-
 
 	pr_err("Bmt block not found!\n");
 
@@ -312,32 +292,27 @@ static int find_available_block(struct bmt_handler *bmt, bool start_from_end)
 
 	pr_debug("Try to find_available_block\n");
 
-
 	block = start_from_end ? (bmt->dev_info->block_num - 1) :
-		bmt->start_block;
+	    bmt->start_block;
 	direct = start_from_end ? -1 : 1;
 
 	for (i = 0; i < bmt->block_count; i++, block += direct) {
 		if (block == bmt->current_block) {
-			pr_debug("Skip bmt block 0x%x\n",
-				    block);
+			pr_debug("Skip bmt block 0x%x\n", block);
 			continue;
 		}
 
 		if (bmt_block_is_bad(bmt, block)) {
-			pr_debug("Skip bad block 0x%x\n",
-				    block);
+			pr_debug("Skip bad block 0x%x\n", block);
 			continue;
 		}
 
 		if (bmt_block_is_mapped(&bmt->data_info, block) >= 0) {
-			pr_debug("Skip mapped block 0x%x\n",
-				    block);
+			pr_debug("Skip mapped block 0x%x\n", block);
 			continue;
 		}
 
-		pr_debug("Find block 0x%x available\n",
-			    block);
+		pr_debug("Find block 0x%x available\n", block);
 
 		return block;
 	}
@@ -391,8 +366,7 @@ static bool bmt_write_to_flash(struct bmt_handler *bmt)
 			}
 		}
 
-		pr_debug("Find BMT block: 0x%x\n",
-			    bmt->current_block);
+		pr_debug("Find BMT block: 0x%x\n", bmt->current_block);
 
 		/* write bmt to flash */
 		ret = bmt_erase_block(bmt, bmt->current_block);
@@ -401,19 +375,17 @@ static bool bmt_write_to_flash(struct bmt_handler *bmt)
 			ret = bmt_write_page(bmt, page);
 			if (ret == true)
 				break;
-			pr_err("write failed 0x%x\n",
-				    bmt->current_block);
+			pr_err("write failed 0x%x\n", bmt->current_block);
 		}
 
-		pr_err("erase fail, mark bad 0x%x\n",
-			    bmt->current_block);
+		pr_err("erase fail, mark bad 0x%x\n", bmt->current_block);
 		bmt_mark_block_bad(bmt, bmt->current_block);
 
 		bmt->current_block = 0;
 	}
 
 	pr_debug("Write BMT data to block 0x%x success\n",
-		    bmt->current_block);
+		 bmt->current_block);
 
 	return true;
 }
@@ -431,7 +403,7 @@ static int bmt_construct(struct bmt_handler *bmt)
 	u32 index, bad_index, row_addr, count = 0;
 	int mapped_block;
 	struct bmt_data_info *data_info = &bmt->data_info;
-	u32 end_block = bmt->start_block +  bmt->block_count;
+	u32 end_block = bmt->start_block + bmt->block_count;
 	u32 ppb = dev_info->block_size / dev_info->page_size;
 
 	/* init everything in BMT struct */
@@ -444,8 +416,7 @@ static int bmt_construct(struct bmt_handler *bmt)
 
 	for (index = bmt->start_block; index < end_block; index++) {
 		if (bmt_block_is_bad(bmt, index)) {
-			pr_err("Skip bad block: 0x%x\n",
-				    index);
+			pr_err("Skip bad block: 0x%x\n", index);
 			continue;
 		}
 
@@ -453,19 +424,17 @@ static int bmt_construct(struct bmt_handler *bmt)
 		bmt_read_page(bmt, row_addr);
 		bad_index = get_bad_index_from_oob(bmt, bmt->oob);
 		if (bad_index >= bmt->start_block) {
-			pr_err("get bad index: 0x%x\n",
-				    bad_index);
+			pr_err("get bad index: 0x%x\n", bad_index);
 			if (bad_index != 0xFFFF)
 				pr_err("Invalid index\n");
 			continue;
 		}
 
 		pr_debug("0x%x mapped to bad block: 0x%x\n",
-			    index, bad_index);
+			 index, bad_index);
 
 		if (!bmt_block_is_bad(bmt, index)) {
-			pr_debug("block 0x%x not bad\n",
-				    bad_index);
+			pr_debug("block 0x%x not bad\n", bad_index);
 			continue;
 		}
 
@@ -480,13 +449,13 @@ static int bmt_construct(struct bmt_handler *bmt)
 		}
 
 		pr_debug("Add mapping: 0x%x -> 0x%x to BMT\n",
-			    bad_index, index);
+			 bad_index, index);
 
 	}
 
 	data_info->header.mapped_count = count;
 	pr_debug("Scan replace pool done, mapped block: %d\n",
-		    data_info->header.mapped_count);
+		 data_info->header.mapped_count);
 
 	/* write BMT back */
 	ret = bmt_write_to_flash(bmt);
@@ -515,8 +484,7 @@ int nandx_bmt_init(struct nandx_chip_info *dev_info, u32 block_num)
 	int ret;
 
 	if (block_num > MAIN_BMT_SIZE) {
-		pr_err("bmt size %d over %d\n",
-			    block_num, MAIN_BMT_SIZE);
+		pr_err("bmt size %d over %d\n", block_num, MAIN_BMT_SIZE);
 		return -ENOMEM;
 	}
 
@@ -531,7 +499,7 @@ int nandx_bmt_init(struct nandx_chip_info *dev_info, u32 block_num)
 	nandx_bmt->block_count = block_num;
 
 	pr_info("bmt start block: %d, bmt block count: %d\n",
-		    nandx_bmt->start_block, nandx_bmt->block_count);
+		nandx_bmt->start_block, nandx_bmt->block_count);
 
 	memset(nandx_bmt->data_info.table, 0,
 	       block_num * sizeof(struct bmt_entry));
@@ -545,15 +513,12 @@ int nandx_bmt_init(struct nandx_chip_info *dev_info, u32 block_num)
 	return 0;
 }
 
-
 void nandx_bmt_exit(void)
 {
 	mem_free(nandx_bmt->data);
 	mem_free(nandx_bmt->oob);
 	mem_free(nandx_bmt);
 }
-
-
 
 u32 nandx_bmt_update(u32 bad_block, enum UPDATE_REASON reason)
 {
@@ -563,21 +528,17 @@ u32 nandx_bmt_update(u32 bad_block, enum UPDATE_REASON reason)
 	struct bmt_entry *entry;
 #ifdef CONFIG_MNTL_SUPPORT
 	struct data_bmt_struct *info = &(bmt->data_info.data_bmt);
-#endif
 
-#ifdef CONFIG_MNTL_SUPPORT
-	if ((bad_block >= info->start_block)
-		&& (bad_block < info->end_block)) {
+	if (bad_block >= info->start_block &&
+	    bad_block < info->end_block) {
 		if (nandx_bmt_get_mapped_block(bad_block) != DATA_BAD_BLK) {
-			pr_debug("update_DATA bad block %d\n",
-				    bad_block);
-			info->entry[info->bad_count].bad_index  = bad_block;
+			pr_debug("update_DATA bad block %d\n", bad_block);
+			info->entry[info->bad_count].bad_index = bad_block;
 			info->entry[info->bad_count].flag = reason;
 
 			info->bad_count++;
 		} else {
-			pr_err("block(%d) in bad list\n",
-				    bad_block);
+			pr_err("block(%d) in bad list\n", bad_block);
 			return bad_block;
 		}
 	} else
@@ -585,8 +546,7 @@ u32 nandx_bmt_update(u32 bad_block, enum UPDATE_REASON reason)
 	{
 		map_index = find_available_block(bmt, false);
 		if (!map_index) {
-			pr_err("%s: no good block\n",
-				    __func__);
+			pr_err("%s: no good block\n", __func__);
 			return bad_block;
 		}
 
@@ -597,7 +557,7 @@ u32 nandx_bmt_update(u32 bad_block, enum UPDATE_REASON reason)
 				entry = &data_info->table[i];
 				if (entry->mapped_index == bad_block) {
 					pr_debug("block %d is bad\n",
-						   entry->bad_index);
+						 entry->bad_index);
 					break;
 				}
 			}
@@ -617,7 +577,6 @@ u32 nandx_bmt_update(u32 bad_block, enum UPDATE_REASON reason)
 
 	return map_index;
 }
-
 
 void nandx_bmt_update_oob(u32 block, u8 *oob)
 {
@@ -661,8 +620,9 @@ u32 nandx_bmt_get_mapped_block(u32 block)
 	    (block < data_bmt_info->end_block)) {
 		for (i = 0; i < data_bmt_info->bad_count; i++) {
 			if (data_bmt_info->entry[i].bad_index == block) {
-				pr_debug("FTL partition bad block at 0x%x, bad_count:%d\n",
-					block, data_bmt_info->bad_count);
+				pr_debug
+				    ("FTL bad block at 0x%x, bad_count:%d\n",
+				     block, data_bmt_info->bad_count);
 				return DATA_BAD_BLK;
 			}
 		}
@@ -678,7 +638,6 @@ u32 nandx_bmt_get_mapped_block(u32 block)
 	return block;
 }
 
-
 #ifdef CONFIG_MNTL_SUPPORT
 int nandx_bmt_get_data_bmt(struct data_bmt_struct *data_bmt)
 {
@@ -686,7 +645,8 @@ int nandx_bmt_get_data_bmt(struct data_bmt_struct *data_bmt)
 	struct data_bmt_struct *data_bmt_info = &(bmt->data_info.data_bmt);
 
 	if (data_bmt_info->version == DATA_BMT_VERSION) {
-		memcpy(data_bmt, data_bmt_info, sizeof(struct data_bmt_struct));
+		memcpy(data_bmt, data_bmt_info,
+		       sizeof(struct data_bmt_struct));
 		return 0;
 	}
 

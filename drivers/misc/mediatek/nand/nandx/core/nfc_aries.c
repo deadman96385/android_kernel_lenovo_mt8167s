@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #include "nandx_util.h"
 #include "nandx_errno.h"
 #include "nandx_device_info.h"
@@ -22,46 +15,57 @@ static inline void nfc_dump_register(struct nfc_info *info)
 	pr_info("NFI_CNFG = 0x%x\nNFI_PAGEFMT = 0x%x\nNFI_CON = 0x%x\n",
 		nfi_readl(info, NFI_CNFG), nfi_readl(info, NFI_PAGEFMT),
 		nfi_readl(info, NFI_CON));
-	pr_info("NFI_ACCCON = 0x%x\nNFI_INTR_EN = 0x%x\nNFI_INTR_STA = 0x%x\n",
-		nfi_readl(info, NFI_ACCCON), nfi_readl(info, NFI_INTR_EN),
-		nfi_readl(info, NFI_INTR_STA));
+	pr_info
+	    ("NFI_ACCCON = 0x%x\nNFI_INTR_EN = 0x%x\nNFI_INTR_STA = 0x%x\n",
+	     nfi_readl(info, NFI_ACCCON), nfi_readl(info, NFI_INTR_EN),
+	     nfi_readl(info, NFI_INTR_STA));
 	pr_info("NFI_CMD = 0x%x\nNFI_ADDRNOB = 0x%x\nNFI_COLADDR = 0x%x\n",
 		nfi_readl(info, NFI_CMD), nfi_readl(info, NFI_ADDRNOB),
 		nfi_readl(info, NFI_COLADDR));
-	pr_info("NFI_ROWADDR = 0x%x\nNFI_CNRNB = 0x%x\nNFI_PIO_DIRDY = 0x%x\n",
-		nfi_readl(info, NFI_ROWADDR), nfi_readl(info, NFI_CNRNB),
-		nfi_readl(info, NFI_PIO_DIRDY));
+	pr_info
+	    ("NFI_ROWADDR = 0x%x\nNFI_CNRNB = 0x%x\nNFI_PIO_DIRDY = 0x%x\n",
+	     nfi_readl(info, NFI_ROWADDR), nfi_readl(info, NFI_CNRNB),
+	     nfi_readl(info, NFI_PIO_DIRDY));
 	pr_info("NFI_STA = 0x%x\nNFI_ADDRCNTR = 0x%x\nNFI_STRADDR = 0x%x\n",
 		nfi_readl(info, NFI_STA), nfi_readl(info, NFI_ADDRCNTR),
 		nfi_readl(info, NFI_STRADDR));
 	pr_info("NFI_BYTELEN = 0x%x\nNFI_CSEL = 0x%x\nNFI_FDML0 = 0x%x\n",
 		nfi_readl(info, NFI_BYTELEN), nfi_readl(info, NFI_CSEL),
 		nfi_readl(info, NFI_FDML(0)));
-	pr_info("NFI_FDMM0 = 0x%x\nNFI_DEBUG_CON1 = 0x%x\nNFI_MASTER_STA = 0x%x\n",
-		nfi_readl(info, NFI_FDMM(0)), nfi_readl(info, NFI_DEBUG_CON1),
-		nfi_readl(info, NFI_MASTER_STA));
+	pr_info
+	    ("NFI_FDMM0 = 0x%x\nNFI_DEBUG_CON1 = 0x%x\nNFI_MASTER_STA = 0x%x\n",
+	     nfi_readl(info, NFI_FDMM(0)), nfi_readl(info, NFI_DEBUG_CON1),
+	     nfi_readl(info, NFI_MASTER_STA));
 	pr_info("NFI_SECCUS_SIZE = 0x%x\nNFI_RANDOM_CNFG = 0x%x\n",
-		nfi_readl(info, NFI_SECCUS_SIZE), nfi_readl(info, NFI_RANDOM_CNFG));
+		nfi_readl(info, NFI_SECCUS_SIZE),
+		nfi_readl(info, NFI_RANDOM_CNFG));
 	pr_info("NFI_EMPTY_THRESH = 0x%x\nNFI_NAND_TYPE_CNFG = 0x%x\n",
-		nfi_readl(info, NFI_EMPTY_THRESH), nfi_readl(info, NFI_NAND_TYPE_CNFG));
+		nfi_readl(info, NFI_EMPTY_THRESH),
+		nfi_readl(info, NFI_NAND_TYPE_CNFG));
 	pr_info("NFI_ACCCON1 = 0x%x\nNFI_DELAY_CTRL = 0x%x\n",
-		nfi_readl(info, NFI_ACCCON1), nfi_readl(info, NFI_DELAY_CTRL));
+		nfi_readl(info, NFI_ACCCON1),
+		nfi_readl(info, NFI_DELAY_CTRL));
 	pr_info("NFI_TLC_RD_WHR2 = 0x%x\n", nfi_readl(info, NFI_TLC_RD_WHR2));
-	pr_info("ECC_ENCCON = 0x%x\nECC_ENCCNFG = 0x%x\nECC_ENCDIADDR = 0x%x\n",
-		ecc_readl(info, ECC_ENCCON), ecc_readl(info, ECC_ENCCNFG),
-		ecc_readl(info, ECC_ENCDIADDR));
-	pr_info("ECC_ENCIDLE = 0x%x\nECC_ENCSTA = 0x%x\nECC_ENCIRQ_EN = 0x%x\n",
-		ecc_readl(info, ECC_ENCIDLE), ecc_readl(info, ECC_ENCSTA),
-		ecc_readl(info, ECC_ENCIRQ_EN));
-	pr_info("ECC_ENCIRQ_STA = 0x%x\nECC_PIO_DIRDY = 0x%x\nECC_DECCON = 0x%x\n",
-		ecc_readl(info, ECC_ENCIRQ_STA), ecc_readl(info, ECC_PIO_DIRDY),
-		ecc_readl(info, ECC_DECCON));
-	pr_info("ECC_DECCNFG = 0x%x\nECC_DECDIADDR = 0x%x\nECC_DECIDLE = 0x%x\n",
-		ecc_readl(info, ECC_DECCNFG), ecc_readl(info, ECC_DECDIADDR),
-		ecc_readl(info, ECC_DECIDLE));
-	pr_info("ECC_DECENUM0 = 0x%x\nECC_DECDONE = 0x%x\nECC_DECIRQ_EN = 0x%x\n",
-		ecc_readl(info, ECC_DECENUM(0)), ecc_readl(info, ECC_DECDONE),
-		ecc_readl(info, ECC_DECIRQ_EN));
+	pr_info
+	    ("ECC_ENCCON = 0x%x\nECC_ENCCNFG = 0x%x\nECC_ENCDIADDR = 0x%x\n",
+	     ecc_readl(info, ECC_ENCCON), ecc_readl(info, ECC_ENCCNFG),
+	     ecc_readl(info, ECC_ENCDIADDR));
+	pr_info
+	    ("ECC_ENCIDLE = 0x%x\nECC_ENCSTA = 0x%x\nECC_ENCIRQ_EN = 0x%x\n",
+	     ecc_readl(info, ECC_ENCIDLE), ecc_readl(info, ECC_ENCSTA),
+	     ecc_readl(info, ECC_ENCIRQ_EN));
+	pr_info
+	    ("ECC_ENCIRQ_STA = 0x%x\nECC_PIO_DIRDY = 0x%x\nECC_DECCON = 0x%x\n",
+	     ecc_readl(info, ECC_ENCIRQ_STA), ecc_readl(info, ECC_PIO_DIRDY),
+	     ecc_readl(info, ECC_DECCON));
+	pr_info
+	    ("ECC_DECCNFG = 0x%x\nECC_DECDIADDR = 0x%x\nECC_DECIDLE = 0x%x\n",
+	     ecc_readl(info, ECC_DECCNFG), ecc_readl(info, ECC_DECDIADDR),
+	     ecc_readl(info, ECC_DECIDLE));
+	pr_info
+	    ("ECC_DECENUM0 = 0x%x\nECC_DECDONE = 0x%x\nECC_DECIRQ_EN = 0x%x\n",
+	     ecc_readl(info, ECC_DECENUM(0)), ecc_readl(info, ECC_DECDONE),
+	     ecc_readl(info, ECC_DECIRQ_EN));
 	pr_info("ECC_DECIRQ_STA = 0x%x\nECC_DECFSM = 0x%x\n",
 		ecc_readl(info, ECC_DECIRQ_STA), ecc_readl(info, ECC_DECFSM));
 }
@@ -71,11 +75,13 @@ static inline void ecc_wait_idle(struct nfc_info *info, enum ECC_OPERATION op)
 	int ret;
 	u32 reg;
 
-	ret = readl_poll_timeout_atomic(info->res->ecc_regs + ECC_IDLE_REG(op),
-				reg, reg & ECC_IDLE_MASK, 2, ECC_TIMEOUT);
+	ret =
+	    readl_poll_timeout_atomic(info->res->ecc_regs + ECC_IDLE_REG(op),
+				      reg, reg & ECC_IDLE_MASK, 2,
+				      ECC_TIMEOUT);
 	if (ret) {
 		pr_err("%s NOT idle\n",
-		      op == ECC_ENCODE ? "encoder" : "decoder");
+		       op == ECC_ENCODE ? "encoder" : "decoder");
 		nfc_dump_register(info);
 	}
 }
@@ -86,7 +92,8 @@ static inline void ecc_wait_ioready(struct nfc_info *info)
 	u32 reg;
 
 	ret = readl_poll_timeout_atomic(info->res->ecc_regs + ECC_PIO_DIRDY,
-				reg, reg & PIO_DI_RDY, 2, ECC_TIMEOUT);
+					reg, reg & PIO_DI_RDY, 2,
+					ECC_TIMEOUT);
 	if (ret)
 		pr_err("ecc io not ready\n");
 }
@@ -102,7 +109,7 @@ static int ecc_runtime_config(struct nfc_info *info)
 	}
 	if (i == info->ecc_strength_num) {
 		pr_err("invalid ecc strength %d\n",
-			   info->format.ecc_strength);
+		       info->format.ecc_strength);
 		return -EINVAL;
 	}
 
@@ -126,7 +133,7 @@ static int ecc_runtime_config(struct nfc_info *info)
 	if (cfg->mode == ECC_DMA_MODE) {
 		if (cfg->addr & 0x3)
 			pr_err("%s: (0x%x) not 4B align\n",
-			      __func__, cfg->addr);
+			       __func__, cfg->addr);
 		ecc_writel(info, cfg->addr, ECC_DIADDR_REG(cfg->op));
 	}
 
@@ -196,13 +203,17 @@ static int ecc_wait_done(struct nfc_info *info)
 	} else {
 		if (op == ECC_ENCODE) {
 			ret = readl_poll_timeout_atomic(ecc_regs + ECC_ENCSTA,
-					reg, reg & ENC_IDLE, 2, ECC_TIMEOUT);
+							reg, reg & ENC_IDLE,
+							2, ECC_TIMEOUT);
 			if (ret)
 				goto timeout;
 		} else {
-			ret = readw_poll_timeout_atomic(ecc_regs + ECC_DECDONE,
-					reg, reg & info->ecccfg.sectors,
-					2, ECC_TIMEOUT);
+			ret =
+			    readw_poll_timeout_atomic(ecc_regs + ECC_DECDONE,
+						      reg,
+						      reg & info->ecccfg.
+						      sectors, 2,
+						      ECC_TIMEOUT);
 			if (ret)
 				goto timeout;
 		}
@@ -212,10 +223,10 @@ static int ecc_wait_done(struct nfc_info *info)
 
 timeout:
 	pr_err("%s: %s timeout!\n",
-		    __func__, op == ECC_ENCODE ? "encode" : "decode");
+	       __func__, op == ECC_ENCODE ? "encode" : "decode");
 	nfc_dump_register(info);
 
-	return  -ETIMEDOUT;
+	return -ETIMEDOUT;
 }
 
 static bool nfc_flash_macro_is_idle(struct nfc_info *info)
@@ -225,7 +236,8 @@ static bool nfc_flash_macro_is_idle(struct nfc_info *info)
 	void *nfi_regs = info->res->nfi_regs;
 
 	ret = readl_poll_timeout_atomic(nfi_regs + NFI_STA, reg,
-				 reg & FLASH_MACRO_IDLE, 2, MTK_TIMEOUT);
+					reg & FLASH_MACRO_IDLE, 2,
+					MTK_TIMEOUT);
 	if (ret)
 		pr_err("wait flash macro idle timeout!\n");
 
@@ -239,7 +251,7 @@ static inline void nfc_wait_ioready(struct nfc_info *info)
 	void *nfi_regs = info->res->nfi_regs;
 
 	ret = readl_poll_timeout_atomic(nfi_regs + NFI_PIO_DIRDY, reg,
-				 reg & PIO_DI_RDY, 2, MTK_TIMEOUT);
+					reg & PIO_DI_RDY, 2, MTK_TIMEOUT);
 	if (ret)
 		pr_err("data not ready\n");
 }
@@ -268,11 +280,13 @@ static void nfc_write_fdm(struct nfc_handler *handler, u8 *fdm)
 		valm = 0;
 		for (j = 0; j < 8; j++) {
 			if (j < 4)
-				vall |= (j < handler->fdm_size ? *fdm++ : 0xff)
-					<< (j * 8);
+				vall |=
+				    (j < handler->fdm_size ? *fdm++ : 0xff)
+				    << (j * 8);
 			else
-				valm |= (j < handler->fdm_size ? *fdm++ : 0xff)
-					<< ((j - 4) * 8);
+				valm |=
+				    (j < handler->fdm_size ? *fdm++ : 0xff)
+				    << ((j - 4) * 8);
 		}
 		nfi_writel(info, vall, NFI_FDML(i));
 		nfi_writel(info, valm, NFI_FDMM(i));
@@ -331,28 +345,27 @@ static void nfc_hw_init(struct nfc_info *info)
 	ecc_writel(info, reg, ECC_BYPASS);
 }
 
-static int nfc_setup_ecc_clk(struct nfc_info *info, struct nfc_frequency *freq)
+static int nfc_setup_ecc_clk(struct nfc_info *info,
+			     struct nfc_frequency *freq)
 {
 	int i, temp = 0;
 	u32 rate = 0;
 
 	/* just enable ecc clk if this IP supports individual ecc clk */
 	if (!info->ecc_clk_en) {
-		pr_warn("%s: not support ecc clk\n",
-			    __func__);
+		pr_warn("%s: not support ecc clk\n", __func__);
 		return 0;
 	}
 
 	/* 8167 issue */
 	if (info->res->ver == NANDX_MT8167 && !info->mode.dma_en) {
-		pr_warn("%s: do not enable ecc clk\n",
-			    __func__);
+		pr_warn("%s: do not enable ecc clk\n", __func__);
 		return 0;
 	}
 
 	if (freq->ecc_clk_num < 0 || freq->sel_ecc_idx >= freq->ecc_clk_num) {
 		pr_warn("%s: invalid clk, num %d, idx %d\n",
-			    __func__, freq->ecc_clk_num, freq->sel_ecc_idx);
+			__func__, freq->ecc_clk_num, freq->sel_ecc_idx);
 		return -EINVAL;
 	}
 
@@ -374,8 +387,8 @@ static int nfc_setup_ecc_clk(struct nfc_info *info, struct nfc_frequency *freq)
 }
 
 static int nfc_change_legacy_interface(struct nfc_info *info,
-					struct nandx_legacy_timing *legacy,
-					struct nfc_frequency *freq)
+				       struct nandx_legacy_timing *legacy,
+				       struct nfc_frequency *freq)
 {
 	u32 rate, tpoecs, tprecs, tc2r, tw2r, twh, twst, trlt, tstrobe = 0;
 	u32 reg = 0;
@@ -472,8 +485,8 @@ static void nfc_set_delay_ctrl(struct nfc_info *info)
 }
 
 static int nfc_change_onfi_interface(struct nfc_info *info,
-					struct nandx_onfi_timing *onfi,
-					struct nfc_frequency *freq)
+				     struct nandx_onfi_timing *onfi,
+				     struct nfc_frequency *freq)
 {
 	u32 reg, rate = 0, temp;
 	int i, idx = 0;
@@ -544,7 +557,7 @@ static int nfc_change_onfi_interface(struct nfc_info *info,
 	reg = ACCTIMING1(trdpre, twrpre, trdpst, twrpst);
 	nfi_writel(info, reg, NFI_ACCCON1);
 
-	/* set NAND type*/
+	/* set NAND type */
 	nfi_writel(info, NAND_TYPE_SYNC, NFI_NAND_TYPE_CNFG);
 
 	nfc_set_delay_ctrl(info);
@@ -555,8 +568,8 @@ static int nfc_change_onfi_interface(struct nfc_info *info,
 }
 
 static int nfc_change_toggle_interface(struct nfc_info *info,
-					struct nandx_toggle_timing *toggle,
-					struct nfc_frequency *freq)
+				       struct nandx_toggle_timing *toggle,
+				       struct nfc_frequency *freq)
 {
 	return 0;
 }
@@ -642,7 +655,7 @@ static int ecc_cpu_correct(struct nfc_handler *handler, u8 *data, u32 sector)
 
 		if (byteloc >= handler->sector_size
 		    && byteloc < (handler->sector_size
-		    + handler->fdm_ecc_size)) {
+				  + handler->fdm_ecc_size)) {
 			/* error in fdm */
 			byteloc -= handler->sector_size;
 			if (byteloc < 4) {
@@ -727,13 +740,13 @@ void nfc_send_command(struct nfc_handler *handler, u8 cmd)
 	nfi_writel(info, cmd, NFI_CMD);
 
 	ret = readl_poll_timeout_atomic(nfi_regs + NFI_STA, reg,
-				!(reg & STA_CMD), 2, MTK_TIMEOUT);
+					!(reg & STA_CMD), 2, MTK_TIMEOUT);
 	if (ret)
 		pr_err("send cmd 0x%x timeout\n", cmd);
 }
 
 void nfc_send_address(struct nfc_handler *handler, u32 col, u32 row,
-			     u32 col_cycle, u32 row_cycle)
+		      u32 col_cycle, u32 row_cycle)
 {
 	struct nfc_info *info = handler_to_info(handler);
 	int ret;
@@ -745,7 +758,7 @@ void nfc_send_address(struct nfc_handler *handler, u32 col, u32 row,
 	nfi_writel(info, col_cycle | (row_cycle << ROW_SHIFT), NFI_ADDRNOB);
 
 	ret = readl_poll_timeout_atomic(nfi_regs + NFI_STA, reg,
-				 !(reg & STA_ADDR), 2, MTK_TIMEOUT);
+					!(reg & STA_ADDR), 2, MTK_TIMEOUT);
 	if (ret)
 		pr_err("send address timeout\n");
 }
@@ -811,8 +824,7 @@ void nfc_write_byte(struct nfc_handler *handler, u8 data)
  *       If read with ecc, check whether buffer is NULL. If NULL, do nothing.
  *       If not NULL, store FDM data to this buffer.
  */
-int nfc_read_sectors(struct nfc_handler *handler, int num, u8 *data,
-			    u8 *fdm)
+int nfc_read_sectors(struct nfc_handler *handler, int num, u8 *data, u8 *fdm)
 {
 	struct nfc_info *info = handler_to_info(handler);
 	u32 reg, dma_addr = 0, len = num * handler->sector_size;
@@ -850,9 +862,10 @@ int nfc_read_sectors(struct nfc_handler *handler, int num, u8 *data,
 		info->ecccfg.op = ECC_DECODE;
 		info->ecccfg.mode = ECC_NFI_MODE;
 		info->ecccfg.deccon = info->mode.dma_en ? ECC_DEC_CORRECT :
-				      ECC_DEC_LOCATE;
+		    ECC_DEC_LOCATE;
 		info->ecccfg.sectors = 1 << (num - 1);
-		info->ecccfg.len = handler->sector_size + handler->fdm_ecc_size;
+		info->ecccfg.len =
+		    handler->sector_size + handler->fdm_ecc_size;
 		info->ecccfg.strength = handler->ecc_strength;
 		ret = ecc_enable(info);
 		if (ret) {
@@ -878,7 +891,7 @@ int nfc_read_sectors(struct nfc_handler *handler, int num, u8 *data,
 	/* TODO: move to a sperate function */
 	if (!info->mode.dma_en) {
 		data_len = handler->sector_size
-			   + (autofmt ? 0 : handler->spare_size);
+		    + (autofmt ? 0 : handler->spare_size);
 		if (data_len & 0x3) {
 			reg = nfi_readw(info, NFI_CNFG) | CNFG_BYTE_RW;
 			nfi_writew(info, reg, NFI_CNFG);
@@ -901,7 +914,8 @@ int nfc_read_sectors(struct nfc_handler *handler, int num, u8 *data,
 
 			if (info->mode.ecc_en) {
 				ret = ecc_cpu_correct(handler, data + i *
-						      handler->sector_size, i);
+						      handler->sector_size,
+						      i);
 				if (ret < 0) {
 					err_sector++;
 					bitflips = ret;
@@ -928,18 +942,20 @@ int nfc_read_sectors(struct nfc_handler *handler, int num, u8 *data,
 	}
 
 	ret = readl_poll_timeout_atomic(nfi_regs + NFI_BYTELEN, reg,
-				 ADDRCNTR_SEC(reg) >= (u32)num, 2, MTK_TIMEOUT);
+					ADDRCNTR_SEC(reg) >= (u32)num, 2,
+					MTK_TIMEOUT);
 	/* HW issue: if not wait ahb done, need polling bus busy extra */
 	if (ret == 0 && !irq_en)
 		ret = readl_poll_timeout_atomic(nfi_regs + NFI_MASTER_STA,
-				reg, !(reg & MASTER_BUS_BUSY), 2, MTK_TIMEOUT);
+						reg, !(reg & MASTER_BUS_BUSY),
+						2, MTK_TIMEOUT);
 	if (ret) {
 		pr_err("wait bytelen timeout %d\n",
-			   nfi_readl(info, NFI_BYTELEN));
+		       nfi_readl(info, NFI_BYTELEN));
 		pr_err("cnfg 0x%x fmt 0x%x\n con 0x%x",
-			   nfi_readl(info, NFI_CNFG),
-			   nfi_readl(info, NFI_PAGEFMT),
-			   nfi_readl(info, NFI_CON));
+		       nfi_readl(info, NFI_CNFG),
+		       nfi_readl(info, NFI_PAGEFMT),
+		       nfi_readl(info, NFI_CON));
 		bitflips = -ETIMEDOUT;
 		goto err;
 	} else {
@@ -1020,7 +1036,8 @@ int nfc_write_page(struct nfc_handler *handler, u8 *data, u8 *fdm)
 		/* setup ecc config */
 		info->ecccfg.op = ECC_ENCODE;
 		info->ecccfg.mode = ECC_NFI_MODE;
-		info->ecccfg.len = handler->sector_size + handler->fdm_ecc_size;
+		info->ecccfg.len =
+		    handler->sector_size + handler->fdm_ecc_size;
 		info->ecccfg.strength = handler->ecc_strength;
 		ret = ecc_enable(info);
 		if (ret) {
@@ -1066,7 +1083,7 @@ int nfc_write_page(struct nfc_handler *handler, u8 *data, u8 *fdm)
 
 	if (!info->mode.dma_en) {
 		data_len = handler->sector_size
-			  + (autofmt ? handler->spare_size : 0);
+		    + (autofmt ? handler->spare_size : 0);
 		data_len *= sectors;
 
 		if (data_len & 0x3) {
@@ -1090,15 +1107,15 @@ int nfc_write_page(struct nfc_handler *handler, u8 *data, u8 *fdm)
 	if (irq_en) {
 		ret = nand_event_wait_complete(info->nfi_done, MTK_TIMEOUT);
 		if (!ret) {
-			pr_err("%s: dma timeout!\n",
-				    __func__);
+			pr_err("%s: dma timeout!\n", __func__);
 			nfc_dump_register(info);
 			nfi_writew(info, 0, NFI_INTR_EN);
 		}
 	}
 
 	ret = readl_poll_timeout_atomic(nfi_regs + NFI_ADDRCNTR, reg,
-				 ADDRCNTR_SEC(reg) >= sectors, 2, MTK_TIMEOUT);
+					ADDRCNTR_SEC(reg) >= sectors, 2,
+					MTK_TIMEOUT);
 	if (ret) {
 		pr_err("do page write timeout\n");
 		nfc_dump_register(info);
@@ -1147,8 +1164,7 @@ int nfc_change_interface(struct nfc_handler *handler,
 }
 
 int nfc_change_mode(struct nfc_handler *handler,
-			enum OPS_MODE_TYPE mode,
-			bool enable, void *arg)
+		    enum OPS_MODE_TYPE mode, bool enable, void *arg)
 {
 	struct nfc_info *info = handler_to_info(handler);
 
@@ -1238,7 +1254,7 @@ int nfc_set_format(struct nfc_handler *handler, struct nfc_format *format)
 	min_fdm -= div_up(max_ecc * ECC_PARITY_BITS, 8);
 	if (ecc_strength > max_ecc) {
 		pr_warn("required ecc strength %d, max supported %d\n",
-			   ecc_strength, max_ecc);
+			ecc_strength, max_ecc);
 		handler->ecc_strength = max_ecc;
 		handler->fdm_size = min_fdm;
 	} else if (format->ecc_strength < min_ecc) {
@@ -1282,8 +1298,7 @@ int nfc_set_format(struct nfc_handler *handler, struct nfc_format *format)
 		fmt = PAGEFMT_8K_16K;
 		break;
 	default:
-		pr_err("invalid page len: %d\n",
-			    format->page_size);
+		pr_err("invalid page len: %d\n", format->page_size);
 		return -EINVAL;
 	}
 
@@ -1379,7 +1394,8 @@ int nfc_wait_busy(struct nfc_handler *handler, int timeout,
 	} else if (type == IRQ_WAIT_RB || type == POLL_WAIT_RB) {
 		nfi_writew(info, 0x21, NFI_CNRNB);
 		ret = readl_poll_timeout_atomic(nfi_regs + NFI_STA, reg,
-					  reg & STA_BUSY2READY, 2, timeout);
+						reg & STA_BUSY2READY, 2,
+						timeout);
 	} else if (type == POLL_WAIT_TWHR2) {
 		/* disable tWHR2 wait at first */
 		nfi_writel(info, 0, NFI_TLC_RD_WHR2);

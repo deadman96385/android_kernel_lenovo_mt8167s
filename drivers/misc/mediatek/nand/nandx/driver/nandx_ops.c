@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 #include "nandx_util.h"
 #include "nandx_errno.h"
 #include "nandx_info.h"
@@ -42,8 +35,8 @@ struct wrap_ops {
 static struct nandx_lock nlock;
 
 static int set_ops_table(struct nandx_chip_info *info,
-			struct nandx_ops *ops_table, int count,
-			struct ops_data *odata)
+			 struct nandx_ops *ops_table, int count,
+			 struct ops_data *odata)
 {
 	u32 start_row;
 	u32 page_size;
@@ -86,8 +79,7 @@ static int set_ops_table(struct nandx_chip_info *info,
 	return 0;
 }
 
-static struct nandx_ops *
-get_error_ops(struct nandx_ops *ops_table, int count)
+static struct nandx_ops *get_error_ops(struct nandx_ops *ops_table, int count)
 {
 	int i;
 
@@ -101,9 +93,9 @@ get_error_ops(struct nandx_ops *ops_table, int count)
 }
 
 static int nandx_ops_block_rw(struct nandx_core *ncore,
-				struct wrap_ops *wrapops, bool is_raw,
-				bool do_multi, void *callback,
-				struct nandx_ops *err_ops)
+			      struct wrap_ops *wrapops, bool is_raw,
+			      bool do_multi, void *callback,
+			      struct nandx_ops *err_ops)
 {
 	size_t new_len;
 	int ret, ops_count, plane_num, mode = 0;
@@ -133,8 +125,7 @@ static int nandx_ops_block_rw(struct nandx_core *ncore,
 
 	ops_count = div_up(new_len, page_size);
 	if (ops_count % plane_num) {
-		pr_err("%s: count %d not plane align\n",
-				__func__, ops_count);
+		pr_err("%s: count %d not plane align\n", __func__, ops_count);
 		return -EINVAL;
 	}
 
@@ -162,7 +153,8 @@ static int nandx_ops_block_rw(struct nandx_core *ncore,
 			ops = get_error_ops(ops_table, ops_count);
 			NANDX_ASSERT(ops);
 			if (ops)
-				memcpy(err_ops, ops, sizeof(struct nandx_ops));
+				memcpy(err_ops, ops,
+				       sizeof(struct nandx_ops));
 		}
 		goto err;
 	}
@@ -173,8 +165,8 @@ err:
 }
 
 static int nandx_write_error_handler(struct nandx_core *ncore,
-					u32 err_blk, u32 err_page,
-					u8 *buf, bool do_multi)
+				     u32 err_blk, u32 err_page,
+				     u8 *buf, bool do_multi)
 {
 	u8 *data;
 	bool raw_part;
@@ -219,14 +211,14 @@ static int nandx_write_error_handler(struct nandx_core *ncore,
 
 	nandx_bmt_update_oob(err_blk, wrap.oob);
 	ret = nandx_ops_block_rw(ncore, &wrap, raw_part,
-				do_multi, nandx_core_read, NULL);
+				 do_multi, nandx_core_read, NULL);
 	if (ret < 0)
 		goto oob_err;
 	new_block = nandx_ops_mark_bad(err_blk, UPDATE_WRITE_FAIL);
 	new_addr = new_block * block_size;
 	wrap.offs = new_addr;
 	ret = nandx_ops_block_rw(ncore, &wrap, raw_part,
-				do_multi, nandx_core_write, NULL);
+				 do_multi, nandx_core_write, NULL);
 
 oob_err:
 	mem_free(wrap.oob);
@@ -280,11 +272,11 @@ static int nandx_ops_rw(struct nandx_core *ncore,
 		 * raw_part = nandx_pmt_is_raw_partition(pt);
 		 * erase_size = info->block_size;
 		 * if (raw_part)
-		 *	erase_size = info->block_size / info->wl_page_num;
+		 *      erase_size = info->block_size / info->wl_page_num;
 		 */
 		nandx_ops_addr_transfer(ncore, addr, &block, &map_block);
 		map_addr = (long long)map_block * info->block_size +
-			   reminder(addr, erase_size);
+		    reminder(addr, erase_size);
 
 		wrap.offs = map_addr;
 		wrap.len = size;
@@ -292,13 +284,14 @@ static int nandx_ops_rw(struct nandx_core *ncore,
 		nandx_bmt_update_oob(block, wrap.oob);
 
 		ret = nandx_ops_block_rw(ncore, &wrap, raw_part,
-					do_multi, callback, &err_ops);
-		if (ret < 0) {
+					 do_multi, callback, &err_ops);
+		if (ret < 0 && ret != -ENANDFLIPS) {
 			if (err_ops.status != -ENANDWRITE)
 				goto oob_err;
 			err_page = err_ops.row % block_page_num;
 			ret = nandx_write_error_handler(ncore, map_block,
-						err_page, data, do_multi);
+							err_page, data,
+							do_multi);
 			if (ret < 0)
 				goto oob_err;
 		}
@@ -326,8 +319,7 @@ static int nandx_ops_rw_oob(struct nandx_core *ncore, long long offs, u8 *oob,
 
 	info = ncore->info;
 	if (reminder(offs, info->page_size)) {
-		pr_err("%s: addr %llu not sector align\n",
-				__func__, offs);
+		pr_err("%s: addr %llu not sector align\n", __func__, offs);
 		return -EINVAL;
 	}
 
@@ -356,7 +348,7 @@ err:
 }
 
 int nandx_ops_read(struct nandx_core *ncore, long long from,
-			size_t len, u8 *buf, bool do_multi)
+		   size_t len, u8 *buf, bool do_multi)
 {
 	struct wrap_ops wrap;
 	int ret;
@@ -373,7 +365,7 @@ int nandx_ops_read(struct nandx_core *ncore, long long from,
 }
 
 int nandx_ops_write(struct nandx_core *ncore, long long to,
-			size_t len, u8 *buf, bool do_multi)
+		    size_t len, u8 *buf, bool do_multi)
 {
 	struct wrap_ops wrap;
 	int ret;
@@ -413,8 +405,7 @@ int nandx_ops_write_oob(struct nandx_core *ncore, long long to, u8 *oob)
 	return ret;
 }
 
-int nandx_ops_erase_block(struct nandx_core *ncore,
-			long long laddr)
+int nandx_ops_erase_block(struct nandx_core *ncore, long long laddr)
 {
 	bool raw_part;
 	int plane_num, ret = 0;
@@ -453,8 +444,7 @@ int nandx_ops_erase_block(struct nandx_core *ncore,
 
 	ret = nandx_core_erase(rows, plane_num, mode);
 	if (ret < 0) {
-		pr_err("erase block 0x%x failed\n",
-			    map_block);
+		pr_err("erase block 0x%x failed\n", map_block);
 		ret = nandx_ops_mark_bad(map_block, UPDATE_ERASE_FAIL);
 	}
 
@@ -463,7 +453,7 @@ int nandx_ops_erase_block(struct nandx_core *ncore,
 }
 
 int nandx_ops_erase(struct nandx_core *ncore, long long offs,
-				long long limit, size_t size)
+		    long long limit, size_t size)
 {
 	long long cur_offs;
 	u32 erase_size, block_cnt;
@@ -481,7 +471,7 @@ int nandx_ops_erase(struct nandx_core *ncore, long long offs,
 
 	if (reminder(offs, erase_size) || reminder(size, erase_size)) {
 		pr_debug("%s: invalid offs 0x%llx 0x%zx\n",
-			    __func__, offs, size);
+			 __func__, offs, size);
 		return -EINVAL;
 	}
 
@@ -492,9 +482,9 @@ int nandx_ops_erase(struct nandx_core *ncore, long long offs,
 	cur_offs = offs;
 	while (block_cnt) {
 		if (nandx_ops_erase_block(ncore, cur_offs) < 0) {
-			pr_warn("erase 0x%llx fail\n",
-				    cur_offs);
-			nandx_ops_mark_bad((u32)div_down(cur_offs, erase_size),
+			pr_warn("erase 0x%llx fail\n", cur_offs);
+			nandx_ops_mark_bad((u32)
+					   div_down(cur_offs, erase_size),
 					   UPDATE_ERASE_FAIL);
 		}
 
@@ -503,7 +493,7 @@ int nandx_ops_erase(struct nandx_core *ncore, long long offs,
 
 		if (limit && block_cnt && cur_offs >= limit) {
 			pr_warn("off 0x%llx exceed 0x%llx\n",
-				    cur_offs, limit);
+				cur_offs, limit);
 			return 0;
 		}
 	}
@@ -522,7 +512,7 @@ int nandx_ops_isbad(long long offs)
 }
 
 u32 nandx_ops_addr_transfer(struct nandx_core *ncore, long long laddr,
-				u32 *blk, u32 *map_blk)
+			    u32 *blk, u32 *map_blk)
 {
 	int block_page_num;
 	u32 page_size, block_size;
@@ -543,8 +533,7 @@ void dump_nand_info(struct nandx_chip_info *info)
 	pr_info("block_num is %u\n", info->block_num);
 	pr_info("block_size is %u\n", info->block_size);
 	pr_info("page_size is %u\n", info->page_size);
-	pr_info("slc_block_size is %u\n",
-		    info->slc_block_size);
+	pr_info("slc_block_size is %u\n", info->slc_block_size);
 	pr_info("oob_size is %u\n", info->oob_size);
 	pr_info("sector_size is %u\n", info->sector_size);
 	pr_info("plane_num is %d\n", info->plane_num);
@@ -627,7 +616,6 @@ struct nandx_core *nandx_device_init(u32 mode)
 	pdata->freq.sel_2x_idx = -1;
 	pdata->freq.sel_ecc_idx = -1;
 
-
 	ret = nandx_platform_init(pdata);
 	if (ret < 0)
 		goto pdata_err;
@@ -703,8 +691,9 @@ retry:
 		if (new_state != FL_READY && new_state != FL_PM_SUSPENDED) {
 			high_speed_en = ncore->pdata->freq.sel_2x_idx >= 0;
 			ecc_clk_en = ncore->pdata->freq.sel_ecc_idx >= 0;
-			nandx_platform_enable_clock(ncore->pdata, high_speed_en,
-					    ecc_clk_en);
+			nandx_platform_enable_clock(ncore->pdata,
+						    high_speed_en,
+						    ecc_clk_en);
 		}
 
 		nlock->state = new_state;

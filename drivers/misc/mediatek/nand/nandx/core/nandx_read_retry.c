@@ -1,16 +1,9 @@
 /*
  * Copyright (C) 2017 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ * Licensed under either
+ *     BSD Licence, (see NOTICE for more details)
+ *     GNU General Public License, version 2.0, (see NOTICE for more details)
  */
-
 
 #include "nandx_errno.h"
 #include "nandx_chip_common.h"
@@ -58,8 +51,8 @@ static void micron_rr_set_parameters(struct nandx_chip *chip, u8 *param)
 
 static void micron_rr_exit(struct nandx_chip *chip)
 {
-	u8 param[RR_FEATURE_NUM] = {0};
-	u8 param_back[RR_FEATURE_NUM] = {0xff};
+	u8 param[RR_FEATURE_NUM] = { 0 };
+	u8 param_back[RR_FEATURE_NUM] = { 0xff };
 	u8 feature = chip->feature[FEATURE_READ_RETRY];
 
 	chip->rr_count = 0;
@@ -68,6 +61,7 @@ static void micron_rr_exit(struct nandx_chip *chip)
 	nandx_chip_set_feature_with_check(chip, feature, param, param_back,
 					  RR_FEATURE_NUM);
 }
+
 /* MICRON READ RETRY End */
 
 /* MLC SANDISK READ RETRY Start */
@@ -76,20 +70,32 @@ static void mlc_sandisk_rr_get_parameters(struct nandx_chip *chip, u8 *param)
 {
 	u16 i, index;
 	u8 rr_setting[MLC_SANDISK_SETS_NUM] = {
-	/* P0, P1, P2, P3 */
-	0x00, 0x00, 0x00, 0x00, 0x7c, 0x00, 0x00, 0x7c, 0x04, 0x00, 0x7c, 0x78,
-	0x78, 0x00, 0x78, 0x74, 0x08, 0x7c, 0x00, 0x7c, 0x00, 0x7c, 0x7c, 0x78,
-	0x7c, 0x7c, 0x78, 0x74, 0x00, 0x7c, 0x74, 0x70, 0x00, 0x78, 0x00, 0x7c,
-	0x00, 0x78, 0x7c, 0x78, 0x00, 0x78, 0x78, 0x74, 0x00, 0x78, 0x74, 0x70,
-	0x00, 0x78, 0x70, 0x6c, 0x00, 0x04, 0x04, 0x00, 0x00, 0x04, 0x00, 0x7c,
-	0x0c, 0x04, 0x7c, 0x78, 0x0c, 0x04, 0x78, 0x74, 0x10, 0x08, 0x00, 0x7c,
-	0x10, 0x08, 0x04, 0x00, 0x0c, 0x0c, 0x04, 0x04, 0x10, 0x0c, 0x04, 0x00,
-	0x14, 0x10, 0x08, 0x00, 0x18, 0x14, 0x0c, 0x00, 0x0c, 0x0c, 0x04, 0x7c,
-	0x78, 0x74, 0x78, 0x74, 0x78, 0x74, 0x74, 0x70, 0x78, 0x74, 0x70, 0x6c,
-	0x78, 0x74, 0x6c, 0x68, 0x78, 0x70, 0x78, 0x74, 0x78, 0x70, 0x74, 0x70,
-	0x78, 0x70, 0x6c, 0x68, 0x78, 0x70, 0x70, 0x6c, 0x78, 0x6c, 0x70, 0x6c,
-	0x78, 0x6c, 0x6c, 0x68, 0x78, 0x6c, 0x68, 0x64, 0x74, 0x68, 0x6c, 0x68,
-	0x74, 0x68, 0x68, 0x64
+		/* P0, P1, P2, P3 */
+		0x00, 0x00, 0x00, 0x00, 0x7c, 0x00, 0x00, 0x7c, 0x04, 0x00,
+		0x7c, 0x78,
+		0x78, 0x00, 0x78, 0x74, 0x08, 0x7c, 0x00, 0x7c, 0x00, 0x7c,
+		0x7c, 0x78,
+		0x7c, 0x7c, 0x78, 0x74, 0x00, 0x7c, 0x74, 0x70, 0x00, 0x78,
+		0x00, 0x7c,
+		0x00, 0x78, 0x7c, 0x78, 0x00, 0x78, 0x78, 0x74, 0x00, 0x78,
+		0x74, 0x70,
+		0x00, 0x78, 0x70, 0x6c, 0x00, 0x04, 0x04, 0x00, 0x00, 0x04,
+		0x00, 0x7c,
+		0x0c, 0x04, 0x7c, 0x78, 0x0c, 0x04, 0x78, 0x74, 0x10, 0x08,
+		0x00, 0x7c,
+		0x10, 0x08, 0x04, 0x00, 0x0c, 0x0c, 0x04, 0x04, 0x10, 0x0c,
+		0x04, 0x00,
+		0x14, 0x10, 0x08, 0x00, 0x18, 0x14, 0x0c, 0x00, 0x0c, 0x0c,
+		0x04, 0x7c,
+		0x78, 0x74, 0x78, 0x74, 0x78, 0x74, 0x74, 0x70, 0x78, 0x74,
+		0x70, 0x6c,
+		0x78, 0x74, 0x6c, 0x68, 0x78, 0x70, 0x78, 0x74, 0x78, 0x70,
+		0x74, 0x70,
+		0x78, 0x70, 0x6c, 0x68, 0x78, 0x70, 0x70, 0x6c, 0x78, 0x6c,
+		0x70, 0x6c,
+		0x78, 0x6c, 0x6c, 0x68, 0x78, 0x6c, 0x68, 0x64, 0x74, 0x68,
+		0x6c, 0x68,
+		0x74, 0x68, 0x68, 0x64
 	};
 
 	index = chip->rr_count % MLC_SANDISK_SETS_NUM;
@@ -99,10 +105,9 @@ static void mlc_sandisk_rr_get_parameters(struct nandx_chip *chip, u8 *param)
 	chip->rr_count += RR_FEATURE_NUM;
 }
 
-
 static void mlc_sandisk_rr_set_parameters(struct nandx_chip *chip, u8 *param)
 {
-	u8 param_back[RR_FEATURE_NUM] = {0xff};
+	u8 param_back[RR_FEATURE_NUM] = { 0xff };
 	u8 feature = chip->feature[FEATURE_READ_RETRY];
 
 	nandx_chip_set_feature_with_check(chip, feature, param, param_back,
@@ -141,7 +146,7 @@ static void mlc_sandisk_rr_enable(struct nandx_chip *chip)
 
 static void mlc_sandisk_rr_exit(struct nandx_chip *chip)
 {
-	u8 param[RR_MAX_PARAM_NUM] = {0};
+	u8 param[RR_MAX_PARAM_NUM] = { 0 };
 
 	chip->rr_count = 0;
 	mlc_sandisk_rr_set_parameters(chip, param);
@@ -149,7 +154,6 @@ static void mlc_sandisk_rr_exit(struct nandx_chip *chip)
 }
 
 /* MLC SANDISK READ RETRY End */
-
 
 /* MLC SANDISK 19NM READ RETRY Start */
 #define MLC_SANDISK_19NM_SETS_NUM	(42)
@@ -199,7 +203,7 @@ static void mlc_sandisk_19nm_rr_set_parameters(struct nandx_chip *chip,
 					       u8 *param)
 {
 	int i;
-	u8 address[3] = {0x04, 0x05, 0x07};
+	u8 address[3] = { 0x04, 0x05, 0x07 };
 	struct nfc_handler *nfc = chip->nfc;
 
 	/* change nfc timming ? */
@@ -222,7 +226,7 @@ static void mlc_sandisk_19nm_rr_enable(struct nandx_chip *chip)
 
 static void mlc_sandisk_19nm_rr_exit(struct nandx_chip *chip)
 {
-	u8 param[RR_MAX_PARAM_NUM] = {0};
+	u8 param[RR_MAX_PARAM_NUM] = { 0 };
 	struct nfc_handler *nfc = chip->nfc;
 
 	chip->rr_count = 0;
@@ -354,7 +358,7 @@ static void mlc_toshiba_19nm_rr_set_parameters(struct nandx_chip *chip,
 {
 	int i;
 	struct nfc_handler *nfc = chip->nfc;
-	u8 address[5] = {0x04, 0x05, 0x06, 0x07, 0x0d};
+	u8 address[5] = { 0x04, 0x05, 0x06, 0x07, 0x0d };
 
 	for (i = 0; i < 5; i++) {
 		nfc->send_command(nfc, 0x55);
@@ -375,7 +379,7 @@ static void mlc_toshiba_19nm_rr_enable(struct nandx_chip *chip)
 
 static void mlc_toshiba_19nm_rr_exit(struct nandx_chip *chip)
 {
-	u8 param[RR_MAX_PARAM_NUM] = {0};
+	u8 param[RR_MAX_PARAM_NUM] = { 0 };
 
 	chip->rr_count = 0;
 	mlc_toshiba_19nm_rr_set_parameters(chip, param);
@@ -383,7 +387,6 @@ static void mlc_toshiba_19nm_rr_exit(struct nandx_chip *chip)
 }
 
 /* MLC TOSHIBA 19NM READ RETRY End */
-
 
 /* MLC TOSHIBA 15NM READ RETRY Start */
 #define MLC_TOSHIBA_15NM_SETS_NUM	(50)
@@ -413,7 +416,6 @@ static void mlc_toshiba_15nm_rr_get_parameters(struct nandx_chip *chip,
 		chip->rr_count = 0;
 }
 
-
 static void mlc_toshiba_15nm_rr_enable(struct nandx_chip *chip)
 {
 	struct nfc_handler *nfc = chip->nfc;
@@ -427,7 +429,6 @@ static void mlc_toshiba_15nm_rr_enable(struct nandx_chip *chip)
 
 /* MLC TOSHIBA 15NM READ RETRY End */
 
-
 /* MLC HYNIX 20/1X/16NM READ RETRY Start */
 static u8 *mlc_hynix_rr_table_read(struct nandx_chip *chip)
 {
@@ -435,12 +436,12 @@ static u8 *mlc_hynix_rr_table_read(struct nandx_chip *chip)
 	static u32 table_offset;
 	static bool only_once;
 	struct nfc_handler *nfc = chip->nfc;
-	u8 rr_type =  chip->dev_info->read_retry_type;
+	u8 rr_type = chip->dev_info->read_retry_type;
 	u32 table_size, set_size, set_offset;
-	u8 addr_1st[2] = {0xff, 0xcc};
-	u8 data[2] = {0x40, 0x4d};
-	u8 command[5] = {0x16, 0x17, 0x04, 0x19, 0x00};
-	u8 addr_2nd[5] = {0x00, 0x00, 0x00, 0x02, 0x00};
+	u8 addr_1st[2] = { 0xff, 0xcc };
+	u8 data[2] = { 0x40, 0x4d };
+	u8 command[5] = { 0x16, 0x17, 0x04, 0x19, 0x00 };
+	u8 addr_2nd[5] = { 0x00, 0x00, 0x00, 0x02, 0x00 };
 	u32 index = 0, count;
 	u8 *origin, *inverse;
 
@@ -522,11 +523,10 @@ static u8 *mlc_hynix_rr_table_read(struct nandx_chip *chip)
 	return NULL;
 }
 
-
 static void mlc_hynix_rr_get_parameters(struct nandx_chip *chip, u8 *param)
 {
 	u8 i, max_count;
-	u8 rr_type =  chip->dev_info->read_retry_type;
+	u8 rr_type = chip->dev_info->read_retry_type;
 	u8 *mlc_hynix_rr_setting;
 
 	mlc_hynix_rr_setting = mlc_hynix_rr_table_read(chip);
@@ -545,13 +545,13 @@ static void mlc_hynix_rr_get_parameters(struct nandx_chip *chip, u8 *param)
 static void mlc_hynix_rr_set_parameters(struct nandx_chip *chip, u8 *param)
 {
 	u8 i, max_count;
-	u8 rr_type =  chip->dev_info->read_retry_type;
+	u8 rr_type = chip->dev_info->read_retry_type;
 	struct nfc_handler *nfc = chip->nfc;
-	u8 address[8] = {0xcc, 0xbf, 0xaa, 0xab, 0xcd, 0xad, 0xae, 0xaf};
+	u8 address[8] = { 0xcc, 0xbf, 0xaa, 0xab, 0xcd, 0xad, 0xae, 0xaf };
 
 	max_count = rr_type == RR_MLC_HYNIX_20NM ? 8 : 4;
 	if (rr_type == RR_MLC_HYNIX_1XNM || rr_type == RR_MLC_HYNIX_16NM) {
-		for (i  = 0; i < max_count; i++)
+		for (i = 0; i < max_count; i++)
 			address[i] = 0x38 + i;
 	}
 
@@ -563,7 +563,6 @@ static void mlc_hynix_rr_set_parameters(struct nandx_chip *chip, u8 *param)
 	nfc->send_command(nfc, 0x16);
 }
 
-
 static void mlc_hynix_rr_exit(struct nandx_chip *chip)
 {
 	u8 param[RR_MAX_PARAM_NUM];
@@ -573,7 +572,6 @@ static void mlc_hynix_rr_exit(struct nandx_chip *chip)
 	mlc_hynix_rr_set_parameters(chip, param);
 	chip->rr_count = 0;
 }
-
 
 /* MLC HYNIX 20/1X/16NM READ RETRY End */
 
@@ -645,7 +643,6 @@ static void tlc_sandisk_1ynm_rr_get_parameters(struct nandx_chip *chip,
 	if (chip->rr_count >= max_count)
 		chip->rr_count = 0;
 }
-
 
 #define TLC_SANDISK_1ZNM_SETS_NUM	(329)
 #define SLC_SANDISK_1ZNM_SETS_NUM	(25)
@@ -723,10 +720,9 @@ static void tlc_sandisk_1znm_rr_get_parameters(struct nandx_chip *chip,
 		chip->rr_count = 0;
 }
 
-
 static void tlc_sandisk_rr_set_parameters(struct nandx_chip *chip, u8 *param)
 {
-	u8 back[RR_MAX_PARAM_NUM] = {0};
+	u8 back[RR_MAX_PARAM_NUM] = { 0 };
 
 	if (chip->slc_mode) {
 		nandx_chip_set_feature_with_check(chip, 0x14, param, back,
@@ -735,10 +731,10 @@ static void tlc_sandisk_rr_set_parameters(struct nandx_chip *chip, u8 *param)
 		nandx_chip_set_feature_with_check(chip, 0x12, param, back,
 						  RR_FEATURE_NUM);
 		nandx_chip_set_feature_with_check(chip, 0x13, param +
-					RR_FEATURE_NUM, back, RR_FEATURE_NUM);
+						  RR_FEATURE_NUM, back,
+						  RR_FEATURE_NUM);
 	}
 }
-
 
 static void tlc_sandisk_rr_exit(struct nandx_chip *chip)
 {
@@ -752,7 +748,6 @@ static void tlc_sandisk_rr_exit(struct nandx_chip *chip)
 
 	nandx_chip_reset(chip);
 }
-
 
 /* TLC SANDISK 1Y/1ZNM READ RETRY End */
 
@@ -815,10 +810,9 @@ static void tlc_toshiba_15nm_rr_get_parameters(struct nandx_chip *chip,
 		chip->rr_count = 0;
 }
 
-
 static void tlc_toshiba_rr_set_parameters(struct nandx_chip *chip, u8 *param)
 {
-	u8 back[RR_MAX_PARAM_NUM] = {0};
+	u8 back[RR_MAX_PARAM_NUM] = { 0 };
 
 	/* LUN address: LUN0 = 0x00, LUN1 = 0x01, LUN2 = 0x02 ... */
 	if (chip->slc_mode) {
@@ -827,16 +821,16 @@ static void tlc_toshiba_rr_set_parameters(struct nandx_chip *chip, u8 *param)
 	} else {
 		nandx_chip_set_lun_feature_with_check(chip, 0x00, 0x12, param,
 						      back, RR_FEATURE_NUM);
-		nandx_chip_set_lun_feature_with_check(chip, 0x00, 0x13, param +
-					RR_FEATURE_NUM, back, RR_FEATURE_NUM);
+		nandx_chip_set_lun_feature_with_check(chip, 0x00, 0x13,
+						      param + RR_FEATURE_NUM,
+						      back, RR_FEATURE_NUM);
 	}
 }
 
-
 static void tlc_toshiba_rr_exit(struct nandx_chip *chip)
 {
-	u8 param[RR_MAX_PARAM_NUM] = {0};
-	u8 back[RR_MAX_PARAM_NUM] = {0};
+	u8 param[RR_MAX_PARAM_NUM] = { 0 };
+	u8 back[RR_MAX_PARAM_NUM] = { 0 };
 
 	/* LUN address: LUN0 = 0x00, LUN1 = 0x01, LUN2 = 0x02 ... */
 	if (chip->slc_mode) {
@@ -854,74 +848,61 @@ static void tlc_toshiba_rr_exit(struct nandx_chip *chip)
 
 /* TLC TOSHIBA 15NM READ RETRY End */
 
-
 static struct read_retry_ops nand_read_retry[RR_TYPE_NUM] = {
 	{0, 0, (rr_entry_t)rr_none, (rr_get_parameters_t)rr_none,
-		(rr_set_parameters_t)rr_none, (rr_enable_t)rr_none,
-		(rr_exit_t)rr_none
-	}, /* RR_TYPE_NONE */
+	 (rr_set_parameters_t)rr_none, (rr_enable_t)rr_none,
+	 (rr_exit_t)rr_none},	/* RR_TYPE_NONE */
 
 	{8, 8, (rr_entry_t)rr_none, micron_rr_get_parameters,
-		micron_rr_set_parameters, (rr_enable_t)rr_none,
-		micron_rr_exit
-	}, /* RR_MLC_MICRON */
+	 micron_rr_set_parameters, (rr_enable_t)rr_none,
+	 micron_rr_exit},	/* RR_MLC_MICRON */
 
 	{37, 23, (rr_entry_t)rr_none, mlc_sandisk_rr_get_parameters,
-		mlc_sandisk_rr_set_parameters, mlc_sandisk_rr_enable,
-		mlc_sandisk_rr_exit
-	}, /* RR_MLC_SANDISK */
+	 mlc_sandisk_rr_set_parameters, mlc_sandisk_rr_enable,
+	 mlc_sandisk_rr_exit},	/* RR_MLC_SANDISK */
 
-	{21, 17, mlc_sandisk_19nm_rr_entry, mlc_sandisk_19nm_rr_get_parameters,
-		mlc_sandisk_19nm_rr_set_parameters, mlc_sandisk_19nm_rr_enable,
-		mlc_sandisk_19nm_rr_exit
-	}, /* RR_MLC_SANDISK_19NM */
+	{21, 17, mlc_sandisk_19nm_rr_entry,
+	 mlc_sandisk_19nm_rr_get_parameters,
+	 mlc_sandisk_19nm_rr_set_parameters, mlc_sandisk_19nm_rr_enable,
+	 mlc_sandisk_19nm_rr_exit},	/* RR_MLC_SANDISK_19NM */
 
 	{32, 25, (rr_entry_t)rr_none, mlc_sandisk_1znm_rr_get_parameters,
-		mlc_sandisk_rr_set_parameters, sandisk_rr_enable,
-		mlc_sandisk_rr_exit
-	}, /* RR_MLC_SANDISK_1ZNM */
+	 mlc_sandisk_rr_set_parameters, sandisk_rr_enable,
+	 mlc_sandisk_rr_exit},	/* RR_MLC_SANDISK_1ZNM */
 
 	{7, 7, mlc_toshiba_19nm_rr_entry, mlc_toshiba_19nm_rr_get_parameters,
-		mlc_toshiba_19nm_rr_set_parameters, mlc_toshiba_19nm_rr_enable,
-		mlc_toshiba_19nm_rr_exit
-	}, /* RR_MLC_TOSHIBA_19NM */
+	 mlc_toshiba_19nm_rr_set_parameters, mlc_toshiba_19nm_rr_enable,
+	 mlc_toshiba_19nm_rr_exit},	/* RR_MLC_TOSHIBA_19NM */
 
-	{10, 10, mlc_toshiba_19nm_rr_entry, mlc_toshiba_15nm_rr_get_parameters,
-		mlc_toshiba_19nm_rr_set_parameters, mlc_toshiba_15nm_rr_enable,
-		mlc_toshiba_19nm_rr_exit
-	}, /* RR_MLC_TOSHIBA_15NM */
-
-	{8, 8, (rr_entry_t)rr_none, mlc_hynix_rr_get_parameters,
-		mlc_hynix_rr_set_parameters, (rr_enable_t)rr_none,
-		mlc_hynix_rr_exit
-	}, /* RR_MLC_HYNIX_20NM */
+	{10, 10, mlc_toshiba_19nm_rr_entry,
+	 mlc_toshiba_15nm_rr_get_parameters,
+	 mlc_toshiba_19nm_rr_set_parameters, mlc_toshiba_15nm_rr_enable,
+	 mlc_toshiba_19nm_rr_exit},	/* RR_MLC_TOSHIBA_15NM */
 
 	{8, 8, (rr_entry_t)rr_none, mlc_hynix_rr_get_parameters,
-		mlc_hynix_rr_set_parameters, (rr_enable_t)rr_none,
-		mlc_hynix_rr_exit
-	}, /* RR_MLC_HYNIX_1XNM */
+	 mlc_hynix_rr_set_parameters, (rr_enable_t)rr_none,
+	 mlc_hynix_rr_exit},	/* RR_MLC_HYNIX_20NM */
+
+	{8, 8, (rr_entry_t)rr_none, mlc_hynix_rr_get_parameters,
+	 mlc_hynix_rr_set_parameters, (rr_enable_t)rr_none,
+	 mlc_hynix_rr_exit},	/* RR_MLC_HYNIX_1XNM */
 
 	{12, 12, (rr_entry_t)rr_none, mlc_hynix_rr_get_parameters,
-		mlc_hynix_rr_set_parameters, (rr_enable_t)rr_none,
-		mlc_hynix_rr_exit
-	}, /* RR_MLC_HYNIX_16NM */
+	 mlc_hynix_rr_set_parameters, (rr_enable_t)rr_none,
+	 mlc_hynix_rr_exit},	/* RR_MLC_HYNIX_16NM */
 
 	{40, 11, (rr_entry_t)rr_none, tlc_sandisk_1ynm_rr_get_parameters,
-		tlc_sandisk_rr_set_parameters, sandisk_rr_enable,
-		tlc_sandisk_rr_exit
-	}, /* RR_TLC_SANDISK_1YNM */
+	 tlc_sandisk_rr_set_parameters, sandisk_rr_enable,
+	 tlc_sandisk_rr_exit},	/* RR_TLC_SANDISK_1YNM */
 
 	{47, 25, (rr_entry_t)rr_none, tlc_sandisk_1znm_rr_get_parameters,
-		tlc_sandisk_rr_set_parameters, sandisk_rr_enable,
-		tlc_sandisk_rr_exit
-	}, /* RR_TLC_SANDISK_1ZNM */
+	 tlc_sandisk_rr_set_parameters, sandisk_rr_enable,
+	 tlc_sandisk_rr_exit},	/* RR_TLC_SANDISK_1ZNM */
 
 	{31, 7, (rr_entry_t)rr_none, tlc_toshiba_15nm_rr_get_parameters,
-		tlc_toshiba_rr_set_parameters, (rr_enable_t)rr_none,
-		tlc_toshiba_rr_exit
-	}, /* RR_TLC_TOSHIBA_15NM */
+	 tlc_toshiba_rr_set_parameters, (rr_enable_t)rr_none,
+	 tlc_toshiba_rr_exit},	/* RR_TLC_TOSHIBA_15NM */
 };
-
 
 struct read_retry_ops *get_read_retry_ops(struct nandx_device_info *dev_info)
 {
@@ -959,11 +940,10 @@ struct read_retry_ops *get_read_retry_ops(struct nandx_device_info *dev_info)
 	return rr_ops;
 }
 
-
 int setup_read_retry(struct nandx_chip *chip, int count)
 {
 	u16 rr_loop_count;
-	u8 param[RR_MAX_PARAM_NUM] = {0};
+	u8 param[RR_MAX_PARAM_NUM] = { 0 };
 	struct read_retry_ops *rr_ops = chip->rr_ops;
 
 	rr_loop_count = get_loop_count(chip);
@@ -987,11 +967,11 @@ int setup_read_retry(struct nandx_chip *chip, int count)
 }
 
 int nandx_chip_read_retry(struct nandx_chip *chip,
-				struct nandx_ops *ops, int *count)
+			  struct nandx_ops *ops, int *count)
 {
 	int ret = 0, num;
 	u16 rr_loop_count;
-	u8 param[RR_MAX_PARAM_NUM] = {0};
+	u8 param[RR_MAX_PARAM_NUM] = { 0 };
 	struct read_retry_ops *rr_ops = chip->rr_ops;
 
 	if (!rr_ops) {
