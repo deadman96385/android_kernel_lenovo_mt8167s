@@ -6,7 +6,7 @@
  */
 
 #include "dm.h"
-
+#include "dm-verity.h"
 #include <linux/module.h>
 #include <linux/vmalloc.h>
 #include <linux/blkdev.h>
@@ -374,8 +374,21 @@ dev_t dm_get_dev_t(const char *path)
 	struct block_device *bdev;
 
 	bdev = lookup_bdev(path);
-	if (IS_ERR(bdev))
-		dev = name_to_dev_t(path);
+	if (IS_ERR(bdev)) {
+		const unsigned int timeout_ms = DM_VERITY_WAIT_DEV_TIMEOUT_MS;
+		unsigned int wait_time_ms = 0;
+
+		while (driver_probe_done() || !(dev = name_to_dev_t(path))) {
+			DMERR("dm_get_dev_t: wait 100ms and retry...\n");
+			msleep(100);
+			wait_time_ms += 100;
+			if (wait_time_ms > timeout_ms) {
+				DMERR("dm_get_dev_t: retry timeout\n");
+				DMERR("no dev found for %s\n", path);
+				break;
+			}
+		}
+	}
 	else {
 		dev = bdev->bd_dev;
 		bdput(bdev);
