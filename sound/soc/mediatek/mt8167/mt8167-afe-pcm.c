@@ -1780,7 +1780,7 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = runtime->rate;
 	const unsigned int channels = runtime->channels;
-	const int phy_width = snd_pcm_format_physical_width(runtime->format);
+	int phy_width = snd_pcm_format_physical_width(runtime->format);
 	const unsigned int stream = substream->stream;
 	unsigned int val;
 	unsigned int bck;
@@ -1789,6 +1789,11 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 		dev_info(afe->dev, "%s prepared already\n", __func__);
 		return 0;
 	}
+
+	dev_info(afe->dev, "%s bit_width = %d\n", __func__, phy_width);
+	/*support S24_LE*/
+	if (phy_width > 16)
+		phy_width = 32;
 
 	if (rate % 8000) {
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
