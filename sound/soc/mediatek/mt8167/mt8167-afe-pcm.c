@@ -1197,6 +1197,15 @@ static int mt8167_afe_int_adda_startup(struct snd_pcm_substream *substream,
 
 	mt8167_afe_enable_main_clk(afe);
 
+	mt8167_afe_enable_afe_on(afe);
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
+	} else {
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_ADC);
+	}
+	udelay(100);
+
 	return 0;
 }
 
@@ -1221,6 +1230,14 @@ static void mt8167_afe_int_adda_shutdown(struct snd_pcm_substream *substream,
 
 		be->prepared[stream] = false;
 	}
+
+	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC);
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
+	} else {
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_ADC);
+	}
+	mt8167_afe_disable_afe_on(afe);
 
 	mt8167_afe_disable_main_clk(afe);
 }
