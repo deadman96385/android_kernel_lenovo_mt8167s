@@ -537,6 +537,7 @@ unsigned int mtkfb_update_buf_ticket(unsigned int session_id, unsigned int layer
 				     unsigned int idx, unsigned int ticket)
 {
 	struct mtkfb_fence_buf_info *buf;
+	struct mtkfb_fence_buf_info *tmp_buf;
 	unsigned int mva = 0x0;
 	struct disp_session_sync_info *session_info;
 	struct disp_sync_info *layer_info;
@@ -557,7 +558,7 @@ unsigned int mtkfb_update_buf_ticket(unsigned int session_id, unsigned int layer
 	}
 
 	mutex_lock(&layer_info->sync_lock);
-	list_for_each_entry(buf, &layer_info->buf_list, list) {
+	list_for_each_entry_safe(buf, tmp_buf, &layer_info->buf_list, list) {
 		if (buf->idx == idx) {
 			buf->trigger_ticket = ticket;
 			break;
