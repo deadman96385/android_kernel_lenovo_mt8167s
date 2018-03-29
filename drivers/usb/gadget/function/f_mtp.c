@@ -1398,6 +1398,7 @@ static void mtp_function_disable(struct usb_function *f)
 	VDBG(cdev, "%s disabled\n", dev->function.name);
 }
 
+#ifdef CONFIG_USB_G_ANDROID
 static int mtp_bind_config(struct usb_configuration *c,
 					  bool ptp_config)
 {
@@ -1434,7 +1435,7 @@ static int mtp_bind_config(struct usb_configuration *c,
 
 	return usb_add_function(c, &dev->function);
 }
-
+#endif
 
 static int __mtp_setup(struct mtp_instance *fi_mtp)
 {
@@ -1483,10 +1484,12 @@ err1:
 	return ret;
 }
 
+#ifdef CONFIG_USB_G_ANDROID
 static int mtp_setup(void)
 {
 	return __mtp_setup(NULL);
 }
+#endif
 
 static int mtp_setup_configfs(struct mtp_instance *fi_mtp)
 {

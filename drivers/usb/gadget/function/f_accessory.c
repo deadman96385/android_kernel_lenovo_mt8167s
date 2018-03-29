@@ -971,10 +971,12 @@ __acc_function_bind(struct usb_configuration *c,
 	return 0;
 }
 
+#ifdef CONFIG_USB_G_ANDROID
 static int
 acc_function_bind(struct usb_configuration *c, struct usb_function *f) {
 	return __acc_function_bind(c, f, false);
 }
+#endif
 
 static int
 acc_function_bind_configfs(struct usb_configuration *c,
@@ -1175,6 +1177,7 @@ static void acc_function_disable(struct usb_function *f)
 	VDBG(cdev, "%s disabled\n", dev->function.name);
 }
 
+#ifdef CONFIG_USB_G_ANDROID
 static int acc_bind_config(struct usb_configuration *c)
 {
 	struct acc_dev *dev = _acc_dev;
@@ -1203,6 +1206,7 @@ static int acc_bind_config(struct usb_configuration *c)
 
 	return usb_add_function(c, &dev->function);
 }
+#endif
 
 static int acc_setup(void)
 {
