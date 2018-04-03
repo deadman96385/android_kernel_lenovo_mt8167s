@@ -457,6 +457,8 @@ unsigned int mtkfb_query_buf_va(unsigned int session_id, unsigned int layer_id, 
 	ASSERT(layer_id < DISP_SESSION_TIMELINE_COUNT);
 
 	session_info = _get_session_sync_info(session_id);
+	if (session_info == NULL)
+		return 0;
 	layer_info = &(session_info->session_layer_info[layer_id]);
 	if (layer_id != layer_info->layer_id) {
 		MTKFB_FENCE_ERR("wrong layer id %d(rt), %d(in)!\n", layer_info->layer_id, layer_id);
@@ -490,7 +492,11 @@ unsigned int mtkfb_query_release_idx(unsigned int session_id, unsigned int layer
 	struct mtkfb_fence_buf_info *pre_buf = NULL;
 	unsigned int idx = 0x0;
 	struct disp_session_sync_info *session_info = _get_session_sync_info(session_id);
-	struct disp_sync_info *layer_info = &(session_info->session_layer_info[layer_id]);
+	struct disp_sync_info *layer_info = NULL;
+
+	if (session_info == NULL)
+		return 0;
+	layer_info = &(session_info->session_layer_info[layer_id]);
 
 	if (layer_id != layer_info->layer_id) {
 		MTKFB_FENCE_ERR("wrong layer id %d(rt), %d(in)!\n", layer_info->layer_id, layer_id);
@@ -550,6 +556,8 @@ unsigned int mtkfb_update_buf_ticket(unsigned int session_id, unsigned int layer
 	}
 
 	session_info = _get_session_sync_info(session_id);
+	if (session_info == NULL)
+		return 0;
 	layer_info = &(session_info->session_layer_info[layer_id]);
 
 	if (layer_id != layer_info->layer_id) {
@@ -578,7 +586,11 @@ unsigned int mtkfb_query_idx_by_ticket(unsigned int session_id, unsigned int lay
 	struct mtkfb_fence_buf_info *buf = NULL;
 	int idx = -1;
 	struct disp_session_sync_info *session_info = _get_session_sync_info(session_id);
-	struct disp_sync_info *layer_info = &(session_info->session_layer_info[layer_id]);
+	struct disp_sync_info *layer_info = NULL;
+
+	if (session_info == NULL)
+		return 0;
+	layer_info = &(session_info->session_layer_info[layer_id]);
 
 	if (layer_id != layer_info->layer_id) {
 		DISPERR("wrong layer id %d(rt), %d(in)!\n", layer_info->layer_id, layer_id);
@@ -612,6 +624,8 @@ bool mtkfb_update_buf_info_new(unsigned int session_id, unsigned int mva_offset,
 	}
 
 	session_info = _get_session_sync_info(session_id);
+	if (session_info == NULL)
+		return 0;
 	layer_info = &(session_info->session_layer_info[buf_info->layer_id]);
 	if (buf_info->layer_id != layer_info->layer_id) {
 		DISPERR("wrong layer id %d(rt), %d(in)!\n", layer_info->layer_id, buf_info->layer_id);
@@ -643,6 +657,8 @@ unsigned int mtkfb_query_buf_info(unsigned int session_id, unsigned int layer_id
 	int query_info = 0;
 
 	session_info = _get_session_sync_info(session_id);
+	if (session_info == NULL)
+		return 0;
 	layer_info = &(session_info->session_layer_info[layer_id]);
 	if (layer_id != layer_info->layer_id) {
 		DISPERR("wrong layer id %d(rt), %d(in)!\n", layer_info->layer_id, layer_id);
@@ -730,6 +746,8 @@ unsigned int mtkfb_query_frm_seq_by_addr(unsigned int session_id, unsigned int l
 		return 0;
 
 	session_info = _get_session_sync_info(session_id);
+	if (session_info == NULL)
+		return 0;
 	layer_info = &(session_info->session_layer_info[layer_id]);
 
 	if (layer_id != layer_info->layer_id) {
@@ -834,6 +852,8 @@ void mtkfb_release_fence(unsigned int session_id, unsigned int layer_id, int fen
 	struct disp_session_sync_info *session_info = NULL;
 
 	session_info = _get_session_sync_info(session_id);
+	if (session_info == NULL)
+		return;
 	layer_info = _get_sync_info(session_id, layer_id);
 
 	if (layer_info == NULL) {
@@ -1148,6 +1168,8 @@ struct mtkfb_fence_buf_info *disp_sync_prepare_buf(struct disp_buffer_info *buf)
 	session_id = buf->session_id;
 	timeline_id = buf->layer_id;
 	session_info = _get_session_sync_info(session_id);
+	if (session_info == NULL)
+		return NULL;
 	layer_info = _get_sync_info(session_id, timeline_id);
 
 	if (layer_info == NULL) {
