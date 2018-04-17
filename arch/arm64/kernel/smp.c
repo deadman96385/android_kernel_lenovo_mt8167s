@@ -178,6 +178,8 @@ asmlinkage void secondary_start_kernel(void)
 
 	aee_rr_rec_hotplug_footprint(cpu, 1);
 
+	aee_rr_rec_hotplug_footprint(cpu, 1);
+
 	/*
 	 * All kernel threads share the same mm context; grab a
 	 * reference and switch to it.

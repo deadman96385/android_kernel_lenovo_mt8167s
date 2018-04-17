@@ -6,7 +6,7 @@
  */
 
 #include "dm.h"
-
+#include "dm-verity.h"
 #include <linux/module.h>
 #include <linux/vmalloc.h>
 #include <linux/blkdev.h>

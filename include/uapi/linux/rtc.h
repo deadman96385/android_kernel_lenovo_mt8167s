@@ -39,6 +39,7 @@ struct rtc_time_wo_cnt {
 	int tm_wday;
 	int tm_yday;
 	int tm_isdst;
+	int tm_cnt;
 };
 
 /*

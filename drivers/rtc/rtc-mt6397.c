@@ -791,6 +791,10 @@ static int mtk_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 		  tm->tm_year + RTC_MIN_YEAR, tm->tm_mon, tm->tm_mday,
 		  tm->tm_hour, tm->tm_min, tm->tm_sec, alm->enabled);
 
+	dev_err(rtc->dev, "set al time = %04d/%02d/%02d %02d:%02d:%02d (%d)\n",
+		  tm->tm_year + RTC_MIN_YEAR, tm->tm_mon, tm->tm_mday,
+		  tm->tm_hour, tm->tm_min, tm->tm_sec, alm->enabled);
+
 	mutex_lock(&rtc->lock);
 	switch (alm->enabled) {
 	case 2:

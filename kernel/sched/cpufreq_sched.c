@@ -151,10 +151,8 @@ int dbg_id = DEBUG_FREQ_DISABLED;
 
 /**
  * gov_data - per-policy data internal to the governor
- * @up_throttle: next throttling period expiry if increasing OPP
- * @down_throttle: next throttling period expiry if decreasing OPP
- * @up_throttle_nsec: throttle period length in nanoseconds if increasing OPP
- * @down_throttle_nsec: throttle period length in nanoseconds if decreasing OPP
+ * @throttle: next throttling period expiry. Derived from throttle_nsec
+ * @throttle_nsec: throttle period length in nanoseconds
  * @task: worker thread for dvfs transition that may block/sleep
  * @irq_work: callback used to wake up worker thread
  * @requested_freq: last frequency requested by the sched governor
@@ -275,8 +273,14 @@ static void cpufreq_sched_try_driver_target(int target_cpu, struct cpufreq_polic
 	/* avoid race with cpufreq_sched_stop. */
 	if (!down_write_trylock(&policy->rwsem))
 		return;
+	/*
+	 * debug
+	 */
+	met_cpu_dvfs(cid, freq, 1);
 
+	printk_dbg("%s: cid=%d cpu=%d max_freq=%u +\n", __func__, cid, policy->cpu, policy->max);
 	__cpufreq_driver_target(policy, freq, CPUFREQ_RELATION_L);
+	printk_dbg("%s: cid=%d cpu=%d max_freq=%u -\n", __func__, cid, policy->cpu, policy->max);
 
 	up_write(&policy->rwsem);
 
@@ -452,6 +456,10 @@ static void update_fdomain_capacity_request(int cpu, int type)
 #endif
 	arch_get_cluster_cpus(&cls_cpus, cid);
 
+	/* bail early if we are throttled */
+	if (ktime_before(ktime_get(), gd->throttle))
+		goto out;
+
 	/* find max capacity requested by cpus in this policy */
 	for_each_cpu(cpu_tmp, &cls_cpus) {
 		struct sched_capacity_reqs *scr;
@@ -563,6 +571,7 @@ static void update_fdomain_capacity_request(int cpu, int type)
 
 	/* update request freq */
 	gd->requested_freq = freq_new;
+	gd->target_cpu = cpu;
 
 	gd->last_freq_update_time = time;
 
@@ -761,6 +770,10 @@ static int cpufreq_sched_start(struct cpufreq_policy *policy)
 #else
 	int cpu;
 
+#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
+	return 0;
+#endif
+
 	for_each_cpu(cpu, policy->cpus)
 		per_cpu(enabled, cpu) = 1;
 
@@ -895,9 +908,7 @@ static ssize_t store_down_throttle_nsec(struct cpufreq_policy *policy,
 }
 
 /*
- * Create show/store routines
- * - sys: One governor instance for complete SYSTEM
- * - pol: One governor instance per struct cpufreq_policy
+ * debug function
  */
 #define show_gov_pol_sys(file_name)                                     \
 	static ssize_t show_##file_name##_gov_pol                       \
@@ -936,10 +947,6 @@ static struct attribute *sched_attributes_gov_pol[] = {
 	NULL,
 };
 
-static struct attribute_group sched_attr_group_gov_pol = {
-	.attrs = sched_attributes_gov_pol,
-	.name = "sched",
-};
 
 #ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_SCHED
 static

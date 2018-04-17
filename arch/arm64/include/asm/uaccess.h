@@ -32,6 +32,7 @@
 #include <linux/thread_info.h>
 
 #include <asm/cpufeature.h>
+#include <asm/kernel-pgtable.h>
 #include <asm/ptrace.h>
 #include <asm/errno.h>
 #include <asm/memory.h>

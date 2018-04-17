@@ -794,6 +794,73 @@ static int gen_ndis_set_resp(struct rndis_params *params, u32 OID,
 	return retval;
 }
 
+#ifdef CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT
+static int rndis_set_action(struct rndis_params *params, u32 OID, u8 *buf, u32 buf_len)
+{
+	int i, retval = -ENOTSUPP;
+
+	if (buf_len && rndis_debug > 1) {
+		pr_debug("set OID %08x value, len %d:\n", OID, buf_len);
+		for (i = 0; i < buf_len; i += 16) {
+			pr_debug("%03d: %08x %08x %08x %08x\n", i,
+				get_unaligned_le32(&buf[i]),
+				get_unaligned_le32(&buf[i + 4]),
+				get_unaligned_le32(&buf[i + 8]),
+				get_unaligned_le32(&buf[i + 12]));
+		}
+	}
+
+	if (rndis_debug)
+		pr_debug("rndis_set_action, OID is 0x%x\n", OID);
+
+	switch (OID) {
+	case RNDIS_OID_GEN_CURRENT_PACKET_FILTER:
+
+		/* these NDIS_PACKET_TYPE_* bitflags are shared with
+		 * cdc_filter; it's not RNDIS-specific
+		 * NDIS_PACKET_TYPE_x == USB_CDC_PACKET_TYPE_x for x in:
+		 *	PROMISCUOUS, DIRECTED,
+		 *	MULTICAST, ALL_MULTICAST, BROADCAST
+		 */
+		*params->filter = (u16)get_unaligned_le32(buf);
+		pr_debug("%s: RNDIS_OID_GEN_CURRENT_PACKET_FILTER %08x\n",
+			__func__, *params->filter);
+
+		/* this call has a significant side effect:  it's
+		 * what makes the packet flow start and stop, like
+		 * activating the CDC Ethernet altsetting.
+		 */
+		retval = 0;
+		if (*params->filter) {
+			params->state = RNDIS_DATA_INITIALIZED;
+			netif_carrier_on(params->dev);
+			if (netif_running(params->dev))
+				netif_wake_queue(params->dev);
+		} else {
+			params->state = RNDIS_INITIALIZED;
+			netif_carrier_off(params->dev);
+			netif_stop_queue(params->dev);
+		}
+		break;
+
+	case RNDIS_OID_802_3_MULTICAST_LIST:
+		/* I think we can ignore this */
+		pr_debug("%s: RNDIS_OID_802_3_MULTICAST_LIST\n", __func__);
+		retval = 0;
+		break;
+
+	default:
+		pr_warn("%s: set unknown OID 0x%08X, size %d\n",
+			 __func__, OID, buf_len);
+	}
+
+	if (retval)
+		pr_debug("rndis_set_action, <==== retval is 0x%x\n", retval);
+
+	return retval;
+}
+#endif
+
 /*
  * Response Functions
  */
@@ -884,6 +951,17 @@ static int rndis_set_response(struct rndis_params *params, rndis_set_msg_type *b
 	rndis_set_cmplt_type *resp;
 	rndis_resp_t *r;
 
+#ifdef CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT
+	BufLength = le32_to_cpu(buf->InformationBufferLength);
+	BufOffset = le32_to_cpu(buf->InformationBufferOffset);
+#endif
+
+#ifdef CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT
+	if (!reply) {
+		rndis_set_action(params, le32_to_cpu(buf->OID),
+				((u8 *)buf) + 8 + BufOffset, BufLength);
+	} else {
+#endif
 	r = rndis_add_response(params, sizeof(rndis_set_cmplt_type));
 	if (!r) {
 		pr_err("rndis_set_response, rndis_add_response return NULL\n");
@@ -915,6 +993,9 @@ static int rndis_set_response(struct rndis_params *params, rndis_set_msg_type *b
 		resp->Status = cpu_to_le32(RNDIS_STATUS_SUCCESS);
 
 	params->resp_avail(params->v);
+#ifdef CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT
+	}
+#endif
 	return 0;
 }
 
@@ -945,6 +1026,9 @@ static int rndis_reset_response(struct rndis_params *params, rndis_reset_msg_typ
 	resp->AddressingReset = cpu_to_le32(1);
 
 	params->resp_avail(params->v);
+#ifdef CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT
+	}
+#endif
 	return 0;
 }
 
@@ -1049,7 +1133,11 @@ EXPORT_SYMBOL_GPL(rndis_set_host_mac);
 /*
  * Message Parser
  */
+#ifdef CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT
+int rndis_msg_parser(struct rndis_params *params, u8 *buf, u8 direct_state, struct usb_ctrlrequest *ctrl_req)
+#else
 int rndis_msg_parser(struct rndis_params *params, u8 *buf)
+#endif
 {
 	u32 MsgType, MsgLength, MsgID;
 	__le32 *tmp;

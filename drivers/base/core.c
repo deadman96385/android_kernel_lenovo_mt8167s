@@ -2071,6 +2071,7 @@ void device_shutdown(void)
 		dev = list_entry(devices_kset->list.prev, struct device,
 				kobj.entry);
 
+		dev_info(dev, "get device\n");
 		/*
 		 * hold reference count of device's parent to
 		 * prevent it from being freed because parent's

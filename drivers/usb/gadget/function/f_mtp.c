@@ -642,6 +642,25 @@ static ssize_t mtp_read(struct file *fp, char __user *buf,
 			skip_cnt++;
 	}
 
+	{
+		static DEFINE_RATELIMIT_STATE(ratelimit, 1 * HZ, 5);
+		static int skip_cnt;
+
+		if (!strstr(current->comm, "MtpServer")) {
+			MTP_QUEUE_DBG("NOT MtpServer.........\n");
+			mtp_dbg_dump();
+
+			/* return directly for malfunction usage */
+			return count;
+		}
+
+		if (__ratelimit(&ratelimit)) {
+			MTP_QUEUE_DBG("MtpServer........., skip_cnt:%d\n", skip_cnt);
+			skip_cnt = 0;
+		} else
+			skip_cnt++;
+	}
+
 	DBG(cdev, "mtp_read(%zu)\n", count);
 
 	if (true) {

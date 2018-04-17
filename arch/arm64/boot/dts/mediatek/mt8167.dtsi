@@ -142,11 +142,6 @@
 		};
 	};
 
-	memory {
-		device_type = "memory";
-		reg = <0 0x40000000 0 0x20000000>;
-	};
-
 	reserved_memory: reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <2>;
@@ -155,22 +150,22 @@
 		atf_reserved_memory: atf-reserved-memory {
 			compatible = "mediatek,mt8167-atf-reserved-memory";
 			no-map;
-			reg = <0 0x54600000 0 0x30000>;
+			reg = <0 0x43000000 0 0x30000>;
 		};
 
 		ram_console-reserved-memory {
 			compatible = "mediatek,ram_console";
-			reg = <0 0x54400000 0 0x10000>;
+			reg = <0 0x44400000 0 0x10000>;
 		};
 
 		pstore-reserved-memory {
 			compatible = "mediatek,pstore";
-			reg = <0 0x54410000 0 0xe0000>;
+			reg = <0 0x44410000 0 0xe0000>;
 		};
 
 		minirdump-reserved-memory {
 			compatible = "mediatek,minirdump";
-			reg = <0 0x544f0000 0 0x10000>;
+			reg = <0 0x444f0000 0 0x10000>;
 		};
 
 	};
@@ -466,6 +461,15 @@
 		fhctl@10018f00 {
 			compatible = "mediatek,mt8167-fhctl";
 			reg = <0 0x10018f00 0 0x100>;
+		};
+
+		irrx: irrx@10019000 {
+			compatible = "mediatek,mt8167-irrx";
+			reg = <0 0x10019000 0 0x1000>;
+			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_LOW>;
+			clocks = <&clk32k>;
+			clock-names = "irrx_clock";
+			status = "disabled";
 		};
 
 		accdet: accdet@1001b000 {

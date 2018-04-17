@@ -861,6 +861,11 @@ static void rndis_response_complete(struct usb_ep *ep, struct usb_request *req)
 
 	cdev = rndis->port.func.config->cdev;
 
+	if (!rndis->port.func.config || !rndis->port.func.config->cdev)
+		return;
+
+	cdev = rndis->port.func.config->cdev;
+
 	/* after TX:
 	 *  - USB_CDC_GET_ENCAPSULATED_RESPONSE (ep0/control)
 	 *  - RNDIS_RESPONSE_AVAILABLE (status/irq)
@@ -1159,6 +1164,18 @@ static void rndis_disable(struct usb_function *f)
 		pr_info("%s, DIRECT_STATE_DEACTIVATED before rx_fill\n", __func__);
 		rx_fill(rndis->port.ioport, GFP_KERNEL);
 		pr_info("%s, rx_fill done!!\n", __func__);
+	}
+#endif
+
+#ifdef CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT
+	if (rndis->direct_state == DIRECT_STATE_ACTIVATING ||
+		rndis->direct_state == DIRECT_STATE_ACTIVATED) {
+		rndis->network_type = RNDIS_NETWORK_TYPE_NONE;
+		/* Deactivating direct tethering */
+		rndis_deactivate_direct_tethering(f);
+		rndis->direct_state = DIRECT_STATE_DEACTIVATED;
+		pr_info("%s, rndis_resume_data_control\n", __func__);
+		rndis_resume_data_control(rndis);
 	}
 #endif
 

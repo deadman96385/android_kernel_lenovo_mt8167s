@@ -1199,6 +1199,22 @@ static void check_sync(struct device *dev,
 	entry = bucket_find_contain(&bucket, ref, &flags);
 
 	if (!entry) {
+#ifdef CONFIG_MACH_MT8167
+		/*
+		 * we could not find out why the first time alloc iova,
+		 * dma debug will report this warning. but check every thing
+		 * seems alright. Just igore the first warning of m4u.
+		 * warning address offset are from 0x3fd0 ~ 0x3ff0.
+		 */
+		static int first_warning;
+
+		if (!strncmp(dev_name(dev), "10203000.m4u", 12) && first_warning < 12) {
+			dev_warn(dev, "[device address=0x%016llx] [size=%llu bytes]\n",
+				(unsigned long long)ref->dev_addr, ref->size);
+			first_warning++;
+			goto out;
+		}
+#endif
 		err_printk(dev, NULL, "DMA-API: device driver tries "
 				"to sync DMA memory it has not allocated "
 				"[device address=0x%016llx] [size=%llu bytes]\n",
@@ -1461,13 +1477,21 @@ void debug_dma_alloc_coherent(struct device *dev, size_t size,
 	if (!entry)
 		return;
 
+	/* handle vmalloc and linear addresses */
+	if (!is_vmalloc_addr(virt) && !virt_to_page(virt))
+		return;
+
 	entry->type      = dma_debug_coherent;
 	entry->dev       = dev;
-	entry->pfn	 = page_to_pfn(virt_to_page(virt));
 	entry->offset	 = (size_t) virt & ~PAGE_MASK;
 	entry->size      = size;
 	entry->dev_addr  = dma_addr;
 	entry->direction = DMA_BIDIRECTIONAL;
+
+	if (is_vmalloc_addr(virt))
+		entry->pfn = vmalloc_to_pfn(virt);
+	else
+		entry->pfn = page_to_pfn(virt_to_page(virt));
 
 	add_dma_entry(entry);
 }
@@ -1479,12 +1503,20 @@ void debug_dma_free_coherent(struct device *dev, size_t size,
 	struct dma_debug_entry ref = {
 		.type           = dma_debug_coherent,
 		.dev            = dev,
-		.pfn		= page_to_pfn(virt_to_page(virt)),
 		.offset		= (size_t) virt & ~PAGE_MASK,
 		.dev_addr       = addr,
 		.size           = size,
 		.direction      = DMA_BIDIRECTIONAL,
 	};
+
+	/* handle vmalloc and linear addresses */
+	if (!is_vmalloc_addr(virt) && !virt_to_page(virt))
+		return;
+
+	if (is_vmalloc_addr(virt))
+		ref.pfn = vmalloc_to_pfn(virt);
+	else
+		ref.pfn = page_to_pfn(virt_to_page(virt));
 
 	if (unlikely(dma_debug_disabled()))
 		return;

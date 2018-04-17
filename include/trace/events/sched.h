@@ -1937,12 +1937,14 @@ TRACE_EVENT(sched_cfs_length,
 #ifdef CONFIG_SCHED_WALT
 struct rq;
 
-TRACE_EVENT(walt_update_task_ravg,
+/*
+ * Tracepoint for cfs task enqueue event
+ */
+TRACE_EVENT(sched_cfs_enqueue_task,
 
-	TP_PROTO(struct task_struct *p, struct rq *rq, int evt,
-						u64 wallclock, u64 irqtime),
+		TP_PROTO(struct task_struct *tsk, int tsk_load, int cpu_id),
 
-	TP_ARGS(p, rq, evt, wallclock, irqtime),
+		TP_ARGS(tsk, tsk_load, cpu_id),
 
 	TP_STRUCT__entry(
 		__array(char, comm, TASK_COMM_LEN)
@@ -1968,51 +1970,28 @@ TRACE_EVENT(walt_update_task_ravg,
 		__field(u32, active_windows)
 	),
 
-	TP_fast_assign(
-		__entry->wallclock      = wallclock;
-		__entry->win_start      = rq->window_start;
-		__entry->delta          = (wallclock - rq->window_start);
-		__entry->evt            = evt;
-		__entry->cpu            = rq->cpu;
-		__entry->cur_pid        = rq->curr->pid;
-		__entry->cur_freq       = rq->cur_freq;
-		memcpy(__entry->comm, p->comm, TASK_COMM_LEN);
-		__entry->pid            = p->pid;
-		__entry->mark_start     = p->ravg.mark_start;
-		__entry->delta_m        = (wallclock - p->ravg.mark_start);
-		__entry->demand         = p->ravg.demand;
-		__entry->sum            = p->ravg.sum;
-		__entry->irqtime        = irqtime;
-		__entry->cs             = rq->curr_runnable_sum;
-		__entry->ps             = rq->prev_runnable_sum;
-		__entry->curr_window	= p->ravg.curr_window;
-		__entry->prev_window	= p->ravg.prev_window;
-		__entry->nt_cs		= rq->nt_curr_runnable_sum;
-		__entry->nt_ps		= rq->nt_prev_runnable_sum;
-		__entry->active_windows	= p->ravg.active_windows;
-	),
+		TP_fast_assign(
+			memcpy(__entry->comm, tsk->comm, TASK_COMM_LEN);
+			__entry->tsk_pid = tsk->pid;
+			__entry->tsk_load = tsk_load;
+			__entry->cpu_id = cpu_id;
+			),
 
-	TP_printk("wc %llu ws %llu delta %llu event %d cpu %d cur_freq %u cur_pid %d task %d (%s) ms %llu delta %llu demand %u sum %u irqtime %llu"
-		" cs %llu ps %llu cur_window %u prev_window %u nt_cs %llu nt_ps %llu active_wins %u"
-		, __entry->wallclock, __entry->win_start, __entry->delta,
-		__entry->evt, __entry->cpu,
-		__entry->cur_freq, __entry->cur_pid,
-		__entry->pid, __entry->comm, __entry->mark_start,
-		__entry->delta_m, __entry->demand,
-		__entry->sum, __entry->irqtime,
-		__entry->cs, __entry->ps,
-		__entry->curr_window, __entry->prev_window,
-		  __entry->nt_cs, __entry->nt_ps,
-		  __entry->active_windows
-		)
-);
+		TP_printk("cpu-id=%d task-pid=%4d task-load=%4d comm=%s",
+			__entry->cpu_id,
+			__entry->tsk_pid,
+			__entry->tsk_load,
+			__entry->comm)
+		);
 
-TRACE_EVENT(walt_update_history,
+/*
+ * Tracepoint for cfs task dequeue event
+ */
+TRACE_EVENT(sched_cfs_dequeue_task,
 
-	TP_PROTO(struct rq *rq, struct task_struct *p, u32 runtime, int samples,
-			int evt),
+		TP_PROTO(struct task_struct *tsk, int tsk_load, int cpu_id),
 
-	TP_ARGS(rq, p, runtime, samples, evt),
+		TP_ARGS(tsk, tsk_load, cpu_id),
 
 	TP_STRUCT__entry(
 		__array(	char,	comm,   TASK_COMM_LEN	)
@@ -2054,11 +2033,45 @@ TRACE_EVENT(walt_update_history,
 		__entry->hist[4], __entry->cpu)
 );
 
-TRACE_EVENT(walt_migration_update_sum,
+/*
+ * Tracepoint for cfs runqueue load ratio update
+ */
+TRACE_EVENT(sched_cfs_load_update,
 
-	TP_PROTO(struct rq *rq, struct task_struct *p),
+		TP_PROTO(struct task_struct *tsk, int tsk_load, int tsk_delta, int cpu_id),
 
-	TP_ARGS(rq, p),
+		TP_ARGS(tsk, tsk_load, tsk_delta, cpu_id),
+
+		TP_STRUCT__entry(
+			__array(char, comm, TASK_COMM_LEN)
+			__field(pid_t, tsk_pid)
+			__field(int, tsk_load)
+			__field(int, tsk_delta)
+			__field(int, cpu_id)
+			),
+
+		TP_fast_assign(
+			memcpy(__entry->comm, tsk->comm, TASK_COMM_LEN);
+			__entry->tsk_pid = tsk->pid;
+			__entry->tsk_load = tsk_load;
+			__entry->tsk_delta = tsk_delta;
+			__entry->cpu_id = cpu_id;
+			),
+
+		TP_printk("cpu-id=%d task-pid=%4d task-load=%4d(%d) comm=%s",
+				__entry->cpu_id,
+				__entry->tsk_pid,
+				__entry->tsk_load,
+				__entry->tsk_delta,
+				__entry->comm)
+		);
+
+/*
+ * Tracepoint for showing tracked cfs runqueue runnable load.
+ */
+TRACE_EVENT(sched_cfs_runnable_load,
+
+		TP_PROTO(int cpu_id, int cpu_load, int cpu_ntask),
 
 	TP_STRUCT__entry(
 		__field(int, cpu)
@@ -2069,20 +2082,69 @@ TRACE_EVENT(walt_migration_update_sum,
 		__field(s64, nt_ps)
 	),
 
-	TP_fast_assign(
-		__entry->cpu		= cpu_of(rq);
-		__entry->cs		= rq->curr_runnable_sum;
-		__entry->ps		= rq->prev_runnable_sum;
-		__entry->nt_cs		= (s64)rq->nt_curr_runnable_sum;
-		__entry->nt_ps		= (s64)rq->nt_prev_runnable_sum;
-		__entry->pid		= p->pid;
-	),
+		TP_STRUCT__entry(
+			__field(int, cpu_id)
+			__field(int, cpu_load)
+			__field(int, cpu_ntask)
+			),
 
-	TP_printk("cpu %d: cs %llu ps %llu nt_cs %lld nt_ps %lld pid %d",
-		  __entry->cpu, __entry->cs, __entry->ps,
-		  __entry->nt_cs, __entry->nt_ps, __entry->pid)
-);
-#endif /* CONFIG_SCHED_WALT */
+		TP_fast_assign(
+			__entry->cpu_id = cpu_id;
+			__entry->cpu_load = cpu_load;
+			__entry->cpu_ntask = cpu_ntask;
+			),
+
+		TP_printk("cpu-id=%d cfs-load=%4d, cfs-ntask=%2d",
+			__entry->cpu_id,
+			__entry->cpu_load,
+			__entry->cpu_ntask)
+		);
+
+/*
+ * Tracepoint for profiling runqueue length
+ */
+TRACE_EVENT(sched_runqueue_length,
+
+		TP_PROTO(int cpu, int length),
+
+		TP_ARGS(cpu, length),
+
+		TP_STRUCT__entry(
+			__field(int, cpu)
+			__field(int, length)
+			),
+
+		TP_fast_assign(
+			__entry->cpu = cpu;
+			__entry->length = length;
+			),
+
+		TP_printk("cpu=%d rq-length=%2d",
+			__entry->cpu,
+			__entry->length)
+	   );
+
+TRACE_EVENT(sched_cfs_length,
+
+		TP_PROTO(int cpu, int length),
+
+		TP_ARGS(cpu, length),
+
+		TP_STRUCT__entry(
+			__field(int, cpu)
+			__field(int, length)
+			),
+
+		TP_fast_assign(
+			__entry->cpu = cpu;
+			__entry->length = length;
+			),
+
+		TP_printk("cpu=%d cfs-length=%2d",
+			__entry->cpu,
+			__entry->length)
+	   );
+#endif /* CONFIG_HMP_TRACER */
 
 
 #endif /* _TRACE_SCHED_H */

@@ -552,6 +552,12 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 		 */
 		expired = time_after(jiffies, timeout);
 		if (send_status) {
+			/*
+			 * Due to the possibility of being preempted after
+			 * sending the status command, check the expiration
+			 * time first.
+			 */
+			expired = time_after(jiffies, timeout);
 			err = __mmc_send_status(card, &status, ignore_crc);
 			if (err)
 				goto out;

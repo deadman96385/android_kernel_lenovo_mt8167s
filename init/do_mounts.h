@@ -84,3 +84,5 @@ void dm_run_setup(void);
 static inline void dm_run_setup(void) {}
 
 #endif
+
+void mark_rootfs_corrupted(void);

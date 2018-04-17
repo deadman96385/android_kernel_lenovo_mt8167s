@@ -282,6 +282,10 @@ void nand_release_device(struct mtd_info *mtd)
 
 	spin_lock(&chip->controller->lock);
 	chip->controller->active = NULL;
+#ifdef CONFIG_MTK_MTD_NAND
+	if (chip->state != FL_READY && chip->state != FL_PM_SUSPENDED)
+		nand_disable_clock();
+#endif
 	chip->state = FL_READY;
 	wake_up(&chip->controller->wq);
 	spin_unlock(&chip->controller->lock);
@@ -1043,6 +1047,10 @@ retry:
 		chip->controller->active = chip;
 
 	if (chip->controller->active == chip && chip->state == FL_READY) {
+#ifdef CONFIG_MTK_MTD_NAND
+		if (new_state != FL_READY && new_state != FL_PM_SUSPENDED)
+			nand_enable_clock();
+#endif
 		chip->state = new_state;
 		spin_unlock(lock);
 #ifdef CONFIG_MTK_MTD_NAND

@@ -1998,6 +1998,10 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	}
 	cc->start = tmpll;
 
+#if defined(CONFIG_MTK_HW_FDE_AES)
+	FDEERR("%s %s %s %s %s %s\n", __func__, argv[0], argv[1], argv[2], argv[3], argv[4]);
+#endif
+
 	argv += 5;
 	argc -= 5;
 

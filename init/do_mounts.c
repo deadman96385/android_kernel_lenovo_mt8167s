@@ -418,6 +418,7 @@ retry:
 		printk("DEBUG_BLOCK_EXT_DEVT is enabled, you need to specify "
 		       "explicit textual name for \"root=\" boot option.\n");
 #endif
+		mark_rootfs_corrupted();
 		panic("VFS: Unable to mount root fs on %s", b);
 	}
 	if (!(flags & MS_RDONLY)) {
@@ -434,6 +435,7 @@ retry:
 #ifdef CONFIG_BLOCK
 	__bdevname(ROOT_DEV, b);
 #endif
+	mark_rootfs_corrupted();
 	panic("VFS: Unable to mount root fs on %s", b);
 out:
 	put_page(page);
