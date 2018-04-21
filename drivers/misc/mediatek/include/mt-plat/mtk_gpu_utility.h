@@ -47,6 +47,7 @@ bool mtk_get_gpu_page_cache(unsigned int *pPageCache);
 
 /* unit: 0~100 % */
 bool mtk_get_gpu_loading(unsigned int *pLoading);
+bool mtk_get_gpu_loading2(unsigned int *pLoading, int reset);
 bool mtk_get_gpu_block(unsigned int *pBlock);
 bool mtk_get_gpu_idle(unsigned int *pIlde);
 bool mtk_get_gpu_freq(unsigned int *pFreq);
@@ -90,6 +91,8 @@ typedef struct {
 } GPU_PMU;
 bool mtk_get_gpu_pmu_init(GPU_PMU *pmus, int pmu_size, int *ret_size);
 bool mtk_get_gpu_pmu_swapnreset(GPU_PMU *pmus, int pmu_size);
+bool mtk_get_gpu_pmu_deinit(void);
+bool mtk_get_gpu_pmu_swapnreset_stop(void);
 
 typedef void (*gpu_power_change_notify_fp)(int power_on);
 

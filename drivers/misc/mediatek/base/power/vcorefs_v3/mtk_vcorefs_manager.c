@@ -21,6 +21,11 @@
 #include "mtk_spm_vcore_dvfs.h"
 #include "mmdvfs_mgr.h"
 
+__weak void mmdvfs_notify_prepare_action(struct mmdvfs_prepare_action_event *event)
+{
+	vcorefs_crit("NOT SUPPORT MM DVFS NOTIFY\n");
+}
+
 static DEFINE_MUTEX(vcorefs_mutex);
 
 #define DEFINE_ATTR_RO(_name)			\
@@ -58,12 +63,16 @@ struct vcorefs_profile {
 static struct vcorefs_profile vcorefs_ctrl = {
 	.plat_init_opp	= 0,
 	.init_done	= 0,
+#if defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758)
+	.autok_finish   = 1,
+#else
 	.autok_finish   = 0,
+#endif
 	.autok_lock	= 0,
 	.dvfs_lock	= 0,
 	.dvfs_request   = 0,
 	.kr_req_mask	= 0,
-	.kr_log_mask	= 0, /* (1U << KIR_GPU) */
+	.kr_log_mask	= (1U << KIR_GPU) | (1U << KIR_FBT) | (1U << KIR_PERF) | (1U << KIR_TLC),
 };
 
 /*
@@ -115,6 +124,7 @@ int vcorefs_each_kicker_request(enum dvfs_kicker kicker)
 
 int spm_msdc_dvfs_setting(int msdc, bool enable)
 {
+#if !defined(CONFIG_MACH_MT6759) && !defined(CONFIG_MACH_MT6759)
 	struct vcorefs_profile *pwrctrl = &vcorefs_ctrl;
 	struct mmdvfs_prepare_action_event evt_from_vcore = {MMDVFS_EVENT_PREPARE_CALIBRATION_END};
 
@@ -123,7 +133,11 @@ int spm_msdc_dvfs_setting(int msdc, bool enable)
 
 	pwrctrl->autok_finish = enable;
 
-	vcorefs_crit("[%s] MSDC AUTO FINISH\n", __func__);
+#if defined(CONFIG_MACH_MT6739)
+	dvfsrc_msdc_autok_finish();
+#endif
+
+	vcorefs_crit("[%s] MSDC AUTOK FINISH\n", __func__);
 
 #ifdef CONFIG_MTK_DCS
 	dcs_full_init();
@@ -132,32 +146,41 @@ int spm_msdc_dvfs_setting(int msdc, bool enable)
 
 	/* notify MM DVFS for msdc autok end */
 	mmdvfs_notify_prepare_action(&evt_from_vcore);
-
+#endif
 	return 0;
+}
+
+__weak int spm_vcorefs_get_kicker_group(int kicker)
+{
+	return 1;
 }
 
 static int _get_dvfs_opp(struct vcorefs_profile *pwrctrl, enum dvfs_kicker kicker, enum dvfs_opp opp)
 {
 	unsigned int dvfs_opp = UINT_MAX;
-	int i;
+	int i, group;
 	char table[NUM_KICKER * 4 + 1];
 	char *p = table;
 	char *buff_end = table + (NUM_KICKER * 4 + 1);
 
+	group = spm_vcorefs_get_kicker_group(kicker);
+
 	for (i = 0; i < NUM_KICKER; i++) {
-		if (kicker_table[i] < 0)
+		if (kicker_table[i] < 0 || group != spm_vcorefs_get_kicker_group(i))
 			continue;
 
 		if (kicker_table[i] < dvfs_opp)
 			dvfs_opp = kicker_table[i];
 	}
 
-	/* if have no request, set to init OPP */
-	if (dvfs_opp == UINT_MAX) {
-		dvfs_opp = pwrctrl->plat_init_opp;
-		pwrctrl->dvfs_request = false;
-	} else {
-		pwrctrl->dvfs_request = true;
+	if (group == 1) {
+		/* if have no request, set to init OPP */
+		if (dvfs_opp == UINT_MAX) {
+			dvfs_opp = pwrctrl->plat_init_opp;
+			pwrctrl->dvfs_request = false;
+		} else {
+			pwrctrl->dvfs_request = true;
+		}
 	}
 
 	for (i = 0; i < NUM_KICKER; i++)
@@ -406,15 +429,15 @@ static ssize_t vcore_debug_store(struct kobject *kobj, struct kobj_attribute *at
 	int kicker, val, r;
 	char cmd[32];
 
-	if (sscanf(buf, "%31s %d", cmd, &val) != 2)
-		return -EPERM;
-
-	if (pwrctrl->kr_log_mask != 65535) /* no log when DRAM HQA stress (0xFFFF)*/
-		vcorefs_crit("vcore_debug: cmd: %s, val: %d\n", cmd, val);
-
 	r = governor_debug_store(buf);
 	if (!r)
 		return count;
+
+	if (sscanf(buf, "%31s %d", cmd, &val) != 2)
+		return -EPERM;
+
+	if ((pwrctrl->kr_log_mask & 0xFFFF) != 65535) /* no log when DRAM HQA stress (0xFFFF)*/
+		vcorefs_crit("vcore_debug: cmd: %s, val: %d\n", cmd, val);
 
 	if (!strcmp(cmd, "feature_en")) {
 		mutex_lock(&vcorefs_mutex);

@@ -6,6 +6,22 @@
  * published by the Free Software Foundation.
  */
 
+/*
+ * Support multi-type scheduler driven dvfs
+ *
+ * typeI: (scheduler assist dvfs)
+ *   The sched-assist is not a governor. Scheduler can trigger a request
+ *   to tiny system  directly. (kconfig: CONFIG_CPU_FREQ_GOV_SCHED,
+ *   CONFIG_CPU_FREQ_SCHED_ASSIST, CONFIG_MTK_TINYSYS_SSPM_SUPPORT)
+ *
+ * typeII: (scheduler governor with tiny system)
+ *   (kconfig: CONFIG_CPU_FREQ_GOV_SCHED, CONFIG_MTK_TINYSYS_SSPM_SUPPORT)
+ *
+ * typeIII: (scheduler governor wo tiny system)
+ *   (kconfig:  CONFIG_CPU_FREQ_GOV_SCHED)
+ *
+ */
+
 #include <linux/cpufreq.h>
 #include <linux/module.h>
 #include <linux/kthread.h>
@@ -13,20 +29,40 @@
 #include <linux/irq_work.h>
 #include <linux/delay.h>
 #include <linux/string.h>
+#include <trace/events/sched.h>
 
 #include "sched.h"
 #include "cpufreq_sched.h"
 
+/* next throttling period expiry if increasing OPP */
+#define THROTTLE_DOWN_NSEC     2000000 /* 2ms default */
+/* next throttling period expiry if decreasing OPP */
+#define THROTTLE_UP_NSEC       500000  /* 500us default */
+
+#define THROTTLE_NSEC          2000000 /* 2ms default */
+
+#define MAX_CLUSTER_NR 3
+
 #ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
-#define THROTTLE_NSEC	2000000 /* 2ms default */
+int sched_dvfs_type = 1;
 #else
-#define THROTTLE_NSEC	3000000 /* 3ms default */
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+int sched_dvfs_type = 2;
+#else
+int sched_dvfs_type = 3;
+#endif /* end of tiny sys */
+#endif /* end of sched-assist */
+
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+static DEFINE_PER_CPU(unsigned long, freq_scale) = SCHED_CAPACITY_SCALE;
 #endif
 
 #ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
 struct static_key __read_mostly __sched_freq = STATIC_KEY_INIT_TRUE;
-#else
+#else /* GOV_SCHED */
 struct static_key __read_mostly __sched_freq = STATIC_KEY_INIT_FALSE;
+/* To confirm kthread if created */
+static bool g_inited[MAX_CLUSTER_NR] = {false};
 #endif
 
 static bool __read_mostly cpufreq_driver_slow;
@@ -38,26 +74,80 @@ static struct cpufreq_governor cpufreq_gov_sched;
 static DEFINE_PER_CPU(unsigned long, enabled);
 DEFINE_PER_CPU(struct sched_capacity_reqs, cpu_sched_capacity_reqs);
 
-#define MAX_CLUSTER_NR 3
-
+/* keep goverdata as gloabl variable */
 static struct gov_data *g_gd[MAX_CLUSTER_NR] = { NULL };
 
-static void met_cpu_dvfs(int cid, int freq, int flag);
-
-static bool g_inited[MAX_CLUSTER_NR] = {false};
 
 #define DEBUG 0
 #define DEBUG_KLOG 0
 
 #if DEBUG_KLOG
-#define printk_dbg(f, a...) printk(dev "[scheddvfs] "f, ##a)
+#define printk_dbg(f, a...) printk_deferred("[scheddvfs] "f, ##a)
 #else
 #define printk_dbg(f, a...) do {} while (0)
 #endif
 
-#if MET_SCHED_DEBUG
 #include <mt-plat/met_drv.h>
-#endif
+
+struct sugov_cpu {
+	struct sugov_policy *sg_policy;
+
+	unsigned int cached_raw_freq;
+	unsigned long iowait_boost;
+	unsigned long iowait_boost_max;
+	u64 last_update;
+
+	/* The fields below are only needed when sharing a policy. */
+	unsigned long util;
+	unsigned long max;
+	unsigned int flags;
+	int idle;
+};
+
+static DEFINE_PER_CPU(struct sugov_cpu, sugov_cpu);
+
+static void sugov_set_iowait_boost(struct sugov_cpu *sg_cpu, u64 time,
+		unsigned int flags)
+{
+	if (flags == SCHE_IOWAIT)
+		sg_cpu->iowait_boost = sg_cpu->iowait_boost_max;
+	else if (sg_cpu->iowait_boost) {
+		s64 delta_ns = time - sg_cpu->last_update;
+
+		/* Clear iowait_boost if the CPU apprears to have been idle. */
+		if (delta_ns > TICK_NSEC)
+			sg_cpu->iowait_boost = 0;
+	}
+}
+
+static char met_iowait_info[10][32] = {
+	"sched_ioboost_cpu0",
+	"sched_ioboost_cpu1",
+	"sched_ioboost_cpu2",
+	"sched_ioboost_cpu3",
+	"sched_ioboost_cpu4",
+	"sched_ioboost_cpu5",
+	"sched_ioboost_cpu6",
+	"sched_ioboost_cpu7",
+	"NULL",
+	"NULL"
+};
+
+static char met_dvfs_info[5][16] = {
+	"sched_dvfs_cid0",
+	"sched_dvfs_cid1",
+	"sched_dvfs_cid2",
+	"NULL",
+	"NULL"
+};
+
+unsigned long int min_boost_freq[3] = {0};
+
+void (*cpufreq_notifier_fp)(int cluster_id, unsigned long freq);
+EXPORT_SYMBOL(cpufreq_notifier_fp);
+
+unsigned int capacity_margin_dvfs = DEFAULT_CAP_MARGIN_DVFS;
+int dbg_id = DEBUG_FREQ_DISABLED;
 
 /**
  * gov_data - per-policy data internal to the governor
@@ -77,6 +167,10 @@ static bool g_inited[MAX_CLUSTER_NR] = {false};
  */
 struct gov_data {
 	ktime_t throttle;
+	ktime_t up_throttle;
+	ktime_t down_throttle;
+	unsigned int up_throttle_nsec;
+	unsigned int down_throttle_nsec;
 	unsigned int throttle_nsec;
 	struct task_struct *task;
 	struct irq_work irq_work;
@@ -84,13 +178,35 @@ struct gov_data {
 	struct cpufreq_policy *policy;
 	int target_cpu;
 	int cid;
+	enum throttle_type thro_type; /* throttle up or down */
+	u64 last_freq_update_time;
 };
+
+void show_freq_kernel_log(int dbg_id, int cid, unsigned int freq)
+{
+	if (dbg_id == cid || dbg_id == DEBUG_FREQ_ALL)
+		printk_deferred("[name:sched_power&] cid=%d freq=%u\n", cid, freq);
+}
+
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+unsigned long cpufreq_scale_freq_capacity(struct sched_domain *sd, int cpu)
+{
+	return per_cpu(freq_scale, cpu);
+}
+#endif
 
 static void cpufreq_sched_try_driver_target(int target_cpu, struct cpufreq_policy *policy,
 					    unsigned int freq, int type)
 {
 	struct gov_data *gd;
 	int cid;
+	unsigned int boost_min;
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+	int cpu;
+	struct cpumask cls_cpus;
+	unsigned int max;
+	unsigned long scale;
+#endif
 
 	cid = arch_get_cluster_id(target_cpu);
 
@@ -99,21 +215,53 @@ static void cpufreq_sched_try_driver_target(int target_cpu, struct cpufreq_polic
 		return;
 	}
 
-	/* policy is NOT trusted!!! here??? */
+	/* policy may NOT trusted! */
 	gd = g_gd[cid];
 
-#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
+	if (dbg_id  < DEBUG_FREQ_DISABLED)
+		show_freq_kernel_log(dbg_id, cid, freq);
+
+	/* no freq = 0 case */
+	if (!freq)
+		return;
+
+	boost_min = min_boost_freq[cid];
+
+	/* if freq changed, give fps tracker notification. */
+	if (boost_min)
+		if (cpufreq_notifier_fp)
+			cpufreq_notifier_fp(cid, freq);
+
+	/* update current freq asap if tiny system. */
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+	max = arch_scale_get_max_freq(target_cpu);
+
+	/* freq is real world frequency already. */
+	scale = (freq << SCHED_CAPACITY_SHIFT) / max;
+
+	arch_get_cluster_cpus(&cls_cpus, cid);
+
+	for_each_cpu(cpu, &cls_cpus) {
+		per_cpu(freq_scale, cpu) = scale;
+		arch_scale_set_curr_freq(cpu, freq);
+
+		#ifdef CONFIG_SCHED_WALT
+		walt_cpufreq_notifier_trans(cpu, freq);
+		#endif
+	}
+#endif
+
+	printk_dbg("%s: cid=%d cpu=%d freq=%u max_freq=%lu\n",
+			__func__,
+			cid, gd->target_cpu, freq, arch_scale_get_max_freq(target_cpu));
+
 	/*
-	 * debug
+	 * try to apply requested frequency to platform.
 	 */
-	met_cpu_dvfs(cid, freq, 0);
-
-	/* SSPM should support??? */
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
 	mt_cpufreq_set_by_schedule_load_cluster(cid, freq);
-
-	gd->throttle = ktime_add_ns(ktime_get(), gd->throttle_nsec);
 #else
-	policy = gd->policy;
+	policy = cpufreq_cpu_get(gd->target_cpu);
 
 	if (IS_ERR_OR_NULL(policy))
 		return;
@@ -122,7 +270,7 @@ static void cpufreq_sched_try_driver_target(int target_cpu, struct cpufreq_polic
 		!policy->governor_data)
 		return;
 
-	/* avoid race with cpufreq_sched_stop */
+	/* avoid race with cpufreq_sched_stop. */
 	if (!down_write_trylock(&policy->rwsem))
 		return;
 	/*
@@ -134,10 +282,55 @@ static void cpufreq_sched_try_driver_target(int target_cpu, struct cpufreq_polic
 	__cpufreq_driver_target(policy, freq, CPUFREQ_RELATION_L);
 	printk_dbg("%s: cid=%d cpu=%d max_freq=%u -\n", __func__, cid, policy->cpu, policy->max);
 
-	gd->throttle = ktime_add_ns(ktime_get(), gd->throttle_nsec);
 	up_write(&policy->rwsem);
+
+	if (policy)
+		cpufreq_cpu_put(policy);
 #endif
+	/* debug */
+	met_tag_oneshot(0, met_dvfs_info[cid], freq);
+
+	/*
+	 * update throttle time:
+	 * avoid inteference betwewn increasing/decreasing OPP.
+	 */
+	if (gd->thro_type == DVFS_THROTTLE_UP)
+		gd->up_throttle = ktime_add_ns(ktime_get(), gd->up_throttle_nsec);
+	else
+		gd->down_throttle = ktime_add_ns(ktime_get(), gd->down_throttle_nsec);
+
+	gd->throttle = ktime_add_ns(ktime_get(), gd->throttle_nsec);
 }
+
+#ifdef CONFIG_CPU_FREQ_GOV_SCHEDPLUS
+void update_cpu_freq_quick(int cpu, int freq)
+{
+	int cid = arch_get_cluster_id(cpu);
+	int freq_new;
+	struct gov_data *gd;
+	int max_clus_nr = arch_get_nr_clusters();
+	unsigned int cur_freq;
+
+	if (cid >= max_clus_nr || cid < 0)
+		return;
+
+	gd = g_gd[cid];
+	cur_freq = gd->requested_freq;
+
+	freq_new = mt_cpufreq_find_close_freq(cid, freq);
+
+#if 0
+	if (freq_new == cur_freq)
+		return;
+#endif
+
+	gd->thro_type = freq_new <= cur_freq ?
+			DVFS_THROTTLE_DOWN : DVFS_THROTTLE_UP;
+
+	cpufreq_sched_try_driver_target(cpu, NULL, freq_new, -1);
+}
+EXPORT_SYMBOL(update_cpu_freq_quick);
+#endif
 
 #if 0
 static bool finish_last_request(struct gov_data *gd)
@@ -159,6 +352,8 @@ static bool finish_last_request(struct gov_data *gd)
 }
 #endif
 
+
+#ifndef CONFIG_CPU_FREQ_SCHED_ASSIST
 /*
  * we pass in struct cpufreq_policy. This is safe because changing out the
  * policy requires a call to __cpufreq_governor(policy, CPUFREQ_GOV_STOP),
@@ -170,7 +365,7 @@ static int cpufreq_sched_thread(void *data)
 {
 	struct cpufreq_policy *policy;
 	struct gov_data *gd;
-	unsigned int new_request = 0;
+	/* unsigned int new_request = 0; */
 	int cpu;
 	/* unsigned int last_request = 0; */
 
@@ -185,7 +380,7 @@ static int cpufreq_sched_thread(void *data)
 		if (kthread_should_stop())
 			break;
 
-		cpufreq_sched_try_driver_target(cpu, policy, new_request, SCHE_INVALID);
+		cpufreq_sched_try_driver_target(cpu, policy, g_gd[gd->cid]->requested_freq, SCHE_INVALID);
 #if 0
 		new_request = gd->requested_freq;
 		if (new_request == last_request) {
@@ -211,23 +406,29 @@ static void cpufreq_sched_irq_work(struct irq_work *irq_work)
 {
 	struct gov_data *gd;
 
-	gd = container_of(irq_work, struct gov_data, irq_work);
-	if (!gd)
+	if (!irq_work)
 		return;
+
+	gd = container_of(irq_work, struct gov_data, irq_work);
 
 	wake_up_process(gd->task);
 }
+#endif
 
 static void update_fdomain_capacity_request(int cpu, int type)
 {
 	unsigned int freq_new, cpu_tmp;
 	struct gov_data *gd;
 	unsigned long capacity = 0;
-#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
 	int cid = arch_get_cluster_id(cpu);
 	struct cpumask cls_cpus;
-#endif
+	s64 delta_ns;
+	unsigned long arch_max_freq = arch_scale_get_max_freq(cpu);
+	u64 time = cpu_rq(cpu)->clock;
 	struct cpufreq_policy *policy = NULL;
+	ktime_t throttle, now;
+	unsigned int cur_freq;
+	unsigned int max, min, boost_min;
 
 	/*
 	 * Avoid grabbing the policy if possible. A test is still
@@ -237,62 +438,149 @@ static void update_fdomain_capacity_request(int cpu, int type)
 	if (!per_cpu(enabled, cpu))
 		return;
 
-#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
 	gd = g_gd[cid];
 
-	/* bail early if we are throttled */
-	if (ktime_before(ktime_get(), gd->throttle))
+#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
+	/* type.I */
+	if (!mt_cpufreq_get_sched_enable())
 		goto out;
-
-	arch_get_cluster_cpus(&cls_cpus, cid);
-
-	/* find max capacity requested by cpus in this policy */
-	for_each_cpu(cpu_tmp, &cls_cpus) {
-		struct sched_capacity_reqs *scr;
-
-		if (!cpu_online(cpu))
-			continue;
-
-		scr = &per_cpu(cpu_sched_capacity_reqs, cpu_tmp);
-		capacity = max(capacity, scr->total);
-	}
-
-	freq_new = capacity * arch_scale_get_max_freq(cpu) >> SCHED_CAPACITY_SHIFT;
 #else
-	if (likely(cpu_online(cpu)))
-		policy = cpufreq_cpu_get(cpu);
+	policy = cpufreq_cpu_get(cpu);
 
 	if (IS_ERR_OR_NULL(policy))
 		return;
 
 	if (policy->governor != &cpufreq_gov_sched ||
-	    !policy->governor_data)
+		 !policy->governor_data)
 		goto out;
-
-	gd = policy->governor_data;
+#endif
+	arch_get_cluster_cpus(&cls_cpus, cid);
 
 	/* bail early if we are throttled */
 	if (ktime_before(ktime_get(), gd->throttle))
 		goto out;
 
 	/* find max capacity requested by cpus in this policy */
-	for_each_cpu(cpu_tmp, policy->cpus) {
+	for_each_cpu(cpu_tmp, &cls_cpus) {
 		struct sched_capacity_reqs *scr;
+		unsigned long boosted_util = 0;
+		struct sugov_cpu *sg_cpu = &per_cpu(sugov_cpu, cpu_tmp);
 
+		if (!cpu_online(cpu_tmp))
+			continue;
+
+		/* convert IO boosted freq to capacity */
+		boosted_util = (sg_cpu->iowait_boost << SCHED_CAPACITY_SHIFT) /
+					arch_max_freq;
+
+		/* iowait boost */
+		if (cpu_tmp == cpu) {
+			/* IO boosting only for CFS */
+			if (type != SCHE_RT && type != SCHE_DL) {
+
+				/* update iowait_boost */
+				sugov_set_iowait_boost(sg_cpu, time, type);
+
+				 /* convert IO boosted freq to capacity */
+				boosted_util = (sg_cpu->iowait_boost << SCHED_CAPACITY_SHIFT) /
+							arch_max_freq;
+
+				met_tag_oneshot(0, met_iowait_info[cpu_tmp], sg_cpu->iowait_boost);
+
+				/* the boost is reduced by half during each following update */
+				sg_cpu->iowait_boost >>= 1;
+			}
+			sg_cpu->last_update = time;
+		}
 		scr = &per_cpu(cpu_sched_capacity_reqs, cpu_tmp);
-		capacity = max(capacity, scr->total);
+
+		/*
+		 * If the CPU utilization was last updated before the previous
+		 * frequency update and the time elapsed between the last update
+		 * of the CPU utilization and the last frequency update is long
+		 * enough, don't take the CPU into account as it probably is
+		 * idle now (and clear iowait_boost for it).
+		 */
+		delta_ns = gd->last_freq_update_time - cpu_rq(cpu_tmp)->clock;
+
+		if (delta_ns > TICK_NSEC * 2) {/* 2tick */
+			sg_cpu->iowait_boost = 0;
+			sg_cpu->idle = 1;
+			continue;
+		}
+
+		sg_cpu->idle = 0;
+
+		/* check if IO boosting */
+		if (boosted_util > scr->total)
+			capacity = max(capacity, boosted_util);
+		else
+			capacity = max(capacity, scr->total);
 	}
 
-	/* Convert the new maximum capacity request into a cpu frequency */
-	freq_new = capacity * policy->max >> SCHED_CAPACITY_SHIFT;
+	/* get real world frequency */
+	freq_new = capacity * arch_max_freq >> SCHED_CAPACITY_SHIFT;
 
-	if (freq_new == gd->requested_freq)
+	/* clamp frequency for governor limit */
+	max = arch_scale_get_max_freq(cpu);
+	min = arch_scale_get_min_freq(cpu);
+
+	freq_new = clamp(freq_new, min, max);
+
+	/* clamp frequency by boost limit */
+	boost_min = min_boost_freq[cid];
+	freq_new = clamp(freq_new, boost_min, max);
+
+	/* to get frequency in real world */
+	freq_new = mt_cpufreq_find_close_freq(cid, freq_new);
+
+	/* no freq = 0 case */
+	if (!freq_new)
 		goto out;
 
-#endif /* !CONFIG_CPU_FREQ_SCHED_ASSIST */
+	now = ktime_get();
 
+	cur_freq = gd->requested_freq;
+
+	gd->target_cpu = cpu;
+
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+	/* type.II */
+	cur_freq = mt_cpufreq_get_cur_freq(cid);
+#else
+	/* type.III */
+	cur_freq = policy->cur;
+#endif
+
+#ifndef CONFIG_CPU_FREQ_SCHED_ASSIST
+	/* No change in frequency? Bail and return current capacity. */
+	if (freq_new == cur_freq)
+		goto out;
+#endif
+
+	/* get throttling type */
+	throttle = freq_new <= cur_freq ?
+			gd->down_throttle : gd->up_throttle;
+
+	gd->thro_type = freq_new <= cur_freq ?
+			DVFS_THROTTLE_DOWN : DVFS_THROTTLE_UP;
+
+	/* No throttling in time? Bail and return. */
+	if (ktime_before(now, throttle))
+		goto out;
+
+	/* update request freq */
 	gd->requested_freq = freq_new;
 	gd->target_cpu = cpu;
+
+	gd->last_freq_update_time = time;
+
+	mt_sched_printf(sched_dvfs, "cpu=%d type=%d cur=%d new=%d thro_type=%s now=%lld thro_time=%lld",
+			gd->target_cpu, sched_dvfs_type,
+			cur_freq, freq_new,
+			(gd->thro_type == DVFS_THROTTLE_UP) ? "up":"dw",
+			now.tv64, throttle.tv64
+			);
 
 	/*
 	 * Throttling is not yet supported on platforms with fast cpufreq
@@ -319,7 +607,7 @@ void update_cpu_capacity_request(int cpu, bool request, int type)
 	scr = &per_cpu(cpu_sched_capacity_reqs, cpu);
 
 	new_capacity = scr->cfs + scr->rt;
-	new_capacity = new_capacity * capacity_margin
+	new_capacity = new_capacity * capacity_margin_dvfs
 		/ SCHED_CAPACITY_SCALE;
 	new_capacity += scr->dl;
 
@@ -329,7 +617,7 @@ void update_cpu_capacity_request(int cpu, bool request, int type)
 #endif
 
 	scr->total = new_capacity;
-	if (request)
+	if (request || type == SCHE_IOWAIT)
 		update_fdomain_capacity_request(cpu, type);
 }
 
@@ -343,17 +631,24 @@ static inline void clear_sched_freq(void)
 	static_key_slow_dec(&__sched_freq);
 }
 
+
+static struct attribute_group sched_attr_group_gov_pol;
+static struct attribute_group *get_sysfs_attr(void)
+{
+	return &sched_attr_group_gov_pol;
+}
+
 static int cpufreq_sched_policy_init(struct cpufreq_policy *policy)
 {
+#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
+	get_sysfs_attr();
+
+	return 0;
+#else
 	struct gov_data *gd_ptr;
 	int cpu;
-	int cid;
-
-#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
-	return 0;
-#endif
-
-	cid = arch_get_cluster_id(policy->cpu);
+	int rc;
+	int cid = arch_get_cluster_id(policy->cpu);
 
 	/* if kthread is created, return */
 	if (g_inited[cid]) {
@@ -367,6 +662,13 @@ static int cpufreq_sched_policy_init(struct cpufreq_policy *policy)
 				sizeof(struct sched_capacity_reqs));
 
 		set_sched_freq();
+
+		/* for "/sys/devices/system/cpu/cpufreq/policy(cpu)/sched" */
+		rc = sysfs_create_group(&policy->kobj, get_sysfs_attr());
+		if (rc) {
+			pr_debug("%s: couldn't create sysfs attributes: %d\n", __func__, rc);
+			goto err;
+		}
 
 		return 0;
 	}
@@ -388,6 +690,13 @@ static int cpufreq_sched_policy_init(struct cpufreq_policy *policy)
 
 	pr_debug("%s: throttle threshold = %u [ns]\n",
 		  __func__, gd_ptr->throttle_nsec);
+
+	/* for "/sys/devices/system/cpu/cpufreq/policy(cpu)/sched" */
+	rc = sysfs_create_group(&policy->kobj, get_sysfs_attr());
+	if (rc) {
+		pr_debug("%s: couldn't create sysfs attributes: %d\n", __func__, rc);
+		goto err;
+	}
 
 	if (cpufreq_driver_is_slow()) {
 		int ret;
@@ -428,9 +737,12 @@ static int cpufreq_sched_policy_init(struct cpufreq_policy *policy)
 	return 0;
 
 err:
-	kfree(gd_ptr);
+	sysfs_remove_group(get_governor_parent_kobj(policy), get_sysfs_attr());
+	policy->governor_data = NULL;
 	WARN_ON(1);
+
 	return -ENOMEM;
+#endif
 }
 
 static int cpufreq_sched_policy_exit(struct cpufreq_policy *policy)
@@ -439,24 +751,23 @@ static int cpufreq_sched_policy_exit(struct cpufreq_policy *policy)
 
 #ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
 	return 0;
-#endif
-
+#else
 	clear_sched_freq();
-#if 0
-	if (cpufreq_driver_slow) {
-		kthread_stop(gd->task);
-		put_task_struct(gd->task);
-	}
-#endif
+
+	sysfs_remove_group(&policy->kobj, get_sysfs_attr());
 
 	policy->governor_data = NULL;
 
 	/* kfree(gd); */
 	return 0;
+#endif
 }
 
 static int cpufreq_sched_start(struct cpufreq_policy *policy)
 {
+#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
+	return 0;
+#else
 	int cpu;
 
 #ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
@@ -467,23 +778,25 @@ static int cpufreq_sched_start(struct cpufreq_policy *policy)
 		per_cpu(enabled, cpu) = 1;
 
 	return 0;
+#endif
 }
 
 static int cpufreq_sched_stop(struct cpufreq_policy *policy)
 {
+#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
+	return 0;
+#else
 	struct gov_data *gd = policy->governor_data;
 	int cpu;
 
-#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
-	return 0;
-#endif
-
-	irq_work_sync(&gd->irq_work);
+	if (cpufreq_driver_slow)
+		irq_work_sync(&gd->irq_work);
 
 	for_each_cpu(cpu, policy->cpus)
 		per_cpu(enabled, cpu) = 0;
 
 	return 0;
+#endif
 }
 
 static int cpufreq_sched_setup(struct cpufreq_policy *policy,
@@ -491,29 +804,25 @@ static int cpufreq_sched_setup(struct cpufreq_policy *policy,
 {
 #if DEBUG
 	int cpu = -1;
-	int target_cpu = -1;
 	char str[256] = {0};
 	int len = 0;
 
-	for_each_cpu(cpu, policy->cpus) {
-		if (target_cpu == -1)
-			target_cpu = cpu;
+	for_each_cpu(cpu, policy->cpus)
 		len += snprintf(str+len, 256, ",%d", cpu);
-	}
 #endif
 
 	switch (event) {
 	case CPUFREQ_GOV_POLICY_INIT:
-		printk_dbg("%s cpu=%d (%s) init\n", __func__, target_cpu, str);
+		printk_dbg("%s cpu=%d (%s) init\n", __func__, policy->cpu, str);
 		return cpufreq_sched_policy_init(policy);
 	case CPUFREQ_GOV_POLICY_EXIT:
-		printk_dbg("%s cpu=%d exit\n", __func__, target_cpu);
+		printk_dbg("%s cpu=%d (NULL) exit\n", __func__, policy->cpu);
 		return cpufreq_sched_policy_exit(policy);
 	case CPUFREQ_GOV_START:
-		printk_dbg("%s cpu=%d (%s) start\n", __func__, target_cpu, str);
+		printk_dbg("%s cpu=%d (%s) start\n", __func__, policy->cpu, str);
 		return cpufreq_sched_start(policy);
 	case CPUFREQ_GOV_STOP:
-		printk_dbg("%s cpu=%d (%s) stop\n", __func__, target_cpu, str);
+		printk_dbg("%s cpu=%d (%s) stop\n", __func__, policy->cpu, str);
 		return cpufreq_sched_stop(policy);
 	case CPUFREQ_GOV_LIMITS:
 		break;
@@ -529,7 +838,6 @@ static int cpu_hotplug_handler(struct notifier_block *nb,
 		unsigned long val, void *data)
 {
 	int cpu = (unsigned long)data;
-	int cid = arch_get_cluster_id(cpu);
 
 	switch (val) {
 	case CPU_ONLINE:
@@ -547,33 +855,97 @@ static int cpu_hotplug_handler(struct notifier_block *nb,
 		per_cpu(enabled, cpu) = 0;
 
 		printk_dbg("%s cpu=%d down_prepare\n", __func__, cpu);
-		/*
-		 * debug
-		 */
-#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
-		met_cpu_dvfs(cid, 0, 0);
-#else
-		met_cpu_dvfs(cid, 0, 1);
-#endif
 		break;
 	}
 	return NOTIFY_OK;
 }
 
+/* Tunables */
+static ssize_t show_up_throttle_nsec(struct cpufreq_policy *policy, char *buf)
+{
+	int cid = arch_get_cluster_id(policy->cpu);
+	struct gov_data *gd = g_gd[cid];
+
+	return sprintf(buf, "%u\n", gd->up_throttle_nsec);
+}
+
+static ssize_t store_up_throttle_nsec(struct cpufreq_policy *policy,
+		const char *buf, size_t count)
+{
+	int ret;
+	unsigned long int val;
+	int cid = arch_get_cluster_id(policy->cpu);
+	struct gov_data *gd = g_gd[cid];
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+	gd->up_throttle_nsec = val;
+	return count;
+}
+
+static ssize_t show_down_throttle_nsec(struct cpufreq_policy *policy, char *buf)
+{
+	int cid = arch_get_cluster_id(policy->cpu);
+	struct gov_data *gd = g_gd[cid];
+
+	return sprintf(buf, "%u\n", gd->down_throttle_nsec);
+}
+
+static ssize_t store_down_throttle_nsec(struct cpufreq_policy *policy,
+		const char *buf, size_t count)
+{
+	int ret;
+	unsigned long int val;
+	int cid = arch_get_cluster_id(policy->cpu);
+	struct gov_data *gd = g_gd[cid];
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+	gd->down_throttle_nsec = val;
+	return count;
+}
+
 /*
  * debug function
  */
-static
-void met_cpu_dvfs(int cid, int freq, int flag)
-{
-#if MET_SCHED_DEBUG
-	char string[64] = {0};
-
-	snprintf(string, sizeof(string), "sched_dvfs_%d_cid%d", flag, cid);
-
-	met_tag_oneshot(0, string, freq);
-#endif
+#define show_gov_pol_sys(file_name)                                     \
+	static ssize_t show_##file_name##_gov_pol                       \
+(struct cpufreq_policy *policy, char *buf)                              \
+{                                                                       \
+	return show_##file_name(policy, buf);            \
 }
+
+#define store_gov_pol_sys(file_name)                                    \
+	static ssize_t store_##file_name##_gov_pol                      \
+(struct cpufreq_policy *policy, const char *buf, size_t count)          \
+{                                                                       \
+	return store_##file_name(policy, buf, count);    \
+}
+
+#define gov_pol_attr_rw(_name)                                          \
+	static struct freq_attr _name##_gov_pol =                       \
+__ATTR(_name, 0644, show_##_name##_gov_pol, store_##_name##_gov_pol)
+
+#define show_store_gov_pol_sys(file_name)                               \
+	show_gov_pol_sys(file_name);                                    \
+	store_gov_pol_sys(file_name)
+
+#define tunable_handlers(file_name) \
+	show_gov_pol_sys(file_name); \
+	store_gov_pol_sys(file_name); \
+	gov_pol_attr_rw(file_name)
+
+tunable_handlers(down_throttle_nsec);
+tunable_handlers(up_throttle_nsec);
+
+/* Per policy governor instance */
+static struct attribute *sched_attributes_gov_pol[] = {
+	&up_throttle_nsec_gov_pol.attr,
+	&down_throttle_nsec_gov_pol.attr,
+	NULL,
+};
 
 
 #ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_SCHED
@@ -591,8 +963,20 @@ static int __init cpufreq_sched_init(void)
 	int i;
 
 	for_each_cpu(cpu, cpu_possible_mask) {
+		struct sugov_cpu *sg_cpu = &per_cpu(sugov_cpu, cpu);
+		int cid = arch_get_cluster_id(cpu);
+
 		memset(&per_cpu(cpu_sched_capacity_reqs, cpu), 0,
 				sizeof(struct sched_capacity_reqs));
+
+		sg_cpu->util = 0;
+		sg_cpu->max = 0;
+		sg_cpu->flags = 0;
+		sg_cpu->last_update = 0;
+		sg_cpu->cached_raw_freq = 0;
+		sg_cpu->iowait_boost = 0;
+		sg_cpu->iowait_boost_max = mt_cpufreq_get_freq_by_idx(cid, 0);
+		sg_cpu->iowait_boost_max >>= 1; /* limit max to half */
 	}
 
 	for (i = 0; i < MAX_CLUSTER_NR; i++) {
@@ -601,8 +985,10 @@ static int __init cpufreq_sched_init(void)
 			WARN_ON(1);
 			return -ENOMEM;
 		}
+		g_gd[i]->up_throttle_nsec = THROTTLE_UP_NSEC;
+		g_gd[i]->down_throttle_nsec = THROTTLE_DOWN_NSEC;
 		g_gd[i]->throttle_nsec = THROTTLE_NSEC;
-
+		g_gd[i]->last_freq_update_time = 0;
 		/* keep cid needed */
 		g_gd[i]->cid = i;
 	}
@@ -619,11 +1005,51 @@ static int __init cpufreq_sched_init(void)
 	cpu_hotplug.notifier_call = cpu_hotplug_handler;
 	register_hotcpu_notifier(&cpu_hotplug);
 
-
 	return cpufreq_register_governor(&cpufreq_gov_sched);
 }
 
 #ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
+static int cpufreq_callback(struct notifier_block *nb,
+		unsigned long val, void *data)
+{
+	struct cpufreq_freqs *freq = data;
+	int cpu = freq->cpu;
+	struct cpumask cls_cpus;
+	int id;
+	int cid = arch_get_cluster_id(cpu);
+	ktime_t throttle = g_gd[cid]->throttle;
+	bool sched_dvfs;
+
+	if (freq->flags & CPUFREQ_CONST_LOOPS)
+		return NOTIFY_OK;
+
+	sched_dvfs = mt_cpufreq_get_sched_enable();
+
+	if (val == CPUFREQ_PRECHANGE) {
+		/* consider DVFS has been changed by PPM or other governors */
+		if (!sched_dvfs ||
+		    !ktime_before(ktime_get(), ktime_add_ns(throttle, (20000000 - THROTTLE_NSEC)/*20ms*/))) {
+			arch_get_cluster_cpus(&cls_cpus, cid);
+			for_each_cpu(id, &cls_cpus)
+				arch_scale_set_curr_freq(id, freq->new);
+		}
+	}
+
+	return NOTIFY_OK;
+}
+
+
+static struct notifier_block cpufreq_notifier = {
+	.notifier_call = cpufreq_callback,
+};
+
+static int __init register_cpufreq_notifier(void)
+{
+	return cpufreq_register_notifier(&cpufreq_notifier,
+			CPUFREQ_TRANSITION_NOTIFIER);
+}
+
+core_initcall(register_cpufreq_notifier);
 /* sched-assist dvfs is NOT a governor. */
 late_initcall(cpufreq_sched_init);
 #else

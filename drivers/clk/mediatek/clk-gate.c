@@ -23,8 +23,18 @@
 #include "clk-mtk.h"
 #include "clk-gate.h"
 
-#if defined(CONFIG_MACH_MT6799)
+#if defined(CONFIG_MACH_MT6763)
 /*#define MT_CCF_BRINGUP  1*/
+#elif defined(CONFIG_MACH_MT6759)
+/*#define MT_CCF_BRINGUP*/
+#elif defined(CONFIG_MACH_MT6758)
+/*#define MT_CCF_BRINGUP*/
+#elif defined(CONFIG_MACH_MT6739)
+/*#define MT_CCF_BRINGUP*/
+#elif defined(CONFIG_MACH_MT6771)
+/*#define MT_CCF_BRINGUP*/
+#elif defined(CONFIG_MACH_MT6775)
+#define MT_CCF_BRINGUP
 #endif
 
 #ifdef MT_CCF_BRINGUP
@@ -54,7 +64,7 @@ static void mtk_cg_disable_inv_dummy(struct clk_hw *hw)
 static int mtk_cg_bit_is_cleared(struct clk_hw *hw)
 {
 	struct mtk_clk_gate *cg = to_clk_gate(hw);
-	u32 val;
+	u32 val = 0;
 
 	regmap_read(cg->regmap, cg->sta_ofs, &val);
 
@@ -66,7 +76,7 @@ static int mtk_cg_bit_is_cleared(struct clk_hw *hw)
 static int mtk_cg_bit_is_set(struct clk_hw *hw)
 {
 	struct mtk_clk_gate *cg = to_clk_gate(hw);
-	u32 val;
+	u32 val = 0;
 
 	regmap_read(cg->regmap, cg->sta_ofs, &val);
 

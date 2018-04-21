@@ -12,6 +12,7 @@
 #include <linux/export.h>
 #include <linux/ftrace.h>
 
+#include <asm/stack_pointer.h>
 #include <asm/stacktrace.h>
 
 struct return_address_data {
@@ -44,7 +45,7 @@ void *return_address(unsigned int level)
 	frame.sp = current_stack_pointer;
 	frame.pc = (unsigned long)return_address; /* dummy */
 
-	walk_stackframe(&frame, save_return_addr, &data);
+	walk_stackframe(current, &frame, save_return_addr, &data);
 
 	if (!data.level)
 		return data.addr;

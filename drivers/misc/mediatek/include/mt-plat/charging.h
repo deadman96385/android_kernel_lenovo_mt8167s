@@ -76,7 +76,7 @@ do { \
 	if (Enable_BATDRV_LOG >= (int)num) \
 		switch (num) {\
 		case BAT_LOG_CRTI:\
-			pr_err(fmt, ##args); \
+			pr_notice(fmt, ##args); \
 			break; \
 			/*fall-through*/\
 		default: \
@@ -149,6 +149,10 @@ typedef enum {
 	CHARGING_CMD_SET_DC_VBATOV,
 	CHARGING_CMD_GET_IS_DC_ENABLE,
 	CHARGING_CMD_SET_PEP20_EFFICIENCY_TABLE,
+	CHARGING_CMD_SW_RESET,
+	CHARGING_CMD_ENABLE_DISCHARGE,
+	CHARGING_CMD_GET_TBUS,
+	CHARGING_CMD_GET_TBAT,
 	CHARGING_CMD_NUMBER
 } CHARGING_CTRL_CMD;
 

@@ -174,6 +174,8 @@
 static struct rtc_device *rtc;
 static DEFINE_SPINLOCK(rtc_lock);
 
+static void rtc_save_pwron_time(bool enable, struct rtc_time *tm, bool logo);
+
 static int rtc_show_time;
 static int rtc_show_alarm = 1;
 
@@ -265,7 +267,7 @@ bool rtc_low_power_detected(void)
 }
 EXPORT_SYMBOL(rtc_low_power_detected);
 
-void rtc_gpio_enable_32k(rtc_gpio_user_t user)
+void rtc_gpio_enable_32k(enum rtc_gpio_user_t user)
 {
 	unsigned long flags;
 
@@ -280,7 +282,7 @@ void rtc_gpio_enable_32k(rtc_gpio_user_t user)
 }
 EXPORT_SYMBOL(rtc_gpio_enable_32k);
 
-void rtc_gpio_disable_32k(rtc_gpio_user_t user)
+void rtc_gpio_disable_32k(enum rtc_gpio_user_t user)
 {
 	unsigned long flags;
 
@@ -350,10 +352,21 @@ void rtc_disable_writeif(void)
 void rtc_mark_recovery(void)
 {
 	unsigned long flags;
+	struct rtc_time defaulttm;
 
 	rtc_xinfo("rtc_mark_recovery\n");
 	spin_lock_irqsave(&rtc_lock, flags);
 	hal_rtc_set_spare_register(RTC_FAC_RESET, 0x1);
+	/* Clear alarm setting when doing factory recovery. */
+	defaulttm.tm_year = RTC_DEFAULT_YEA - RTC_MIN_YEAR;
+	defaulttm.tm_mon = RTC_DEFAULT_MTH;
+	defaulttm.tm_mday = RTC_DEFAULT_DOM;
+	defaulttm.tm_wday = 1;
+	defaulttm.tm_hour = 0;
+	defaulttm.tm_min = 0;
+	defaulttm.tm_sec = 0;
+	rtc_save_pwron_time(false, &defaulttm, false);
+	hal_rtc_clear_alarm(&defaulttm);
 	spin_unlock_irqrestore(&rtc_lock, flags);
 }
 
@@ -469,13 +482,14 @@ static void rtc_handler(void)
 	bool pwron_alm = false, isLowPowerIrq = false, pwron_alarm = false;
 	struct rtc_time nowtm;
 	struct rtc_time tm;
+	unsigned long flags;
 
 	rtc_xinfo("rtc_tasklet_handler start\n");
 
-	spin_lock(&rtc_lock);
+	spin_lock_irqsave(&rtc_lock, flags);
 	isLowPowerIrq = hal_rtc_is_lp_irq();
 	if (isLowPowerIrq) {
-		spin_unlock(&rtc_lock);
+		spin_unlock_irqrestore(&rtc_lock, flags);
 		return;
 	}
 #if RTC_RELPWR_WHEN_XRST
@@ -497,15 +511,22 @@ static void rtc_handler(void)
 #if defined(CONFIG_MTK_KERNEL_POWER_OFF_CHARGING)
 			if (get_boot_mode() == KERNEL_POWER_OFF_CHARGING_BOOT
 			    || get_boot_mode() == LOW_POWER_OFF_CHARGING_BOOT) {
-				time += 1;
-				rtc_time_to_tm(time, &tm);
-				tm.tm_year -= RTC_MIN_YEAR_OFFSET;
-				tm.tm_mon += 1;
-				/* tm.tm_sec += 1; */
-				hal_rtc_set_alarm(&tm);
-				hal_rtc_is_pwron_alarm(&nowtm, &tm);
-				rtc_xinfo("KPOC set al nowtm %d, tm %d\n", nowtm.tm_sec, tm.tm_sec);
-				spin_unlock(&rtc_lock);
+				do {
+					now_time += 1;
+					rtc_time_to_tm(now_time, &tm);
+					tm.tm_year -= RTC_MIN_YEAR_OFFSET;
+					tm.tm_mon += 1;
+					hal_rtc_set_pwron_alarm_time(&tm);
+					hal_rtc_set_alarm(&tm);
+					hal_rtc_is_pwron_alarm(&nowtm, &tm);
+					nowtm.tm_year += RTC_MIN_YEAR;
+					tm.tm_year += RTC_MIN_YEAR;
+					now_time = mktime(nowtm.tm_year, nowtm.tm_mon, nowtm.tm_mday,
+						nowtm.tm_hour, nowtm.tm_min, nowtm.tm_sec);
+					time = mktime(tm.tm_year, tm.tm_mon, tm.tm_mday, tm.tm_hour,
+						tm.tm_min, tm.tm_sec);
+				} while (time <= now_time);
+				spin_unlock_irqrestore(&rtc_lock, flags);
 				arch_reset(0, "kpoc");
 			} else {
 				hal_rtc_save_pwron_alarm();
@@ -516,16 +537,14 @@ static void rtc_handler(void)
 			pwron_alm = true;
 #endif
 		} else if (now_time < time) {	/* set power-on alarm */
-			if (tm.tm_sec == 0) {
-				tm.tm_sec = 59;
-				tm.tm_min -= 1;
-			} else {
-				tm.tm_sec -= 1;
-			}
+			time -= 1;
+			rtc_time_to_tm(time, &tm);
+			tm.tm_year -= RTC_MIN_YEAR_OFFSET;
+			tm.tm_mon += 1;
 			hal_rtc_set_alarm(&tm);
 		}
 	}
-	spin_unlock(&rtc_lock);
+	spin_unlock_irqrestore(&rtc_lock, flags);
 
 	if (rtc != NULL)
 		rtc_update_irq(rtc, 1, RTC_IRQF | RTC_AF);
@@ -763,12 +782,9 @@ static int rtc_pdrv_probe(struct platform_device *pdev)
 		rtc_xerror("register rtc device failed (%ld)\n", PTR_ERR(rtc));
 		return PTR_ERR(rtc);
 	}
-#ifdef PMIC_REGISTER_INTERRUPT_ENABLE
-#ifdef CONFIG_MTK_PMIC
+
 	pmic_register_interrupt_callback(RTC_INTERRUPT_NUM, rtc_irq_handler);
 	pmic_enable_interrupt(RTC_INTERRUPT_NUM, 1, "RTC");
-#endif
-#endif
 
 	return 0;
 }

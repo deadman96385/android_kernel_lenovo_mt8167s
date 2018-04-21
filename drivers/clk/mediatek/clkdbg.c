@@ -223,6 +223,20 @@ static void setup_provider_clk(struct provider_clk *pvdck)
 	clkdbg_ops->setup_provider_clk(pvdck);
 }
 
+static u32 read_spm_pwr_status(void)
+{
+	static void __iomem *scpsys_base;
+
+	if (!clkdbg_ops || !clkdbg_ops->read_spm_pwr_status) {
+		if (!scpsys_base)
+			scpsys_base = ioremap(0x10006000, PAGE_SIZE);
+
+		return clk_readl(scpsys_base + 0x60c);
+	}
+
+	return clkdbg_ops->read_spm_pwr_status();
+}
+
 static bool is_valid_reg(void __iomem *addr)
 {
 #ifdef CONFIG_64BIT
@@ -369,16 +383,6 @@ static int clkdbg_dump_regs2(struct seq_file *s, void *v)
 	return 0;
 }
 
-static u32 read_spm_pwr_status(void)
-{
-	static void __iomem *scpsys_base;
-
-	if (!scpsys_base)
-		scpsys_base = ioremap(0x10006000, PAGE_SIZE);
-
-	return clk_readl(scpsys_base + 0x60c);
-}
-
 static bool clk_hw_pwr_is_on(struct clk_hw *c_hw,
 			u32 spm_pwr_status, u32 pwr_mask)
 {
@@ -502,7 +506,12 @@ struct provider_clk *get_all_provider_clks(void)
 		node_name = get_provider_name(node, &cells);
 
 		if (cells == 0) {
-			provider_clks[n].ck = __clk_lookup(node_name);
+			struct clk *ck = __clk_lookup(node_name);
+
+			if (IS_ERR_OR_NULL(ck))
+				continue;
+
+			provider_clks[n].ck = ck;
 			setup_provider_clk(&provider_clks[n]);
 			++n;
 		} else {

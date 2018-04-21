@@ -35,12 +35,6 @@
 #define PMIC_VOL REGULATOR_CHANGE_VOLTAGE
 #define PMIC_EN_VOL 9
 
-#ifdef MTK_EVB_PLATFORM
-#define ENABLE_ALL_OC_IRQ 0
-#else
-#define ENABLE_ALL_OC_IRQ 1
-#endif
-
 /*
  * PMIC EXTERN VARIABLE
  */
@@ -51,14 +45,14 @@ extern int g_low_battery_level;
 extern int g_battery_oc_level;
 /* for update VBIF28 by AUXADC */
 extern unsigned int g_pmic_pad_vbif28_vol;
+/* for chip version used */
+extern unsigned int g_pmic_chip_version;
+/* for recording MD power vosel */
+extern unsigned short g_vmodem_vosel;
 
 /*
  * PMIC EXTERN FUNCTIONS
  */
-/*----- LOW_BATTERY_PROTECT -----*/
-extern void lbat_min_en_setting(int en_val);
-extern void lbat_max_en_setting(int en_val);
-extern void exec_low_battery_callback(LOW_BATTERY_LEVEL low_battery_level);
 /*----- BATTERY_OC_PROTECT -----*/
 extern void exec_battery_oc_callback(BATTERY_OC_LEVEL battery_oc_level);
 extern void bat_oc_h_en_setting(int en_val);
@@ -91,13 +85,11 @@ extern void pmic_auxadc_unlock(void);
 extern unsigned int bat_get_ui_percentage(void);
 extern signed int fgauge_read_v_by_d(int d_val);
 extern signed int fgauge_read_r_bat_by_v(signed int voltage);
-/*extern PMU_ChargerStruct BMT_status;*//*have defined in battery_common.h */
 extern void kpd_pwrkey_pmic_handler(unsigned long pressed);
 extern void kpd_pmic_rstkey_handler(unsigned long pressed);
 extern int is_mt6311_sw_ready(void);
 extern int is_mt6311_exist(void);
 extern int get_mt6311_i2c_ch_num(void);
-extern bool crystal_exist_status(void);
 #if !defined CONFIG_MTK_LEGACY
 extern void pmu_drv_tool_customization_init(void);
 #endif
@@ -106,6 +98,17 @@ extern int batt_init_cust_data(void);
 extern unsigned int mt_gpio_to_irq(unsigned int gpio);
 extern int mt_gpio_set_debounce(unsigned gpio, unsigned debounce);
 extern unsigned int upmu_get_rgs_chrdet(void);
+#ifdef CONFIG_MTK_PMIC_COMMON
+extern int PMIC_check_battery(void);
+extern int PMIC_check_wdt_status(void);
+extern int PMIC_check_pwrhold_status(void);
+extern void PMIC_LP_INIT_SETTING(void);
+extern int PMIC_MD_INIT_SETTING_V1(void);
+extern void PMIC_PWROFF_SEQ_SETTING(void);
+extern int pmic_tracking_init(void);
+#endif
+extern unsigned int PMIC_CHIP_VER(void);
+extern void record_md_vosel(void);
 /*---------------------------------------------------*/
 
 struct regulator;
@@ -127,6 +130,7 @@ struct mtk_regulator {
 	PMU_FLAGS_LIST_ENUM qi_en_reg;
 	PMU_FLAGS_LIST_ENUM qi_vol_reg;
 	const void *pvoltages;
+	const void *idxs;
 	bool isUsedable;
 	struct regulator *reg;
 	int vsleep_en_saved;

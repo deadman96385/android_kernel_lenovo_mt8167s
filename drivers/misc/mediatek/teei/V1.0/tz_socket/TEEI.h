@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016 MICROTRUST Incorporated
+ * Copyright (c) 2015-2017 MICROTRUST Incorporated
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -19,19 +19,19 @@
 #define ARGS_BLOCK_SIZE 1024
 
 struct sockaddr {
-	unsigned short sa_family; /* 地址族 */
-	char sa_data[14];   /* 14字节协议地址 */
+	unsigned short sa_family;
+	char sa_data[14];
 };
 
 struct in_addr {
-	unsigned long s_addr; /* that’s a 32-bit long, or 4 bytes */
+	unsigned long s_addr; /* that's a 32-bit long, or 4 bytes */
 };
 
 struct sockaddr_in {
-	short int sin_family;   /* 地址族 */
-	unsigned short int sin_port;   /* 端口号 */
-	struct in_addr sin_addr;   /* IP地址 */
-	unsigned char sin_zero[8];   /* 填充0以保持与struct sockaddr同样大小 */
+	short int sin_family;
+	unsigned short int sin_port;
+	struct in_addr sin_addr;
+	unsigned char sin_zero[8];
 };
 
 struct TEEI_socket_command {
@@ -105,7 +105,7 @@ struct TEEI_socket_command {
 };
 
 
-typedef union TEEI_socket_response_type {
+union TEEI_socket_response_type {
 	int value;
 	uint32_t addr;
 	bool hasError;
@@ -115,40 +115,6 @@ typedef union TEEI_socket_response_type {
 		void *buf;
 		unsigned int size;
 	} recv;
-} TEEI_socket_response;
+};
 
-
-#if 0
-typedef (void *) TEEI_pointer_message;
-
-#define TEEI_CREATE_MESSAGE_FIALED -1;
-
-#define MESSAGE_HEADER(msg) ((struct TEEI_message_header *)msg)
-#define MESSAGE_PAYLOAD(msg) (void *)(msg + sizeof(TEEI_message_header))
-
-/**
- * get size of a message.
- */
-inline int TEEI_sizeof_message(TEEI_pointer_message pMessage)
-{
-	TEEI_message_header *msg = (TEEI_message_header *) pMessage;
-	return msg->payload_size + sizeof(TEEI_message_header);
-}
-
-/*
- * Create a memory block as a message.
- * payload_size: is the payload size.
- * Whole message size = sizeof(TEEI_message_header) + payload_size
- *
- * return message pointer. DO NOT FORGET freeing this block!!!
- *        TEEI_CREATE_MESSAGE_FIALED if malloc failed.
- */
-TEEI_pointer_message create_TEEI_message_with_payload_size(unsigned long payload_size);
-
-/**
- * create a context type message with context name;
- */
-TEEI_pointer_message create_TEEI_message_context_init(const char *TEE_name, int TEE_name_size);
-
-#endif
 #endif /* __TZ_TEEI_H__ */

@@ -312,7 +312,7 @@ static inline unsigned int hmp_cpu_is_fastest(int cpu)
 }
 
 /* Check if cpu is in slowest hmp_domain */
-static inline unsigned int hmp_cpu_is_slowest(int cpu)
+inline unsigned int hmp_cpu_is_slowest(int cpu)
 {
 	struct list_head *pos;
 
@@ -326,6 +326,9 @@ static inline struct hmp_domain *hmp_slower_domain(int cpu)
 	struct list_head *pos;
 
 	pos = &hmp_cpu_domain(cpu)->hmp_domains;
+	if (list_is_last(pos, &hmp_domains))
+		return list_entry(pos, struct hmp_domain, hmp_domains);
+
 	return list_entry(pos->next, struct hmp_domain, hmp_domains);
 }
 
@@ -335,6 +338,9 @@ static inline struct hmp_domain *hmp_faster_domain(int cpu)
 	struct list_head *pos;
 
 	pos = &hmp_cpu_domain(cpu)->hmp_domains;
+	if (pos->prev == &hmp_domains)
+		return list_entry(pos, struct hmp_domain, hmp_domains);
+
 	return list_entry(pos->prev, struct hmp_domain, hmp_domains);
 }
 
@@ -460,9 +466,11 @@ static unsigned int hmp_select_cpu(unsigned int caller, struct task_struct *p,
 	unsigned long curr_wload = 0;
 	unsigned long target_wload = 0;
 	struct cpumask srcp;
+	struct cpumask *tsk_cpus_allow = tsk_cpus_allowed(p);
 
-	cpumask_and(&srcp, cpu_online_mask, mask);
-	target = cpumask_any_and(&srcp, tsk_cpus_allowed(p));
+	cpumask_andnot(&srcp, cpu_online_mask, cpu_isolated_mask);
+	cpumask_and(&srcp, &srcp, mask);
+	target = cpumask_any_and(&srcp, tsk_cpus_allow);
 	if (target >= num_possible_cpus())
 		goto out;
 
@@ -475,7 +483,7 @@ static unsigned int hmp_select_cpu(unsigned int caller, struct task_struct *p,
 	target_wload *= rq_length(target);
 	for_each_cpu(curr, mask) {
 		/* Check CPU status and task affinity */
-		if (!cpu_online(curr) || !cpumask_test_cpu(curr, tsk_cpus_allowed(p)))
+		if (!cpu_online(curr) || !cpumask_test_cpu(curr, tsk_cpus_allow) || cpu_isolated(curr))
 			continue;
 
 		/* For global load balancing, unstable CPU will be bypassed */
@@ -497,61 +505,17 @@ out:
 	return target;
 }
 
-/*
- * Heterogenous Multi-Processor (HMP) - Task Runqueue Selection
- */
-
-/* This function enhances the original task selection function */
-static int hmp_select_task_rq_fair(int sd_flag, struct task_struct *p,
-		int prev_cpu, int new_cpu)
+static int hmp_select_task_migration(int sd_flag, struct task_struct *p, int prev_cpu, int new_cpu,
+		struct cpumask *fast_cpu_mask, struct cpumask *slow_cpu_mask)
 {
 	int step = 0;
 	struct sched_entity *se = &p->se;
 	int B_target = num_possible_cpus();
 	int L_target = num_possible_cpus();
 	struct clb_env clbenv;
-	struct list_head *pos;
-	struct cpumask fast_cpu_mask, slow_cpu_mask;
 
-#ifdef CONFIG_HMP_TRACER
-	int cpu = 0;
-
-	for_each_online_cpu(cpu)
-		trace_sched_cfs_runnable_load(cpu, cfs_load(cpu), cfs_length(cpu));
-#endif
-
-	/* error handling */
-	if (prev_cpu >= num_possible_cpus())
-		return new_cpu;
-
-	/*
-	 * Skip all the checks if only one CPU is online.
-	 * Otherwise, select the most appropriate CPU from cluster.
-	 */
-	if (num_online_cpus() == 1)
-		goto out;
-
-	cpumask_clear(&fast_cpu_mask);
-	cpumask_clear(&slow_cpu_mask);
-	/* order: fast to slow hmp domain */
-	list_for_each(pos, &hmp_domains) {
-		struct hmp_domain *domain = list_entry(pos, struct hmp_domain, hmp_domains);
-
-		if (!cpumask_empty(&domain->cpus)) {
-			if (cpumask_empty(&fast_cpu_mask)) {
-				cpumask_copy(&fast_cpu_mask, &domain->possible_cpus);
-			} else {
-				cpumask_copy(&slow_cpu_mask, &domain->possible_cpus);
-				break;
-			}
-		}
-	}
-
-	if (cpumask_empty(&fast_cpu_mask) || cpumask_empty(&slow_cpu_mask))
-		return new_cpu;
-
-	B_target = hmp_select_cpu(HMP_SELECT_RQ, p, &fast_cpu_mask, prev_cpu, 0);
-	L_target = hmp_select_cpu(HMP_SELECT_RQ, p, &slow_cpu_mask, prev_cpu, 1);
+	B_target = hmp_select_cpu(HMP_SELECT_RQ, p, fast_cpu_mask, prev_cpu, 0);
+	L_target = hmp_select_cpu(HMP_SELECT_RQ, p, slow_cpu_mask, prev_cpu, 1);
 
 	/*
 	 * Only one cluster exists or only one cluster is allowed for this task
@@ -581,8 +545,8 @@ static int hmp_select_task_rq_fair(int sd_flag, struct task_struct *p,
 	}
 	memset(&clbenv, 0, sizeof(clbenv));
 	clbenv.flags |= HMP_SELECT_RQ;
-	cpumask_copy(&clbenv.lcpus, &slow_cpu_mask);
-	cpumask_copy(&clbenv.bcpus, &fast_cpu_mask);
+	cpumask_copy(&clbenv.lcpus, slow_cpu_mask);
+	cpumask_copy(&clbenv.bcpus, fast_cpu_mask);
 	clbenv.ltarget = L_target;
 	clbenv.btarget = B_target;
 	sched_update_clbstats(&clbenv);
@@ -599,13 +563,72 @@ static int hmp_select_task_rq_fair(int sd_flag, struct task_struct *p,
 
 select_fast:
 	new_cpu = B_target;
+	cpumask_clear(slow_cpu_mask);
 	goto out;
 select_slow:
 	new_cpu = L_target;
+	cpumask_copy(fast_cpu_mask, slow_cpu_mask);
+	cpumask_clear(slow_cpu_mask);
 	goto out;
 
 out:
+#ifdef CONFIG_HMP_TRACER
+	trace_sched_hmp_load(clbenv.bstats.load_avg, clbenv.lstats.load_avg);
+#endif
+	return new_cpu;
+}
 
+/*
+ * Heterogenous Multi-Processor (HMP) - Task Runqueue Selection
+ */
+
+/* This function enhances the original task selection function */
+static int hmp_select_task_rq_fair(int sd_flag, struct task_struct *p,
+		int prev_cpu, int new_cpu)
+{
+	struct list_head *pos;
+	struct sched_entity *se = &p->se;
+	struct cpumask fast_cpu_mask, slow_cpu_mask;
+
+#ifdef CONFIG_HMP_TRACER
+	int cpu = 0;
+
+	for_each_online_cpu(cpu)
+		trace_sched_cfs_runnable_load(cpu, cfs_load(cpu), cfs_length(cpu));
+#endif
+
+	if (sched_boost() && idle_cpu(new_cpu) && hmp_cpu_is_fastest(new_cpu))
+		return new_cpu;
+
+	/* error handling */
+	if (prev_cpu >= num_possible_cpus())
+		return new_cpu;
+
+	/*
+	 * Skip all the checks if only one CPU is online.
+	 * Otherwise, select the most appropriate CPU from cluster.
+	 */
+	if (num_online_cpus() == 1)
+		goto out;
+
+	cpumask_clear(&fast_cpu_mask);
+	cpumask_clear(&slow_cpu_mask);
+	/* order: fast to slow hmp domain */
+	list_for_each(pos, &hmp_domains) {
+		struct hmp_domain *domain = list_entry(pos, struct hmp_domain, hmp_domains);
+
+		if (!cpumask_empty(&domain->cpus)) {
+			if (cpumask_empty(&fast_cpu_mask)) {
+				cpumask_copy(&fast_cpu_mask, &domain->possible_cpus);
+			} else {
+				cpumask_copy(&slow_cpu_mask, &domain->possible_cpus);
+				new_cpu = hmp_select_task_migration(sd_flag, p,
+					prev_cpu, new_cpu, &fast_cpu_mask, &slow_cpu_mask);
+			}
+		}
+	}
+
+out:
 	/* it happens when num_online_cpus=1 */
 	if (new_cpu >= nr_cpu_ids) {
 		/* BUG_ON(1); */
@@ -614,12 +637,9 @@ out:
 
 	cfs_nr_pending(new_cpu)++;
 	cfs_pending_load(new_cpu) += se_load(se);
-#ifdef CONFIG_HMP_TRACER
-	trace_sched_hmp_load(clbenv.bstats.load_avg, clbenv.lstats.load_avg);
-	trace_sched_hmp_select_task_rq(p, step, sd_flag, prev_cpu, new_cpu,
-			se_load(se), &clbenv.bstats, &clbenv.lstats);
-#endif
+
 	return new_cpu;
+
 }
 
 #define hmp_fast_cpu_has_spare_cycles(B, cpu_load) (cpu_load < \
@@ -680,6 +700,7 @@ static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_enti
 #ifdef CONFIG_HMP_TRACER
 	unsigned int caller = clbenv->flags;
 #endif
+	cpumask_t act_mask;
 
 	L = &clbenv->lstats;
 	B = &clbenv->bstats;
@@ -689,6 +710,8 @@ static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_enti
 	check->status |= HMP_TASK_UP_MIGRATION;
 	check->result = 0;
 
+	cpumask_andnot(&act_mask, cpu_active_mask, cpu_isolated_mask);
+
 	/*
 	 * No migration is needed if
 	 * 1) There is only one cluster
@@ -697,7 +720,8 @@ static unsigned int hmp_up_migration(int cpu, int *target_cpu, struct sched_enti
 	 */
 	if (!L->ncpu || !B->ncpu
 			|| cpumask_test_cpu(curr_cpu, &clbenv->bcpus)
-			|| !cpumask_intersects(&clbenv->bcpus, tsk_cpus_allowed(p)))
+			|| !cpumask_intersects(&clbenv->bcpus, tsk_cpus_allowed(p))
+			|| !cpumask_intersects(&clbenv->bcpus, &act_mask))
 		goto out;
 
 	/*
@@ -772,6 +796,7 @@ static unsigned int hmp_down_migration(int cpu, int *target_cpu, struct sched_en
 	struct mcheck *check;
 	int curr_cpu = cpu;
 	unsigned int caller = clbenv->flags;
+	cpumask_t act_mask;
 
 	L = &clbenv->lstats;
 	B = &clbenv->bstats;
@@ -781,6 +806,8 @@ static unsigned int hmp_down_migration(int cpu, int *target_cpu, struct sched_en
 	check->status |= HMP_TASK_DOWN_MIGRATION;
 	check->result = 0;
 
+	cpumask_andnot(&act_mask, cpu_active_mask, cpu_isolated_mask);
+
 	/*
 	 * No migration is needed if
 	 * 1) There is only one cluster
@@ -789,7 +816,8 @@ static unsigned int hmp_down_migration(int cpu, int *target_cpu, struct sched_en
 	 */
 	if (!L->ncpu || !B->ncpu
 			|| cpumask_test_cpu(curr_cpu, &clbenv->lcpus)
-			|| !cpumask_intersects(&clbenv->lcpus, tsk_cpus_allowed(p)))
+			|| !cpumask_intersects(&clbenv->lcpus, tsk_cpus_allowed(p))
+			|| !cpumask_intersects(&clbenv->lcpus, &act_mask))
 		goto out;
 
 	/*
@@ -966,7 +994,8 @@ static int hmp_active_task_migration_cpu_stop(void *data)
 	if (busiest_rq->nr_running <= 1)
 		goto out_unlock;
 	/* Are both target and busiest cpu online */
-	if (!cpu_online(busiest_cpu) || !cpu_online(target_cpu))
+	if (!cpu_online(busiest_cpu) || !cpu_online(target_cpu) ||
+		cpu_isolated(busiest_cpu) || cpu_isolated(target_cpu))
 		goto out_unlock;
 	/* Task has migrated meanwhile, abort forced migration */
 	if ((!p) || (task_rq(p) != busiest_rq))
@@ -1020,11 +1049,13 @@ out_unlock:
  */
 static DEFINE_SPINLOCK(hmp_force_migration);
 
+#ifdef CONFIG_SCHED_HMP_PLUS
 /* For debugging purpose, to depart functions of cpu_stop to make call_stack clear. */
 static int hmp_idle_pull_cpu_stop(void *data)
 {
 	return hmp_active_task_migration_cpu_stop(data);
 }
+#endif
 
 static int hmp_force_up_cpu_stop(void *data)
 {
@@ -1516,7 +1547,8 @@ inline int hmp_fork_balance(struct task_struct *p, int prev_cpu)
 
 		lowest_ratio = hmp_domain_min_load(hmpdom, &new_cpu);
 
-		if (new_cpu < nr_cpu_ids && cpumask_test_cpu(new_cpu, tsk_cpus_allowed(p)))
+		if (new_cpu < nr_cpu_ids && cpumask_test_cpu(new_cpu, tsk_cpus_allowed(p))
+			&& !cpu_isolated(new_cpu))
 			return new_cpu;
 
 		new_cpu = cpumask_any_and(&hmp_faster_domain(cpu)->cpus,
@@ -1586,6 +1618,7 @@ static int cpufreq_policy_callback(struct notifier_block *nb,
 	for_each_cpu(i, policy->cpus) {
 		arch_scale_set_curr_freq(i, policy->cur);
 		arch_scale_set_max_freq(i, policy->max);
+		arch_scale_set_min_freq(i, policy->min);
 	}
 
 	return NOTIFY_OK;

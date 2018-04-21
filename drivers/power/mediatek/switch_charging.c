@@ -209,21 +209,20 @@ static BATTERY_VOLTAGE_ENUM select_jeita_cv(void)
 {
 	BATTERY_VOLTAGE_ENUM cv_voltage;
 
-	if (g_temp_status == TEMP_ABOVE_POS_60) {
+	if (g_temp_status == TEMP_ABOVE_POS_60)
 		cv_voltage = JEITA_TEMP_ABOVE_POS_60_CV_VOLTAGE;
-	} else if (g_temp_status == TEMP_POS_45_TO_POS_60) {
+	else if (g_temp_status == TEMP_POS_45_TO_POS_60)
 		cv_voltage = JEITA_TEMP_POS_45_TO_POS_60_CV_VOLTAGE;
-	} else if (g_temp_status == TEMP_POS_10_TO_POS_45) {
+	else if (g_temp_status == TEMP_POS_10_TO_POS_45)
 		cv_voltage = MTK_CV_VOLTAGE;
-	} else if (g_temp_status == TEMP_POS_0_TO_POS_10) {
+	else if (g_temp_status == TEMP_POS_0_TO_POS_10)
 		cv_voltage = JEITA_TEMP_POS_0_TO_POS_10_CV_VOLTAGE;
-	} else if (g_temp_status == TEMP_NEG_10_TO_POS_0) {
+	else if (g_temp_status == TEMP_NEG_10_TO_POS_0)
 		cv_voltage = JEITA_TEMP_NEG_10_TO_POS_0_CV_VOLTAGE;
-	} else if (g_temp_status == TEMP_BELOW_NEG_10) {
+	else if (g_temp_status == TEMP_BELOW_NEG_10)
 		cv_voltage = JEITA_TEMP_BELOW_NEG_10_CV_VOLTAGE;
-	} else {
+	else
 		cv_voltage = BATTERY_VOLT_04_200000_V;
-	}
 
 	return cv_voltage;
 }
@@ -353,7 +352,7 @@ bool get_usb_current_unlimited(void)
 	if (BMT_status.charger_type == STANDARD_HOST || BMT_status.charger_type == CHARGING_HOST)
 		return usb_unlimited;
 
-		return false;
+	return false;
 }
 
 void set_usb_current_unlimited(bool enable)
@@ -901,7 +900,7 @@ static void mtk_select_cv(void)
 
 	battery_charging_control(CHARGING_CMD_SET_CV_VOLTAGE, &cv_voltage);
 
-#if defined(CONFIG_MTK_HAFG_20)
+#if (CONFIG_MTK_GAUGE_VERSION == 20)
 	g_cv_voltage = cv_voltage;
 #endif
 }

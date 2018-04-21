@@ -27,7 +27,11 @@
 #include <linux/regulator/consumer.h>
 
 #include "include/pmic.h"
-#include "mtk_pmic_regulator.h"
+#ifdef CONFIG_MTK_PMIC_CHIP_MT6335
+#include "mt6335/mtk_pmic_regulator.h"
+#endif
+
+#define REGULATOR_READY
 
 #define REGULATOR_TEST 0
 
@@ -37,15 +41,17 @@ extern int mtk_ldos_size;
 extern int pmic_regulator_matches_size;
 
 #ifndef CONFIG_MTK_PMIC_CHIP_MT6353
+#ifdef CONFIG_MTK_PMIC_CHIP_MT6335
 /*---extern variable---*/
 extern struct mtk_bucks_t mtk_bucks_class[];
 /*---extern function---*/
-extern int buck_is_enabled(BUCK_TYPE type);
-extern int buck_enable(BUCK_TYPE type, unsigned char en);
-extern int buck_set_mode(BUCK_TYPE type, unsigned char pmode);
-extern int buck_set_voltage(BUCK_TYPE type, unsigned int voltage);
-extern unsigned int buck_get_voltage(BUCK_TYPE type);
+extern int buck_is_enabled(enum BUCK_TYPE type);
+extern int buck_enable(enum BUCK_TYPE type, unsigned char en);
+extern int buck_set_mode(enum BUCK_TYPE type, unsigned char pmode);
+extern int buck_set_voltage(enum BUCK_TYPE type, unsigned int voltage);
+extern unsigned int buck_get_voltage(enum BUCK_TYPE type);
 #endif /*--COMMON API after MT6335--*/
+#endif /*--COMMON API after MT6353--*/
 
 #ifdef REGULATOR_TEST
 extern void pmic_regulator_en_test(void);

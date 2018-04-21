@@ -59,7 +59,7 @@ struct musb_ep;
 #ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
 #include <mt-plat/mtk_boot_common.h>
 #endif
-extern u32 fake_CDP;
+extern int fake_CDP;
 extern unsigned int musb_speed;
 
 extern struct musb *_mu3d_musb;
@@ -147,6 +147,12 @@ extern void musb_g_disconnect(struct musb *);
 extern unsigned musb_uart_debug;
 extern int usb20_phy_init_debugfs(void);
 #endif
+#ifdef CONFIG_PHY_MTK_SSUSB
+extern int ssusb_phy_init_debugfs(struct phy *mtk_phy);
+extern int ssusb_phy_exit_debugfs(void);
+extern void init_phy_hal(struct phy *phy);
+#endif
+
 /****************************** HOST ROLE ***********************************/
 
 #define	is_host_capable()	(1)
@@ -166,18 +172,18 @@ extern void musb_host_rx(struct musb *, u8);
 #endif
 
 /* USB working mode */
-typedef enum {
+enum cable_mode {
 	CABLE_MODE_CHRG_ONLY = 0,
 	CABLE_MODE_NORMAL,
 	CABLE_MODE_HOST_ONLY,
 	CABLE_MODE_MAX
-} CABLE_MODE;
+};
 
-typedef enum {
+enum usb_state_enum {
 	USB_SUSPEND = 0,
 	USB_UNCONFIGURED,
 	USB_CONFIGURED
-} usb_state_enum;
+};
 
 /* host side ep0 states */
 enum musb_h_ep0_state {
@@ -512,6 +518,7 @@ struct musb {
 	u16 int_tx;
 
 	struct usb_phy *xceiv;
+	struct phy *mtk_phy;
 
 	int nIrq;
 	unsigned irq_wake:1;
@@ -625,10 +632,7 @@ struct musb {
 	u32 error_wQmuVal;
 	u32 error_wErrVal;
 #endif
-
-#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT) || defined(CONFIG_MTK_MD_DIRECT_LOGGING_SUPPORT)
-	u32 bus_event;
-#endif
+	struct workqueue_struct *st_wq;
 };
 
 static inline struct musb *gadget_to_musb(struct usb_gadget *g)
@@ -816,6 +820,10 @@ extern void usb_phy_switch_to_uart(void);
 extern ssize_t musb_cmode_show(struct device *dev, struct device_attribute *attr, char *buf);
 extern ssize_t musb_cmode_store(struct device *dev, struct device_attribute *attr, const char *buf,
 				size_t count);
+extern ssize_t musb_saving_mode_show(struct device *dev, struct device_attribute *attr, char *buf);
+extern ssize_t musb_saving_mode_store(struct device *dev, struct device_attribute *attr, const char *buf,
+				size_t count);
+extern bool is_saving_mode(void);
 
 extern void usb20_pll_settings(bool host, bool forceOn);
 
@@ -836,9 +844,6 @@ static inline int mtk_is_host_mode(void)
 #ifdef CONFIG_USB_C_SWITCH
 extern int typec_switch_usb_disconnect(void *data);
 extern int typec_switch_usb_connect(void *data);
-#endif
-#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT) || defined(CONFIG_MTK_MD_DIRECT_LOGGING_SUPPORT)
-extern int musb_notify_md_bus_event(struct musb *musb, u32 bus_event);
 #endif
 extern int mu3d_force_on;
 extern void mt_usb_connect(void);

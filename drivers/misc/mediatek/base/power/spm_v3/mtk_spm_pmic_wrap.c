@@ -74,10 +74,62 @@ static struct pmic_wrap_setting pw = {
 	.addr = {{0, 0} },
 
 	.set[PMIC_WRAP_PHASE_ALLINONE] = {
+#if defined(CONFIG_MACH_MT6759)
+		._[IDX_ALL_VSRAM_PWR_ON]      = {PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, _BITS_(0:0, 1),},
+		._[IDX_ALL_VSRAM_SHUTDOWN]    = {PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, _BITS_(0:0, 0),},
+		._[IDX_ALL_VSRAM_NORMAL]      = {PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, _BITS_(1:0, 1),},
+		._[IDX_ALL_VSRAM_SLEEP]       = {PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, _BITS_(1:0, 3),},
+		._[IDX_ALL_DPIDLE_LEAVE]      = {PMIC_RG_SRCLKEN_IN2_EN_ADDR, _BITS_(0:0, 1),},
+		._[IDX_ALL_DPIDLE_ENTER]      = {PMIC_RG_SRCLKEN_IN2_EN_ADDR, _BITS_(0:0, 0),},
+		._[IDX_ALL_RESERVE_6]         = {0, 0,},
+		._[IDX_ALL_VCORE_SUSPEND]     = {PMIC_RG_BUCK_VCORE_VOSEL_ADDR, VOLT_TO_PMIC_VAL(56800),},
+		._[IDX_ALL_VPROCL2_PWR_ON]    = {PMIC_RG_BUCK_VPROC12_EN_ADDR, _BITS_(0:0, 1),},
+		._[IDX_ALL_VPROCL2_SHUTDOWN]  = {PMIC_RG_BUCK_VPROC12_EN_ADDR, _BITS_(0:0, 0),},
+		._[IDX_ALL_VCORE_LEVEL2]      = {PMIC_RG_BUCK_VCORE_VOSEL_ADDR, VOLT_TO_PMIC_VAL(62500),},
+		._[IDX_ALL_VCORE_LEVEL3]      = {PMIC_RG_BUCK_VCORE_VOSEL_ADDR, VOLT_TO_PMIC_VAL(75000),},
+		._[IDX_ALL_VPROC_PWR_ON]      = {PMIC_RG_BUCK_VPROC11_EN_ADDR, _BITS_(0:0, 1),},
+		._[IDX_ALL_VPROC_SHUTDOWN]    = {PMIC_RG_BUCK_VPROC11_EN_ADDR, _BITS_(0:0, 0),},
+		._[IDX_ALL_VPROC_NORMAL]      = {PMIC_RG_BUCK_VPROC11_EN_ADDR, _BITS_(1:0, 1),},
+		._[IDX_ALL_VPROC_SLEEP]       = {PMIC_RG_BUCK_VPROC11_EN_ADDR, _BITS_(1:0, 3),},
+#elif defined(CONFIG_MACH_MT6758)
+		._[CMD_0]    = {PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, _BITS_(0:0, 1),},
+		._[CMD_1]    = {PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, _BITS_(0:0, 0),},
+		._[CMD_2]    = {PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, _BITS_(1:0, 1),},
+		._[CMD_3]    = {PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, _BITS_(1:0, 3),},
+		._[CMD_4]    = {PMIC_RG_SRCLKEN_IN2_EN_ADDR, _BITS_(0:0, 1),},
+		._[CMD_5]    = {PMIC_RG_SRCLKEN_IN2_EN_ADDR, _BITS_(0:0, 0),},
+		._[CMD_6]    = {0, 0,},
+		._[CMD_7]    = {PMIC_RG_BUCK_VCORE_VOSEL_ADDR, VOLT_TO_PMIC_VAL(60000),},
+		._[CMD_8]    = {PMIC_RG_BUCK_VCORE_VOSEL_ADDR, VOLT_TO_PMIC_VAL(70000),},
+		._[CMD_9]    = {PMIC_RG_BUCK_VCORE_VOSEL_ADDR, VOLT_TO_PMIC_VAL(80000),},
+		._[CMD_10]   = {0, 0,},
+		._[CMD_11]   = {0, 0,},
+		._[CMD_12]   = {PMIC_RG_BUCK_VPROC11_EN_ADDR, _BITS_(0:0, 1),},
+		._[CMD_13]   = {PMIC_RG_BUCK_VPROC11_EN_ADDR, _BITS_(0:0, 0),},
+		._[CMD_14]   = {PMIC_RG_BUCK_VPROC11_EN_ADDR, _BITS_(1:0, 1),},
+		._[CMD_15]   = {PMIC_RG_BUCK_VPROC11_EN_ADDR, _BITS_(1:0, 3),},
+#elif defined(CONFIG_MACH_MT6775)
+		._[CMD_0]    = {PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, _BITS_(0:0, 1),},
+		._[CMD_1]    = {PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, _BITS_(0:0, 0),},
+		._[CMD_2]    = {PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, _BITS_(1:0, 1),},
+		._[CMD_3]    = {PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, _BITS_(1:0, 3),},
+		._[CMD_4]    = {PMIC_RG_SRCLKEN_IN2_EN_ADDR, _BITS_(0:0, 1),},
+		._[CMD_5]    = {PMIC_RG_SRCLKEN_IN2_EN_ADDR, _BITS_(0:0, 0),},
+		._[CMD_6]    = {PMIC_RG_LDO_VSRAM_GPU_EN_ADDR, _BITS_(0:0, 1),},
+		._[CMD_7]    = {PMIC_RG_LDO_VSRAM_GPU_EN_ADDR, _BITS_(0:0, 0),},
+		._[CMD_8]    = {PMIC_RG_BUCK_VCORE_VOSEL_ADDR, VOLT_TO_PMIC_VAL(62500),},
+		._[CMD_9]    = {PMIC_RG_BUCK_VCORE_VOSEL_ADDR, VOLT_TO_PMIC_VAL(70000),},
+		._[CMD_10]   = {PMIC_RG_BUCK_VCORE_VOSEL_ADDR, VOLT_TO_PMIC_VAL(80000),},
+		._[CMD_11]   = {PMIC_RG_BUCK_VPROC11_EN_ADDR, _BITS_(0:0, 1),},
+		._[CMD_12]   = {PMIC_RG_BUCK_VPROC11_EN_ADDR, _BITS_(0:0, 0),},
+		._[CMD_13]   = {0, 0,},
+		._[CMD_14]   = {0, 0,},
+		._[CMD_15]   = {0, 0,},
+#else
 		._[IDX_ALL_1_VSRAM_PWR_ON]      = {MT6335_LDO_VSRAM_DVFS1_CON0, _BITS_(0:0, 1),},
 		._[IDX_ALL_1_VSRAM_SHUTDOWN]    = {MT6335_LDO_VSRAM_DVFS1_CON0, _BITS_(0:0, 0),},
 		._[IDX_ALL_1_VSRAM_NORMAL]      = {MT6335_LDO_VSRAM_DVFS1_CON1, VOLT_TO_PMIC_VAL(80000),},
-		._[IDX_ALL_1_VSRAM_SLEEP]       = {MT6335_LDO_VSRAM_DVFS1_CON1, VOLT_TO_PMIC_VAL(65000),},
+		._[IDX_ALL_1_VSRAM_SLEEP]       = {MT6335_LDO_VSRAM_DVFS1_CON1, VOLT_TO_PMIC_VAL(55000),},
 		._[IDX_ALL_DPIDLE_LEAVE]        = {MT6335_TOP_SPI_CON0, _BITS_(0:0, 1),},
 		._[IDX_ALL_DPIDLE_ENTER]        = {MT6335_TOP_SPI_CON0, _BITS_(0:0, 0),},
 		._[IDX_ALL_RESERVE_6]           = {0, 0,},
@@ -89,7 +141,8 @@ static struct pmic_wrap_setting pw = {
 		._[IDX_ALL_2_VSRAM_PWR_ON]      = {MT6335_LDO_VSRAM_DVFS2_CON0, _BITS_(0:0, 1),},
 		._[IDX_ALL_2_VSRAM_SHUTDOWN]    = {MT6335_LDO_VSRAM_DVFS2_CON0, _BITS_(0:0, 0),},
 		._[IDX_ALL_2_VSRAM_NORMAL]      = {MT6335_LDO_VSRAM_DVFS2_CON1, VOLT_TO_PMIC_VAL(80000),},
-		._[IDX_ALL_2_VSRAM_SLEEP]       = {MT6335_LDO_VSRAM_DVFS2_CON1, VOLT_TO_PMIC_VAL(65000),},
+		._[IDX_ALL_2_VSRAM_SLEEP]       = {MT6335_LDO_VSRAM_DVFS2_CON1, VOLT_TO_PMIC_VAL(55000),},
+#endif
 		.nr_idx = NR_IDX_ALL,
 	},
 };
@@ -119,9 +172,7 @@ void _mt_spm_pmic_table_init(void)
 		{(unsigned long)PMIC_WRAP_DVFS_ADR15, (unsigned long)PMIC_WRAP_DVFS_WDATA15,},
 	};
 
-
 	memcpy(pw.addr, pwrap_cmd_default, sizeof(pwrap_cmd_default));
-
 }
 
 void mt_spm_pmic_wrap_set_phase(enum pmic_wrap_phase_id phase)
@@ -159,8 +210,6 @@ void mt_spm_pmic_wrap_set_cmd(enum pmic_wrap_phase_id phase, int idx, unsigned i
 	WARN_ON(phase >= NR_PMIC_WRAP_PHASE);
 	WARN_ON(idx >= pw.set[phase].nr_idx);
 
-	/* spm_pwrap_info("@%s: phase = 0x%x, idx = %d, cmd_wdata = 0x%x\n", __func__, phase, idx, cmd_wdata); */
-
 	pmic_wrap_lock(flags);
 
 	pw.set[phase]._[idx].cmd_wdata = cmd_wdata;
@@ -169,11 +218,10 @@ void mt_spm_pmic_wrap_set_cmd(enum pmic_wrap_phase_id phase, int idx, unsigned i
 		spm_write(pw.addr[idx].cmd_wdata, cmd_wdata);
 
 	pmic_wrap_unlock(flags);
-
 }
 EXPORT_SYMBOL(mt_spm_pmic_wrap_set_cmd);
 
-#if 1
+#if !defined(CONFIG_MACH_MT6775)	/* TODO: fix it for MT6775 */
 void mt_spm_pmic_wrap_set_cmd_full(enum pmic_wrap_phase_id phase, int idx, unsigned int cmd_addr,
 				   unsigned int cmd_wdata)
 {
@@ -181,10 +229,6 @@ void mt_spm_pmic_wrap_set_cmd_full(enum pmic_wrap_phase_id phase, int idx, unsig
 
 	WARN_ON(phase >= NR_PMIC_WRAP_PHASE);
 	WARN_ON(idx >= pw.set[phase].nr_idx);
-
-	/* spm_pwrap_info("@%s: phase = 0x%x, idx = %d, cmd_addr = 0x%x, cmd_wdata = 0x%x\n",
-	 *  __func__, phase, idx, cmd_addr, cmd_wdata);
-	 */
 
 	pmic_wrap_lock(flags);
 
@@ -214,10 +258,6 @@ void mt_spm_pmic_wrap_get_cmd_full(enum pmic_wrap_phase_id phase, int idx, unsig
 	*p_cmd_wdata = pw.set[phase]._[idx].cmd_wdata;
 
 	pmic_wrap_unlock(flags);
-	/* spm_pwrap_info("@%s: phase = 0x%x, idx = %d, original cmd_addr = 0x%x, cmd_wdata = 0x%x\n",
-	 *  __func__, phase, idx, *p_cmd_addr, *p_cmd_wdata);
-	 */
-
 }
 EXPORT_SYMBOL(mt_cpufreq_get_pmic_cmd_full);
 #endif

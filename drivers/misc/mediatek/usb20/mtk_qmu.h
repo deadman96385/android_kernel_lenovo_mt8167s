@@ -38,14 +38,15 @@
 #define MAX_QMU_EP RXQ_NUM
 #define TXQ	0
 #define RXQ	1
+#define ISOC_EP_START_IDX 1
 
 /* QMU SETTING */
 #define NO_ZLP 0
 #define HW_MODE 1
 #define GPD_MODE 2
-/* #define TXZLP GPD_MODE */
+#define TXZLP GPD_MODE
 /* #define TXZLP HW_MODE */
-#define TXZLP NO_ZLP
+/*#define TXZLP NO_ZLP */
 
 /* #define CFG_RX_ZLP_EN */
 /* #define CFG_RX_COZ_EN */
@@ -53,38 +54,77 @@
 #define CFG_CS_CHECK
 /* #define CFG_EMPTY_CHECK */
 
+#ifdef CONFIG_MTK_MUSB_DRV_36BIT
+struct tx_haddr {
+	u8 hiaddr;
+	u8 reserved;
+};
+
+struct rx_haddr {
+	u8 hiaddr;
+};
+
+union gpd_b14 {
+	u8 ExtLength; /*Tx ExtLength for  TXGPD*/
+	struct rx_haddr rx_haddr; /*Rx hi address for RXGPD*/
+};
+
+union gpd_w1 {
+	u16 DataBufferLen; /*Rx Allow Length for RXGPD*/
+	struct tx_haddr tx_haddr; /*Tx hi address for TXGPD */
+};
+#endif
+
+
 /* TGPD */
-typedef struct _TGPD {
+struct TGPD {
 	u8 flag;
 	u8 chksum;
-	u16 DataBufferLen;	/*Rx Allow Length */
-
+#ifdef CONFIG_MTK_MUSB_DRV_36BIT
+	union gpd_w1 gpd_w1;
+#else
+	u16 DataBufferLen; /*Rx Allow Length */
+#endif
 	/* address field, 32-bit long */
 	u32 pNext;
 	u32 pBuf;
 
 	u16 bufLen;
+#ifdef CONFIG_MTK_MUSB_DRV_36BIT
+	union gpd_b14 gpd_b14;
+#else
 	u8 ExtLength;
+#endif
 	u8 ZTepFlag;
-} TGPD, *PGPD;
+};
 
-typedef struct _GPD_RANGE {
-	PGPD pNext;
-	PGPD pStart;
-	PGPD pEnd;
-} GPD_R, *RGPD;
+struct _GPD_RANGE {
+	struct TGPD *pNext;
+	struct TGPD *pStart;
+	struct TGPD *pEnd;
+};
 
 extern int mtk_host_qmu_concurrent;
 extern int mtk_host_qmu_pipe_msk;
+extern int mtk_host_qmu_force_isoc_restart;
 extern int mtk_host_active_dev_cnt;
+#ifdef CONFIG_MTK_UAC_POWER_SAVING
 extern unsigned int low_power_timer_total_trigger_cnt;
 extern unsigned int low_power_timer_total_wake_cnt;
 extern int low_power_timer_mode2_option;
 extern int low_power_timer_mode;
+extern int usb_on_sram;
+extern int audio_on_sram;
+extern int use_mtk_audio;
+extern int mtk_audio_request_sram(dma_addr_t *phys_addr, unsigned char **virt_addr,
+		unsigned int length, void *user);
+extern void mtk_audio_free_sram(void *user);
+extern int gpd_switch_to_sram(struct device *dev);
+extern void gpd_switch_to_dram(struct device *dev);
+#endif
 extern int mtk_qmu_dbg_level;	/* refer to musb_core.c */
 extern int mtk_qmu_max_gpd_num;
-extern struct musb_hw_ep *qmu_isoc_ep;
-extern int isoc_ep_start_idx;
+extern int isoc_ep_end_idx;
 extern int isoc_ep_gpd_count;
 static inline int mtk_dbg_level(unsigned level)
 {
@@ -103,16 +143,16 @@ static inline int mtk_dbg_level(unsigned level)
 #define QMU_DBG_ON
 #ifdef QMU_DBG_ON
 #define QMU_ERR(format, args...) do {if (mtk_dbg_level(LOG_ERR)) \
-	pr_warn("QMU_ERR,<%s %d>, " format, __func__, __LINE__, ## args);  } \
+	pr_notice("QMU_ERR,<%s %d>, " format, __func__, __LINE__, ## args);  } \
 	while (0)
 #define QMU_WARN(format, args...) do {if (mtk_dbg_level(LOG_WARN)) \
-	pr_warn("QMU_WARN,<%s %d>, " format, __func__, __LINE__, ## args);  } \
+	pr_notice("QMU_WARN,<%s %d>, " format, __func__, __LINE__, ## args);  } \
 	while (0)
 #define QMU_INFO(format, args...) do {if (mtk_dbg_level(LOG_INFO)) \
-	pr_warn("QMU_INFO,<%s %d>, " format, __func__, __LINE__, ## args);  } \
+	pr_notice("QMU_INFO,<%s %d>, " format, __func__, __LINE__, ## args);  } \
 	while (0)
 #define QMU_DBG(format, args...) do {if (mtk_dbg_level(LOG_DBG)) \
-	pr_warn("QMU_DBG,<%s %d>, " format, __func__, __LINE__, ## args);  } \
+	pr_notice("QMU_DBG,<%s %d>, " format, __func__, __LINE__, ## args);  } \
 	while (0)
 #else
 #define QMU_ERR(format, args...) do {} while (0)
@@ -211,6 +251,8 @@ static inline int mtk_dbg_level(unsigned level)
 #define DQMU_TX_ZLP(n)		(DQMU_TX0_ZLP<<((n)-1))
 #define DQMU_TX0_MULTIPLE	0x00010000
 #define DQMU_TX_MULTIPLE(n)	(DQMU_TX0_MULTIPLE<<((n)-1))
+#define DQMU_T0Q_GDP_ZLP	0x00000100
+#define DQMU_TQ_GDP_ZLP(n)	(DQMU_T0Q_GDP_ZLP<<((n)-1))
 #define DQMU_RX0_MULTIPLE	0x00010000
 #define DQMU_RX_MULTIPLE(n)	(DQMU_RX0_MULTIPLE<<((n)-1))
 #define DQMU_RX0_ZLP		0x01000000
@@ -293,61 +335,124 @@ u8 PDU_calcCksum(u8 *data, int len);
 
 /* brief Define DMAQ GPD format */
 #define TGPD_FLAGS_HWO              0x01
-#define TGPD_IS_FLAGS_HWO(_pd)      (((TGPD *)_pd)->flag & TGPD_FLAGS_HWO)
-#define TGPD_SET_FLAGS_HWO(_pd)     (((TGPD *)_pd)->flag |= TGPD_FLAGS_HWO)
-#define TGPD_CLR_FLAGS_HWO(_pd)     (((TGPD *)_pd)->flag &= (~TGPD_FLAGS_HWO))
+#define TGPD_IS_FLAGS_HWO(_pd)      (((struct TGPD *)_pd)->flag & TGPD_FLAGS_HWO)
+#define TGPD_SET_FLAGS_HWO(_pd)     (((struct TGPD *)_pd)->flag |= TGPD_FLAGS_HWO)
+#define TGPD_CLR_FLAGS_HWO(_pd)     (((struct TGPD *)_pd)->flag &= (~TGPD_FLAGS_HWO))
 #define TGPD_FORMAT_BDP             0x02
-#define TGPD_IS_FORMAT_BDP(_pd)     (((TGPD *)_pd)->flag & TGPD_FORMAT_BDP)
-#define TGPD_SET_FORMAT_BDP(_pd)    (((TGPD *)_pd)->flag |= TGPD_FORMAT_BDP)
-#define TGPD_CLR_FORMAT_BDP(_pd)    (((TGPD *)_pd)->flag &= (~TGPD_FORMAT_BDP))
+#define TGPD_IS_FORMAT_BDP(_pd)     (((struct TGPD *)_pd)->flag & TGPD_FORMAT_BDP)
+#define TGPD_SET_FORMAT_BDP(_pd)    (((struct TGPD *)_pd)->flag |= TGPD_FORMAT_BDP)
+#define TGPD_CLR_FORMAT_BDP(_pd)    (((struct TGPD *)_pd)->flag &= (~TGPD_FORMAT_BDP))
 
-#define TGPD_SET_FLAG(_pd, _flag)   (((TGPD *)_pd)->flag = (((TGPD *)_pd)->flag&(~TGPD_FLAGS_HWO))|(_flag))
-#define TGPD_GET_FLAG(_pd)             (((TGPD *)_pd)->flag & TGPD_FLAGS_HWO)
-#define TGPD_SET_CHKSUM(_pd, _n)    (((TGPD *)_pd)->chksum = PDU_calcCksum((u8 *)_pd, _n))
-#define TGPD_SET_CHKSUM_HWO(_pd, _n)    (((TGPD *)_pd)->chksum = PDU_calcCksum((u8 *)_pd, _n)-1)
-#define TGPD_GET_CHKSUM(_pd)        (((TGPD *)_pd)->chksum)
-#define TGPD_SET_FORMAT(_pd, _fmt)  (((TGPD *)_pd)->flag = (((TGPD *)_pd)->flag&(~TGPD_FORMAT_BDP))|(_fmt))
-#define TGPD_GET_FORMAT(_pd)        (((((TGPD *)_pd)->flag & TGPD_FORMAT_BDP)>>1))
-#define TGPD_SET_DataBUF_LEN(_pd, _len) (((TGPD *)_pd)->DataBufferLen = _len)
-#define TGPD_ADD_DataBUF_LEN(_pd, _len) (((TGPD *)_pd)->DataBufferLen += _len)
-#define TGPD_GET_DataBUF_LEN(_pd)       (((TGPD *)_pd)->DataBufferLen)
-#define TGPD_SET_NEXT(_pd, _next)   (((TGPD *)_pd)->pNext = (u32)(unsigned long)((TGPD *)_next))
-#define TGPD_GET_NEXT(_pd)			((TGPD *)(unsigned long)((TGPD *)_pd)->pNext)
+#define TGPD_SET_FLAG(_pd, _flag) \
+			(((struct TGPD *)_pd)->flag = (((struct TGPD *)_pd)->flag&(~TGPD_FLAGS_HWO))|(_flag))
+#define TGPD_GET_FLAG(_pd)             (((struct TGPD *)_pd)->flag & TGPD_FLAGS_HWO)
+#define TGPD_SET_CHKSUM(_pd, _n)    (((struct TGPD *)_pd)->chksum = PDU_calcCksum((u8 *)_pd, _n))
+#define TGPD_SET_CHKSUM_HWO(_pd, _n)    (((struct TGPD *)_pd)->chksum = PDU_calcCksum((u8 *)_pd, _n)-1)
+#define TGPD_GET_CHKSUM(_pd)        (((struct TGPD *)_pd)->chksum)
+#define TGPD_SET_FORMAT(_pd, _fmt) \
+			(((struct TGPD *)_pd)->flag = (((struct TGPD *)_pd)->flag&(~TGPD_FORMAT_BDP))|(_fmt))
+#define TGPD_GET_FORMAT(_pd)        (((((struct TGPD *)_pd)->flag & TGPD_FORMAT_BDP)>>1))
 
-#define TGPD_SET_DATA(_pd, _data)   (((TGPD *)_pd)->pBuf = (u32)(unsigned long)_data)
-#define TGPD_GET_DATA(_pd)          ((u8 *)(unsigned long)((TGPD *)_pd)->pBuf)
-#define TGPD_SET_BUF_LEN(_pd, _len) (((TGPD *)_pd)->bufLen = _len)
-#define TGPD_ADD_BUF_LEN(_pd, _len) (((TGPD *)_pd)->bufLen += _len)
-#define TGPD_GET_BUF_LEN(_pd)       (((TGPD *)_pd)->bufLen)
-#define TGPD_SET_EXT_LEN(_pd, _len) (((TGPD *)_pd)->ExtLength = _len)
-#define TGPD_GET_EXT_LEN(_pd)        (((TGPD *)_pd)->ExtLength)
-#define TGPD_SET_EPaddr(_pd, _EP)  (((TGPD *)_pd)->ZTepFlag = (((TGPD *)_pd)->ZTepFlag&0xF0)|(_EP))
-#define TGPD_GET_EPaddr(_pd)        (((TGPD *)_pd)->ZTepFlag & 0x0F)
+#ifdef CONFIG_MTK_MUSB_DRV_36BIT
+#define TGPD_SET_DataBUF_LEN(_pd, _len) (((struct TGPD *)_pd)->gpd_w1.DataBufferLen = _len)
+#define TGPD_ADD_DataBUF_LEN(_pd, _len) (((struct TGPD *)_pd)->gpd_w1.DataBufferLen += _len)
+#define TGPD_GET_DataBUF_LEN(_pd)       (((struct TGPD *)_pd)->gpd_w1.DataBufferLen)
+#else
+#define TGPD_SET_DataBUF_LEN(_pd, _len) (((struct TGPD *)_pd)->DataBufferLen = _len)
+#define TGPD_ADD_DataBUF_LEN(_pd, _len) (((struct TGPD *)_pd)->DataBufferLen += _len)
+#define TGPD_GET_DataBUF_LEN(_pd)       (((struct TGPD *)_pd)->DataBufferLen)
+#endif
+
+#ifdef CONFIG_MTK_MUSB_DRV_36BIT
+#define TGPD_SET_NEXT(_pd, _next)	(((struct TGPD *)_pd)->pNext = (u32)_next)
+#define TGPD_SET_NEXT_TXHI(_pd, _next)	\
+	do {	\
+		((struct TGPD *) _pd)->gpd_w1.tx_haddr.hiaddr &= 0x0F;	\
+		((struct TGPD *) _pd)->gpd_w1.tx_haddr.hiaddr |= ((u8)_next << 4);	\
+	} while (0)
+
+#define TGPD_SET_NEXT_RXHI(_pd, _next)	\
+	do {	\
+		((struct TGPD *) _pd)->gpd_b14.rx_haddr.hiaddr &= 0x0F; \
+		((struct TGPD *) _pd)->gpd_b14.rx_haddr.hiaddr |= ((u8)_next << 4); \
+	} while (0)
+
+#define TGPD_GET_NEXT(_pd)		((uintptr_t)((struct TGPD *)_pd)->pNext)
+#define TGPD_GET_NEXT_TXHI(_pd)		((uintptr_t)((struct TGPD *)_pd)->gpd_w1.tx_haddr.hiaddr >> 4)
+#define TGPD_GET_NEXT_RXHI(_pd)		((uintptr_t)((struct TGPD *)_pd)->gpd_b14.rx_haddr.hiaddr >> 4)
+#define TGPD_GET_NEXT_TX(_pd)		((struct TGPD *)(TGPD_GET_NEXT(_pd) |  (TGPD_GET_NEXT_TXHI(_pd) << 32)))
+#define TGPD_GET_NEXT_RX(_pd)		((struct TGPD *)(TGPD_GET_NEXT(_pd) |  (TGPD_GET_NEXT_RXHI(_pd) << 32)))
+#define TGPD_SET_DATA(_pd, _data)	(((struct TGPD *)_pd)->pBuf = (u32)_data)
+#define TGPD_SET_DATA_TXHI(_pd, _next)	\
+	do {	\
+		((struct TGPD *)_pd)->gpd_w1.tx_haddr.hiaddr &= 0xF0; \
+		((struct TGPD *)_pd)->gpd_w1.tx_haddr.hiaddr |= ((u8)_next & 0x0F); \
+	} while (0)
+
+#define TGPD_SET_DATA_RXHI(_pd, _next)	\
+	do {	\
+		((struct TGPD *)_pd)->gpd_b14.rx_haddr.hiaddr &= 0xF0; \
+		((struct TGPD *)_pd)->gpd_b14.rx_haddr.hiaddr |= ((u8)_next & 0x0F); \
+	} while (0)
+
+#define TGPD_GET_DATA(_pd)		((uintptr_t)((struct TGPD *)_pd)->pBuf)
+#define TGPD_GET_DATA_TXHI(_pd)		((uintptr_t)((struct TGPD *)_pd)->gpd_w1.tx_haddr.hiaddr & 0x0F)
+#define TGPD_GET_DATA_RXHI(_pd)		((uintptr_t)((struct TGPD *)_pd)->gpd_b14.rx_haddr.hiaddr & 0x0F)
+#define TGPD_GET_DATA_TX(_pd)		((struct TGPD *)(TGPD_GET_DATA(_pd) |  (TGPD_GET_DATA_TXHI(_pd) << 32)))
+#define TGPD_GET_DATA_RX(_pd)		((struct TGPD *)(TGPD_GET_DATA(_pd) |  (TGPD_GET_DATA_RXHI(_pd) << 32)))
+#else
+#define TGPD_GET_NEXT_TX(_pd)		TGPD_GET_NEXT(_pd)
+#define TGPD_GET_NEXT_RX(_pd)		TGPD_GET_NEXT(_pd)
+
+#define TGPD_SET_NEXT(_pd, _next)   (((struct TGPD *)_pd)->pNext = (u32)(uintptr_t)((struct TGPD *)_next))
+#define TGPD_GET_NEXT(_pd)			((struct TGPD *)(uintptr_t)((struct TGPD *)_pd)->pNext)
+
+#define TGPD_GET_DATA_TX(_pd)		TGPD_GET_DATA(_pd)
+#define TGPD_GET_DATA_RX(_pd)		TGPD_GET_DATA(_pd)
+
+#define TGPD_SET_DATA(_pd, _data)   (((struct TGPD *)_pd)->pBuf = (u32)(uintptr_t)_data)
+#define TGPD_GET_DATA(_pd)          ((u8 *)(uintptr_t)((struct TGPD *)_pd)->pBuf)
+#endif
+
+#define TGPD_SET_BUF_LEN(_pd, _len) (((struct TGPD *)_pd)->bufLen = _len)
+#define TGPD_ADD_BUF_LEN(_pd, _len) (((struct TGPD *)_pd)->bufLen += _len)
+#define TGPD_GET_BUF_LEN(_pd)       (((struct TGPD *)_pd)->bufLen)
+
+#ifdef CONFIG_MTK_MUSB_DRV_36BIT
+#define TGPD_SET_EXT_LEN(_pd, _len)	(((struct TGPD *)_pd)->gpd_b14.ExtLength = _len)
+#define TGPD_GET_EXT_LEN(_pd)		(((struct TGPD *)_pd)->gpd_b14.ExtLength)
+#else
+#define TGPD_SET_EXT_LEN(_pd, _len) (((struct TGPD *)_pd)->ExtLength = _len)
+#define TGPD_GET_EXT_LEN(_pd)        (((struct TGPD *)_pd)->ExtLength)
+#endif
+
+#define TGPD_SET_EPaddr(_pd, _EP)  (((struct TGPD *)_pd)->ZTepFlag = (((struct TGPD *)_pd)->ZTepFlag&0xF0)|(_EP))
+#define TGPD_GET_EPaddr(_pd)        (((struct TGPD *)_pd)->ZTepFlag & 0x0F)
 
 #define TGPD_FORMAT_TGL             0x10
-#define TGPD_IS_FORMAT_TGL(_pd)     ((((TGPD *)_pd)->ZTepFlag & TGPD_FORMAT_TGL))
-#define TGPD_SET_FORMAT_TGL(_pd)    ((((TGPD *)_pd)->ZTepFlag |= TGPD_FORMAT_TGL))
-#define TGPD_CLR_FORMAT_TGL(_pd)    ((((TGPD *)_pd)->ZTepFlag &= (~TGPD_FORMAT_TGL)))
+#define TGPD_IS_FORMAT_TGL(_pd)     ((((struct TGPD *)_pd)->ZTepFlag & TGPD_FORMAT_TGL))
+#define TGPD_SET_FORMAT_TGL(_pd)    ((((struct TGPD *)_pd)->ZTepFlag |= TGPD_FORMAT_TGL))
+#define TGPD_CLR_FORMAT_TGL(_pd)    ((((struct TGPD *)_pd)->ZTepFlag &= (~TGPD_FORMAT_TGL)))
 #define TGPD_FORMAT_ZLP             0x20
-#define TGPD_IS_FORMAT_ZLP(_pd)     ((((TGPD *)_pd)->ZTepFlag & TGPD_FORMAT_ZLP))
-#define TGPD_SET_FORMAT_ZLP(_pd)    ((((TGPD *)_pd)->ZTepFlag |= TGPD_FORMAT_ZLP))
-#define TGPD_CLR_FORMAT_ZLP(_pd)    ((((TGPD *)_pd)->ZTepFlag &= (~TGPD_FORMAT_ZLP)))
+#define TGPD_IS_FORMAT_ZLP(_pd)     ((((struct TGPD *)_pd)->ZTepFlag & TGPD_FORMAT_ZLP))
+#define TGPD_SET_FORMAT_ZLP(_pd)    ((((struct TGPD *)_pd)->ZTepFlag |= TGPD_FORMAT_ZLP))
+#define TGPD_CLR_FORMAT_ZLP(_pd)    ((((struct TGPD *)_pd)->ZTepFlag &= (~TGPD_FORMAT_ZLP)))
 
-#define TGPD_SET_TGL(_pd, _TGL)  (((TGPD *)_pd)->ZTepFlag |= ((_TGL) ? 0x10 : 0x00))
-#define TGPD_GET_TGL(_pd)        (((TGPD *)_pd)->ZTepFlag & 0x10 ? 1:0)
-#define TGPD_SET_ZLP(_pd, _ZLP)  (((TGPD *)_pd)->ZTepFlag |= ((_ZLP) ? 0x20 : 0x00))
-#define TGPD_GET_ZLP(_pd)        (((TGPD *)_pd)->ZTepFlag & 0x20 ? 1:0)
+#define TGPD_SET_TGL(_pd, _TGL)  (((struct TGPD *)_pd)->ZTepFlag |= ((_TGL) ? 0x10 : 0x00))
+#define TGPD_GET_TGL(_pd)        (((struct TGPD *)_pd)->ZTepFlag & 0x10 ? 1:0)
+#define TGPD_SET_ZLP(_pd, _ZLP)  (((struct TGPD *)_pd)->ZTepFlag |= ((_ZLP) ? 0x20 : 0x00))
+#define TGPD_GET_ZLP(_pd)        (((struct TGPD *)_pd)->ZTepFlag & 0x20 ? 1:0)
 
 #define TGPD_FLAG_IOC				0x80
-#define TGPD_SET_IOC(_pd)			(((TGPD *)_pd)->flag |= TGPD_FLAG_IOC)
-#define TGPD_CLR_IOC(_pd)			(((TGPD *)_pd)->flag &= (~TGPD_FLAG_IOC))
+#define TGPD_SET_IOC(_pd)			(((struct TGPD *)_pd)->flag |= TGPD_FLAG_IOC)
+#define TGPD_CLR_IOC(_pd)			(((struct TGPD *)_pd)->flag &= (~TGPD_FLAG_IOC))
 
 extern void qmu_destroy_gpd_pool(struct device *dev);
 extern int qmu_init_gpd_pool(struct device *dev);
 extern void qmu_reset_gpd_pool(u32 ep_num, u8 isRx);
 extern bool mtk_is_qmu_enabled(u8 EP_Num, u8 isRx);
 extern void mtk_qmu_enable(struct musb *musb, u8 EP_Num, u8 isRx);
-extern void mtk_qmu_insert_task(u8 EP_Num, u8 isRx, u8 *buf, u32 length, u8 zlp, u8 isioc);
+extern void mtk_qmu_insert_task(u8 EP_Num, u8 isRx, dma_addr_t buf, u32 length, u8 zlp, u8 isioc);
 extern void mtk_qmu_resume(u8 EP_Num, u8 isRx);
 extern void qmu_done_rx(struct musb *musb, u8 ep_num);
 extern void qmu_done_tx(struct musb *musb, u8 ep_num);

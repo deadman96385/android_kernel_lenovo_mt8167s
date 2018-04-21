@@ -1,10 +1,6 @@
 /*
-<<<<<<< Updated upstream
- *  include/linux/mfd/rt5081_pmu.h
- *  include header file for Richtek RT5081 PMU
+ *  include header file for Richtek RT5081 Charger
  *
-=======
->>>>>>> Stashed changes
  *  Copyright (C) 2016 Richtek Technology Corp.
  *  cy_huang <cy_huang@richtek.com>
  *
@@ -25,10 +21,17 @@
 #include <linux/rtmutex.h>
 #include <linux/interrupt.h>
 
+#define rt_dbg(dev, fmt, ...) \
+	do { \
+		if (dbg_log_en) \
+			dev_dbg(dev, fmt, ##__VA_ARGS__); \
+	} while (0)
+
 enum {
 	RT5081_PMU_COREDEV,
 	RT5081_PMU_CHGDEV,
-	RT5081_PMU_FLEDDEV,
+	RT5081_PMU_FLEDDEV1,
+	RT5081_PMU_FLEDDEV2,
 	RT5081_PMU_LDODEV,
 	RT5081_PMU_RGBLEDDEV,
 	RT5081_PMU_BLEDDEV,
@@ -59,9 +62,7 @@ struct rt5081_pmu_chip {
 	struct device *dev;
 	struct irq_domain *irq_domain;
 	struct rt_regmap_device *rd;
-#ifndef CONFIG_RT_REGMAP
 	struct rt_mutex io_lock;
-#endif /* #ifdef CONFIG_RT_REGMAP */
 	int irq;
 	uint8_t chip_rev;
 };
@@ -72,6 +73,10 @@ struct rt5081_pmu_chip {
 #define RT5081_PMU_REG_CORECTRL2	(0x02)
 #define RT5081_PMU_REG_RSTPASCODE1	(0x03)
 #define RT5081_PMU_REG_RSTPASCODE2	(0x04)
+#define RT5081_PMU_REG_HIDDENPASCODE1	(0x07)
+#define RT5081_PMU_REG_HIDDENPASCODE2	(0x08)
+#define RT5081_PMU_REG_HIDDENPASCODE3	(0x09)
+#define RT5081_PMU_REG_HIDDENPASCODE4	(0x0A)
 #define RT5081_PMU_REG_IRQIND		(0x0B)
 #define RT5081_PMU_REG_IRQMASK		(0x0C)
 #define RT5081_PMU_REG_IRQSET		(0x0D)
@@ -110,10 +115,24 @@ struct rt5081_pmu_chip {
 #define RT5081_PMU_REG_CHGDIRCHG1	(0x2D)
 #define RT5081_PMU_REG_CHGDIRCHG2	(0x2E)
 #define RT5081_PMU_REG_CHGDIRCHG3	(0x2F)
+#define RT5081_PMU_REG_CHGHIDDENCTRL0	(0x30)
+#define RT5081_PMU_REG_CHGHIDDENCTRL1	(0x31)
+#define RT5081_PMU_REG_LG_CONTROL	(0x33)
+#define RT5081_PMU_REG_CHGHIDDENCTRL6	(0x35)
+#define RT5081_PMU_REG_CHGHIDDENCTRL7	(0x36)
+#define RT5081_PMU_REG_CHGHIDDENCTRL8	(0x37)
+#define RT5081_PMU_REG_CHGHIDDENCTRL9	(0x38)
+#define RT5081_PMU_REG_CHGHIDDENCTRL15	(0x3E)
 #define RT5081_PMU_REG_CHGSTAT		(0x4A)
 #define RT5081_PMU_REG_CHGNTC		(0x4B)
 #define RT5081_PMU_REG_ADCDATAH		(0x4C)
 #define RT5081_PMU_REG_ADCDATAL		(0x4D)
+#define RT5081_PMU_REG_ADCDATATUNEH	(0x4E)
+#define RT5081_PMU_REG_ADCDATATUNEL	(0x4F)
+#define RT5081_PMU_REG_ADCDATAORGH	(0x50)
+#define RT5081_PMU_REG_ADCDATAORGL	(0x51)
+#define RT5081_PMU_REG_ADCBATDATAH	(0x52)
+#define RT5081_PMU_REG_ADCBATDATAL	(0x53)
 #define RT5081_PMU_REG_CHGCTRL19	(0x60)
 #define RT5081_PMU_REG_OVPCTRL		(0x61)
 /* flashled control */
@@ -257,6 +276,8 @@ extern int rt5081_pmu_regmap_register(struct rt5081_pmu_chip *chip,
 extern void rt5081_pmu_regmap_unregister(struct rt5081_pmu_chip *chip);
 extern int rt5081_pmu_get_virq_number(struct rt5081_pmu_chip *chip,
 	const char *name);
+extern const char *rt5081_pmu_get_hwirq_name(struct rt5081_pmu_chip *chip,
+	int id);
 extern int rt5081_pmu_irq_register(struct rt5081_pmu_chip *chip);
 extern void rt5081_pmu_irq_unregister(struct rt5081_pmu_chip *chip);
 extern void rt5081_pmu_irq_suspend(struct rt5081_pmu_chip *chip);

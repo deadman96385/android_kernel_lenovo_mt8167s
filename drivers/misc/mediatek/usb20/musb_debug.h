@@ -54,7 +54,7 @@
 #define xprintk(level,  format, args...) do { \
 	if (_dbg_level(level)) { \
 		if (musb_uart_debug) {\
-			pr_warn("[MUSB]%s %d: " format, \
+			pr_notice("[MUSB]%s %d: " format, \
 				__func__, __LINE__, ## args); \
 		} \
 		else{\
@@ -63,8 +63,9 @@
 		} \
 	} } while (0)
 
-extern unsigned musb_debug;
-extern unsigned musb_uart_debug;
+extern int musb_debug;
+extern int musb_debug_limit;
+extern int musb_uart_debug;
 
 static inline int _dbg_level(unsigned level)
 {
@@ -76,9 +77,23 @@ static inline int _dbg_level(unsigned level)
 #endif
 #define DBG(level, fmt, args...) xprintk(level, fmt, ## args)
 
-/* extern const char *otg_state_string(struct musb *); */
+#define DBG_LIMIT(FREQ, fmt, args...) do {\
+	static DEFINE_RATELIMIT_STATE(ratelimit, HZ, FREQ);\
+	static int skip_cnt;\
+	\
+	if (unlikely(!musb_debug_limit))\
+		DBG(0, fmt "<unlimit>\n", ## args);\
+	else { \
+		if (__ratelimit(&ratelimit)) {\
+			DBG(0, fmt ", skip_cnt<%d>\n", ## args, skip_cnt);\
+			skip_cnt = 0;\
+		} else\
+			skip_cnt++;\
+	} \
+} while (0)\
 
-extern int musb_init_debugfs(struct musb *musb);
-extern void musb_exit_debugfs(struct musb *musb);
+/* extern const char *otg_state_string(struct musb *); */
+extern int musb_init_debugfs(struct musb *musb)  __attribute__((weak));
+extern void musb_exit_debugfs(struct musb *musb) __attribute__((weak));
 
 #endif				/*  __MUSB_LINUX_DEBUG_H__ */

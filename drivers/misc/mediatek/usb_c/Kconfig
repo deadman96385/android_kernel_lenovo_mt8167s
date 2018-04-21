@@ -80,6 +80,7 @@ config USB_C_SWITCH_MT6392
 
 config TCPC_CLASS
 	bool "TypeC Port Controller Device Class"
+	select USB_C_SWITCH
 	help
 	  Say Y to enable
 	  Typec Port
@@ -88,6 +89,7 @@ config TCPC_CLASS
 
 config USB_POWER_DELIVERY
 	bool "Support USB power delivery Function"
+	depends on TCPC_CLASS
 	default n
 	help
 	  Say Y to enable
@@ -108,13 +110,32 @@ config TCPC_RT1711
 config TCPC_RT1711H
 	bool "Richtek RT1711H TypeC port Controller Driver"
 	depends on TCPC_CLASS
-	select USB_C_SWITCH
 	default n
 	help
 	  Say Y to enable
 	  Richtek RT1711H
 	  TypeC port Controller
 	  Driver
+
+config TCPC_RT5081
+	bool "Richtek RT1711H TypeC port Controller Driver"
+	depends on TCPC_CLASS
+	default n
+	help
+	  Say Y to enable Richtek RT5081
+	  TypeC port Controller
+	  Also Support Power Delivery
+	  Say N to disable
+
+config TCPC_MT6370
+	bool "MediaTek MT6370 TypeC port Controller Driver"
+	depends on TCPC_CLASS
+	default n
+	help
+	  Say Y to enable MediaTek MT6370
+	  TypeC port Controller
+	  Also Support Power Delivery
+	  Say N to disable
 
 config USB_PD_VBUS_STABLE_TOUT
 	int "PD VBUS Stable Timeout"
@@ -135,3 +156,12 @@ config RT7207_ADAPTER
 	  Richtek RT7207
 	  PD Adapter
 	  Function.
+
+config USB_C_SWITCH_U3_MUX
+	bool "USB TYPE-C USB 3.0 Mux"
+	default n
+	---help---
+	  Enables to support USB3.0 mux in usb-c.
+	  To support TYPE-C USB3.0 must have a MUX to switch SSRX1/SSTX1/SSRX2/SSTX2 pins.
+	  Say Y to enable TYPEC USB3.0 Mux
+	  If unsure, say N.

@@ -11,26 +11,33 @@
  * GNU General Public License for more details.
  */
 #include <linux/kernel.h>
-#include <mach/mtk_gpt.h>
 #include "mtk_cpuidle.h"
 #include "mtk_idle_internal.h"
 #include "mtk_idle_profile.h"
 #include "mtk_spm_resource_req_internal.h"
+
+#if defined(CONFIG_CPU_FREQ)
+#include <mtk_cpufreq_api.h>
+#endif
 
 #if SPM_MET_TAGGING
 #include <core/met_drv.h>
 #endif
 
 #define IDLE_PROF_TAG                   "Power/swap "
-#define idle_prof_emerg(fmt, args...)   pr_emerg(IDLE_PROF_TAG fmt, ##args)
-#define idle_prof_alert(fmt, args...)   pr_alert(IDLE_PROF_TAG fmt, ##args)
-#define idle_prof_crit(fmt, args...)    pr_crit(IDLE_PROF_TAG fmt, ##args)
-#define idle_prof_err(fmt, args...)     pr_err(IDLE_PROF_TAG fmt, ##args)
-#define idle_prof_warn(fmt, args...)    pr_warn(IDLE_PROF_TAG fmt, ##args)
-#define idle_prof_notice(fmt, args...)  pr_notice(IDLE_PROF_TAG fmt, ##args)
-#define idle_prof_info(fmt, args...)    pr_debug(IDLE_PROF_TAG fmt, ##args)
-#define idle_prof_ver(fmt, args...)     pr_debug(IDLE_PROF_TAG fmt, ##args)
-#define idle_prof_dbg(fmt, args...)     pr_debug(IDLE_PROF_TAG fmt, ##args)
+#define idle_prof_pr_emerg(fmt, args...)   pr_emerg(IDLE_PROF_TAG fmt, ##args)
+#define idle_prof_pr_alert(fmt, args...)   pr_alert(IDLE_PROF_TAG fmt, ##args)
+#define idle_prof_pr_crit(fmt, args...)    pr_crit(IDLE_PROF_TAG fmt, ##args)
+#define idle_prof_pr_err(fmt, args...)     pr_err(IDLE_PROF_TAG fmt, ##args)
+#define idle_prof_pr_warn(fmt, args...)    pr_warn(IDLE_PROF_TAG fmt, ##args)
+#define idle_prof_pr_notice(fmt, args...)  pr_notice(IDLE_PROF_TAG fmt, ##args)
+#define idle_prof_pr_info(fmt, args...)    pr_info(IDLE_PROF_TAG fmt, ##args)
+#define idle_prof_pr_dbg(fmt, args...)     pr_debug(IDLE_PROF_TAG fmt, ##args)
+
+unsigned int __attribute__((weak))mt_cpufreq_get_cur_freq(unsigned int id)
+{
+	return 0;
+}
 
 /* idle ratio */
 static bool idle_ratio_en;
@@ -44,6 +51,7 @@ static unsigned long long idle_cnt_dump_prev_time;
 static unsigned int idle_cnt_dump_criteria = 5000;          /* 5 sec */
 
 static struct mtk_idle_buf idle_log;
+static struct mtk_idle_buf idle_state_log;
 
 #define reset_log()              reset_idle_buf(idle_log)
 #define get_log()                get_idle_buf(idle_log)
@@ -100,6 +108,7 @@ static struct mtk_idle_prof idle_prof[NR_TYPES] = {
 	[IDLE_TYPE_SO3] = DEFINE_ATTR("SODI3", "soidle3", 30000),
 	[IDLE_TYPE_SO]  = DEFINE_ATTR("SODI", "soidle", 30000),
 	[IDLE_TYPE_MC]  = DEFINE_ATTR("MC", "mcidle", ~0),
+	[IDLE_TYPE_MCSO]  = DEFINE_ATTR("MCSODI", "mcsodi", 30000),
 	[IDLE_TYPE_SL]  = DEFINE_ATTR("SL", "slidle", ~0),
 	[IDLE_TYPE_RG]  = DEFINE_ATTR("RG", "rgidle", ~0)
 };
@@ -112,7 +121,7 @@ static struct mtk_idle_prof idle_prof[NR_TYPES] = {
 #define GET_EVENT_RATIO_SPEED(x)    ((x)/(WINDOW_LEN_SPEED/1000))
 #define GET_EVENT_RATIO_NORMAL(x)   ((x)/(WINDOW_LEN_NORMAL/1000))
 
-idle_twam_t idle_twam;
+struct mtk_idle_twam idle_twam;
 
 #if SPM_MET_TAGGING
 #define idle_get_current_time_us(x) do {\
@@ -130,14 +139,22 @@ static const char *idle_met_label[NR_TYPES] = {
 };
 #endif
 
-p_idle_twam_t mtk_idle_get_twam(void)
+unsigned long long idle_get_current_time_ms(void)
+{
+	u64 idle_current_time = sched_clock();
+
+	do_div(idle_current_time, 1000000);
+	return idle_current_time;
+}
+
+struct mtk_idle_twam *mtk_idle_get_twam(void)
 {
 	return &idle_twam;
 }
 
 void mtk_idle_twam_callback(struct twam_sig *ts)
 {
-	idle_prof_warn("spm twam (sel%d: %d) ratio: %5u/1000\n",
+	idle_prof_pr_notice("spm twam (sel%d: %d) ratio: %5u/1000\n",
 			idle_twam.sel, idle_twam.event,
 			(idle_twam.speed_mode)?GET_EVENT_RATIO_SPEED(ts->sig0):GET_EVENT_RATIO_NORMAL(ts->sig0));
 }
@@ -180,7 +197,7 @@ void mtk_idle_ratio_calc_start(int type, int cpu)
 {
 	unsigned long flags;
 
-	if (idle_ratio_en && type >= 0 && type < NR_TYPES && (cpu == 0 || cpu == 4))
+	if (idle_ratio_en && type >= 0 && type < NR_TYPES)
 		idle_prof[type].ratio.start = idle_get_current_time_ms();
 
 	if (type < IDLE_TYPE_MC) {
@@ -199,7 +216,7 @@ void mtk_idle_ratio_calc_start(int type, int cpu)
 
 void mtk_idle_ratio_calc_stop(int type, int cpu)
 {
-	if (idle_ratio_en && type >= 0 && type < NR_TYPES && (cpu == 0 || cpu == 4))
+	if (idle_ratio_en && type >= 0 && type < NR_TYPES)
 		idle_prof[type].ratio.value += idle_get_current_time_ms() - idle_prof[type].ratio.start;
 
 	if (type < IDLE_TYPE_MC) {
@@ -231,6 +248,7 @@ void mtk_idle_ratio_calc_stop(int type, int cpu)
 			ratio->value_so3 = (type == IDLE_TYPE_SO3) ? ratio->value : 0;
 			ratio->value_so = (type == IDLE_TYPE_SO) ? ratio->value : 0;
 		} else {
+#if defined(__LP64__) || defined(_LP64)
 			ratio->value = ((IDLE_RATIO_WINDOW_MS - interval) *
 							last_ratio / IDLE_RATIO_WINDOW_MS)
 							+ last_idle_time;
@@ -243,9 +261,23 @@ void mtk_idle_ratio_calc_stop(int type, int cpu)
 			ratio->value_so = ((IDLE_RATIO_WINDOW_MS - interval) *
 							last_ratio_so / IDLE_RATIO_WINDOW_MS)
 							+ ((type == IDLE_TYPE_SO) ? last_idle_time : 0);
+#else
+			ratio->value = div_s64((IDLE_RATIO_WINDOW_MS - interval) *
+							last_ratio, IDLE_RATIO_WINDOW_MS)
+							+ last_idle_time;
+			ratio->value_dp = div_s64((IDLE_RATIO_WINDOW_MS - interval) *
+							last_ratio_dp, IDLE_RATIO_WINDOW_MS)
+							+ ((type == IDLE_TYPE_DP) ? last_idle_time : 0);
+			ratio->value_so3 = div_s64((IDLE_RATIO_WINDOW_MS - interval) *
+							last_ratio_so3, IDLE_RATIO_WINDOW_MS)
+							+ ((type == IDLE_TYPE_SO3) ? last_idle_time : 0);
+			ratio->value_so = div_s64((IDLE_RATIO_WINDOW_MS - interval) *
+							last_ratio_so, IDLE_RATIO_WINDOW_MS)
+							+ ((type == IDLE_TYPE_SO) ? last_idle_time : 0);
+#endif
 		}
 #if 0
-		idle_prof_err("XXIDLE %llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu, %d\n",
+		idle_prof_pr_notice("XXIDLE %llu, %llu, %llu, %llu, %llu, %llu, %llu, %llu, %d\n",
 			ratio->last_end_ts, ratio->start_ts, ratio->end_ts,
 			ratio->value, ratio->value_dp, ratio->value_so3, ratio->value_so, last_ratio, type);
 #endif
@@ -296,6 +328,7 @@ static void mtk_idle_dump_cnt(int type)
 	bool enter_idle = false;
 	unsigned long idle_cnt;
 	int i;
+	unsigned long total_cnt = 0;
 
 	p_idle = &idle_prof[type].block;
 
@@ -314,11 +347,12 @@ static void mtk_idle_dump_cnt(int type)
 			idle_buf_append(buf, "[%d] = %lu, ", i, idle_cnt);
 			enter_idle = true;
 		}
+		total_cnt += idle_cnt;
 		p_idle->last_cnt[i] = p_idle->cnt[i];
 	}
 
 	if (enter_idle)
-		append_log("%s --- ", get_idle_buf(buf));
+		append_log("%s Total = %lu --- ", get_idle_buf(buf), total_cnt);
 	else
 		append_log("No enter --- ");
 }
@@ -355,9 +389,10 @@ void mtk_idle_dump_cnt_in_interval(void)
 	mtk_idle_dump_cnt(IDLE_TYPE_DP);
 	mtk_idle_dump_cnt(IDLE_TYPE_SO3);
 	mtk_idle_dump_cnt(IDLE_TYPE_SO);
+	mtk_idle_dump_cnt(IDLE_TYPE_MCSO);
 
 	/* dump log */
-	idle_prof_warn("%s\n", get_log());
+	idle_prof_pr_notice("%s\n", get_log());
 
 	/* dump idle ratio */
 	if (idle_ratio_en) {
@@ -371,7 +406,7 @@ void mtk_idle_dump_cnt_in_interval(void)
 			idle_prof[i].ratio.value = 0;
 		}
 		append_log("--- (ms)\n");
-		idle_prof_warn("%s\n", get_log());
+		idle_prof_pr_notice("%s\n", get_log());
 		idle_ratio_profile_start_time = idle_get_current_time_ms();
 	}
 
@@ -421,29 +456,32 @@ bool mtk_idle_select_state(int type, int reason)
 
 	if (dump_block_info) {
 		/* xxidle, rgidle count */
-		reset_log();
+		reset_idle_buf(idle_state_log);
 
-		append_log("CNT(%s,rgidle): ", p_idle->name);
+		idle_buf_append(idle_state_log, "CNT(%s,rgidle): ", p_idle->name);
 		for (i = 0; i < nr_cpu_ids; i++)
-			append_log("[%d] = (%lu,%lu), ", i, p_idle->cnt[i], idle_prof[IDLE_TYPE_RG].block.cnt[i]);
-		idle_prof_warn("%s\n", get_log());
+			idle_buf_append(idle_state_log, "[%d] = (%lu,%lu), ",
+				i, p_idle->cnt[i], idle_prof[IDLE_TYPE_RG].block.cnt[i]);
+		idle_prof_pr_notice("%s\n", get_idle_buf(idle_state_log));
 
 		/* block category */
-		reset_log();
+		reset_idle_buf(idle_state_log);
 
-		append_log("%s_block_cnt: ", p_idle->name);
+		idle_buf_append(idle_state_log, "%s_block_cnt: ", p_idle->name);
 		for (i = 0; i < NR_REASONS; i++)
-			append_log("[%s] = %lu, ", mtk_get_reason_name(i), p_idle->block_cnt[i]);
-		idle_prof_warn("%s\n", get_log());
+			idle_buf_append(idle_state_log, "[%s] = %lu, ", mtk_get_reason_name(i), p_idle->block_cnt[i]);
+		idle_prof_pr_notice("%s\n", get_idle_buf(idle_state_log));
 
-		reset_log();
+		reset_idle_buf(idle_state_log);
 
-		append_log("%s_block_mask: ", p_idle->name);
+		idle_buf_append(idle_state_log, "%s_block_mask: ", p_idle->name);
 		for (i = 0; i < NR_GRPS; i++)
-			append_log("0x%08x, ", p_idle->block_mask[i]);
-		idle_prof_warn("%s\n", get_log());
+			idle_buf_append(idle_state_log, "0x%08x, ", p_idle->block_mask[i]);
+		idle_prof_pr_notice("%s\n", get_idle_buf(idle_state_log));
 
 		memset(p_idle->block_cnt, 0, NR_REASONS * sizeof(p_idle->block_cnt[0]));
+
+		spm_resource_req_block_dump();
 	}
 	p_idle->block_cnt[reason]++;
 	return false;
@@ -465,7 +503,7 @@ void mtk_idle_block_setting(int type, unsigned long *cnt, unsigned long *block_c
 	if (cnt && block_cnt && block_mask)
 		p_idle->init = true;
 	else
-		idle_prof_err("IDLE BLOCKING INFO SETTING FAIL (type:%d)\n", type);
+		idle_prof_pr_err("IDLE BLOCKING INFO SETTING FAIL (type:%d)\n", type);
 }
 
 void mtk_idle_recent_ratio_get(int *window_length_ms, struct mtk_idle_recent_ratio *ratio)
@@ -498,3 +536,74 @@ void mtk_idle_twam_init(void)
 	idle_twam.event = 29;
 }
 
+static bool profile_latency_enabled;
+void mtk_idle_latency_profile_enable(bool enable)
+{
+	profile_latency_enabled = enable;
+}
+
+bool mtk_idle_latency_profile_is_on(void)
+{
+	return profile_latency_enabled;
+}
+
+static unsigned int idle_profile[NR_TYPES][NR_PIDX];
+void mtk_idle_latency_profile(unsigned int idle_type, int idx)
+{
+	unsigned int cur_count = 0;
+	unsigned int *data;
+
+	data = &idle_profile[idle_type][0];
+
+	cur_count = lower_32_bits(sched_clock());
+
+	if (idx % 2 == 0)
+		data[idx/2] = cur_count;
+	else
+		data[idx/2] = cur_count - data[idx/2];
+}
+
+static char plog[256] = { 0 };
+#define log(fmt, args...) \
+		(p += scnprintf(p, sizeof(plog) - strlen(plog), fmt, ##args))
+
+#define PROFILE_LATENCY_NUMBER	(200)
+struct idle_profile_data {
+	unsigned long total[3];
+	unsigned int count;
+};
+
+static struct idle_profile_data g_pdata[NR_TYPES];
+
+void mtk_idle_latency_profile_result(unsigned int idle_type)
+{
+	unsigned int i;
+	char *p = plog;
+	unsigned int *data;
+	struct idle_profile_data *pdata;
+
+	data = &idle_profile[idle_type][0];
+	pdata  = &g_pdata[idle_type];
+
+	log("%s (%u/%u),", mtk_get_idle_name(idle_type),
+		mt_cpufreq_get_cur_freq(0), mt_cpufreq_get_cur_freq(1));
+
+	for (i = 0; i < NR_PIDX; i++)
+		log("%u%s", data[i], (i == NR_PIDX - 1) ? "":",");
+
+	if (pdata->count < PROFILE_LATENCY_NUMBER) {
+		pdata->total[0] += (data[0]);
+		pdata->total[1] += (data[1]);
+		pdata->total[2] += (data[2]);
+		pdata->count++;
+	} else {
+		idle_prof_pr_notice("avg %s: %u, %u, %u\n", mtk_get_idle_name(idle_type),
+			(unsigned int)pdata->total[0]/PROFILE_LATENCY_NUMBER,
+			(unsigned int)pdata->total[1]/PROFILE_LATENCY_NUMBER,
+			(unsigned int)pdata->total[2]/PROFILE_LATENCY_NUMBER);
+		pdata->count = 0;
+		pdata->total[0] = pdata->total[1] = pdata->total[2] = 0;
+	}
+
+	idle_prof_pr_notice("%s\n", plog);
+}

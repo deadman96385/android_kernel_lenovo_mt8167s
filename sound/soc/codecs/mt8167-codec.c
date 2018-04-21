@@ -24,19 +24,12 @@
 #include "mt8167-codec.h"
 #include "mt8167-codec-utils.h"
 
-#ifdef CONFIG_MTK_SPEAKER
-#include "mt6392-codec.h"
-#endif
-
 #define HP_CALI_ITEMS    (HP_CALI_NUMS * HP_PGA_GAIN_NUMS)
 #define DMIC_PHASE_NUM   (8)
 
 enum regmap_module_id {
 	REGMAP_AFE = 0,
 	REGMAP_APMIXEDSYS,
-#ifdef CONFIG_MTK_SPEAKER
-	REGMAP_PWRAP,
-#endif
 	REGMAP_NUMS,
 };
 
@@ -79,9 +72,6 @@ enum aif_tx_mux_id {
 };
 
 struct mt8167_codec_priv {
-#ifdef CONFIG_MTK_SPEAKER
-	struct mt6392_codec_priv mt6392_data;
-#endif
 	struct snd_soc_codec *codec;
 	struct regmap *regmap;
 	struct regmap *regmap_modules[REGMAP_NUMS];
@@ -249,14 +239,14 @@ static struct snd_soc_dai_driver mt8167_codec_dai = {
 	.name = "mt8167-codec-dai",
 	.ops = &mt8167_codec_aif_dai_ops,
 	.playback = {
-		.stream_name = "Playback",
+		.stream_name = "MT8167 Playback",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = MT8167_CODEC_DL_RATES,
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
 	},
 	.capture = {
-		.stream_name = "Capture",
+		.stream_name = "MT8167 Capture",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = MT8167_CODEC_UL_RATES,
@@ -1491,10 +1481,12 @@ static const struct snd_kcontrol_new mt8167_codec_sdm_tone_gen_ctrl =
 
 static const struct snd_soc_dapm_widget mt8167_codec_dapm_widgets[] = {
 	/* stream domain */
-	SND_SOC_DAPM_AIF_OUT_E("AIF TX", "Capture", 0, SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_AIF_OUT_E("AIF TX", "MT8167 Capture", 0,
+			SND_SOC_NOPM, 0, 0,
 			mt8167_codec_aif_tx_event,
 			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
-	SND_SOC_DAPM_AIF_IN_E("AIF RX", "Playback", 0, SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_AIF_IN_E("AIF RX", "MT8167 Playback", 0,
+			SND_SOC_NOPM, 0, 0,
 			mt8167_codec_aif_rx_event,
 			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
 	SND_SOC_DAPM_ADC("Left ADC", NULL, AUDIO_CODEC_CON00, 23, 0),
@@ -1751,16 +1743,6 @@ static bool reg_is_in_apmixedsys(unsigned int reg)
 		return false;
 }
 
-#ifdef CONFIG_MTK_SPEAKER
-static bool reg_is_in_pmic(unsigned int reg)
-{
-	if (reg & PMIC_OFFSET)
-		return true;
-	else
-		return false;
-}
-#endif
-
 /* regmap functions */
 static int codec_reg_read(void *context,
 		unsigned int reg, unsigned int *val)
@@ -1774,14 +1756,7 @@ static int codec_reg_read(void *context,
 	} else if (reg_is_in_apmixedsys(reg)) {
 		id = REGMAP_APMIXEDSYS;
 		offset = APMIXED_OFFSET;
-	}
-#ifdef CONFIG_MTK_SPEAKER
-	else if (reg_is_in_pmic(reg)) {
-		id = REGMAP_PWRAP;
-		offset = PMIC_OFFSET;
-	}
-#endif
-	else
+	} else
 		return -1;
 
 	return module_reg_read(context, reg, val,
@@ -1800,14 +1775,7 @@ static int codec_reg_write(void *context,
 	} else if (reg_is_in_apmixedsys(reg)) {
 		id = REGMAP_APMIXEDSYS;
 		offset = APMIXED_OFFSET;
-	}
-#ifdef CONFIG_MTK_SPEAKER
-	else if (reg_is_in_pmic(reg)) {
-		id = REGMAP_PWRAP;
-		offset = PMIC_OFFSET;
-	}
-#endif
-	else
+	} else
 		return -1;
 
 	return module_reg_write(context, reg, val,
@@ -1923,6 +1891,10 @@ static void mt8167_codec_init_regs_volatile(
 	/* latch phase */
 	abb_afe_con9_val |=
 		(codec_data->dmic_ch_phase[DMIC_L_CH] << 13);
+	if ((codec_data->dmic_wire_mode == DMIC_ONE_WIRE) &&
+		(codec_data->dmic_ch_phase[DMIC_R_CH] != codec_data->dmic_ch_phase[DMIC_L_CH] + 4)) {
+		codec_data->dmic_ch_phase[DMIC_R_CH] = codec_data->dmic_ch_phase[DMIC_L_CH] + 4;
+	}
 	abb_afe_con9_val |=
 		(codec_data->dmic_ch_phase[DMIC_R_CH] << 10);
 
@@ -2021,9 +1993,6 @@ static struct regmap *mt8167_codec_get_regmap_from_dt(const char *phandle_name,
 static const char * const modules_dt_regmap_str[REGMAP_NUMS] = {
 	"mediatek,afe-regmap",
 	"mediatek,apmixedsys-regmap",
-#ifdef CONFIG_MTK_SPEAKER
-	"mediatek,pwrap-regmap",
-#endif
 };
 
 static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
@@ -2039,14 +2008,14 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 		if (!codec_data->regmap_modules[i]) {
 			dev_err(dev, "%s failed to get %s\n",
 				__func__, modules_dt_regmap_str[i]);
+			devm_kfree(dev, codec_data);
 			ret = -EPROBE_DEFER;
 			return ret;
 		}
 	}
 
-	ret = of_property_read_u32(dev->of_node, "mediatek,dmic-wire-mode",
-				&codec_data->dmic_wire_mode);
-	if (ret) {
+	if (of_property_read_u32(dev->of_node, "mediatek,dmic-wire-mode",
+				&codec_data->dmic_wire_mode)) {
 		dev_warn(dev, "%s fail to read dmic-wire-mode in node %s\n",
 			__func__, dev->of_node->full_name);
 		codec_data->dmic_wire_mode = DMIC_ONE_WIRE;
@@ -2073,9 +2042,8 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 		(codec_data->dmic_rate_mode != DMIC_RATE_D3P25M))
 		codec_data->dmic_rate_mode = DMIC_RATE_D1P625M;
 
-	ret = of_property_read_u32(dev->of_node, "mediatek,headphone-cap-sel",
-				&codec_data->headphone_cap_sel);
-	if (ret) {
+	if (of_property_read_u32(dev->of_node, "mediatek,headphone-cap-sel",
+				&codec_data->headphone_cap_sel)) {
 		dev_warn(dev, "%s fail to read headphone-cap-sel in node %s\n",
 			__func__, dev->of_node->full_name);
 		codec_data->headphone_cap_sel = HP_CAP_22UF;
@@ -2086,13 +2054,12 @@ static int mt8167_codec_parse_dt(struct mt8167_codec_priv *codec_data)
 		codec_data->headphone_cap_sel = HP_CAP_22UF;
 	}
 
-	ret = of_property_read_u32(dev->of_node,
+	if (of_property_read_u32(dev->of_node,
 				   "mediatek,micbias0-settle-time-us",
-				   &codec_data->micbias0_settle_time_us);
-	if (ret)
+				   &codec_data->micbias0_settle_time_us))
 		codec_data->micbias0_settle_time_us = 0;
 
-	return 0;
+	return ret;
 }
 
 static int mt8167_codec_probe(struct snd_soc_codec *codec)
@@ -2125,11 +2092,6 @@ static int mt8167_codec_probe(struct snd_soc_codec *codec)
 			S_IFREG | S_IRUGO,
 			NULL, codec_data, &mt8167_codec_debug_ops);
 #endif
-#ifdef CONFIG_MTK_SPEAKER
-	ret = mt6392_codec_probe(codec);
-	if (ret < 0)
-		clk_disable_unprepare(codec_data->clk);
-#endif
 	return ret;
 }
 
@@ -2140,9 +2102,6 @@ static int mt8167_codec_remove(struct snd_soc_codec *codec)
 	clk_disable_unprepare(codec_data->clk);
 #ifdef CONFIG_DEBUG_FS
 	debugfs_remove(codec_data->debugfs);
-#endif
-#ifdef CONFIG_MTK_SPEAKER
-	mt6392_codec_remove(codec);
 #endif
 	return 0;
 }

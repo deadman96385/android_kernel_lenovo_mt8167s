@@ -48,7 +48,7 @@ extern void usb11_exit(void);
 extern void enable_mcu_clock(bool enable);
 extern void enable_phy_clock(bool enable);
 extern struct clk *icusb_clk;
-extern struct clk *usb_clk;
+/*extern struct clk *usb_clk;*/
 #ifdef CONFIG_OF
 extern struct musbfsh *musbfsh_Device;
 #endif
@@ -99,6 +99,9 @@ extern struct musbfsh *musbfsh_Device;
 #define USB11PHY_READ8(offset)          __raw_readb((void __iomem *)(musbfsh_Device->phy_reg_base + 0x900 + (offset)))
 #define USB11PHY_WRITE8(offset, value)  \
 	__raw_writeb(value, (void __iomem *)(musbfsh_Device->phy_reg_base + 0x900 + (offset)))
+#define USB11PHY_WRITE32(offset, value)  \
+		__raw_writel(value, (void __iomem *)(musbfsh_Device->phy_reg_base + 0x900 + (offset)))
+
 #define USB11PHY_SET8(offset, mask)     USB11PHY_WRITE8((offset), USB11PHY_READ8(offset) | (mask))
 #define USB11PHY_CLR8(offset, mask)     USB11PHY_WRITE8((offset), USB11PHY_READ8(offset) & (~(mask)))
 #else

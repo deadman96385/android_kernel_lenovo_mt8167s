@@ -30,8 +30,8 @@ extern void mt_usb_check_reconnect(void);
 extern void musb_id_pin_sw_work(bool host_mode);
 #endif
 #ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-extern void mt_usb_clock_prepare(void);
-extern void mt_usb_clock_unprepare(void);
+extern void mt_usb_clock_prepare(struct musb *musb);
+extern void mt_usb_clock_unprepare(struct musb *musb);
 #endif
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH
@@ -76,7 +76,11 @@ struct mt_usb_glue {
 	struct platform_device	*musb;
 };
 
-extern void wake_up_bat(void);
+#define glue_to_musb(g)         platform_get_drvdata(g->musb)
+
+/* typedef unsigned int kal_uint32; */
+#define kal_uint32 unsigned int
+
 extern enum CHARGER_TYPE mt_charger_type_detection(void);
 extern bool upmu_is_chr_det(void);
 extern kal_uint32 upmu_get_rgs_chrdet(void);
@@ -92,12 +96,11 @@ enum CABLE_MODE {
 };
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH
-typedef enum {
+enum USB_PORT_MODE {
 	PORT_MODE_USB = 0,
 	PORT_MODE_UART,
-
 	PORT_MODE_MAX
-} USB_PORT_MODE;
+};
 
 extern u32 usb_port_mode_temp;
 extern void mtk_uart_usb_rx_sel(unsigned int uart_port, unsigned int enable);

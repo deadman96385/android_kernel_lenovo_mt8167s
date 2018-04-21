@@ -15,14 +15,22 @@
 #define __GED_KPI_H__
 
 #include "ged_type.h"
+#include "eas_controller.h"
+#include <linux/sched.h>
+#include <linux/cpufreq.h>
+#include <linux/topology.h>
 
+GED_ERROR ged_kpi_dequeue_buffer_ts(int pid,
+								u64 ullWdnd,
+								int i32FrameID,
+								int fence_fd,
+								int isSF);
 GED_ERROR ged_kpi_queue_buffer_ts(int pid,
-								unsigned long long ullWdnd,
+								u64 ullWdnd,
 								int i32FrameID,
 								int fence,
-								int QedBuffer_length,
-								int isSF);
-GED_ERROR ged_kpi_acquire_buffer_ts(int pid, unsigned long long ullWdnd, int i32FrameID);
+								int QedBuffer_length);
+GED_ERROR ged_kpi_acquire_buffer_ts(int pid, u64 ullWdnd, int i32FrameID);
 GED_ERROR ged_kpi_sw_vsync(void);
 GED_ERROR ged_kpi_hw_vsync(void);
 int ged_kpi_get_uncompleted_count(void);
@@ -46,7 +54,12 @@ bool ged_kpi_set_cpu_remained_time(long long t_cpu_remained, int QedBuffer_lengt
 bool ged_kpi_set_gpu_dvfs_hint(int t_gpu_target, int t_gpu_cur);
 void ged_kpi_set_game_hint(int mode);
 unsigned int ged_kpi_enabled(void);
+void ged_kpi_set_target_FPS(u64 ulID, int target_FPS);
 
-extern int boost_value_for_GED_idx(int group_idx, int boost_value);
 extern int linear_real_boost(int linear_boost);
+/* extern unsigned long cpufreq_scale_freq_capacity(struct sched_domain *sd, int cpu); */
+extern unsigned long arch_scale_get_max_freq(int cpu);
+#ifdef GED_ENABLE_FB_DVFS
+extern spinlock_t gsGpuUtilLock;
+#endif
 #endif

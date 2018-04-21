@@ -37,7 +37,7 @@
 
 #define MRDUMP_ENABLE_COOKIE 0x590d2ba3
 
-#define MRDUMP_GO_DUMP "MRDUMP06"
+#define MRDUMP_GO_DUMP "MRDUMP07"
 
 #define KSYM_32        1
 #define KSYM_64        2
@@ -74,14 +74,20 @@ struct mrdump_ksyms_param {
 } __packed;
 
 struct mrdump_machdesc {
-	uint32_t crc;
-
 	uint32_t nr_cpus;
 
 	uint64_t page_offset;
 	uint64_t high_memory;
 
 	uint64_t kimage_vaddr;
+	uint64_t kimage_init_begin;
+	uint64_t kimage_init_end;
+	uint64_t kimage_stext;
+	uint64_t kimage_etext;
+	uint64_t kimage_srodata;
+	uint64_t kimage_erodata;
+	uint64_t kimage_sdata;
+	uint64_t kimage_edata;
 
 	uint64_t vmalloc_start;
 	uint64_t vmalloc_end;
@@ -103,6 +109,7 @@ struct mrdump_control_block {
 	char sig[8];
 
 	struct mrdump_machdesc machdesc;
+	uint32_t machdesc_crc;
 
 	uint32_t enabled;
 	uint32_t output_fs_lbaooo;
@@ -167,10 +174,10 @@ struct mrdump_mini_elf_header {
 	struct mrdump_mini_elf_note misc[MRDUMP_MINI_NR_MISC];
 };
 
-typedef struct mrdump_rsvmem_block {
+struct mrdump_rsvmem_block {
 	phys_addr_t start_addr;
 	phys_addr_t size;
-} mrdump_rsvmem_block_t;
+};
 
 
 #define MRDUMP_MINI_HEADER_SIZE ALIGN(sizeof(struct mrdump_mini_elf_header), PAGE_SIZE)
@@ -184,7 +191,7 @@ typedef struct mrdump_rsvmem_block {
 #endif
 
 int mrdump_init(void);
-void __mrdump_create_oops_dump(AEE_REBOOT_MODE reboot_mode, struct pt_regs *regs, const char *msg,
+void __mrdump_create_oops_dump(enum AEE_REBOOT_MODE reboot_mode, struct pt_regs *regs, const char *msg,
 			       ...);
 #if defined(CONFIG_MTK_AEE_IPANIC) || defined(CONFIG_MTK_AEE_MRDUMP)
 void mrdump_rsvmem(void);
@@ -195,20 +202,20 @@ static inline void mrdump_rsvmem(void)
 #endif
 
 #if defined(CONFIG_MTK_AEE_MRDUMP)
-void aee_kdump_reboot(AEE_REBOOT_MODE, const char *msg, ...);
+void aee_kdump_reboot(enum AEE_REBOOT_MODE, const char *msg, ...);
 #else
-static inline void aee_kdump_reboot(AEE_REBOOT_MODE reboot_mode, const char *msg, ...)
+static inline void aee_kdump_reboot(enum AEE_REBOOT_MODE reboot_mode, const char *msg, ...)
 {
 }
 #endif
 
 typedef int (*mrdump_write)(void *buf, int off, int len, int encrypt);
 #if defined(CONFIG_MTK_AEE_IPANIC)
-int mrdump_mini_create_oops_dump(AEE_REBOOT_MODE reboot_mode, mrdump_write write,
+int mrdump_mini_create_oops_dump(enum AEE_REBOOT_MODE reboot_mode, mrdump_write write,
 				 loff_t sd_offset, const char *msg, va_list ap);
 void mrdump_mini_reserve_memory(void);
 #else
-static inline int mrdump_mini_create_oops_dump(AEE_REBOOT_MODE reboot_mode, mrdump_write write,
+static inline int mrdump_mini_create_oops_dump(enum AEE_REBOOT_MODE reboot_mode, mrdump_write write,
 					       loff_t sd_offset, const char *msg, va_list ap)
 {
 	return 0;

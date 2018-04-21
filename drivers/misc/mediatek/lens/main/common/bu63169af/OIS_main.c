@@ -11,9 +11,6 @@
 * GNU General Public License for more details.
 */
 
-#ifndef OIS_MAIN_C
-#define OIS_MAIN_C
-#endif
 
 /* #define OIS_DEBUG */
 #ifdef OIS_DEBUG
@@ -25,6 +22,74 @@
 /* #include <stdio.h> */
 #include "OIS_head.h"
 
+const struct _FACT_ADJ FADJ_DEF
+= {
+	0x0200,			/* gl_CURDAT; */
+	0x0200,			/* gl_HALOFS_X; */
+	0x0200,			/* gl_HALOFS_Y; */
+	0x0000,			/* gl_HX_OFS; */
+	0x0000,			/* gl_HY_OFS; */
+	0x0080,			/* gl_PSTXOF;           RHM_HT 2013.03.21       Change order to adjust EEP ROM map */
+	0x0080,			/* gl_PSTYOF;           RHM_HT 2013.03.21       Change order to adjust EEP ROM map */
+	0x0000,			/* gl_GX_OFS; */
+	0x0000,			/* gl_GY_OFS; */
+
+	0x2000,			/* gl_KgxHG ;           RHM_HT 2013/11/25       Modified */
+	0x2000,			/* gl_KgyHG ;           RHM_HT 2013/11/25       Modified */
+	0x2000,			/* gl_KGXG  ;           RHM_HT 2013/11/25       Modified */
+	0x2000,			/* gl_KGYG  ;           RHM_HT 2013/11/25       Modified */
+	0x0200,			/* gl_SFTHAL_X;         RHM_HT 2013/11/25       Added */
+	0x0200,			/* gl_SFTHAL_Y;         RHM_HT 2013/11/25       Added */
+	0x0000,			/* gl_TMP_X_;           RHM_HT 2013/11/25       Added */
+	0x0000,			/* gl_TMP_Y_;           RHM_HT 2013/11/25       Added */
+	0x0000,			/* gl_KgxH0;            RHM_HT 2013/11/25       Added */
+	0x0000,			/* gl_KgyH0;            RHM_HT 2013/11/25       Added */
+}
+;
+
+/* FACTORY Adjusted data */
+/* These data are stored at the non-vollatile */
+/* memory inside of the CMOS sensor. */
+/* The Host ( ISP or I2C master ) read these */
+/* data from above memory and write to the OIS */
+/* controller. */
+/* --------------------------------------------- */
+struct _FACT_ADJ FADJ_MEM
+= {
+	0x0201,			/* gl_CURDAT; */
+	0x0200,			/* gl_HALOFS_X; */
+	0x0200,			/* gl_HALOFS_Y; */
+	0x0000,			/* gl_HX_OFS; */
+	0x0000,			/* gl_HY_OFS; */
+	0x0080,			/* gl_PSTXOF;           RHM_HT 2013.03.21       Change order to adjust EEP ROM map */
+	0x0080,			/* gl_PSTYOF;           RHM_HT 2013.03.21       Change order to adjust EEP ROM map */
+	0x0000,			/* gl_GX_OFS; */
+	0x0000,			/* gl_GY_OFS; */
+
+	0x2000,			/* gl_KgxHG ;           RHM_HT 2013/11/25       Modified */
+	0x2000,			/* gl_KgyHG ;           RHM_HT 2013/11/25       Modified */
+	0x2000,			/* gl_KGXG  ;           RHM_HT 2013/11/25       Modified */
+	0x2000,			/* gl_KGYG  ;           RHM_HT 2013/11/25       Modified */
+	0x0200,			/* gl_SFTHAL_X;         RHM_HT 2013/11/25       Added */
+	0x0200,			/* gl_SFTHAL_Y;         RHM_HT 2013/11/25       Added */
+	0x0000,			/* gl_TMP_X_;           RHM_HT 2013/11/25       Added */
+	0x0000,			/* gl_TMP_Y_;           RHM_HT 2013/11/25       Added */
+	0x0000,			/* gl_KgxH0;            RHM_HT 2013/11/25       Added */
+	0x0000,			/* gl_KgyH0;            RHM_HT 2013/11/25       Added */
+}
+;
+
+/* Parameters for expanding OIS range */
+/* --------------------------------------------- */
+double p_x, q_x;
+double p_y, q_y;
+short int zero_X;
+short int zero_Y;
+short int PREOUT_X_P, PREOUT_X_N;
+short int PREOUT_Y_P, PREOUT_Y_N;
+double alfa_X, beta_X;
+double alfa_Y, beta_Y;
+
 #ifdef OIS_DEBUG
 #define OIS_DRVNAME "BU63165AF_OIS"
 #define LOG_INF(format, args...) pr_info(OIS_DRVNAME " [%s] " format, __func__, ##args)
@@ -32,7 +97,7 @@
 
 /* GLOBAL variable ( Upper Level Host Set this Global variables ) */
 /* ////////////////////////////////////////////////////////////////////////////// */
-OIS_UWORD BOOT_MODE = _FACTORY_;
+unsigned short int BOOT_MODE = _FACTORY_;
 
 #define	AF_REQ			0x8000
 #define	SCENE_REQ_ON	0x4000
@@ -40,15 +105,15 @@ OIS_UWORD BOOT_MODE = _FACTORY_;
 #define	POWERDOWN		0x1000
 #define	INITIAL_VAL		0x0000
 
-OIS_UWORD OIS_SCENE = _SCENE_D_A_Y_1;
-OIS_UWORD OIS_REQUEST = INITIAL_VAL;	/* OIS control register. */
+unsigned short int OIS_SCENE = _SCENE_D_A_Y_1;
+unsigned short int OIS_REQUEST = INITIAL_VAL;	/* OIS control register. */
 
-/* ==> RHM_HT 2013.03.04        Change type (OIS_UWORD -> double) */
+/* ==> RHM_HT 2013.03.04        Change type (unsigned short int -> double) */
 double OIS_PIXEL[2];		/* Just Only use for factory adjustment. */
 /* <== RHM_HT 2013.03.04 */
-ADJ_STS OIS_MAIN_STS = ADJ_ERR;
+short int OIS_MAIN_STS = ADJ_ERR;
 
-static _FACT_ADJ fadj;
+static struct _FACT_ADJ fadj;
 
 void setOISMode(int Disable)
 {

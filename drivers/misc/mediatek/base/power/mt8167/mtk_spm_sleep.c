@@ -73,7 +73,7 @@ struct wake_status spm_wakesta;	/* record last wakesta */
 
 #define WAKE_SRC_FOR_SUSPEND \
 	(WAKE_SRC_KP | WAKE_SRC_EINT |  WAKE_SRC_CONN_WDT  | WAKE_SRC_CONN2AP | \
-	WAKE_SRC_USB_CD | WAKE_SRC_USB_PDN | WAKE_SRC_ETH | WAKE_SRC_IRRX | \
+	WAKE_SRC_USB_CD | WAKE_SRC_USB_PDN | WAKE_SRC_ETH |\
 	WAKE_SRC_SYSPWREQ)
 
 #define spm_is_wakesrc_invalid(wakesrc)     (!!((u32)(wakesrc) & 0xFC7F3A9B))
@@ -267,9 +267,9 @@ static void spm_clean_after_wakeup(void)
 	__spm_clean_after_wakeup();
 }
 
-static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct pcm_desc *pcmdesc)
+static unsigned int spm_output_wake_reason(struct wake_status *wakesta, struct pcm_desc *pcmdesc)
 {
-	wake_reason_t wr;
+	unsigned int wr;
 
 	wr = __spm_output_wake_reason(wakesta, pcmdesc, true);
 
@@ -299,7 +299,7 @@ static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct 
 }
 
 #if SPM_PWAKE_EN
-static u32 spm_get_wake_period(int pwake_time, wake_reason_t last_wr)
+static u32 spm_get_wake_period(int pwake_time, unsigned int last_wr)
 {
 	int period = SPM_WAKE_PERIOD;
 #if 1
@@ -359,15 +359,6 @@ u32 spm_get_sleep_wakesrc(void)
 	return __spm_suspend.pwrctrl->wake_src;
 }
 
-void spm_set_sleep_26m_req(bool req)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&__spm_lock, flags);
-	__spm_suspend.pwrctrl->pcm_f26m_req = req;
-	spin_unlock_irqrestore(&__spm_lock, flags);
-}
-
 #if SPM_AEE_RR_REC
 void spm_suspend_aee_init(void)
 {
@@ -375,7 +366,7 @@ void spm_suspend_aee_init(void)
 }
 #endif
 
-wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
+unsigned int spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 {
 	u32 sec = 2;
 	u32 capcode;
@@ -384,7 +375,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	struct mtk_irq_mask mask;
 	struct irq_desc *desc = irq_to_desc(spm_irq_0);
 /*	struct wd_api *wd_api; */
-	static wake_reason_t last_wr = WR_NONE;
+	static unsigned int last_wr = WR_NONE;
 	struct pcm_desc *pcmdesc;
 	struct pwr_ctrl *pwrctrl;
 

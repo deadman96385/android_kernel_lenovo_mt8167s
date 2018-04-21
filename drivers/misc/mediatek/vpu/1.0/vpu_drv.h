@@ -21,7 +21,8 @@
 typedef uint8_t vpu_id_t;
 
 /* the last byte of string must be '/0' */
-typedef char vpu_name_t[32];
+/*typedef char vpu_name_t[32];*/
+#define VPU_NAME_SIZE 32
 
 /**
  * Documentation index:
@@ -99,9 +100,16 @@ typedef char vpu_name_t[32];
  *     struct vpu_request req;
  *     ioctl(fd, VPU_IOCTL_DEQUE_REQUEST, req);
  *
- * - VPU_IOCTL_FLUSH_REQUEST: flush all running request, and return failure if not fishied
+ * - VPU_IOCTL_FLUSH_REQUEST: flush all running request, and return failure if not finished
  *
  *     ioctl(fd, VPU_IOCTL_FLUSH_REQUEST, 0);
+ *
+ * - VPU_IOCTL_SET_POWER: request power mode and the performance.
+ *
+ *     struct vpu_power power;
+ *     power.mode = VPU_POWER_MODE_DYNAMIC;
+ *     power.opp = VPU_POWER_OPP_UNREQUEST;
+ *     ioctl(fd, VPU_IOCTL_SET_POWER, power);
  *
  */
 
@@ -155,7 +163,7 @@ struct vpu_prop_desc {
 	uint8_t access;    /* directional data exchange */
 	uint32_t offset;   /* offset = previous offset + previous size */
 	uint32_t count;    /* size = sizeof(type) x count */
-	vpu_name_t name;
+	char name[VPU_NAME_SIZE];
 };
 
 /*---------------------------------------------------------------------------*/
@@ -197,7 +205,7 @@ struct vpu_port {
 	vpu_id_t id;
 	uint8_t usage;
 	uint8_t dir;
-	vpu_name_t name;
+	char name[VPU_NAME_SIZE];
 };
 
 /*---------------------------------------------------------------------------*/
@@ -213,7 +221,7 @@ struct vpu_algo {
 	uint32_t bin_length;
 	uint64_t info_ptr;       /* the pointer to info data buffer */
 	uint64_t bin_ptr;        /* mva of algo bin, which is accessible by VPU */
-	vpu_name_t name;
+	char name[VPU_NAME_SIZE];
 	struct vpu_prop_desc info_descs[VPU_MAX_NUM_PROPS];
 	struct vpu_prop_desc sett_descs[VPU_MAX_NUM_PROPS];
 	struct vpu_port ports[VPU_MAX_NUM_PORTS];
@@ -236,9 +244,28 @@ struct vpu_reg_values {
 /*---------------------------------------------------------------------------*/
 /*  VPU Power                                                                */
 /*---------------------------------------------------------------------------*/
+
+/*
+ * Provide two power modes:
+ * - dynamic: power-saving mode, it's on request to power on device.
+ * - on: power on immediately
+ */
+enum vpu_power_mode {
+	VPU_POWER_MODE_DYNAMIC,
+	VPU_POWER_MODE_ON,
+};
+
+/*
+ * Provide a set of OPPs(operation performance point)
+ * The default opp is at the minimun performance, and users could request the performance.
+ */
+enum vpu_power_opp {
+	VPU_POWER_OPP_UNREQUEST = 0xFF,
+};
+
 struct vpu_power {
-	uint32_t freq;
-	uint32_t power;
+	uint8_t mode;
+	uint8_t opp;
 };
 
 
@@ -303,9 +330,5 @@ struct vpu_request {
 #define VPU_IOCTL_LOAD_ALG          _IOW(VPU_MAGICNO,   7, int)
 #define VPU_IOCTL_REG_WRITE         _IOW(VPU_MAGICNO,   8, int)
 #define VPU_IOCTL_REG_READ          _IOWR(VPU_MAGICNO,  9, int)
-
-int vpu_set_power(struct vpu_power *power);
-
-int vpu_write_register(struct vpu_reg_values regs);
 
 #endif

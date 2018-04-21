@@ -125,6 +125,8 @@ struct eem_det {
 
 	unsigned int disabled; /* Disabled by error or sysfs */
 	unsigned char set_volt_to_upower; /* only when init2, eem need to set volt to upower */
+
+	unsigned int pi_efuse;
 };
 
 struct eem_devinfo {
@@ -239,7 +241,7 @@ extern unsigned int freq[NR_FREQ];
 extern unsigned int eem_vcore[VCORE_NR_FREQ];
 extern unsigned int eem_vcore_index[VCORE_NR_FREQ];
 extern unsigned char vcore_freq[NR_FREQ];
-extern unsigned int vcore_opp[VCORE_NR_FREQ][4];
+extern unsigned int (*vcore_opp)[VCORE_NR_FREQ];
 
 /* for setting pmic pwm mode and auto mode */
 extern struct regulator *eem_regulator_proc1;

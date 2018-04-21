@@ -236,7 +236,7 @@ EXPORT_SYMBOL(blk_start_queue_async);
  **/
 void blk_start_queue(struct request_queue *q)
 {
-	WARN_ON(!irqs_disabled());
+	WARN_ON(!in_interrupt() && !irqs_disabled());
 
 	queue_flag_clear(QUEUE_FLAG_STOPPED, q);
 	__blk_run_queue(q);
@@ -1394,6 +1394,13 @@ void blk_requeue_request(struct request_queue *q, struct request *rq)
 	if (rq->cmd_flags & REQ_QUEUED)
 		blk_queue_end_tag(q, rq);
 
+	/* MTK Patch:
+	 *
+	 * Remove REQ_DEV_STARTED to make sure future possible abort handler
+	 * works correctly.
+	 */
+	rq->cmd_flags &= ~REQ_DEV_STARTED;
+
 	BUG_ON(blk_queued_rq(rq));
 
 	elv_requeue_request(q, rq);
@@ -2024,7 +2031,14 @@ end_io:
  */
 blk_qc_t generic_make_request(struct bio *bio)
 {
-	struct bio_list bio_list_on_stack;
+	/*
+	 * bio_list_on_stack[0] contains bios submitted by the current
+	 * make_request_fn.
+	 * bio_list_on_stack[1] contains bios that were submitted before
+	 * the current make_request_fn, but that haven't been processed
+	 * yet.
+	 */
+	struct bio_list bio_list_on_stack[2];
 	blk_qc_t ret = BLK_QC_T_NONE;
 
 	if (!generic_make_request_checks(bio))
@@ -2041,7 +2055,7 @@ blk_qc_t generic_make_request(struct bio *bio)
 	 * should be added at the tail
 	 */
 	if (current->bio_list) {
-		bio_list_add(current->bio_list, bio);
+		bio_list_add(&current->bio_list[0], bio);
 		goto out;
 	}
 
@@ -2060,24 +2074,39 @@ blk_qc_t generic_make_request(struct bio *bio)
 	 * bio_list, and call into ->make_request() again.
 	 */
 	BUG_ON(bio->bi_next);
-	bio_list_init(&bio_list_on_stack);
-	current->bio_list = &bio_list_on_stack;
+	bio_list_init(&bio_list_on_stack[0]);
+	current->bio_list = bio_list_on_stack;
 	do {
 		struct request_queue *q = bdev_get_queue(bio->bi_bdev);
 
 		if (likely(blk_queue_enter(q, __GFP_DIRECT_RECLAIM) == 0)) {
+			struct bio_list lower, same;
+
+			/* Create a fresh bio_list for all subordinate requests */
+			bio_list_on_stack[1] = bio_list_on_stack[0];
+			bio_list_init(&bio_list_on_stack[0]);
 
 			ret = q->make_request_fn(q, bio);
 
 			blk_queue_exit(q);
-
-			bio = bio_list_pop(current->bio_list);
+			/* sort new bios into those for a lower level
+			 * and those for the same level
+			 */
+			bio_list_init(&lower);
+			bio_list_init(&same);
+			while ((bio = bio_list_pop(&bio_list_on_stack[0])) != NULL)
+				if (q == bdev_get_queue(bio->bi_bdev))
+					bio_list_add(&same, bio);
+				else
+					bio_list_add(&lower, bio);
+			/* now assemble so we handle the lowest level first */
+			bio_list_merge(&bio_list_on_stack[0], &lower);
+			bio_list_merge(&bio_list_on_stack[0], &same);
+			bio_list_merge(&bio_list_on_stack[0], &bio_list_on_stack[1]);
 		} else {
-			struct bio *bio_next = bio_list_pop(current->bio_list);
-
 			bio_io_error(bio);
-			bio = bio_next;
 		}
+		bio = bio_list_pop(&bio_list_on_stack[0]);
 	} while (bio);
 	current->bio_list = NULL; /* deactivate */
 
@@ -2365,6 +2394,56 @@ void blk_account_io_start(struct request *rq, bool new_io)
 
 	part_stat_unlock();
 }
+#ifdef CONFIG_MTK_BLK_RW_PROFILING
+u32 read_counter[RW_ARRAY_SIZE] = {0};
+u32 write_counter[RW_ARRAY_SIZE] = {0};
+void mtk_trace_block_rq(struct request_queue *q, struct request *rq)
+{
+	/* Record 4KB/8KB/.../512KB/others, currently, others all allocate to array[128] */
+	if (blk_rq_bytes(rq) < FS_RW_UNIT)
+		return;
+	/* Not count discard/unmap cmds */
+	if (rq->cmd_flags & REQ_DISCARD)
+		return;
+
+	if (rq_data_dir(rq) == WRITE) {
+		if (blk_rq_bytes(rq) > CHECK_SIZE_LIMIT)
+			write_counter[CHECK_SIZE_LIMIT/FS_RW_UNIT]++;
+		else
+			write_counter[(blk_rq_bytes(rq)/FS_RW_UNIT) - 1]++;
+	} else if (rq_data_dir(rq) == READ) {
+		if (blk_rq_bytes(rq) > CHECK_SIZE_LIMIT)
+			read_counter[CHECK_SIZE_LIMIT/FS_RW_UNIT]++;
+		else
+			read_counter[(blk_rq_bytes(rq)/FS_RW_UNIT) - 1]++;
+	}
+
+}
+void mtk_trace_block_rq_get_rw_counter(u32 *temp_buf, enum block_rw_enum operation)
+{
+	int i = 0;
+
+	for (i = 0; i < RW_ARRAY_SIZE; i++) {
+		if (operation == blockread)
+			temp_buf[i] = read_counter[i];
+		else if (operation == blockwrite)
+			temp_buf[i] = write_counter[i];
+		else if (operation == blockrw)
+			temp_buf[i] = read_counter[i] + write_counter[i];
+	}
+}
+
+int mtk_trace_block_rq_get_rw_counter_clr(void)
+{
+	int i;
+
+	for (i = 0; i < RW_ARRAY_SIZE; i++) {
+		write_counter[i] = 0;
+		read_counter[i] = 0;
+	}
+	return 0;
+}
+#endif
 
 /**
  * blk_peek_request - peek at the top of a request queue
@@ -2433,6 +2512,7 @@ struct request *blk_peek_request(struct request_queue *q)
 			break;
 
 		ret = q->prep_rq_fn(q, rq);
+
 		if (ret == BLKPREP_OK) {
 			break;
 		} else if (ret == BLKPREP_DEFER) {
@@ -2466,6 +2546,11 @@ struct request *blk_peek_request(struct request_queue *q)
 			break;
 		}
 	}
+
+#ifdef CONFIG_MTK_BLK_RW_PROFILING
+	if (rq)
+		mtk_trace_block_rq(q, rq);
+#endif
 
 	return rq;
 }

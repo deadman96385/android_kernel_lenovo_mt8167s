@@ -90,7 +90,6 @@ extern int musbfsh_host_dynamic_fifo_usage_msk;
 
 extern struct clk *usbpll_clk;
 extern struct clk *usbmcu_clk;
-extern struct clk *usb_clk;
 extern struct clk *icusb_clk;
 
 #define MT_USB1_IRQ_ID                      (105)
@@ -119,6 +118,8 @@ extern void musbfsh_host_tx(struct musbfsh *, u8);
 extern void musbfsh_host_rx(struct musbfsh *, u8);
 extern int mt_usb11_clock_prepare(void);
 extern void mt_usb11_clock_unprepare(void);
+extern void mt65xx_usb11_phy_savecurrent(void);
+extern void mt65xx_usb11_phy_recover(void);
 
 /****************************** CONSTANTS ********************************/
 
@@ -222,6 +223,7 @@ struct musbfsh_csr_regs {
 };
 
 struct musbfsh_context_registers {
+	u8 ep0_func_addr;
 	u8 power;
 	u16 intrtxe, intrrxe;
 	u8 intrusbe;
@@ -232,6 +234,7 @@ struct musbfsh_context_registers {
 	u32 otg_interfsel;
 	u32 l1_int;
 
+	int speed;	/* 2: hs, 1: fs, 0: ls */
 	struct musbfsh_csr_regs index_regs[MUSBFSH_C_NUM_EPS];
 };
 
@@ -331,6 +334,9 @@ struct musbfsh {
 	unsigned double_buffer_not_ok:1;
 
 	struct musbfsh_hdrc_config *config;
+#ifdef CONFIG_MUSBFSH_IDDIG
+	struct delayed_work id_pin_work;
+#endif
 };
 
 static inline void musbfsh_configure_ep0(struct musbfsh *musbfsh)

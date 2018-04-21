@@ -1109,11 +1109,6 @@ void hdmi_internal_power_off(void)
 		gpio_set_value(hdmi_power_control_pin, 0);
 	}
 
-	if (hdmi_clockenable == 1) {
-		HDMI_PLUG_LOG("hdmi internal power off:disable clock\n");
-		hdmi_clockenable = 0;
-		hdmi_clock_enable(false);
-	}
 	mtk_smi_larb_clock_off(0, true);
 	if (hdmi_cec_on == 0) {
 		clk_disable(hdmi_ref_clock[INFRA_SYS_CEC_26M]);
@@ -1126,6 +1121,12 @@ void hdmi_internal_power_off(void)
 	if (r_cec_timer.function)
 		del_timer_sync(&r_cec_timer);
 	memset((void *)&r_cec_timer, 0, sizeof(r_cec_timer));
+
+	if (hdmi_clockenable == 1) {
+		HDMI_PLUG_LOG("hdmi internal power off:disable clock\n");
+		hdmi_clockenable = 0;
+		hdmi_clock_enable(false);
+	}
 }
 
 /*----------------------------------------------------------------------------*/
@@ -1501,7 +1502,7 @@ static int hdmi_internal_init(void)
 
 static void vNotifyAppHdmiState(unsigned char u1hdmistate)
 {
-	HDMI_EDID_T get_info;
+	struct _HDMI_EDID_T get_info;
 
 	HDMI_PLUG_LOG("u1hdmistate = %d,%s\n", u1hdmistate, szHdmiPordStatusStr[u1hdmistate]);
 
@@ -1738,7 +1739,7 @@ void hdmi_timer_impl(void)
 		vClearHdmiCmd();
 		/* vcheckhdmiplugstate(); */
 		/* vPlugDetectService(e_hdmi_ctrl_state); */
-	} else if (hdmi_hdmiCmd == HDMI_HDCP_PROTOCAL_CMD) {
+	} else if ((hdmi_hdmiCmd == HDMI_HDCP_PROTOCAL_CMD) && (hdmi_powerenable == 1)) {
 		vClearHdmiCmd();
 		HdcpService(e_hdcp_ctrl_state);
 	}

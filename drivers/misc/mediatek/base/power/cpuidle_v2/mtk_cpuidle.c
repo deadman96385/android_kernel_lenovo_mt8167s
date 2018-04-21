@@ -30,7 +30,6 @@
 #include <mt-plat/mtk_io.h>
 #include <mt-plat/sync_write.h>
 
-#include <mtk_clkmgr.h>
 #include <mtk_cpuidle.h>
 #if defined(CONFIG_MTK_RAM_CONSOLE) || defined(CONFIG_TRUSTONIC_TEE_SUPPORT)
 #include <mt-plat/mtk_secure_api.h>
@@ -39,8 +38,8 @@
 #include <mtk_spm_misc.h>
 
 #ifdef CONFIG_MTK_RAM_CONSOLE
-static volatile void __iomem *mtk_cpuidle_aee_phys_addr;
-static volatile void __iomem *mtk_cpuidle_aee_virt_addr;
+static void __iomem *mtk_cpuidle_aee_phys_addr;
+static void __iomem *mtk_cpuidle_aee_virt_addr;
 #endif
 
 #if MTK_CPUIDLE_TIME_PROFILING
@@ -59,7 +58,7 @@ static void mtk_spm_wakeup_src_restore(void)
 	int i;
 
 	for (i = 0; i < IRQ_NR_MAX; i++) {
-		if (spm_read(SPM_WAKEUP_STA) & wake_src_irq[i])
+		if (readl_relaxed(SPM_WAKEUP_STA) & wake_src_irq[i])
 			mt_irq_set_pending(irq_nr[i]);
 	}
 }
@@ -252,15 +251,17 @@ static void mtk_platform_save_context(int cpu, int idx)
 {
 	mtk_switch_armpll(cpu, 1);
 	mtk_dbg_save_restore(cpu, 1);
+	dpm_mcsi_mtcmos_on_flow(0);
 }
 
 static void mtk_platform_restore_context(int cpu, int idx)
 {
-	if (idx > MTK_MCDI_MODE)
+	if (idx > MTK_MCDI_CLUSTER_MODE)
 		mtk_spm_wakeup_src_restore();
 
 	mtk_dbg_save_restore(cpu, 0);
 	mtk_switch_armpll(cpu, 0);
+	dpm_mcsi_mtcmos_on_flow(1);
 }
 
 int mtk_enter_idle_state(int idx)

@@ -28,7 +28,7 @@ DECLARE_ENABLE_HW_CLOCK(MUTEX_32K);
 #endif
 #undef DECLARE_ENABLE_HW_CLOCK
 
-void cmdq_dev_get_module_clock_by_name(const char *name, const char *clkName,
+void cmdq_dev_get_module_clock_by_name(const char *ref_name, const char *clkName,
 				       struct clk **clk_module);
 uint32_t cmdq_dev_enable_device_clock(bool enable, struct clk *clk_module, const char *clkName);
 bool cmdq_dev_device_clock_is_enable(struct clk *clk_module);
@@ -48,15 +48,13 @@ void cmdq_dev_enable_gce_clock(bool enable);
 bool cmdq_dev_gce_clock_is_enable(void);
 /* virtual address */
 long cmdq_dev_get_module_base_VA_GCE(void);
-long cmdq_dev_get_module_base_VA_MMSYS_CONFIG(void);
-long cmdq_dev_alloc_module_base_VA_by_name(const char *name);
+unsigned long cmdq_dev_alloc_reference_VA_by_name(const char *ref_name);
 /* Other modules information */
 void cmdq_dev_free_module_base_VA(const long VA);
-long cmdq_dev_get_APXGPT2_count(void);
 uint32_t cmdq_dev_get_mmsys_dummy_reg_offset(void);
 /* physical address */
-void cmdq_dev_get_module_PA(const char *name, int index, long *startPA, long *endPA);
-long cmdq_dev_get_module_base_PA_GCE(void);
+phys_addr_t cmdq_dev_get_reference_PA(const char *ref_name, int index);
+phys_addr_t cmdq_dev_get_module_base_PA_GCE(void);
 /* GCE event */
 void cmdq_dev_init_event_table(struct device_node *node);
 void cmdq_dev_test_dts_correctness(void);
@@ -65,10 +63,13 @@ void cmdq_dev_init(struct platform_device *pDevice);
 void cmdq_dev_deinit(void);
 /* dma_set_mask result, to show in status */
 int32_t cmdq_dev_get_dma_mask_result(void);
+u32 cmdq_dev_get_thread_count(void);
 
 struct cmdq_dts_setting {
-	uint32_t prefetch_thread_count;
-	uint32_t prefetch_size[CMDQ_MAX_THREAD_COUNT];
+	u32 prefetch_thread_count;
+	u32 *prefetch_size;
+	u32 ctl_int0;
+	u32 cpr_size;
 };
 
 /* callback when read resource from device tree */

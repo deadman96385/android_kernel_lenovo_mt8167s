@@ -10,10 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  */
-#define TRACE 0
 #include <linux/ring_buffer.h>
 #include <linux/trace_events.h>
-#include <trace.h>
 #include <linux/jiffies.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
@@ -31,11 +29,6 @@
 #include <linux/sched.h>
 #include <linux/hrtimer.h>
 #include <linux/workqueue.h>
-/*#define MET_USER_EVENT_SUPPORT*/
-#if TRACE
-#include <mt-plat/met_drv.h>
-#endif
-/*#include "core/trace.h"*/
 
 #include <linux/platform_device.h>
 #include <trace/events/sched.h>
@@ -43,36 +36,31 @@
 #include <linux/ioctl.h>
 #include "legacy_controller.h"
 #include "eas_controller.h"
-#include "mtk_unified_power.h"
+#include "fpsgo_common.h"
+#include "../perf_ioctl/perf_ioctl.h"
 
-#define DEV_MAJOR 121
-#define DEV_NAME "debug"
-#define DEV_IOCTL_FC 0xD0
-#define IOCTL_WRITE_FC _IOW(DEV_IOCTL_FC, 10, int)
-#define DEV_IOCTL_IV 0xE0
-#define IOCTL_WRITE_IV _IOW(DEV_IOCTL_IV, 10, int)
-#define DEV_IOCTLID2 0xC0
-#define IOCTL_WRITE2 _IOW(DEV_IOCTLID2, 10, int)
-#define DEV_IOCTLID3 0xF0
-#define IOCTL_WRITE3 _IOW(DEV_IOCTLID3, 10, int)
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#define HPS_LATENCY 20000000
+#define TOUCH_TIMEOUT_SEC 5
+#define RENDER_AWARE_TIMEOUT_MSEC 300
+#define MAX_THREAD 5
+#define TOUCH_BOOST_EAS 100
+#define SUPER_BOOST 100
 
-#define ID_EGL 1
-#define ID_OMR 2
+#define EAS 1
+#define LEGACY 2
 
-#define SEQ_printf(m, x...)\
-	do {\
-		if (m)\
-			seq_printf(m, x);\
-		else\
-			pr_debug(x);\
-	} while (0)
-#define TAG "[SOC FBC]"
-
-extern int boost_value_for_GED_idx(int group_idx, int boost_value);
-extern int linear_real_boost(int);
-/*extern int linear_real_boost_pid(int, int);*/
 extern unsigned int mt_cpufreq_get_freq_by_idx(int id, int idx);
-extern int update_userlimit_cpu_freq(int kicker, int num_cluster, struct ppm_limit_data *freq_limit);
-extern int update_userlimit_cpu_core(int kicker, int num_cluster, struct ppm_limit_data *core_limit);
+extern int sched_scheduler_switch(SCHED_LB_TYPE new_sched);
+extern int linear_real_boost(int);
+#ifdef CONFIG_MTK_SCHED_VIP_TASKS
+extern int vip_task_set(int pid, bool set_vip);
+#endif
 
-
+void switch_fbc(int);
+void switch_init_boost(int);
+void switch_twanted(int);
+void switch_ema(int);
+void switch_super_boost(int);
+long fbc_ioctl(unsigned int cmd, unsigned long arg);
+int init_fbc(void);

@@ -28,13 +28,14 @@
 
 #define HEX_FMT "0x%08x"
 #define SIZEOF_SNAPSHOT(g) (sizeof(struct snapshot) + sizeof(unsigned int) * (g->nr_golden_setting - 1))
-#define DEBUG_BUF_SIZE 200
+#define DEBUG_BUF_SIZE 2000
 static char buf[DEBUG_BUF_SIZE] = { 0 };
 static struct base_remap _base_remap;
+static struct pmic_manual_dump _pmic_manual_dump;
 
 static bool _is_pmic_addr(unsigned int addr)
 {
-	return (addr & 0xF0000000) ? 0 : 1;
+	return (addr >> 16) ? 0 : 1;
 }
 
 static u16 gs_pmic_read(u16 reg)
@@ -73,7 +74,7 @@ static void _golden_setting_disable(struct golden *g)
 	}
 }
 
-static void _golden_setting_set_mode(struct golden *g, print_mode mode)
+static void _golden_setting_set_mode(struct golden *g, unsigned int mode)
 {
 	g->mode = mode;
 }
@@ -448,9 +449,14 @@ static ssize_t golden_test_proc_write(struct file *file, const char __user *buff
 {
 	char *buf = _copy_from_user_for_proc(buffer, count);
 	char cmd[64];
+	struct phys_to_virt_table *table;
+	unsigned int base;
 	unsigned int addr;
 	unsigned int mask;
 	unsigned int golden_val;
+
+	if (!buf)
+		return -EINVAL;
 
 	/* set golden setting (hex mode) */
 	if (sscanf(buf, "0x%x 0x%x 0x%x", &addr, &mask, &golden_val) == 3)
@@ -487,6 +493,36 @@ static ssize_t golden_test_proc_write(struct file *file, const char __user *buff
 	/* set reg value (normal mode) */
 	else if (sscanf(buf, "set 0x%x 0x%x", &addr, &golden_val) == 2)
 		_golden_write_reg(addr, 0xFFFFFFFF, golden_val);
+	/* set to dump pmic reg value */
+	else if (sscanf(buf, "set_pmic_manual_dump 0x%x", &addr) == 1) {
+		if (_pmic_manual_dump.addr_array) {
+			if (_pmic_manual_dump.array_pos < _pmic_manual_dump.array_size) {
+				_pmic_manual_dump.addr_array[_pmic_manual_dump.array_pos++] = addr;
+				base  = (addr & (~(unsigned long)REMAP_SIZE_MASK));
+
+				if (!_is_pmic_addr(addr) &&
+				    !_is_exist_in_phys_to_virt_table(base) &&
+				    _base_remap.table) {
+
+					table = _base_remap.table;
+					table[_base_remap.table_pos].phys_base = base;
+					table[_base_remap.table_pos].virt_base
+						= ioremap_nocache(base, REMAP_SIZE_MASK + 1);
+
+					if (!table[_base_remap.table_pos].virt_base)
+						pr_info("Power_gs: ioremap_nocache(0x%x, 0x%x) return NULL\n"
+							, base, REMAP_SIZE_MASK + 1);
+
+					if (_base_remap.table_pos < _base_remap.table_size)
+						_base_remap.table_pos++;
+					else
+						pr_info("Power_gs: base_remap in maximum size, return for skipped\n");
+				}
+			} else
+				pr_info("Power_gs: pmic_manual_dump array is full\n");
+		} else
+			pr_info("Power_gs: pmic_manual_dump init fail\n");
+	}
 	/* XXX: 63 = sizeof(cmd) - 1 */
 	else if (sscanf(buf, "%63s", cmd) == 1) {
 		if (!strcmp(cmd, "enable"))
@@ -511,6 +547,10 @@ static ssize_t golden_test_proc_write(struct file *file, const char __user *buff
 			mt_power_gs_dpidle_compare(GS_ALL);
 		else if (!strcmp(cmd, "dump_sodi"))
 			mt_power_gs_sodi_compare(GS_ALL);
+		else if (!strcmp(cmd, "free_pmic_manual_dump")) {
+			if (_pmic_manual_dump.addr_array)
+				_pmic_manual_dump.array_pos = 0;
+		}
 	}
 
 	free_page((size_t)buf);
@@ -550,6 +590,10 @@ static ssize_t golden_test_proc_write(struct file *file, const char __user *buff
 
 PROC_FOPS_RW(golden_test);
 
+void __attribute__((weak)) mt_power_gs_internal_init(void)
+{
+}
+
 static int mt_golden_setting_init(void)
 {
 #define GOLDEN_SETTING_BUF_SIZE (2 * PAGE_SIZE)
@@ -588,8 +632,16 @@ static int mt_golden_setting_init(void)
 					pr_err("[%s]: fail to mkdir /proc/golden/%s\n", __func__, entries[i].name);
 			}
 
+			_pmic_manual_dump.array_size = REMAP_SIZE_MASK;
+			if (!_pmic_manual_dump.addr_array) {
+				_pmic_manual_dump.addr_array =
+					kmalloc(sizeof(unsigned int) * REMAP_SIZE_MASK + 1, GFP_KERNEL);
+				pr_warn("Power_gs: pmic_manual_dump array malloc done\n");
+			}
+
 			_base_remap.table_size = REMAP_SIZE_MASK;
 			_base_remap.table_pos = 0;
+			mt_power_gs_internal_init();
 			mt_power_gs_table_init();
 		}
 	}
@@ -703,31 +755,102 @@ unsigned int mt_power_gs_base_remap_init(char *scenario, char *pmic_name,
 	return 0;
 }
 
+#define PER_LINE_TO_PRINT 8
+
+void mt_power_gs_pmic_manual_dump(void)
+{
+	unsigned int i, dump_cnt = 0;
+	char *p;
+
+	if (_pmic_manual_dump.addr_array && _pmic_manual_dump.array_pos) {
+		p = buf;
+		p += snprintf(p, sizeof(buf), "\n");
+		p += snprintf(p, sizeof(buf) - (p - buf),
+		"Scenario - PMIC - Addr       - Value\n");
+
+		for (i = 0; i < _pmic_manual_dump.array_pos; i++) {
+			dump_cnt++;
+			p += snprintf(p, sizeof(buf) - (p - buf),
+				"Manual   - PMIC - 0x%08x - 0x%08x\n",
+				_pmic_manual_dump.addr_array[i],
+				_golden_read_reg(_pmic_manual_dump.addr_array[i]));
+
+			if (dump_cnt && ((dump_cnt % PER_LINE_TO_PRINT) == 0)) {
+				pr_warn("%s", buf);
+				p = buf;
+				p += snprintf(p, sizeof(buf), "\n");
+			}
+		}
+		if (dump_cnt % PER_LINE_TO_PRINT)
+			pr_warn("%s", buf);
+	}
+}
+
 void mt_power_gs_compare(char *scenario, char *pmic_name,
 			 const unsigned int *pmic_gs, unsigned int pmic_gs_len)
 {
-	unsigned int i, k, val0, val1, val2, diff;
+	unsigned int i, k, val0, val1, val2, diff, dump_cnt = 0;
 	char *p;
 
-	pr_warn("Scenario - PMIC - Addr       - Value      - Mask       - Golden     - Wrong Bit\n");
+	/* dump diff mode */
+	if (slp_chk_golden_diff_mode) {
+		p = buf;
+		p += snprintf(p, sizeof(buf), "\n");
+		p += snprintf(p, sizeof(buf) - (p - buf),
+		"Scenario - %s - Addr       - Value      - Mask       - Golden     - Wrong Bit\n", pmic_name);
 
-	for (i = 0; i < pmic_gs_len; i += 3) {
-		val0 = _golden_read_reg(pmic_gs[i]);
-		val1 = val0 & pmic_gs[i + 1];
-		val2 = pmic_gs[i + 2] & pmic_gs[i + 1];
+		for (i = 0; i < pmic_gs_len; i += 3) {
+			val0 = _golden_read_reg(pmic_gs[i]);
+			val1 = val0 & pmic_gs[i + 1];
+			val2 = pmic_gs[i + 2] & pmic_gs[i + 1];
 
-		if (val1 != val2) {
-			p = buf;
-			p += snprintf(p, sizeof(buf), "%s - %s - 0x%08x - 0x%08x - 0x%08x - 0x%08x -",
-				      scenario, pmic_name, pmic_gs[i], val0, pmic_gs[i + 1], pmic_gs[i + 2]);
+			if (val1 != val2) {
+				dump_cnt++;
+				p += snprintf(p, sizeof(buf) - (p - buf),
+					"%s - %s - 0x%08x - 0x%08x - 0x%08x - 0x%08x -",
+					scenario, pmic_name, pmic_gs[i], val0, pmic_gs[i + 1], pmic_gs[i + 2]);
 
-			for (k = 0, diff = val1 ^ val2; diff != 0; k++, diff >>= 1) {
-				if ((diff % 2) != 0)
-					p += snprintf(p, sizeof(buf) - (p - buf), " %d", k);
+				for (k = 0, diff = val1 ^ val2; diff != 0; k++, diff >>= 1) {
+					if ((diff % 2) != 0)
+						p += snprintf(p, sizeof(buf) - (p - buf), " %d", k);
+				}
+
+				p += snprintf(p, sizeof(buf) - (p - buf), "\n");
+
+				if (dump_cnt && ((dump_cnt % PER_LINE_TO_PRINT) == 0)) {
+					pr_warn("%s", buf);
+					p = buf;
+					p += snprintf(p, sizeof(buf), "\n");
+				}
 			}
-			pr_warn("%s\n", buf);
-		}
-	}
 
+		}
+		if (dump_cnt % PER_LINE_TO_PRINT)
+			pr_warn("%s", buf);
+
+	/* dump raw data mode */
+	} else {
+		p = buf;
+		p += snprintf(p, sizeof(buf), "\n");
+		p += snprintf(p, sizeof(buf) - (p - buf),
+		"Scenario - PMIC - Addr       - Value\n");
+
+		for (i = 0; i < pmic_gs_len; i += 3) {
+			val0 = _golden_read_reg(pmic_gs[i]);
+
+			dump_cnt++;
+			p += snprintf(p, sizeof(buf) - (p - buf),
+				"%s - %s - 0x%08x - 0x%08x\n",
+				scenario, pmic_name, pmic_gs[i], val0);
+
+			if (dump_cnt && ((dump_cnt % PER_LINE_TO_PRINT) == 0)) {
+				pr_warn("%s", buf);
+				p = buf;
+				p += snprintf(p, sizeof(buf), "\n");
+			}
+		}
+		if (dump_cnt % PER_LINE_TO_PRINT)
+			pr_warn("%s", buf);
+	}
 	pr_warn("Done...\n");
 }

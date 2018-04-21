@@ -23,11 +23,11 @@
 
 void show_pte(struct mm_struct *mm, unsigned long addr);
 
-#define UPPER_LIMIT32 (1UL << 32)
-#define UPPER_LIMIT64 (1UL << 63)
+#define UPPER_LIMIT32 (1ULL << 32)
+#define UPPER_LIMIT64 (1ULL << 63)
 
 extern int _tui_region_offline(phys_addr_t *pa, unsigned long *size,
-		unsigned long upper_limit);
+		u64 upper_limit);
 
 int tui_region_offline64(phys_addr_t *pa, unsigned long *size)
 {
@@ -42,7 +42,7 @@ int tui_region_offline(phys_addr_t *pa, unsigned long *size)
 EXPORT_SYMBOL(tui_region_offline);
 
 extern int _svp_region_offline(phys_addr_t *pa, unsigned long *size,
-		unsigned long upper_limit);
+		u64 upper_limit);
 
 int svp_region_offline64(phys_addr_t *pa, unsigned long *size)
 {
@@ -55,4 +55,14 @@ int svp_region_offline(phys_addr_t *pa, unsigned long *size)
 	return _svp_region_offline(pa, size, UPPER_LIMIT32);
 }
 EXPORT_SYMBOL(svp_region_offline);
+
+#ifdef CONFIG_MTK_ION
+extern void ion_sec_heap_dump_info(void);
+#else
+static inline void ion_sec_heap_dump_info(void)
+{
+	pr_info("%s is not supported\n", __func__);
+}
+#endif
+
 #endif

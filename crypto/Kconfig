@@ -273,7 +273,7 @@ config CRYPTO_ECHAINIV
 	select CRYPTO_AEAD
 	select CRYPTO_NULL
 	select CRYPTO_RNG_DEFAULT
-	default m
+	default y
 	help
 	  This IV generator generates an IV based on the encryption of
 	  a sequence number xored with a salt.  This is the default
@@ -288,6 +288,24 @@ config CRYPTO_CBC
 	help
 	  CBC: Cipher Block Chaining mode
 	  This block cipher algorithm is required for IPSec.
+
+config CRYPTO_HEH
+	tristate "HEH support"
+	select CRYPTO_CMAC
+	select CRYPTO_ECB
+	select CRYPTO_GF128MUL
+	select CRYPTO_MANAGER
+	select CRYPTO_POLY_HASH_ARM64_CE if ARM64 && KERNEL_MODE_NEON
+	help
+	  HEH: Hash-Encrypt-Hash mode
+	  HEH is a proposed block cipher mode of operation which extends the
+	  strong pseudo-random permutation (SPRP) property of block ciphers to
+	  arbitrary-length input strings.  This provides a stronger notion of
+	  security than existing block cipher modes of operation (e.g. CBC, CTR,
+	  XTS), though it is usually less performant.  Applications include disk
+	  encryption and encryption of file names and contents.  Currently, this
+	  implementation only provides a symmetric cipher interface, so it can't
+	  yet be used as an AEAD.
 
 config CRYPTO_CTR
 	tristate "CTR support"
@@ -343,6 +361,7 @@ config CRYPTO_XTS
 	select CRYPTO_BLKCIPHER
 	select CRYPTO_MANAGER
 	select CRYPTO_GF128MUL
+	select CRYPTO_ECB
 	help
 	  XTS: IEEE1619/D16 narrow block cipher use with aes-xts-plain,
 	  key size 256, 384 or 512 bits. This implementation currently
@@ -1520,6 +1539,15 @@ config CRYPTO_LZO
 	select LZO_DECOMPRESS
 	help
 	  This is the LZO algorithm.
+
+config CRYPTO_LZ4K
+        tristate "LZ4K compression algorithm"
+	default n
+        select CRYPTO_ALGAPI
+        help
+          Mediatek's proprietary LZ4K algorithm.
+	  It has better compression ratio than the one in LZO
+	  with less performance degradation.
 
 config CRYPTO_842
 	tristate "842 compression algorithm"

@@ -320,6 +320,16 @@ static int chrlmt_unregister(struct chrlmt_handle *handle)
 	return -1;
 }
 
+int clbcct_get_chr_curr_limit(void)
+{
+	return chrlmt_bat_chr_curr_limit;
+}
+
+int clbcct_get_input_curr_limit(void)
+{
+	return chrlmt_chr_input_curr_limit;
+}
+
 static void chrlmt_set_limit_handler(struct work_struct *work)
 {
 	if (bat_info_charging_type == 3) {
@@ -341,6 +351,11 @@ static void chrlmt_set_limit_handler(struct work_struct *work)
 			((chrlmt_chr_input_curr_limit != -1) ? chrlmt_chr_input_curr_limit * 1000 : -1));
 		charger_manager_set_charging_current_limit(pthermal_consumer, 0,
 			((chrlmt_bat_chr_curr_limit != -1) ? chrlmt_bat_chr_curr_limit * 1000 : -1));
+		/* High Voltage (Vbus) control*/
+		if (chrlmt_bat_chr_curr_limit == 0)
+			charger_manager_enable_high_voltage_charging(pthermal_consumer, false);
+		if (chrlmt_bat_chr_curr_limit == -1)
+			charger_manager_enable_high_voltage_charging(pthermal_consumer, true);
 #else
 #ifdef CONFIG_MTK_SWITCH_INPUT_OUTPUT_CURRENT_SUPPORT
 		set_chr_input_current_limit(chrlmt_chr_input_curr_limit);
@@ -502,6 +517,12 @@ static int mtk_cooler_bcct_register_ltf(void)
 	mtk_cooler_bcct_dprintk("%s\n", __func__);
 
 	chrlmt_register(&cl_bcct_chrlmt_handle);
+
+#if (MAX_NUM_INSTANCE_MTK_COOLER_BCCT == 3)
+	MTK_CL_BCCT_SET_LIMIT(1000, cl_bcct_state[0]);
+	MTK_CL_BCCT_SET_LIMIT(500, cl_bcct_state[1]);
+	MTK_CL_BCCT_SET_LIMIT(0, cl_bcct_state[2]);
+#endif
 
 	for (i = MAX_NUM_INSTANCE_MTK_COOLER_BCCT; i-- > 0;) {
 		char temp[20] = { 0 };
@@ -1101,7 +1122,9 @@ static int _cl_abcct_read(struct seq_file *m, void *v)
 {
 	mtk_cooler_bcct_dprintk("%s\n", __func__);
 
-	seq_printf(m, "%d\n", abcct_cur_bat_chr_curr_limit);
+	seq_printf(m, "%d %ld %ld %ld %ld %d %d\n",
+		abcct_cur_bat_chr_curr_limit, abcct_target_temp, abcct_kp, abcct_ki, abcct_kd,
+		abcct_max_bat_chr_curr_limit, abcct_min_bat_chr_curr_limit);
 	seq_printf(m, "abcct_cur_bat_chr_curr_limit %d\n", abcct_cur_bat_chr_curr_limit);
 	seq_printf(m, "abcct_cur_chr_input_curr_limit %d\n", abcct_cur_chr_input_curr_limit);
 	seq_printf(m, "abcct_pep30_cur_input_curr_limit %d\n", abcct_pep30_cur_input_curr_limit);

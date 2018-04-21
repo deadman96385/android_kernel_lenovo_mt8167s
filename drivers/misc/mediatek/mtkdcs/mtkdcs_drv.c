@@ -22,13 +22,16 @@
 #include <linux/kthread.h>
 #include <linux/wakelock.h>
 #include <linux/delay.h>
+#include <linux/fb.h>
 #include <mach/emi_mpu.h>
 #include <mach/fliper.h>
 #include <mt-plat/mtk_meminfo.h>
+#include <mt-plat/aee.h>
 #include "mtkdcs_drv.h"
 #include <mtk_spm_vcore_dvfs.h>
 #include <mtk_vcorefs_manager.h>
 #include <mtkdcs_drv.h>
+#include <smi_public.h>
 #include <internal.h>
 
 static enum dcs_status sys_dcs_status = DCS_NORMAL;
@@ -78,6 +81,12 @@ enum dcs_sysfs_mode {
 	DCS_SYSFS_FREERUN_LOWPOWER,
 	DCS_SYSFS_FREERUN_ASYNC_NORMAL,
 	DCS_SYSFS_FREERUN_ASYNC_EXIT_NORMAL,
+	DCS_SYSFS_WFD_KICKER,
+	DCS_SYSFS_EXIT_WFD_KICKER,
+	DCS_SYSFS_VENC_KICKER,
+	DCS_SYSFS_EXIT_VENC_KICKER,
+	DCS_SYSFS_CAMERA_KICKER,
+	DCS_SYSFS_EXIT_CAMERA_KICKER,
 	DCS_SYSFS_NR_MODE,
 };
 
@@ -91,6 +100,12 @@ static char * const dcs_sysfs_mode_name[DCS_SYSFS_NR_MODE] = {
 	"freerun lowpower",
 	"freerun async normal",
 	"freerun async exit normal",
+	"wfd", /* DCS_SYSFS_WFD_KICKER */
+	"exit wfd", /* DCS_SYSFS_EXIT_WFD_KICKER */
+	"venc", /* DCS_SYSFS_VENC_KICKER */
+	"exit venc", /* DCS_SYSFS_EXIT_VENC_KICKER */
+	"camera", /* DCS_SYSFS_CAMERA_KICKER */
+	"exit camera", /* DCS_SYSFS_EXIT_CAMERA_KICKER */
 };
 
 /*
@@ -112,21 +127,25 @@ char * const dcs_status_name(enum dcs_status status)
 #include "sspm_ipi.h"
 static unsigned int dcs_recv_data[4];
 
-static int dcs_get_status_ipi(enum dcs_status *sys_dcs_status)
+static int dcs_get_status_ipi(enum dcs_status *dcs_status)
 {
 	int ipi_data_ret = 0, err;
-	unsigned int ipi_buf[32];
+	unsigned int ipi_buf[6];
 
 	ipi_buf[0] = IPI_DCS_GET_MODE;
 
-	err = sspm_ipi_send_sync(IPI_ID_DCS, 1, (void *)ipi_buf, 0, &ipi_data_ret);
+	err = sspm_ipi_send_sync_new(IPI_ID_DCS, IPI_OPT_POLLING, (void *)ipi_buf, 6,
+			&ipi_data_ret, 1);
 
 	if (err) {
 		pr_err("[%s:%d]ipi_write error: %d\n", __func__, __LINE__, err);
 		return -EBUSY;
 	}
 
-	*sys_dcs_status = (ipi_data_ret) ? DCS_LOWPOWER : DCS_NORMAL;
+	if (ipi_data_ret == -1)
+		return -EBUSY;
+
+	*dcs_status = (ipi_data_ret) ? DCS_LOWPOWER : DCS_NORMAL;
 
 	return 0;
 }
@@ -134,14 +153,13 @@ static int dcs_get_status_ipi(enum dcs_status *sys_dcs_status)
 static int dcs_migration_ipi(enum migrate_dir dir)
 {
 	int ipi_data_ret = 0, err;
-	unsigned int ipi_buf[32];
+	unsigned int ipi_buf[6];
 
 	ipi_buf[0] = IPI_DCS_MIGRATION;
 	ipi_buf[1] = dir;
 
-	pr_info("dcs migration start\n");
-	err = sspm_ipi_send_sync(IPI_ID_DCS, 1, (void *)ipi_buf, 0, &ipi_data_ret);
-	pr_info("dcs migration end\n");
+	err = sspm_ipi_send_sync_new(IPI_ID_DCS, IPI_OPT_POLLING, (void *)ipi_buf, 6,
+			&ipi_data_ret, 1);
 
 	if (err) {
 		pr_err("[%d]ipi_write error: %d\n", __LINE__, err);
@@ -154,7 +172,7 @@ static int dcs_migration_ipi(enum migrate_dir dir)
 static int dcs_set_dummy_write_ipi(void)
 {
 	int ipi_data_ret = 0, err;
-	unsigned int ipi_buf[32];
+	unsigned int ipi_buf[6];
 
 	ipi_buf[0] = IPI_DCS_SET_DUMMY_WRITE;
 	ipi_buf[1] = 0;
@@ -163,7 +181,8 @@ static int dcs_set_dummy_write_ipi(void)
 	ipi_buf[4] = 0x300000;
 	ipi_buf[5] = 0x000000;
 
-	err = sspm_ipi_send_sync(IPI_ID_DCS, 1, (void *)ipi_buf, 0, &ipi_data_ret);
+	err = sspm_ipi_send_sync_new(IPI_ID_DCS, IPI_OPT_POLLING, (void *)ipi_buf, 6,
+			&ipi_data_ret, 1);
 
 	if (err) {
 		pr_err("[%d]ipi_write error: %d\n", __LINE__, err);
@@ -176,11 +195,12 @@ static int dcs_set_dummy_write_ipi(void)
 static int dcs_dump_reg_ipi(void)
 {
 	int ipi_data_ret = 0, err;
-	unsigned int ipi_buf[32];
+	unsigned int ipi_buf[6];
 
 	ipi_buf[0] = IPI_DCS_DUMP_REG;
 
-	err = sspm_ipi_send_sync(IPI_ID_DCS, 1, (void *)ipi_buf, 0, &ipi_data_ret);
+	err = sspm_ipi_send_sync_new(IPI_ID_DCS, IPI_OPT_POLLING, (void *)ipi_buf, 6,
+			&ipi_data_ret, 1);
 
 	if (err) {
 		pr_err("[%d]ipi_write error: %d\n", __LINE__, err);
@@ -211,32 +231,6 @@ static int dcs_ipi_register(void)
 }
 
 /*
- * dcs_froce_acc_low
- * set or unset force access low function
- *
- * return 0 on success, otherwise error code
- */
-static int dcs_froce_acc_low(int enable)
-{
-	int ipi_data_ret = 0, err;
-	unsigned int ipi_buf[32];
-
-	ipi_buf[0] = IPI_DCS_FORCE_ACC_LOW;
-	ipi_buf[1] = enable;
-
-	err = sspm_ipi_send_sync(IPI_ID_DCS, 1, (void *)ipi_buf, 0, &ipi_data_ret);
-
-	if (err) {
-		pr_err("[%d]ipi_write error: %d\n", __LINE__, err);
-		return -EBUSY;
-	}
-
-	pr_info("%s returns 0x%x\n", __func__, ipi_data_ret);
-
-	return 0;
-}
-
-/*
  * __dcs_dram_channel_switch
  *
  * Do the channel switch operation
@@ -247,6 +241,7 @@ static int dcs_froce_acc_low(int enable)
 static int __dcs_dram_channel_switch(enum dcs_status status)
 {
 	int err;
+	int retry = 100;
 #ifdef DCS_PROFILE
 	unsigned long long start, t, now;
 #endif
@@ -256,11 +251,44 @@ static int __dcs_dram_channel_switch(enum dcs_status status)
 		(sys_dcs_status != status)) {
 		/* speed up lpdma, use max DRAM frequency */
 		vcorefs_request_dvfs_opp(KIR_DCS, OPP_0);
+		/* enable SMI outstanding */
+		smi_bus_enable(SMI_LARB_MMSYS0, "DCS");
+		smi_common_ostd_setting(1);
 
 #ifdef DCS_PROFILE
 		start = sched_clock();
 #endif
+		pr_info("dcs migration start to=%s\n", dcs_status_name(status));
 		err = dcs_migration_ipi(status == DCS_NORMAL ? NORMAL : LOWPWR);
+		if (err) {
+			pr_err("[%d]ipi_write error: %d\n",
+					__LINE__, err);
+			sys_dcs_status = DCS_BUSY;
+			BUG(); /* fatal error */
+			return -EBUSY;
+		}
+		/* poll status */
+		mdelay(700);
+		while (retry > 0) {
+			err = dcs_get_status_ipi(&sys_dcs_status);
+			if (!err)
+				break;
+			pr_warn("dcs get status(%d), to=%s\n", retry,
+					dcs_status_name(status));
+			mdelay(100);
+			retry--;
+		}
+		if (retry == 0) {
+#ifdef CONFIG_MTK_EMI_MPU
+			dump_emi_outstanding_for_md();
+#endif
+#ifdef CONFIG_MTK_AEE_FEATURE
+			aee_kernel_warning_api(__FILE__, __LINE__, DB_OPT_DEFAULT,
+					"DCS timeout", "dump EMI debug register");
+#endif
+			msleep(15000);
+			BUG();
+		}
 #ifdef DCS_PROFILE
 		now = sched_clock();
 		t = now - start;
@@ -274,21 +302,21 @@ static int __dcs_dram_channel_switch(enum dcs_status status)
 		} else
 			perf.latest_async_time = 0;
 #endif
-		if (err) {
-			pr_err("[%d]ipi_write error: %d\n",
-					__LINE__, err);
-			sys_dcs_status = DCS_BUSY;
-			BUG(); /* fatal error */
-			return -EBUSY;
-		}
-		sys_dcs_status = status;
+		if (sys_dcs_status != status)
+			pr_warn("status not changed. (%s should be %s\n",
+					dcs_status_name(sys_dcs_status),
+					dcs_status_name(status));
+		else
+			nr_swap++;
+		pr_info("dcs migration end\n");
 		pr_info("sys_dcs_status=%s\n", dcs_status_name(sys_dcs_status));
-		nr_swap++;
 
-		mdelay(500);
 		/* notify bwm */
 		notify_bwm_dcs(status == DCS_NORMAL ?
 				normal_channel_num : lowpower_channel_num);
+		/* disable SMI outstanding */
+		smi_common_ostd_setting(0);
+		smi_bus_disable(SMI_LARB_MMSYS0, "DCS");
 		/* release DRAM frequency */
 		vcorefs_request_dvfs_opp(KIR_DCS, OPP_UNREQ);
 		/* update DVFSRC setting */
@@ -309,6 +337,7 @@ static int dcs_get_status_ipi(enum dcs_status *sys_dcs_status)
 static int dcs_set_dummy_write_ipi(void) { return 0; }
 static int dcs_dump_reg_ipi(void) { return 0; }
 static int dcs_ipi_register(void) { return 0; }
+static int dcs_force_acc_low_ipi(int enable) { return 0; }
 static int __dcs_dram_channel_switch(enum dcs_status status) { return 0; }
 #endif /* end of CONFIG_MTK_TINYSYS_SSPM_SUPPORT */
 
@@ -353,7 +382,7 @@ int __dcs_enter_perf(enum dcs_kicker kicker)
 {
 	dcs_kicker |= (1 << kicker);
 
-	pr_info("[%d]dcs_kicker=%08lx\n", __LINE__, dcs_kicker);
+	pr_info("[%d] dcs_kicker=%08lx\n", __LINE__, dcs_kicker);
 
 	/* wakeup thread */
 	pr_info("wakeup dcs_thread\n");
@@ -425,6 +454,43 @@ int dcs_exit_perf(enum dcs_kicker kicker)
 	return 0;
 }
 
+/*
+ * exit_PASR:
+ *
+ * Create a fake fb event to make PASR exit current state.
+ * PASR will exit and release DCS lock
+ */
+static int exit_PASR(void)
+{
+	struct fb_event fb_event;
+	int blank = 0;
+
+	fb_event.data = &blank;
+	memory_lowpower_fb_event(NULL, FB_EVENT_BLANK, &fb_event);
+
+	return 0;
+}
+
+/*
+ * must_be_done
+ *
+ * should these modes must be done even PASR locked DCS?
+ * @mode: dcs_sysfs_mode
+ *
+ * return true if the mode must be done
+ */
+static bool must_be_done(enum dcs_sysfs_mode mode)
+{
+	if ((mode == DCS_SYSFS_CAMERA_KICKER) ||
+			(mode == DCS_SYSFS_WFD_KICKER) ||
+			(mode == DCS_SYSFS_VENC_KICKER) ||
+			(mode == DCS_SYSFS_EXIT_CAMERA_KICKER) ||
+			(mode == DCS_SYSFS_EXIT_WFD_KICKER) ||
+			(mode == DCS_SYSFS_EXIT_VENC_KICKER))
+		return true;
+
+	return false;
+}
 
 /*
  * dcs_dram_channel_switch_by_sysfs_mode
@@ -444,9 +510,22 @@ static int dcs_dram_channel_switch_by_sysfs_mode(enum dcs_sysfs_mode mode)
 	if (!dcs_core_initialized || !dcs_full_initialized)
 		return -ENODEV;
 
+	if (must_be_done(mode))
+		exit_PASR();
+
 	mutex_lock(&dcs_kicker_lock);
 	wake_lock(&dcs_wake_lock);
-	down_write(&dcs_rwsem);
+
+	if (must_be_done(mode))
+		/* must get the lock */
+		down_write(&dcs_rwsem);
+	else {
+		ret = down_write_trylock(&dcs_rwsem);
+		if (!ret) {
+			ret = -EBUSY;
+			goto out_busy;
+		}
+	}
 
 	/* only 'always' commands can overwrite 'always' commands */
 	if ((dcs_sysfs_mode <= DCS_SYSFS_ALWAYS_LOWPOWER) &&
@@ -475,13 +554,38 @@ static int dcs_dram_channel_switch_by_sysfs_mode(enum dcs_sysfs_mode mode)
 		dcs_sysfs_mode = DCS_SYSFS_FREERUN;
 		ret = __dcs_exit_perf(DCS_KICKER_PERF);
 		break;
+	case DCS_SYSFS_WFD_KICKER:
+		dcs_sysfs_mode = DCS_SYSFS_FREERUN;
+		ret = __dcs_enter_perf(DCS_KICKER_WFD);
+		break;
+	case DCS_SYSFS_EXIT_WFD_KICKER:
+		dcs_sysfs_mode = DCS_SYSFS_FREERUN;
+		ret = __dcs_exit_perf(DCS_KICKER_WFD);
+		break;
+	case DCS_SYSFS_VENC_KICKER:
+		dcs_sysfs_mode = DCS_SYSFS_FREERUN;
+		ret = __dcs_enter_perf(DCS_KICKER_VENC);
+		break;
+	case DCS_SYSFS_EXIT_VENC_KICKER:
+		dcs_sysfs_mode = DCS_SYSFS_FREERUN;
+		ret = __dcs_exit_perf(DCS_KICKER_VENC);
+		break;
+	case DCS_SYSFS_CAMERA_KICKER:
+		dcs_sysfs_mode = DCS_SYSFS_FREERUN;
+		ret = __dcs_enter_perf(DCS_KICKER_CAMERA);
+		break;
+	case DCS_SYSFS_EXIT_CAMERA_KICKER:
+		dcs_sysfs_mode = DCS_SYSFS_FREERUN;
+		ret = __dcs_exit_perf(DCS_KICKER_CAMERA);
+		break;
 	default:
-		pr_alert("unknown sysfs mode: %d\n", mode);
+		pr_info("unknown sysfs mode: %d\n", mode);
 		break;
 	}
 
 out:
 	up_write(&dcs_rwsem);
+out_busy:
 	wake_unlock(&dcs_wake_lock);
 	mutex_unlock(&dcs_kicker_lock);
 
@@ -579,10 +683,8 @@ static int dcs_thread_entry(void *p)
 		/* perform channel swtich */
 		pr_info("%s waken\n", __func__);
 		err = dcs_dram_channel_switch(DCS_NORMAL);
-		if (err) {
+		if (err)
 			pr_err("[%d] fail: %d\n", __LINE__, err);
-			return err;
-		}
 	} while (1);
 
 	return 0;
@@ -612,12 +714,9 @@ int __dcs_get_dcs_status(int *ch, enum dcs_status *dcs_status)
 		pr_err("[%d], incorrect DCS status=%s\n",
 				__LINE__,
 				dcs_status_name(sys_dcs_status));
-		goto BUSY;
+		BUG(); /* fatal error */
 	}
 	return 0;
-BUSY:
-	*ch = -1;
-	return -EBUSY;
 }
 
 /*
@@ -703,6 +802,16 @@ int dcs_full_init(void)
 	return 0;
 }
 
+static int __dcs_mpu_protection_enable(void)
+{
+	return 0;
+}
+
+static int __dcs_mpu_protection_disable(void)
+{
+	return 0;
+}
+
 /*
  * dcs_mpu_protection
  *
@@ -713,24 +822,10 @@ int dcs_full_init(void)
  */
 int dcs_mpu_protection(int enable)
 {
-	int err;
-
-	err = dcs_froce_acc_low(enable);
-	if (err) {
-		pr_err("[%s:%d]ipi_write error: %d\n", __func__, __LINE__, err);
-		BUG(); /* fatal error */
-	}
-	pr_info("%s force acc low\n", enable ? "enable" : "disable");
-
-	emi_mpu_set_region_protection((unsigned long long)mpu_start,
-			(unsigned long long)mpu_end - 1, DCS_MPU_REGION,
-			enable ? MPU_ACCESS_PERMISSON_FORBIDDEN :
-			MPU_ACCESS_PERMISSON_NO_PROTECTION);
-
-	pr_info("%s MPU\n", enable ? "enable" : "disable");
-
-	/* wait for EMI to consume all transactions in the proection range */
-	mdelay(1);
+	if (enable)
+		__dcs_mpu_protection_enable();
+	else
+		__dcs_mpu_protection_disable();
 
 	return 0;
 }
@@ -749,16 +844,16 @@ static ssize_t mtkdcs_status_show(struct device *dev,
 		 * we're holding the rw_sem, so it's safe to use
 		 * dcs_sysfs_mode
 		 */
-		n += sprintf(buf, "dcs_status=%s, channel=%d, dcs_sysfs_mode=%s\n",
+		n += snprintf(buf + n, PAGE_SIZE - n, "dcs_status=%s, channel=%d, dcs_sysfs_mode=%s\n",
 				dcs_status_name(dcs_status),
 				ch,
 				dcs_sysfs_mode_name[dcs_sysfs_mode]);
-		n += sprintf(buf + n, "dcs lbw_start=%llx, lbw_end=%llx\n",
+		n += snprintf(buf + n, PAGE_SIZE - n, "dcs lbw_start=%llx, lbw_end=%llx\n",
 				lbw_start, lbw_end);
-		n += sprintf(buf + n, "dcs mpu_start=%llx, mpu_end=%llx\n",
+		n += snprintf(buf + n, PAGE_SIZE - n, "dcs mpu_start=%llx, mpu_end=%llx\n",
 				mpu_start, mpu_end);
-		n += sprintf(buf + n, "nr_swap=%u\n", nr_swap);
-		n += sprintf(buf + n, "kicker=0x%lx\n", dcs_kicker);
+		n += snprintf(buf + n, PAGE_SIZE - n, "nr_swap=%u\n", nr_swap);
+		n += snprintf(buf + n, PAGE_SIZE - n, "kicker=0x%lx\n", dcs_kicker);
 		dcs_get_dcs_status_unlock();
 	}
 
@@ -771,15 +866,53 @@ static ssize_t mtkdcs_status_show(struct device *dev,
 	return n;
 }
 
+/*
+ * mtkdcs_debug_show
+ * debug entry for debug system, do not wait for any lock here
+ */
+static ssize_t mtkdcs_debug_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	enum dcs_status dcs_status;
+	int n = 0, ch;
+	int ret_kicker_lock, ret_status_lock;
+
+	ret_kicker_lock = mutex_trylock(&dcs_kicker_lock);
+	ret_status_lock = dcs_get_dcs_status_trylock(&ch, &dcs_status);
+
+	/*
+	 * We're getting debug information, do not care lock
+	 */
+	n += snprintf(buf + n, PAGE_SIZE - n, "dcs_kicker_lock %s, dcs_rwsem %s\n",
+			ret_kicker_lock ? "ok" : "fail",
+			!ret_status_lock ? "ok" : "fail");
+	n += snprintf(buf + n, PAGE_SIZE - n, "dcs_status=%s, channel=%d, dcs_sysfs_mode=%s\n",
+			dcs_status_name(dcs_status),
+			ch,
+			dcs_sysfs_mode_name[dcs_sysfs_mode]);
+	n += snprintf(buf + n, PAGE_SIZE - n, "dcs lbw_start=%llx, lbw_end=%llx\n",
+			lbw_start, lbw_end);
+	n += snprintf(buf + n, PAGE_SIZE - n, "dcs mpu_start=%llx, mpu_end=%llx\n",
+			mpu_start, mpu_end);
+	n += snprintf(buf + n, PAGE_SIZE - n, "nr_swap=%u\n", nr_swap);
+	n += snprintf(buf + n, PAGE_SIZE - n, "kicker=0x%lx\n", dcs_kicker);
+
+	if (ret_kicker_lock)
+		mutex_unlock(&dcs_kicker_lock);
+	if (!ret_status_lock)
+		dcs_get_dcs_status_unlock();
+
+	return n;
+}
 static ssize_t mtkdcs_mode_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	enum dcs_sysfs_mode mode;
 	int n = 0;
 
-	n += sprintf(buf + n, "available modes:\n");
+	n += snprintf(buf + n, PAGE_SIZE - n, "available modes:\n");
 	for (mode = DCS_SYSFS_MODE_START; mode < DCS_SYSFS_NR_MODE; mode++)
-		n += sprintf(buf + n, "%s\n", dcs_sysfs_mode_name[mode]);
+		n += snprintf(buf + n, PAGE_SIZE - n, "%s\n", dcs_sysfs_mode_name[mode]);
 
 	return n;
 }
@@ -796,7 +929,7 @@ static ssize_t mtkdcs_mode_store(struct device *dev,
 			goto apply_mode;
 	}
 
-	pr_alert("[%d] unknown command: %s\n", __LINE__, buf);
+	pr_info("[%d] unknown command: %s\n", __LINE__, buf);
 	return n;
 
 apply_mode:
@@ -812,7 +945,7 @@ static ssize_t mtkdcs_perf_show(struct device *dev,
 {
 	int n = 0;
 
-	n += sprintf(buf + n, "latest_ipi=%lluns, max_ipi=%lluns, latest_async=%lluns\n",
+	n += snprintf(buf + n, PAGE_SIZE - n, "latest_ipi=%lluns, max_ipi=%lluns, latest_async=%lluns\n",
 			perf.latest_time, perf.max_time,
 			perf.latest_async_time);
 
@@ -825,6 +958,7 @@ static DEVICE_ATTR(mode, S_IRUGO | S_IWUSR, mtkdcs_mode_show, mtkdcs_mode_store)
 #ifdef DCS_PROFILE
 static DEVICE_ATTR(perf, S_IRUGO, mtkdcs_perf_show, NULL);
 #endif
+static DEVICE_ATTR(debug, S_IRUGO, mtkdcs_debug_show, NULL);
 
 static struct attribute *mtkdcs_attrs[] = {
 	&dev_attr_status.attr,
@@ -832,6 +966,7 @@ static struct attribute *mtkdcs_attrs[] = {
 #ifdef DCS_PROFILE
 	&dev_attr_perf.attr,
 #endif
+	&dev_attr_debug.attr,
 	NULL,
 };
 
@@ -887,6 +1022,11 @@ static int __init mtkdcs_init(void)
 	mpu_start = get_max_DRAM_size() / 2 + PHYS_OFFSET;
 	mpu_end = get_max_DRAM_size() + PHYS_OFFSET;
 
+	/* setup MPU (default no protection) */
+	emi_mpu_set_region_protection((unsigned long long)mpu_start,
+			(unsigned long long)mpu_end - 1, DCS_MPU_REGION,
+			MPU_ACCESS_PERMISSON_NO_PROTECTION);
+
 	/* Start a kernel thread */
 	dcs_thread = kthread_run(dcs_thread_entry, NULL, "dcs_thread");
 	if (IS_ERR(dcs_thread)) {
@@ -895,6 +1035,14 @@ static int __init mtkdcs_init(void)
 	}
 
 	dcs_core_initialized = true;
+
+#ifdef DCS_SCREENOFF_ONLY_MODE
+	ret = dcs_enter_perf(DCS_KICKER_DEBUG);
+	if (ret) {
+		pr_err("enter perf failed, kick=%d\n", DCS_KICKER_DEBUG);
+		return ret;
+	}
+#endif
 
 	return 0;
 }

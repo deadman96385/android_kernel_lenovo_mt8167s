@@ -14,11 +14,6 @@
 #ifndef OIS_DEFINITION_H
 #define OIS_DEFINITION_H
 
-#ifdef	OIS_MAIN_C
-#define	EXT
-#else
-#define	EXT	extern
-#endif
 
 /* ================================================================= */
 /* Common */
@@ -615,34 +610,34 @@
 #define _OTHR_HYpreOUT	0x0002
 
 /* Factory Adjustment data */
-typedef struct {
-	OIS_UWORD gl_CURDAT;
-	OIS_UWORD gl_HALOFS_X;
-	OIS_UWORD gl_HALOFS_Y;
-	OIS_UWORD gl_HX_OFS;
-	OIS_UWORD gl_HY_OFS;
-	OIS_UWORD gl_PSTXOF;	/* RHM_HT 2013.03.21    Change order to adjust EEP ROM map */
-	OIS_UWORD gl_PSTYOF;	/* RHM_HT 2013.03.21    Change order to adjust EEP ROM map */
-	OIS_UWORD gl_GX_OFS;
-	OIS_UWORD gl_GY_OFS;
-	OIS_UWORD gl_KgxHG;
-	OIS_UWORD gl_KgyHG;
-	OIS_UWORD gl_KGXG;
-	OIS_UWORD gl_KGYG;
-	OIS_UWORD gl_SFTHAL_X;	/* RHM_HT 2013/11/25    Added */
-	OIS_UWORD gl_SFTHAL_Y;	/* RHM_HT 2013/11/25    Added */
-	OIS_UWORD gl_TMP_X_;	/* RHM_HT 2013/11/25    Added */
-	OIS_UWORD gl_TMP_Y_;	/* RHM_HT 2013/11/25    Added */
-	OIS_UWORD gl_KgxH0;	/* RHM_HT 2013/11/25    Added */
-	OIS_UWORD gl_KgyH0;	/* RHM_HT 2013/11/25    Added */
-} _FACT_ADJ;
+struct _FACT_ADJ {
+	unsigned short int gl_CURDAT;
+	unsigned short int gl_HALOFS_X;
+	unsigned short int gl_HALOFS_Y;
+	unsigned short int gl_HX_OFS;
+	unsigned short int gl_HY_OFS;
+	unsigned short int gl_PSTXOF;	/* RHM_HT 2013.03.21    Change order to adjust EEP ROM map */
+	unsigned short int gl_PSTYOF;	/* RHM_HT 2013.03.21    Change order to adjust EEP ROM map */
+	unsigned short int gl_GX_OFS;
+	unsigned short int gl_GY_OFS;
+	unsigned short int gl_KgxHG;
+	unsigned short int gl_KgyHG;
+	unsigned short int gl_KGXG;
+	unsigned short int gl_KGYG;
+	unsigned short int gl_SFTHAL_X;	/* RHM_HT 2013/11/25    Added */
+	unsigned short int gl_SFTHAL_Y;	/* RHM_HT 2013/11/25    Added */
+	unsigned short int gl_TMP_X_;	/* RHM_HT 2013/11/25    Added */
+	unsigned short int gl_TMP_Y_;	/* RHM_HT 2013/11/25    Added */
+	unsigned short int gl_KgxH0;	/* RHM_HT 2013/11/25    Added */
+	unsigned short int gl_KgyH0;	/* RHM_HT 2013/11/25    Added */
+};
 
 /* Default Parameter of FACTORY Adjust data */
 /* --------------------------------------------- */
-EXT const _FACT_ADJ FADJ_DEF
+extern const struct _FACT_ADJ FADJ_DEF
 #ifdef	OIS_MAIN_C
 = {
-	0x0200,		/* gl_CURDAT; */
+	0x0200,			/* gl_CURDAT; */
 	0x0200,			/* gl_HALOFS_X; */
 	0x0200,			/* gl_HALOFS_Y; */
 	0x0000,			/* gl_HX_OFS; */
@@ -652,7 +647,7 @@ EXT const _FACT_ADJ FADJ_DEF
 	0x0000,			/* gl_GX_OFS; */
 	0x0000,			/* gl_GY_OFS; */
 
-	0x2000,		/* gl_KgxHG ;           RHM_HT 2013/11/25       Modified */
+	0x2000,			/* gl_KgxHG ;           RHM_HT 2013/11/25       Modified */
 	0x2000,			/* gl_KgyHG ;           RHM_HT 2013/11/25       Modified */
 	0x2000,			/* gl_KGXG  ;           RHM_HT 2013/11/25       Modified */
 	0x2000,			/* gl_KGYG  ;           RHM_HT 2013/11/25       Modified */
@@ -673,43 +668,42 @@ EXT const _FACT_ADJ FADJ_DEF
 /* data from above memory and write to the OIS */
 /* controller. */
 /* --------------------------------------------- */
-EXT _FACT_ADJ FADJ_MEM
+extern struct _FACT_ADJ FADJ_MEM
 #ifdef	OIS_MAIN_C
 = {
-	0x0201,		/* gl_CURDAT; */
-	0x0200,		/* gl_HALOFS_X; */
-	0x0200,		/* gl_HALOFS_Y; */
-	0x0000,		/* gl_HX_OFS; */
-	0x0000,		/* gl_HY_OFS; */
-	0x0080,		/* gl_PSTXOF;           RHM_HT 2013.03.21       Change order to adjust EEP ROM map */
-	0x0080,		/* gl_PSTYOF;           RHM_HT 2013.03.21       Change order to adjust EEP ROM map */
-	0x0000,		/* gl_GX_OFS; */
-	0x0000,		/* gl_GY_OFS; */
+	0x0201,			/* gl_CURDAT; */
+	0x0200,			/* gl_HALOFS_X; */
+	0x0200,			/* gl_HALOFS_Y; */
+	0x0000,			/* gl_HX_OFS; */
+	0x0000,			/* gl_HY_OFS; */
+	0x0080,			/* gl_PSTXOF;           RHM_HT 2013.03.21       Change order to adjust EEP ROM map */
+	0x0080,			/* gl_PSTYOF;           RHM_HT 2013.03.21       Change order to adjust EEP ROM map */
+	0x0000,			/* gl_GX_OFS; */
+	0x0000,			/* gl_GY_OFS; */
 
-	0x2000,		/* gl_KgxHG ;           RHM_HT 2013/11/25       Modified */
-	0x2000,		/* gl_KgyHG ;           RHM_HT 2013/11/25       Modified */
-	0x2000,		/* gl_KGXG  ;           RHM_HT 2013/11/25       Modified */
-	0x2000,		/* gl_KGYG  ;           RHM_HT 2013/11/25       Modified */
-	0x0200,		/* gl_SFTHAL_X;         RHM_HT 2013/11/25       Added */
-	0x0200,		/* gl_SFTHAL_Y;         RHM_HT 2013/11/25       Added */
-	0x0000,		/* gl_TMP_X_;           RHM_HT 2013/11/25       Added */
-	0x0000,		/* gl_TMP_Y_;           RHM_HT 2013/11/25       Added */
-	0x0000,		/* gl_KgxH0;            RHM_HT 2013/11/25       Added */
-	0x0000,		/* gl_KgyH0;            RHM_HT 2013/11/25       Added */
+	0x2000,			/* gl_KgxHG ;           RHM_HT 2013/11/25       Modified */
+	0x2000,			/* gl_KgyHG ;           RHM_HT 2013/11/25       Modified */
+	0x2000,			/* gl_KGXG  ;           RHM_HT 2013/11/25       Modified */
+	0x2000,			/* gl_KGYG  ;           RHM_HT 2013/11/25       Modified */
+	0x0200,			/* gl_SFTHAL_X;         RHM_HT 2013/11/25       Added */
+	0x0200,			/* gl_SFTHAL_Y;         RHM_HT 2013/11/25       Added */
+	0x0000,			/* gl_TMP_X_;           RHM_HT 2013/11/25       Added */
+	0x0000,			/* gl_TMP_Y_;           RHM_HT 2013/11/25       Added */
+	0x0000,			/* gl_KgxH0;            RHM_HT 2013/11/25       Added */
+	0x0000,			/* gl_KgyH0;            RHM_HT 2013/11/25       Added */
 }
 #endif
 ;
 
 /* Parameters for expanding OIS range */
 /* --------------------------------------------- */
-EXT double p_x, q_x;
-EXT double p_y, q_y;
-EXT OIS_WORD zero_X;
-EXT OIS_WORD zero_Y;
-EXT OIS_WORD PREOUT_X_P, PREOUT_X_N;
-EXT OIS_WORD PREOUT_Y_P, PREOUT_Y_N;
-EXT double alfa_X, beta_X;
-EXT double alfa_Y, beta_Y;
+extern double p_x, q_x;
+extern double p_y, q_y;
+extern short int zero_X;
+extern short int zero_Y;
+extern short int PREOUT_X_P, PREOUT_X_N;
+extern short int PREOUT_Y_P, PREOUT_Y_N;
+extern double alfa_X, beta_X;
+extern double alfa_Y, beta_Y;
 
-#undef	EXT
 #endif				/* OIS_DEFINITION_H */

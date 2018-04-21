@@ -183,7 +183,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	unsigned long flags;
 	struct mtk_irq_mask mask;
 	struct irq_desc *desc = irq_to_desc(spm_irq_0);
-	wake_reason_t wr = WR_NONE;
+	unsigned int wr = WR_NONE;
 	struct pcm_desc *pcmdesc = __spm_sodi.pcmdesc;
 	struct pwr_ctrl *pwrctrl = __spm_sodi.pwrctrl;
 #if REDUCE_SODI_LOG

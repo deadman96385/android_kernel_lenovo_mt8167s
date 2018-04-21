@@ -1,15 +1,16 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
-* This program is free software; you can redistribute it and/or modify
-* it under the terms of the GNU General Public License version 2 as
-* published by the Free Software Foundation.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-* See http://www.gnu.org/licenses/gpl-2.0.html for more details.
-*/
+ * Copyright (C) 2016 MediaTek Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ */
+
 /* system includes */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -23,7 +24,6 @@
 #include <linux/miscdevice.h>
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
-#include <linux/debugfs.h>
 #include <linux/kthread.h>
 #include <linux/hrtimer.h>
 #include <linux/sched/rt.h>
@@ -38,6 +38,7 @@
 #include <linux/types.h>
 #include <linux/suspend.h>
 #include <linux/topology.h>
+#include <linux/math64.h>
 #include <mt-plat/sync_write.h>
 #include <mt-plat/mtk_io.h>
 #include <mt-plat/aee.h>
@@ -47,27 +48,62 @@
 #include "sspm_ipi.h"
 #endif
 
+#include <mt-plat/met_drv.h>
+
 #include "mtk_cpufreq_internal.h"
+#include "mtk_cpufreq_platform.h"
 #include "mtk_cpufreq_hybrid.h"
+#include "mtk_cpufreq_opp_pv_table.h"
 #include "mtk_cpufreq_debug.h"
 
-#define DEFINE_FOPS_RO(fname)						\
-static int fname##_open(struct inode *inode, struct file *file)		\
-{									\
-	return single_open(file, fname##_show, inode->i_private);	\
-}									\
-static const struct file_operations fname##_fops = {			\
-	.open		= fname##_open,					\
-	.read		= seq_read,					\
-	.llseek		= seq_lseek,					\
-	.release	= single_release,				\
+#ifdef CONFIG_HYBRID_CPU_DVFS
+
+#include <linux/of_address.h>
+u32 *g_dbg_repo;
+static u32 dvfsp_probe_done;
+void __iomem *log_repo;
+static void __iomem *csram_base;
+/* static void __iomem *cspm_base; */
+#define csram_read(offs)		__raw_readl(csram_base + (offs))
+#define csram_write(offs, val)		mt_reg_sync_writel(val, csram_base + (offs))
+
+#define OFFS_TBL_S		0x0010
+#define OFFS_TBL_E		0x0250
+#define PVT_TBL_SIZE    (OFFS_TBL_E - OFFS_TBL_S)
+#define OFFS_DATA_S		0x02a0
+#define OFFS_LOG_S		0x03d0
+#define OFFS_LOG_E		(OFFS_LOG_S + DVFS_LOG_NUM * ENTRY_EACH_LOG * 4)
+
+#define MAX_LOG_FETCH 40
+/* log_box_parsed[MAX_LOG_FETCH] is also used to save last log entry */
+static struct cpu_dvfs_log_box log_box_parsed[1 + MAX_LOG_FETCH];
+
+void parse_time_log_content(unsigned int time_stamp_l_log, unsigned int time_stamp_h_log, int idx)
+{
+	if (time_stamp_h_log == 0 && time_stamp_l_log == 0)
+		log_box_parsed[idx].time_stamp = 0;
+
+	log_box_parsed[idx].time_stamp = ((unsigned long long)time_stamp_h_log << 32) |
+		(unsigned long long)(time_stamp_l_log);
 }
 
-#ifdef CONFIG_HYBRID_CPU_DVFS
+void parse_log_content(unsigned int *local_buf, int idx)
+{
+	struct cpu_dvfs_log *log_box = (struct cpu_dvfs_log *)local_buf;
+	struct mt_cpu_dvfs *p;
+	int i;
+
+	for_each_cpu_dvfs(i, p) {
+		log_box_parsed[idx].cluster_opp_cfg[i].limit_idx = log_box->cluster_opp_cfg[i].limit;
+		log_box_parsed[idx].cluster_opp_cfg[i].base_idx = log_box->cluster_opp_cfg[i].base;
+		log_box_parsed[idx].cluster_opp_cfg[i].freq_idx = log_box->cluster_opp_cfg[i].opp_idx_log;
+	}
+}
+
 spinlock_t cpudvfs_lock;
 static struct task_struct *Ripi_cpu_dvfs_task;
-struct ipi_action ptpod_act;
-uint32_t ptpod_buf[4];
+struct ipi_action cpufreq_act;
+uint32_t cpufreq_buf[4];
 int Ripi_cpu_dvfs_thread(void *data)
 {
 	int i, ret;
@@ -75,71 +111,145 @@ int Ripi_cpu_dvfs_thread(void *data)
 	unsigned long flags;
 	uint32_t pwdata[4];
 	struct cpufreq_freqs freqs;
-	int previous_limit = -1;
 
-	/* cpufreq_info("CPU DVFS received thread\n"); */
-	ptpod_act.data = (void *)ptpod_buf;
-	ret = sspm_ipi_recv_registration_ex(IPI_ID_CPU_DVFS, &cpudvfs_lock, &ptpod_act);
+	int previous_limit = -1;
+	int previous_base = -1;
+	int num_log;
+	unsigned int buf[ENTRY_EACH_LOG] = {0};
+	unsigned int bk_log_offs;
+	unsigned int buf_freq;
+	unsigned long long tf_sum, t_diff, avg_f;
+	int j;
+
+	/* tag_pr_info("CPU DVFS received thread\n"); */
+	cpufreq_act.data = (void *)cpufreq_buf;
+	ret = sspm_ipi_recv_registration_ex(IPI_ID_CPU_DVFS, &cpudvfs_lock, &cpufreq_act);
 
 	if (ret != 0) {
-		cpufreq_err("Error: ipi_recv_registration CPU DVFS error: %d\n", ret);
+		tag_pr_notice("Error: ipi_recv_registration CPU DVFS error: %d\n", ret);
 		do {
 			msleep(1000);
 		} while (!kthread_should_stop());
 		return (-1);
 	}
-	/* cpufreq_info("sspm_ipi_recv_registration IPI_ID_CPU_DVFS pass!!(%d)\n", ret); */
+	/* tag_pr_info("sspm_ipi_recv_registration IPI_ID_CPU_DVFS pass!!(%d)\n", ret); */
 
 	/* an endless loop in which we are doing our work */
-	i = 0;
 	do {
-		i++;
-		/* cpufreq_info("sspm_ipi_recv_wait IPI_ID_CPU_DVFS\n"); */
+		/* tag_pr_info("sspm_ipi_recv_wait IPI_ID_CPU_DVFS\n"); */
 		sspm_ipi_recv_wait(IPI_ID_CPU_DVFS);
-		/* cpufreq_info("Info: CPU DVFS thread received ID=%d, i=%d\n", ptpod_act.id, i); */
+		/* tag_pr_info("Info: CPU DVFS thread received ID=%d, i=%d\n", cpufreq_act.id, i); */
 		spin_lock_irqsave(&cpudvfs_lock, flags);
-		memcpy(pwdata, ptpod_buf, sizeof(pwdata));
+		memcpy(pwdata, cpufreq_buf, sizeof(pwdata));
 		spin_unlock_irqrestore(&cpudvfs_lock, flags);
+
+		bk_log_offs = pwdata[0];
+		num_log = 0;
+		while (bk_log_offs != pwdata[1]) {
+			buf[0] = csram_read(bk_log_offs);
+			bk_log_offs += 4;
+			if (bk_log_offs >= OFFS_LOG_E)
+				bk_log_offs = OFFS_LOG_S;
+			buf[1] = csram_read(bk_log_offs);
+			bk_log_offs += 4;
+			if (bk_log_offs >= OFFS_LOG_E)
+				bk_log_offs = OFFS_LOG_S;
+
+			/* For parsing timestamp */
+			parse_time_log_content(buf[0], buf[1], num_log);
+			for (j = 2; j < ENTRY_EACH_LOG; j++) {
+				/* Read out sram content */
+				buf[j] = csram_read(bk_log_offs);
+				bk_log_offs += 4;
+				if (bk_log_offs >= OFFS_LOG_E)
+					bk_log_offs = OFFS_LOG_S;
+			}
+
+			/* For parsing freq idx */
+			parse_log_content(buf, num_log);
+			num_log++;
+		}
 
 		cpufreq_lock(flags);
 		for_each_cpu_dvfs_only(i, p) {
-#if 0
-			cpufreq_info("DVFS - Received %s: (old | new freq:%d %d, limit:%d, base:%d)\n",
-				cpu_dvfs_get_name(p), cpu_dvfs_get_freq_by_idx(p, p->idx_opp_tbl),
-				cpu_dvfs_get_freq_by_idx(p, (int)(pwdata[0] >> (8*i)) & 0xF),
-				cpu_dvfs_get_freq_by_idx(p, (int)((pwdata[1] >> (8*i+4)) & 0xF)),
-				cpu_dvfs_get_freq_by_idx(p, (int)((pwdata[1] >> (8*i)) & 0xF)));
-#endif
 			if (!p->armpll_is_available)
 				continue;
 
+			if (num_log == 1)
+				j = log_box_parsed[0].cluster_opp_cfg[i].freq_idx;
+			else {
+				tf_sum = 0;
+				for (j = num_log - 1; j >= 1; j--) {
+					buf_freq = cpu_dvfs_get_freq_by_idx(p,
+						log_box_parsed[j - 1].cluster_opp_cfg[i].freq_idx);
+					tf_sum += (log_box_parsed[j].time_stamp - log_box_parsed[j-1].time_stamp) *
+					(buf_freq/1000);
+				}
+				t_diff = log_box_parsed[num_log - 1].time_stamp - log_box_parsed[0].time_stamp;
+#if defined(__LP64__) || defined(_LP64)
+				avg_f = tf_sum / t_diff;
+#else
+				avg_f = div64_u64(tf_sum, t_diff);
+#endif
+				avg_f *= 1000;
+				for (j = p->nr_opp_tbl - 1; j >= 1; j--) {
+					if (cpu_dvfs_get_freq_by_idx(p, j) >= avg_f)
+						break;
+				}
+			}
+
 			/* Avoid memory issue */
-			if (p->mt_policy && p->mt_policy->governor && p->mt_policy->governor_enabled &&
+			if (p->mt_policy && p->mt_policy->governor &&
+				p->mt_policy->governor_enabled &&
 				(p->mt_policy->cpu < 10) && (p->mt_policy->cpu >= 0)) {
-				/* Update policy min/max */
+				int cid;
+
 				previous_limit = p->idx_opp_ppm_limit;
-				p->idx_opp_ppm_base = (int)((pwdata[2] >> (8*i)) & 0xF);
-				p->idx_opp_ppm_limit = (int)((pwdata[1] >> (8*i)) & 0xF);
+				previous_base = p->idx_opp_ppm_base;
+				p->idx_opp_ppm_limit =
+					(int)(log_box_parsed[num_log - 1].cluster_opp_cfg[i].limit_idx);
+				p->idx_opp_ppm_base =
+					(int)(log_box_parsed[num_log - 1].cluster_opp_cfg[i].base_idx);
+
+				if (j < p->idx_opp_ppm_limit)
+					j = p->idx_opp_ppm_limit;
+
+				if (j > p->idx_opp_ppm_base)
+					j = p->idx_opp_ppm_base;
+
+				/* Update policy min/max */
 				p->mt_policy->min =
 					cpu_dvfs_get_freq_by_idx(p, p->idx_opp_ppm_base);
 				p->mt_policy->max =
 					cpu_dvfs_get_freq_by_idx(p, p->idx_opp_ppm_limit);
+
+				cid = arch_get_cluster_id(p->mt_policy->cpu);
+				if (cid == 0) {
+					met_tag_oneshot(0, "sched_dvfs_max_c0", p->mt_policy->max);
+					met_tag_oneshot(0, "sched_dvfs_min_c0", p->mt_policy->min);
+				} else if (cid == 1) {
+					met_tag_oneshot(0, "sched_dvfs_max_c1", p->mt_policy->max);
+					met_tag_oneshot(0, "sched_dvfs_min_c1", p->mt_policy->min);
+				} else if (cid == 2) {
+					met_tag_oneshot(0, "sched_dvfs_max_c2", p->mt_policy->max);
+					met_tag_oneshot(0, "sched_dvfs_min_c2", p->mt_policy->min);
+				}
+
 				/* Policy notification */
-				if (p->idx_opp_tbl != (int)((pwdata[0] >> (8*i)) & 0xF) ||
-					(p->idx_opp_ppm_limit != previous_limit)) {
-					cpufreq_ver("DVFS - cpu%d do postchange\n", p->mt_policy->cpu);
-					freqs.cpu = p->mt_policy->cpu;
-					freqs.old = cpu_dvfs_get_freq_by_idx(p, p->idx_opp_tbl);
-					freqs.new = cpu_dvfs_get_freq_by_idx(p, (int)(pwdata[0] >> (8*i)) & 0xF);
+				if (p->idx_opp_tbl != j ||
+					(p->idx_opp_ppm_limit != previous_limit) ||
+					(p->idx_opp_ppm_base != previous_base)) {
+					freqs.old = cpu_dvfs_get_cur_freq(p);
+					freqs.new = cpu_dvfs_get_freq_by_idx(p, j);
+					p->idx_opp_tbl = j;
+					/* Update frequency change */
 					cpufreq_freq_transition_begin(p->mt_policy, &freqs);
 					cpufreq_freq_transition_end(p->mt_policy, &freqs, 0);
-					p->idx_opp_tbl = (int)(pwdata[0] >> (8*i) & 0xF);
 				}
 			}
 		}
 		cpufreq_unlock(flags);
 
-		/* cpufreq_info("Info: CPU DVFS Task send back Done\n"); */
 	} while (!kthread_should_stop());
 	return 0;
 }
@@ -192,10 +302,18 @@ int dvfs_to_spm2_command(u32 cmd, struct cdvfs_data *cdvfs_d)
 		ret = sspm_ipi_send_sync_new(IPI_ID_CPU_DVFS, IPI_OPT_POLLING, cdvfs_d, len, &ack_data, 1);
 		aee_record_cpu_dvfs_cb(7);
 		if (ret != 0) {
+			tag_pr_notice("ret = %d, set cluster%d ON/OFF state to %d\n",
+				ret, cdvfs_d->u.set_fv.arg[0], cdvfs_d->u.set_fv.arg[1]);
+#if 0
 			cpufreq_ver("#@# %s(%d) sspm_ipi_send_sync ret %d\n", __func__, __LINE__, ret);
+#endif
 		} else if (ack_data < 0) {
+			tag_pr_notice("ret = %d, set cluster%d ON/OFF state to %d\n",
+				ret, cdvfs_d->u.set_fv.arg[0], cdvfs_d->u.set_fv.arg[1]);
+#if 0
 			ret = ack_data;
 			cpufreq_ver("#@# %s(%d) cmd(%d) return %d\n", __func__, __LINE__, cmd, ret);
+#endif
 		}
 		aee_record_cpu_dvfs_cb(8);
 		break;
@@ -277,6 +395,21 @@ int dvfs_to_spm2_command(u32 cmd, struct cdvfs_data *cdvfs_d)
 		}
 		break;
 
+	case IPI_TIME_PROFILE:
+		cdvfs_d->cmd = cmd;
+
+		cpufreq_ver("I'd like to dump time profile data(%d, %d, %d)\n",
+			cdvfs_d->u.set_fv.arg[0], cdvfs_d->u.set_fv.arg[1], cdvfs_d->u.set_fv.arg[2]);
+
+		ret = sspm_ipi_send_sync_new(IPI_ID_CPU_DVFS, IPI_OPT_POLLING, cdvfs_d, len, &ack_data, 1);
+		if (ret != 0) {
+			cpufreq_ver("#@# %s(%d) sspm_ipi_send_sync ret %d\n", __func__, __LINE__, ret);
+		} else if (ack_data < 0) {
+			ret = ack_data;
+			cpufreq_ver("#@# %s(%d) cmd(%d) return %d\n", __func__, __LINE__, cmd, ret);
+		}
+		break;
+
 	default:
 		cpufreq_ver("#@# %s(%d) cmd(%d) wrong!!!\n", __func__, __LINE__, cmd);
 		break;
@@ -285,30 +418,6 @@ int dvfs_to_spm2_command(u32 cmd, struct cdvfs_data *cdvfs_d)
 	return ret;
 }
 
-#include <linux/of_address.h>
-u32 *g_dbg_repo;
-static u32 cmcu_probe_done;
-void __iomem *log_repo;
-static void __iomem *csram_base;
-/* static void __iomem *cspm_base; */
-#define csram_read(offs)		__raw_readl(csram_base + (offs))
-#define csram_write(offs, val)		mt_reg_sync_writel(val, csram_base + (offs))
-
-#define CSRAM_BASE		0x0012a000
-#define CSRAM_SIZE		0x3000		/* 12K bytes */
-#define ENTRY_EACH_LOG		7
-#define OFFS_TBL_S		0x0010
-#define OFFS_TBL_E		0x0250
-#define PVT_TBL_SIZE    (OFFS_TBL_E - OFFS_TBL_S)
-#define OFFS_DATA_S		0x02a0
-#if 0
-#define OFFS_LOG_S		0x03d0
-#define OFFS_LOG_E		0x0ec0
-#else
-#define OFFS_LOG_S		0x03d0
-#define OFFS_LOG_E		0x1438
-#endif
-/* #define OFFS_LOG_E		0x2ff8 */
 #define DBG_REPO_S		CSRAM_BASE
 #define DBG_REPO_E		(DBG_REPO_S + CSRAM_SIZE)
 #define DBG_REPO_TBL_S		(DBG_REPO_S + OFFS_TBL_S)
@@ -324,37 +433,42 @@ static void __iomem *csram_base;
 #define REPO_GUARD0		0x55aa55aa
 #define REPO_GUARD1		0xaa55aa55
 
-#define OFFS_TURBO_FREQ	0x02a4 /* 169 */
-#define OFFS_TURBO_VOLT	0x02a8 /* 170 */
+#define OFFS_TURBO_FREQ		0x02a4	/* 169 */
+#define OFFS_TURBO_VOLT		0x02a8	/* 170 */
 
-#define OFFS_TURBO_EN	0x02b8 /* 202 */
-#define OFFS_SCHED_EN	0x02bc /* 203 */
-#define OFFS_STRESS_EN	0x02c0 /* 204 */
+#define OFFS_TURBO_DIS		0x02b8	/* 174 */
+#define OFFS_SCHED_DIS		0x02bc	/* 175 */
+#define OFFS_STRESS_EN		0x02c0	/* 176 */
+
+/* EEM Update Flag */
+#define OFFS_EEM_S		0x0300	/* 192 */
+#define OFFS_EEM_E		0x030c	/* 195 */
 
 /* ICCS idx */
-#define OFFS_ICCS_IDX_S  0x0310 /* 196 */
-#define OFFS_ICCS_IDX_E  0x0318 /* 198 */
+#define OFFS_ICCS_IDX_S		0x0310	/* 196 */
+#define OFFS_ICCS_IDX_E		0x0318	/* 198 */
+
+/* PPM idx */
+#define OFFS_PPM_LIMIT_S	0x0320	/* 200 */
 
 /* CUR Vproc */
-#define OFFS_CUR_VPROC_S  0x032c
-#define OFFS_CUR_VPROC_E  0x0350
+#define OFFS_CUR_VPROC_S	0x032c	/* 203 */
+#define OFFS_CUR_VPROC_E	0x0350	/* 212 */
 
 /* CUR idx */
-#define OFFS_CUR_FREQ_S  0x0354 /* 213 */
-#define OFFS_CUR_FREQ_E  0x0378 /* 222 */
+#define OFFS_CUR_FREQ_S		0x0354	/* 213 */
+#define OFFS_CUR_FREQ_E		0x0378	/* 222 */
 
 /* WFI idx */
-#define OFFS_WFI_S		0x037c /* 223 */
-#define OFFS_WFI_E		0x03a0 /* 232 */
+#define OFFS_WFI_S		0x037c	/* 223 */
+#define OFFS_WFI_E		0x03a0	/* 232 */
 
 /* Schedule assist idx */
-#define OFFS_SCHED_S		0x03a4 /* 233 */
-#define OFFS_SCHED_E		0x03c8 /* 242 */
+#define OFFS_SCHED_S		0x03a4	/* 233 */
+#define OFFS_SCHED_E		0x03c8	/* 242 */
 
-#define NR_FREQ       16
-
-static u32 dbg_repo_bak[DBG_REPO_NUM];
-static int _mt_cmcu_pdrv_probe(struct platform_device *pdev)
+static u32 g_dbg_repo_bak[DBG_REPO_NUM];
+static int _mt_dvfsp_pdrv_probe(struct platform_device *pdev)
 {
 	/* cspm_base = of_iomap(pdev->dev.of_node, 0); */
 
@@ -363,30 +477,30 @@ static int _mt_cmcu_pdrv_probe(struct platform_device *pdev)
 	if (!csram_base)
 		return -ENOMEM;
 
-	cmcu_probe_done = 1;
+	dvfsp_probe_done = 1;
 
 	return 0;
 }
 
-static int _mt_cmcu_pdrv_remove(struct platform_device *pdev)
+static int _mt_dvfsp_pdrv_remove(struct platform_device *pdev)
 {
 	return 0;
 }
 
 #ifdef CONFIG_OF
-static const struct of_device_id cmcu_of_match[] = {
-	{ .compatible = "mediatek,mt6799-cmcu", },
+static const struct of_device_id dvfsp_of_match[] = {
+	{ .compatible = DVFSP_DT_NODE, },
 	{}
 };
 #endif
 
-static struct platform_driver _mt_cmcu_pdrv = {
-	.probe = _mt_cmcu_pdrv_probe,
-	.remove = _mt_cmcu_pdrv_remove,
+static struct platform_driver _mt_dvfsp_pdrv = {
+	.probe = _mt_dvfsp_pdrv_probe,
+	.remove = _mt_dvfsp_pdrv_remove,
 	.driver = {
-		   .name = "cmcu",
+		   .name = "dvfsp",
 		   .owner = THIS_MODULE,
-		   .of_match_table	= of_match_ptr(cmcu_of_match),
+		   .of_match_table	= of_match_ptr(dvfsp_of_match),
 	},
 };
 
@@ -434,8 +548,12 @@ int cpuhvfs_set_cluster_on_off(int cluster_id, int state)
 	return 0;
 }
 
-int cpuhvfs_set_mix_max(int cluster_id, int base, int limit)
+int cpuhvfs_set_min_max(int cluster_id, int base, int limit)
 {
+#ifdef PPM_AP_SIDE
+	csram_write((OFFS_PPM_LIMIT_S + (cluster_id * 4)),
+		(limit << 16 | base));
+#endif
 	return 0;
 }
 
@@ -449,20 +567,20 @@ int cpuhvfs_get_sched_dvfs_disable(void)
 {
 	unsigned int disable;
 
-	disable = csram_read(OFFS_SCHED_EN);
+	disable = csram_read(OFFS_SCHED_DIS);
 
 	return disable;
 }
 
 int cpuhvfs_set_sched_dvfs_disable(unsigned int disable)
 {
-	csram_write(OFFS_SCHED_EN, disable);
+	csram_write(OFFS_SCHED_DIS, disable);
 	return 0;
 }
 
 int cpuhvfs_set_turbo_disable(unsigned int disable)
 {
-	csram_write(OFFS_TURBO_EN, disable);
+	csram_write(OFFS_TURBO_DIS, disable);
 	return 0;
 }
 
@@ -511,7 +629,7 @@ int cpuhvfs_get_volt(int buck_id)
 
 	return ret;
 #else
-	return 0;
+	return csram_read(OFFS_CUR_VPROC_S + (buck_id * 4));
 #endif
 }
 
@@ -572,6 +690,20 @@ int cpuhvfs_set_turbo_mode(int turbo_mode, int freq_step, int volt_step)
 	return 0;
 }
 
+int cpuhvfs_get_time_profile(void)
+{
+#ifdef CPUDVFS_TIME_PROFILE
+	struct cdvfs_data cdvfs_d;
+
+	cdvfs_d.u.set_fv.arg[0] = 0;
+	cdvfs_d.u.set_fv.arg[1] = 0;
+	cdvfs_d.u.set_fv.arg[2] = 0;
+
+	dvfs_to_spm2_command(IPI_TIME_PROFILE, &cdvfs_d);
+#endif
+	return 0;
+}
+
 int cpuhvfs_set_iccs_freq(enum mt_cpu_dvfs_id id, unsigned int freq)
 {
 	struct mt_cpu_dvfs *p;
@@ -594,7 +726,6 @@ int cpuhvfs_set_iccs_freq(enum mt_cpu_dvfs_id id, unsigned int freq)
 	return 0;
 }
 
-#if 1
 unsigned int counter;
 int cpuhvfs_set_cluster_load_freq(enum mt_cpu_dvfs_id id, unsigned int freq)
 {
@@ -612,7 +743,7 @@ int cpuhvfs_set_cluster_load_freq(enum mt_cpu_dvfs_id id, unsigned int freq)
 
 	counter++;
 	if (counter > 255)
-		counter = 0;
+		counter = 1;
 
 	/* [3:0] freq_idx, [11:4] counter */
 	freq_idx = _search_available_freq_idx(p, freq, 0);
@@ -627,397 +758,87 @@ int cpuhvfs_set_cluster_load_freq(enum mt_cpu_dvfs_id id, unsigned int freq)
 
 	return 0;
 }
-#else
-int cpuhvfs_set_cpu_load_freq(unsigned int cpu, enum cpu_dvfs_sched_type state, unsigned int freq)
-{
-	enum mt_cpu_dvfs_id id;
-	struct mt_cpu_dvfs *p;
-	int freq_idx = 0;
-	unsigned int buf;
-
-	/* cpufreq_ver("sched: cpu = %d, state = %d, freq = %d\n", cpu, state, freq); */
-
-	counter++;
-	if (counter > 255)
-		counter = 0;
-
-	/* [3:0] freq_idx, [7:4] state, [15:8] counter */
-	id = (cpu > 7) ? MT_CPU_DVFS_B :
-		(cpu > 4) ? MT_CPU_DVFS_L : MT_CPU_DVFS_LL;
-
-	p = id_to_cpu_dvfs(id);
-	freq_idx = _search_available_freq_idx(p, freq, 0);
-
-	buf = ((counter << 8) | (state << 4) | freq_idx);
-
-	csram_write((OFFS_SCHED_S + (cpu * 4)), buf);
-
-	/* cpufreq_ver("sched: buf = 0x%x\n", buf); */
-
-	if (id == MT_CPU_DVFS_LL)
-		trace_sched_update(cpu, csram_read(OFFS_SCHED_S), csram_read(OFFS_SCHED_S + 4),
-			csram_read(OFFS_SCHED_S + 8), csram_read(OFFS_SCHED_S + 12));
-	else if (id == MT_CPU_DVFS_L)
-		trace_sched_update(cpu, csram_read(OFFS_SCHED_S + 16), csram_read(OFFS_SCHED_S + 20),
-			csram_read(OFFS_SCHED_S + 24), csram_read(OFFS_SCHED_S + 28));
-	else if (id == MT_CPU_DVFS_B)
-		trace_sched_update(cpu, csram_read(OFFS_SCHED_S + 32), csram_read(OFFS_SCHED_S + 36), 0, 0);
-
-	return 0;
-}
-#endif
-
-/*
-* Module driver
-*/
-#define ARRAY_ROW_SIZE 4
-unsigned int fyTbl[][ARRAY_ROW_SIZE] = {
-/* Freq, Vproc, post_div, clk_div */
-	{1248, 0x32A, 2, 1},/* (LL) */
-	{1209, 0x316, 2, 1},
-	{1170, 0x307, 2, 1},
-	{1118, 0x2F3, 2, 1},
-	{1066, 0x2DF, 2, 1},
-	{1027, 0x2CB, 2, 1},
-	{975, 0x2B7, 4, 1},
-	{923, 0x2A3, 4, 1},
-	{858, 0x28A, 4, 1},
-	{806, 0x276, 4, 1},
-	{741, 0x270, 4, 1},
-	{663, 0x270, 4, 1},
-	{585, 0x270, 4, 1},
-	{520, 0x270, 4, 1},
-	{442, 0x270, 4, 2},
-	{351, 0x270, 4, 2},
-
-	{1378, 0x32A, 2, 1},/* (L) */
-	{1313, 0x316, 2, 1},
-	{1274, 0x307, 2, 1},
-	{1209, 0x2F3, 2, 1},
-	{1144, 0x2DF, 2, 1},
-	{1079, 0x2CB, 2, 1},
-	{1014, 0x2B7, 2, 1},
-	{962, 0x2A3, 4, 1},
-	{884, 0x28A, 4, 1},
-	{819, 0x276, 4, 1},
-	{741, 0x270, 4, 1},
-	{663, 0x270, 4, 1},
-	{585, 0x270, 4, 1},
-	{520, 0x270, 4, 1},
-	{442, 0x270, 4, 2},
-	{338, 0x270, 4, 2},
-
-	{1638, 0x32A, 2, 1},/* (B) */
-	{1534, 0x316, 2, 1},
-	{1469, 0x307, 2, 1},
-	{1378, 0x2F3, 2, 1},
-	{1287, 0x2DF, 2, 1},
-	{1196, 0x2CB, 2, 1},
-	{1105, 0x2B7, 2, 1},
-	{1014, 0x2A3, 2, 1},
-	{897, 0x28A, 4, 1},
-	{806, 0x276, 4, 1},
-	{715, 0x270, 4, 1},
-	{650, 0x270, 4, 1},
-	{572, 0x270, 4, 1},
-	{507, 0x270, 4, 1},
-	{429, 0x270, 4, 2},
-	{338, 0x270, 4, 2},
-
-	{754, 0x32A, 4, 1},/* (CCI) */
-	{715, 0x316, 4, 1},
-	{689, 0x307, 4, 1},
-	{650, 0x2F3, 4, 1},
-	{611, 0x2DF, 4, 1},
-	{585, 0x2CB, 4, 1},
-	{546, 0x2B7, 4, 1},
-	{507, 0x2A3, 4, 1},
-	{468, 0x28A, 4, 2},
-	{429, 0x276, 4, 2},
-	{390, 0x270, 4, 2},
-	{338, 0x270, 4, 2},
-	{299, 0x270, 4, 2},
-	{247, 0x270, 4, 4},
-	{208, 0x270, 4, 4},
-	{156, 0x270, 4, 4},
-};
-
-unsigned int fyaTbl[][ARRAY_ROW_SIZE] = {
-/* Freq, Vproc, post_div, clk_div */
-	{1586, 0x32A, 2, 1},/* (LL) */
-	{1495, 0x316, 2, 1},
-	{1430, 0x307, 2, 1},
-	{1352, 0x2F3, 2, 1},
-	{1261, 0x2DF, 2, 1},
-	{1183, 0x2CB, 2, 1},
-	{1092, 0x2B7, 2, 1},
-	{1014, 0x2A3, 2, 1},
-	{910, 0x28A, 4, 1},
-	{819, 0x276, 4, 1},
-	{741, 0x270, 4, 1},
-	{663, 0x270, 4, 1},
-	{585, 0x270, 4, 1},
-	{520, 0x270, 4, 1},
-	{442, 0x270, 4, 2},
-	{351, 0x270, 4, 2},
-
-	{1690, 0x32A, 2, 1},/* (L) */
-	{1586, 0x316, 2, 1},
-	{1521, 0x307, 2, 1},
-	{1417, 0x2F3, 2, 1},
-	{1326, 0x2DF, 2, 1},
-	{1235, 0x2CB, 2, 1},
-	{1131, 0x2B7, 2, 1},
-	{1040, 0x2A3, 2, 1},
-	{923, 0x28A, 4, 1},
-	{832, 0x276, 4, 1},
-	{741, 0x270, 4, 1},
-	{663, 0x270, 4, 1},
-	{585, 0x270, 4, 1},
-	{520, 0x270, 4, 1},
-	{442, 0x270, 4, 2},
-	{338, 0x270, 4, 2},
-
-	{1976, 0x32A, 2, 1},/* (B) */
-	{1846, 0x316, 2, 1},
-	{1742, 0x307, 2, 1},
-	{1612, 0x2F3, 2, 1},
-	{1495, 0x2DF, 2, 1},
-	{1365, 0x2CB, 2, 1},
-	{1235, 0x2B7, 2, 1},
-	{1105, 0x2A3, 2, 1},
-	{949, 0x28A, 4, 1},
-	{819, 0x276, 4, 1},
-	{715, 0x270, 4, 1},
-	{650, 0x270, 4, 1},
-	{572, 0x270, 4, 1},
-	{507, 0x270, 4, 1},
-	{429, 0x270, 4, 2},
-	{338, 0x270, 4, 2},
-
-	{949, 0x32A, 4, 1},/* (CCI) */
-	{884, 0x316, 4, 1},
-	{845, 0x307, 4, 1},
-	{793, 0x2F3, 4, 1},
-	{728, 0x2DF, 4, 1},
-	{676, 0x2CB, 4, 1},
-	{624, 0x2B7, 4, 1},
-	{559, 0x2A3, 4, 1},
-	{494, 0x28A, 4, 2},
-	{442, 0x276, 4, 2},
-	{390, 0x270, 4, 2},
-	{338, 0x270, 4, 2},
-	{299, 0x270, 4, 2},
-	{247, 0x270, 4, 4},
-	{208, 0x270, 4, 4},
-	{156, 0x270, 4, 4},
-};
-
-unsigned int fybTbl[][ARRAY_ROW_SIZE] = {
-/* Freq, Vproc, post_div, clk_div */
-	{1755, 0x32A, 2, 1},/* (LL) */
-	{1651, 0x316, 2, 1},
-	{1573, 0x307, 2, 1},
-	{1469, 0x2F3, 2, 1},
-	{1365, 0x2DF, 2, 1},
-	{1261, 0x2CB, 2, 1},
-	{1157, 0x2B7, 2, 1},
-	{1053, 0x2A3, 2, 1},
-	{936, 0x28A, 4, 1},
-	{832, 0x276, 4, 1},
-	{741, 0x270, 4, 1},
-	{663, 0x270, 4, 1},
-	{585, 0x270, 4, 1},
-	{520, 0x270, 4, 1},
-	{442, 0x270, 4, 2},
-	{351, 0x270, 4, 2},
-
-	{1872, 0x32A, 2, 1},/* (L) */
-	{1755, 0x316, 2, 1},
-	{1664, 0x307, 2, 1},
-	{1547, 0x2F3, 2, 1},
-	{1430, 0x2DF, 2, 1},
-	{1326, 0x2CB, 2, 1},
-	{1209, 0x2B7, 2, 1},
-	{1092, 0x2A3, 2, 1},
-	{949, 0x28A, 4, 1},
-	{832, 0x276, 4, 1},
-	{741, 0x270, 4, 1},
-	{663, 0x270, 4, 1},
-	{585, 0x270, 4, 1},
-	{520, 0x270, 4, 1},
-	{442, 0x270, 4, 2},
-	{338, 0x270, 4, 2},
-
-	{2197, 0x32A, 1, 1},/* (B) */
-	{2041, 0x316, 1, 1},
-	{1924, 0x307, 2, 1},
-	{1768, 0x2F3, 2, 1},
-	{1625, 0x2DF, 2, 1},
-	{1469, 0x2CB, 2, 1},
-	{1313, 0x2B7, 2, 1},
-	{1170, 0x2A3, 2, 1},
-	{975, 0x28A, 4, 1},
-	{819, 0x276, 4, 1},
-	{715, 0x270, 4, 1},
-	{650, 0x270, 4, 1},
-	{572, 0x270, 4, 1},
-	{507, 0x270, 4, 1},
-	{429, 0x270, 4, 2},
-	{338, 0x270, 4, 2},
-
-	{1053, 0x32A, 2, 1},/* (CCI) */
-	{975, 0x316, 4, 1},
-	{923, 0x307, 4, 1},
-	{858, 0x2F3, 4, 1},
-	{793, 0x2DF, 4, 1},
-	{728, 0x2CB, 4, 1},
-	{663, 0x2B7, 4, 1},
-	{598, 0x2A3, 4, 1},
-	{507, 0x28A, 4, 1},
-	{442, 0x276, 4, 2},
-	{390, 0x270, 4, 2},
-	{338, 0x270, 4, 2},
-	{299, 0x270, 4, 2},
-	{247, 0x270, 4, 4},
-	{208, 0x270, 4, 4},
-	{156, 0x270, 4, 4},
-};
-
-unsigned int sbTbl[][ARRAY_ROW_SIZE] = {
-/* Freq, Vproc, post_div, clk_div */
-	{1378, 0x32A, 2, 1},/* (LL) */
-	{1300, 0x316, 2, 1},
-	{1248, 0x307, 2, 1},
-	{1183, 0x2F3, 2, 1},
-	{1105, 0x2DF, 2, 1},
-	{1027, 0x2CB, 2, 1},
-	{975, 0x2B7, 4, 1},
-	{923, 0x2A3, 4, 1},
-	{858, 0x28A, 4, 1},
-	{806, 0x276, 4, 1},
-	{741, 0x270, 4, 1},
-	{663, 0x270, 4, 1},
-	{585, 0x270, 4, 1},
-	{520, 0x270, 4, 1},
-	{442, 0x270, 4, 2},
-	{351, 0x270, 4, 2},
-
-	{1521, 0x32A, 2, 1},/* (L) */
-	{1430, 0x316, 2, 1},
-	{1365, 0x307, 2, 1},
-	{1274, 0x2F3, 2, 1},
-	{1183, 0x2DF, 2, 1},
-	{1092, 0x2CB, 2, 1},
-	{1014, 0x2B7, 2, 1},
-	{962, 0x2A3, 4, 1},
-	{884, 0x28A, 4, 1},
-	{819, 0x276, 4, 1},
-	{741, 0x270, 4, 1},
-	{663, 0x270, 4, 1},
-	{585, 0x270, 4, 1},
-	{520, 0x270, 4, 1},
-	{442, 0x270, 4, 2},
-	{338, 0x270, 4, 2},
-
-	{1716, 0x32A, 2, 1},/* (B) */
-	{1612, 0x316, 2, 1},
-	{1521, 0x307, 2, 1},
-	{1417, 0x2F3, 2, 1},
-	{1313, 0x2DF, 2, 1},
-	{1196, 0x2CB, 2, 1},
-	{1105, 0x2B7, 2, 1},
-	{1014, 0x2A3, 2, 1},
-	{897, 0x28A, 4, 1},
-	{806, 0x276, 4, 1},
-	{715, 0x270, 4, 1},
-	{650, 0x270, 4, 1},
-	{572, 0x270, 4, 1},
-	{507, 0x270, 4, 1},
-	{429, 0x270, 4, 2},
-	{338, 0x270, 4, 2},
-
-	{832, 0x32A, 4, 1},/* (CCI) */
-	{780, 0x316, 4, 1},
-	{741, 0x307, 4, 1},
-	{689, 0x2F3, 4, 1},
-	{637, 0x2DF, 4, 1},
-	{585, 0x2CB, 4, 1},
-	{546, 0x2B7, 4, 1},
-	{507, 0x2A3, 4, 1},
-	{468, 0x28A, 4, 2},
-	{429, 0x276, 4, 2},
-	{390, 0x270, 4, 2},
-	{338, 0x270, 4, 2},
-	{299, 0x270, 4, 2},
-	{247, 0x270, 4, 4},
-	{208, 0x270, 4, 4},
-	{156, 0x270, 4, 4},
-};
 
 u32 *recordRef;
 static unsigned int *recordTbl;
 
+int cpuhvfs_update_volt(unsigned int cluster_id, unsigned int *volt_tbl, char nr_volt_tbl)
+{
+#ifdef EEM_AP_SIDE
+	int i;
+	int index;
+
+	for (i = 0; i < nr_volt_tbl; i++) {
+		index = (cluster_id * 36) + i;
+		recordRef[index] = ((volt_tbl[i] & 0xFFF) << 16) |
+			(recordRef[index] & 0xFFFF);
+	}
+	csram_write((OFFS_EEM_S + (cluster_id * 4)), 1);
+#endif
+
+	return 0;
+}
+
+/*
+* Module driver
+*/
 void cpuhvfs_pvt_tbl_create(void)
 {
 	int i;
 	unsigned int lv = _mt_cpufreq_get_cpu_level();
 
 	recordRef = ioremap_nocache(DBG_REPO_TBL_S, PVT_TBL_SIZE);
-	cpufreq_info("DVFS - @(Record)%s----->(%p)\n", __func__, recordRef);
+	tag_pr_info("DVFS - @(Record)%s----->(%p)\n", __func__, recordRef);
 	memset_io((u8 *)recordRef, 0x00, PVT_TBL_SIZE);
 
-	if (lv == CPU_LEVEL_0)
-		recordTbl = &fyTbl[0][0];
-	else if (lv == CPU_LEVEL_1)
-		recordTbl = &sbTbl[0][0];
-	else if (lv == CPU_LEVEL_2)
-		recordTbl = &fyaTbl[0][0];
-	else if (lv == CPU_LEVEL_3)
-		recordTbl = &fybTbl[0][0];
+	recordTbl = xrecordTbl[lv];
 
 	for (i = 0; i < NR_FREQ; i++) {
 		/* Freq, Vproc, post_div, clk_div */
 		/* LL [31:16] = Vproc, [15:0] = Freq */
 		recordRef[i] =
-			((*(recordTbl + (i * ARRAY_ROW_SIZE) + 1) & 0xFFF) << 16) |
-			(*(recordTbl + (i * ARRAY_ROW_SIZE)) & 0xFFFF);
+			((*(recordTbl + (i * ARRAY_COL_SIZE) + 1) & 0xFFF) << 16) |
+			(*(recordTbl + (i * ARRAY_COL_SIZE)) & 0xFFFF);
 		cpufreq_ver("DVFS - recordRef[%d] = 0x%x\n", i, recordRef[i]);
-		/* LL [31:16] = postdiv, [15:0] = clkdiv */
+		/* LL [31:16] = clk_div, [15:0] = post_div */
 		recordRef[i + NR_FREQ] =
-			((*(recordTbl + (i * ARRAY_ROW_SIZE) + 3) & 0xFF) << 16) |
-			(*(recordTbl + (i * ARRAY_ROW_SIZE) + 2) & 0xFF);
+			((*(recordTbl + (i * ARRAY_COL_SIZE) + 3) & 0xFF) << 16) |
+			(*(recordTbl + (i * ARRAY_COL_SIZE) + 2) & 0xFF);
 		cpufreq_ver("DVFS - recordRef[%d] = 0x%x\n", i + NR_FREQ, recordRef[i + NR_FREQ]);
 		/* L [31:16] = Vproc, [15:0] = Freq */
 		recordRef[i + 36] =
-			((*(recordTbl + ((NR_FREQ * 1) + i) * ARRAY_ROW_SIZE + 1) & 0xFFF) << 16) |
-			(*(recordTbl + ((NR_FREQ * 1) + i) * ARRAY_ROW_SIZE) & 0xFFFF);
+			((*(recordTbl + ((NR_FREQ * 1) + i) * ARRAY_COL_SIZE + 1) & 0xFFF) << 16) |
+			(*(recordTbl + ((NR_FREQ * 1) + i) * ARRAY_COL_SIZE) & 0xFFFF);
 		cpufreq_ver("DVFS - recordRef[%d] = 0x%x\n", i + 36, recordRef[i + 36]);
-		/* L [31:16] = postdiv, [15:0] = clkdiv */
+		/* L [31:16] = clk_div, [15:0] = post_div */
 		recordRef[i + 36 + NR_FREQ] =
-			((*(recordTbl + ((NR_FREQ * 1) + i) * ARRAY_ROW_SIZE + 3) & 0xFF) << 16) |
-			(*(recordTbl + ((NR_FREQ * 1) + i) * ARRAY_ROW_SIZE + 2) & 0xFF);
+			((*(recordTbl + ((NR_FREQ * 1) + i) * ARRAY_COL_SIZE + 3) & 0xFF) << 16) |
+			(*(recordTbl + ((NR_FREQ * 1) + i) * ARRAY_COL_SIZE + 2) & 0xFF);
 		cpufreq_ver("DVFS - recordRef[%d] = 0x%x\n", i + 36 + NR_FREQ, recordRef[i + 36 + NR_FREQ]);
-		/* CCI [31:16] = Vproc, [15:0] = Freq */
+		/* B/CCI [31:16] = Vproc, [15:0] = Freq */
 		recordRef[i + 72] =
-			((*(recordTbl + ((NR_FREQ * 2) + i) * ARRAY_ROW_SIZE + 1) & 0xFFF) << 16) |
-			(*(recordTbl + ((NR_FREQ * 2) + i) * ARRAY_ROW_SIZE) & 0xFFFF);
+			((*(recordTbl + ((NR_FREQ * 2) + i) * ARRAY_COL_SIZE + 1) & 0xFFF) << 16) |
+			(*(recordTbl + ((NR_FREQ * 2) + i) * ARRAY_COL_SIZE) & 0xFFFF);
 		cpufreq_ver("DVFS - recordRef[%d] = 0x%x\n", i + 72, recordRef[i + 72]);
-		/* CCI [31:16] = postdiv, [15:0] = clkdiv */
+		/* B/CCI [31:16] = clk_div, [15:0] = post_div */
 		recordRef[i + 72 + NR_FREQ] =
-			((*(recordTbl + ((NR_FREQ * 2) + i) * ARRAY_ROW_SIZE + 3) & 0xFFF) << 16) |
-			(*(recordTbl + ((NR_FREQ * 2) + i) * ARRAY_ROW_SIZE + 2) & 0xFF);
+			((*(recordTbl + ((NR_FREQ * 2) + i) * ARRAY_COL_SIZE + 3) & 0xFFF) << 16) |
+			(*(recordTbl + ((NR_FREQ * 2) + i) * ARRAY_COL_SIZE + 2) & 0xFF);
 		cpufreq_ver("DVFS - recordRef[%d] = 0x%x\n", i + 72 + NR_FREQ, recordRef[i + 72 + NR_FREQ]);
-		/* BIG [31:16] = Vproc, [15:0] = Freq */
-		recordRef[i + 108] =
-			((*(recordTbl + ((NR_FREQ * 3) + i) * ARRAY_ROW_SIZE + 1) & 0xFFF) << 16) |
-			(*(recordTbl + ((NR_FREQ * 3) + i) * ARRAY_ROW_SIZE) & 0xFFFF);
-		cpufreq_ver("DVFS - recordRef[%d] = 0x%x\n", i + 108, recordRef[i + 108]);
-		/* BIG [31:16] = postdiv, [15:0] = clkdiv */
-		recordRef[i + 108 + NR_FREQ] =
-			((*(recordTbl + ((NR_FREQ * 3) + i) * ARRAY_ROW_SIZE + 3) & 0xFF) << 16) |
-			(*(recordTbl + ((NR_FREQ * 3) + i) * ARRAY_ROW_SIZE + 2) & 0xFF);
-		cpufreq_ver("DVFS - recordRef[%d] = 0x%x\n", i + 108 + NR_FREQ, recordRef[i + 108 + NR_FREQ]);
+
+		if (NR_MT_CPU_DVFS > 3) {
+			/* CCI [31:16] = Vproc, [15:0] = Freq */
+			recordRef[i + 108] =
+				((*(recordTbl + ((NR_FREQ * 3) + i) * ARRAY_COL_SIZE + 1) & 0xFFF) << 16) |
+				(*(recordTbl + ((NR_FREQ * 3) + i) * ARRAY_COL_SIZE) & 0xFFFF);
+			cpufreq_ver("DVFS - recordRef[%d] = 0x%x\n", i + 108, recordRef[i + 108]);
+			/* CCI [31:16] = clk_div, [15:0] = post_div */
+			recordRef[i + 108 + NR_FREQ] =
+				((*(recordTbl + ((NR_FREQ * 3) + i) * ARRAY_COL_SIZE + 3) & 0xFF) << 16) |
+				(*(recordTbl + ((NR_FREQ * 3) + i) * ARRAY_COL_SIZE + 2) & 0xFF);
+			cpufreq_ver("DVFS - recordRef[%d] = 0x%x\n", i + 108 + NR_FREQ,
+				recordRef[i + 108 + NR_FREQ]);
+		}
 	}
 	recordRef[i*2] = 0xffffffff;
 	recordRef[i*2+36] = 0xffffffff;
@@ -1026,14 +847,14 @@ void cpuhvfs_pvt_tbl_create(void)
 	mb(); /* SRAM writing */
 }
 
-static int dbg_repo_show(struct seq_file *m, void *v)
+static int dbg_repo_proc_show(struct seq_file *m, void *v)
 {
 	int i;
 	u32 *repo = m->private;
 	char ch;
 
 	for (i = 0; i < DBG_REPO_NUM; i++) {
-		if (i >= REPO_I_LOG_S && (i - REPO_I_LOG_S) % ENTRY_EACH_LOG >= (ENTRY_EACH_LOG - 2))
+		if (i >= REPO_I_LOG_S && (i - REPO_I_LOG_S) % ENTRY_EACH_LOG == 0)
 			ch = ':';	/* timestamp */
 		else
 			ch = '.';
@@ -1044,19 +865,56 @@ static int dbg_repo_show(struct seq_file *m, void *v)
 	return 0;
 }
 
-DEFINE_FOPS_RO(dbg_repo);
+static int dbg_repo_bak_proc_show(struct seq_file *m, void *v)
+{
+	int i;
+	u32 *repo = m->private;
+	char ch;
+
+	for (i = 0; i < DBG_REPO_NUM; i++) {
+		if (i >= REPO_I_LOG_S && (i - REPO_I_LOG_S) % ENTRY_EACH_LOG == 0)
+			ch = ':';	/* timestamp */
+		else
+			ch = '.';
+
+		seq_printf(m, "%4d%c%08x%c", i, ch, repo[i], i % 4 == 3 ? '\n' : ' ');
+	}
+
+	return 0;
+}
+
+PROC_FOPS_RO(dbg_repo);
+PROC_FOPS_RO(dbg_repo_bak);
 
 static int create_cpuhvfs_debug_fs(void)
 {
-	struct dentry *root;
+	int i;
+	struct proc_dir_entry *dir = NULL;
 
-	/* create /sys/kernel/debug/cpuhvfs */
-	root = debugfs_create_dir("cpuhvfs", NULL);
-	if (!root)
-		return -EPERM;
+	struct pentry {
+		const char *name;
+		const struct file_operations *fops;
+		void *data;
+	};
 
-	debugfs_create_file("dbg_repo", 0444, root, g_dbg_repo, &dbg_repo_fops);
-	debugfs_create_file("dbg_repo_bak", 0444, root, dbg_repo_bak, &dbg_repo_fops);
+	const struct pentry entries[] = {
+		PROC_ENTRY_DATA(dbg_repo),
+		PROC_ENTRY_DATA(dbg_repo_bak),
+	};
+
+	/* create /proc/cpuhvfs */
+	dir = proc_mkdir("cpuhvfs", NULL);
+	if (!dir) {
+		tag_pr_notice("fail to create /proc/cpuhvfs @ %s()\n", __func__);
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(entries); i++) {
+		if (!proc_create_data
+		    (entries[i].name, S_IRUGO | S_IWUSR | S_IWGRP, dir, entries[i].fops, entries[i].data))
+			tag_pr_notice("%s(), create /proc/cpuhvfs/%s failed\n", __func__,
+				    entries[i].name);
+	}
 
 	return 0;
 }
@@ -1066,13 +924,13 @@ int cpuhvfs_module_init(void)
 	int r;
 
 	if (!log_repo) {
-		cpufreq_err("FAILED TO PRE-INIT CPUHVFS\n");
+		tag_pr_notice("FAILED TO PRE-INIT CPUHVFS\n");
 		return -ENODEV;
 	}
 
 	r = create_cpuhvfs_debug_fs();
 	if (r) {
-		cpufreq_err("FAILED TO CREATE DEBUG FILESYSTEM (%d)\n", r);
+		tag_pr_notice("FAILED TO CREATE DEBUG FILESYSTEM (%d)\n", r);
 		return r;
 	}
 
@@ -1083,16 +941,16 @@ int cpuhvfs_module_init(void)
 	return 0;
 }
 
-static int __init cmcu_module_init(void)
+static int dvfsp_module_init(void)
 {
 	int r;
 
-	r = platform_driver_register(&_mt_cmcu_pdrv);
+	r = platform_driver_register(&_mt_dvfsp_pdrv);
 	if (r)
-		cpufreq_err("fail to register sspm driver @ %s()\n", __func__);
+		tag_pr_notice("fail to register sspm driver @ %s()\n", __func__);
 
-	if (!cmcu_probe_done) {
-		cpufreq_err("FAILED TO PROBE SSPM DEVICE\n");
+	if (!dvfsp_probe_done) {
+		tag_pr_notice("FAILED TO PROBE SSPM DEVICE\n");
 		return -ENODEV;
 	}
 
@@ -1104,9 +962,10 @@ static int __init cmcu_module_init(void)
 static void init_cpuhvfs_debug_repo(void)
 {
 	u32 __iomem *dbg_repo = csram_base;
+	int c, repo_i;
 
 	/* backup debug repo for later analysis */
-	memcpy_fromio(dbg_repo_bak, dbg_repo, DBG_REPO_SIZE);
+	memcpy_fromio(g_dbg_repo_bak, dbg_repo, DBG_REPO_SIZE);
 
 	dbg_repo[0] = REPO_GUARD0;
 	dbg_repo[1] = REPO_GUARD1;
@@ -1119,6 +978,12 @@ static void init_cpuhvfs_debug_repo(void)
 		  DBG_REPO_E - DBG_REPO_DATA_S);
 
 	dbg_repo[REPO_I_DATA_S] = REPO_GUARD0;
+
+	for (c = 0; c < NR_MT_CPU_DVFS && c != MT_CPU_DVFS_CCI; c++) {
+		repo_i = OFFS_PPM_LIMIT_S / sizeof(u32) + c;
+		dbg_repo[repo_i] = (0 << 16) | (NR_FREQ - 1);
+	}
+
 	g_dbg_repo = dbg_repo;
 }
 
@@ -1126,9 +991,13 @@ static int cpuhvfs_pre_module_init(void)
 {
 	int r;
 
-	r = cmcu_module_init();
+#ifdef CPU_DVFS_NOT_READY
+	return 0;
+#endif
+
+	r = dvfsp_module_init();
 	if (r) {
-		cpufreq_err("FAILED TO INIT DVFS SSPM (%d)\n", r);
+		tag_pr_notice("FAILED TO INIT DVFS SSPM (%d)\n", r);
 		return r;
 	}
 
@@ -1139,6 +1008,7 @@ static int cpuhvfs_pre_module_init(void)
 	return 0;
 }
 fs_initcall(cpuhvfs_pre_module_init);
-#endif
-MODULE_DESCRIPTION("Hybrid CPU DVFS Driver v0.1");
-MODULE_LICENSE("GPL");
+
+#endif	/* CONFIG_HYBRID_CPU_DVFS */
+
+MODULE_DESCRIPTION("Hybrid CPU DVFS Driver v0.1.1");

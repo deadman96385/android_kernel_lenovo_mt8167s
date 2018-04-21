@@ -114,8 +114,7 @@
 #define HARDCODE_EP
 
 extern void __iomem *u3_base;
-extern void __iomem *u3_sif_base;
-extern void __iomem *u3_sif2_base;
+extern void __iomem *u3_ippc_base;
 
 #ifdef CONFIG_FPGA_EARLY_PORTING
 extern void __iomem *i2c_base;
@@ -139,20 +138,7 @@ extern u32 i2c_physical_base;
 /*
  * 0x1128_0000 for sifslv register in Infra
  */
-#define SSUSB_SIFSLV_IPPC_BASE		(u3_sif_base+0x700)
-
-#ifdef CONFIG_PROJECT_PHY
-/*
- * 0x1129_0000 for sifslv register in top_ao
- */
-#define SSUSB_SIFSLV_SPLLC_BASE		(u3_sif2_base+0x000)
-#define SSUSB_SIFSLV_U2PHY_COM_BASE	(u3_sif2_base+0x800)
-#define SSUSB_SIFSLV_U3PHYD_BASE	(u3_sif2_base+0x900)
-#define SSUSB_SIFSLV_U2PHY_COM_SIV_B_BASE  (u3_sif2_base+0x800)
-#define SSUSB_USB30_PHYA_SIV_B2_BASE	(u3_sif2_base+0xA00)
-#define SSUSB_USB30_PHYA_SIV_B_BASE	(u3_sif2_base+0xB00)
-#define SSUSB_SIFSLV_U3PHYA_DA_BASE	(u3_sif2_base+0xC00)
-#endif
+#define SSUSB_SIFSLV_IPPC_BASE		(u3_ippc_base)
 
 #include "ssusb_dev_c_header.h"
 #include "ssusb_epctl_csr_c_header.h"

@@ -1,10 +1,15 @@
 /* Mediatek STAR MAC network driver.
  *
- * Copyright (c) 2016-2017 Mediatek Corporation
+ * Copyright (c) 2016-2017 MediaTek Inc.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation.
+ * program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
 #include "star.h"
@@ -64,23 +69,14 @@ static ssize_t proc_reg_write(struct file *file,
 	star_dev *star_dev;
 
 	tmp = kmalloc(count + 1, GFP_KERNEL);
-	if (!tmp) {
-		STAR_PR_ERR("Could not allocate buf!!!\n");
-		kfree(tmp);
-		return -EFAULT;
-	}
-
 	buf = tmp;
-	if (copy_from_user(buf, buffer, count)) {
-		kfree(tmp);
+	if (copy_from_user(buf, buffer, count))
 		return -EFAULT;
-	}
 	buf[count] = '\0';
 
 	dev = star_get_net_device();
 	if (!dev) {
 		STAR_PR_ERR("Could not get eth0 device!!!\n");
-		kfree(tmp);
 		return -1;
 	}
 
@@ -186,9 +182,9 @@ static int get_wol_status(struct seq_file *seq, void *v)
 	star_prv = netdev_priv(dev);
 
 	seq_printf(seq, "Wake On Lan (WOL) type is (%d)\n", star_prv->wol);
-	STAR_PR_INFO("Use 'echo 0 > /proc/driver/star/wol' for WOL_NONE\n");
-	STAR_PR_INFO("Use 'echo 1 > /proc/driver/star/wol' for MAC_WOL\n");
-	STAR_PR_INFO("Use 'echo 2 > /proc/driver/star/wol' for PHY_WOL\n");
+	STAR_PR_INFO("Use 'echo 0 > /proc/driver/star/wol' switch to WOL_NONE\n");
+	STAR_PR_INFO("Use 'echo 1 > /proc/driver/star/wol' switch to MAC_WOL\n");
+	STAR_PR_INFO("Use 'echo 2 > /proc/driver/star/wol' switch to PHY_WOL\n");
 
 	return 0;
 }
@@ -201,22 +197,13 @@ static ssize_t wol_write(struct file *file, const char __user *buffer,
 	char *buf;
 
 	buf = kmalloc(count + 1, GFP_KERNEL);
-	if (!buf) {
-		STAR_PR_ERR("Could not allocate buf!!!\n");
-		kfree(buf);
+	if (copy_from_user(buf, buffer, count))
 		return -EFAULT;
-	}
-
-	if (copy_from_user(buf, buffer, count)) {
-		kfree(buf);
-		return -EFAULT;
-	}
 
 	buf[count] = '\0';
 	dev = star_get_net_device();
 	if (!dev) {
 		STAR_PR_ERR("Could not get eth0 device!!!\n");
-		kfree(buf);
 		return -1;
 	}
 
@@ -266,22 +253,13 @@ static ssize_t wol_flag_write(struct file *file, const char __user *buffer,
 	char *buf;
 
 	buf = kmalloc(count + 1, GFP_KERNEL);
-	if (!buf) {
-		STAR_PR_ERR("Could not allocate buf!!!\n");
-		kfree(buf);
+	if (copy_from_user(buf, buffer, count))
 		return -EFAULT;
-	}
-
-	if (copy_from_user(buf, buffer, count)) {
-		kfree(buf);
-		return -EFAULT;
-	}
 
 	buf[count] = '\0';
 	dev = star_get_net_device();
 	if (!dev) {
 		STAR_PR_ERR("Could not get eth0 device!!!\n");
-		kfree(buf);
 		return -1;
 	}
 
@@ -375,23 +353,13 @@ static ssize_t proc_clear_net_stat(struct file *file,
 	star_dev *star_dev;
 
 	buf = kmalloc(count + 1, GFP_KERNEL);
-	if (!buf) {
-		STAR_PR_ERR("Could not allocate buf!!!\n");
-		kfree(buf);
+	if (copy_from_user(buf, buffer, count))
 		return -EFAULT;
-	}
-
-	if (copy_from_user(buf, buffer, count)) {
-		kfree(buf);
-		return -EFAULT;
-	}
-
 	buf[count] = '\0';
 
 	ndev = star_get_net_device();
 	if (!ndev) {
 		STAR_PR_ERR("Could not get eth0 device!!!\n");
-		kfree(buf);
 		return -1;
 	}
 

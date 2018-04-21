@@ -39,6 +39,8 @@
 
 #include "musb_core.h"
 
+static int h_pre_disable = 1;
+module_param(h_pre_disable, int, 0400);
 
 static void musb_port_suspend(struct musb *musb, bool do_suspend)
 {
@@ -59,7 +61,8 @@ static void musb_port_suspend(struct musb *musb, bool do_suspend)
 		int retries = 10000;
 
 		power &= ~MUSB_POWER_RESUME;
-		power |= MUSB_POWER_SUSPENDM;
+		power |= (MUSB_POWER_SUSPENDM | MUSB_POWER_ENSUSPEND);
+
 		musb_writeb(mbase, MUSB_POWER, power);
 
 		/* Needed for OPT A tests */
@@ -122,6 +125,9 @@ static void musb_port_reset(struct musb *musb, bool do_reset)
 	 */
 	power = musb_readb(mbase, MUSB_POWER);
 	if (do_reset) {
+		DBG(0, "force musb_platform_reset\n");
+		musb_platform_reset(musb);
+		mdelay(3);
 
 		/*
 		 * If RESUME is set, we must make sure it stays minimum 20 ms.
@@ -174,16 +180,19 @@ void musb_root_disconnect(struct musb *musb)
 	usb_hcd_poll_rh_status(musb_to_hcd(musb));
 	musb->is_active = 0;
 
-	/* when UMS device is detached, khubd need to wait for usb-storage
-	  * thread to stop, then it will disable all endpoints, and clean up pending
-	  * URBs. But if usb-storage is waiting for some URBs, it will never stop.
-	  * So there is a dead lock: khubd need to end usb-storage then flush URB,
-	  * but usb-storage need that URB to end itself. So we flush URB here first,
-	  * this will cause usb-storage quit waiting and end itself when khubd asks.
-	 */
-	spin_unlock(&musb->lock);
-	musb_h_pre_disable(musb);
-	spin_lock(&musb->lock);
+	if (h_pre_disable) {
+		/* when UMS device is detached, khubd need to wait for usb-storage
+		 * thread to stop, then it will disable all endpoints, and clean up pending
+		 * URBs. But if usb-storage is waiting for some URBs, it will never stop.
+		 * So there is a dead lock: khubd need to end usb-storage then flush URB,
+		 * but usb-storage need that URB to end itself. So we flush URB here first,
+		 * this will cause usb-storage quit waiting and end itself when khubd asks.
+		 */
+		spin_unlock(&musb->lock);
+		musb_h_pre_disable(musb);
+		spin_lock(&musb->lock);
+	} else
+		DBG(0, "SKIP musb_h_pre_disable\n");
 
 	DBG(0, "host disconnect (%s)\n", otg_state_string(musb->xceiv->otg->state));
 
@@ -231,6 +240,8 @@ int musb_hub_control(struct usb_hcd *hcd,
 	u32 temp;
 	int retval = 0;
 	unsigned long flags;
+
+	musb_platform_prepare_clk(musb);
 
 	spin_lock_irqsave(&musb->lock, flags);
 
@@ -418,5 +429,8 @@ error:
 		retval = -EPIPE;
 	}
 	spin_unlock_irqrestore(&musb->lock, flags);
+
+	musb_platform_unprepare_clk(musb);
+
 	return retval;
 }

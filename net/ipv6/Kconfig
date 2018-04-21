@@ -62,13 +62,23 @@ config INET6_AH
 config INET6_ESP
 	tristate "IPv6: ESP transformation"
 	select XFRM_ALGO
+	select XFRM_USER
+	select XFRM_SUB_POLICY
 	select CRYPTO
 	select CRYPTO_AUTHENC
+	select CRYPTO_AES
+	select CRYPTO_XCBC
+	select CRYPTO_CTR
+	select CRYPTO_ECB
 	select CRYPTO_HMAC
 	select CRYPTO_MD5
 	select CRYPTO_CBC
 	select CRYPTO_SHA1
+	select CRYPTO_SHA256
+	select CRYPTO_SHA512
 	select CRYPTO_DES
+	select CRYPTO_ECHAINIV
+
 	---help---
 	  Support for IPsec ESP.
 
@@ -275,5 +285,14 @@ config IPV6_PIMSM_V2
 	---help---
 	  Support for IPv6 PIM multicast routing protocol PIM-SMv2.
 	  If unsure, say N.
+
+config MTK_IPV6_VZW_REQ6378
+	bool "IPV6: RS triggering to extend route lifetime"
+	depends on IPV6
+	default n
+	---help---
+	  VzW REQ6378 propose that RS should be sent to request RA from gateway
+	  for extending ipv6 route lifetime. the feature is developed to meet
+	  VzW's demandings and should be disabled by default.
 
 endif # IPV6

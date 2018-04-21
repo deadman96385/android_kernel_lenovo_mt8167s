@@ -31,7 +31,7 @@
 #include <linux/blk_types.h>
 #include <linux/module.h>
 
-#ifdef CONFIG_MTK_EXTMEM
+#ifdef CONFIG_MTK_USE_RESERVED_EXT_MEM
 #include <linux/exm_driver.h>
 #endif
 
@@ -116,14 +116,18 @@ static void mtk_btag_pidlog_add(struct request_queue *q, struct bio *bio,
 	int rw = (bio->bi_rw & REQ_WRITE) ? 1 : 0;
 	int major = bio->bi_bdev ? MAJOR(bio->bi_bdev->bd_dev) : 0;
 
-	if (pid != 0xFFFF) {
-#ifdef CONFIG_MMC_BLOCK_IO_LOG
-		if (major == MMC_BLOCK_MAJOR)
-			mtk_btag_pidlog_add_mmc(q, pid, len, rw);
-#endif
+	if (pid != 0xFFFF && major) {
 #ifdef CONFIG_MTK_UFS_BLOCK_IO_LOG
-		if (major == SCSI_DISK0_MAJOR || major == BLOCK_EXT_MAJOR)
+		if (major == SCSI_DISK0_MAJOR || major == BLOCK_EXT_MAJOR) {
 			mtk_btag_pidlog_add_ufs(q, pid, len, rw);
+			return;
+		}
+#endif
+#ifdef CONFIG_MMC_BLOCK_IO_LOG
+		if (major == MMC_BLOCK_MAJOR || major == BLOCK_EXT_MAJOR) {
+			mtk_btag_pidlog_add_mmc(q, pid, len, rw);
+			return;
+		}
 #endif
 	}
 }
@@ -141,11 +145,15 @@ void mtk_btag_pidlog_map_sg(struct request_queue *q, struct bio *bio, struct bio
 	if (!mtk_btag_pagelogger || !bio || !bvec)
 		return;
 
-	page_offset = (unsigned long)(__page_to_pfn(bvec->bv_page)) - PHYS_PFN_OFFSET;
+	page_offset = (unsigned long)(__page_to_pfn(bvec->bv_page)) -
+		(memblock_start_of_DRAM() >> PAGE_SHIFT);
 	spin_lock_irqsave(&mtk_btag_pagelogger_lock, flags);
 	ppl = ((struct page_pid_logger *)mtk_btag_pagelogger) + page_offset;
 	tmp.pid1 = ppl->pid1;
 	tmp.pid2 = ppl->pid2;
+
+	ppl->pid1 = 0xFFFF;
+	ppl->pid2 = 0xFFFF;
 	spin_unlock_irqrestore(&mtk_btag_pagelogger_lock, flags);
 
 	mtk_btag_pidlog_add(q, bio, tmp.pid1, bvec->bv_len);
@@ -169,7 +177,8 @@ void mtk_btag_pidlog_submit_bio(struct bio *bio)
 		if (bvec.bv_page) {
 			unsigned long page_index;
 
-			page_index = (unsigned long)(__page_to_pfn(bvec.bv_page)) - PHYS_PFN_OFFSET;
+			page_index = (unsigned long)(__page_to_pfn(bvec.bv_page)) -
+				(memblock_start_of_DRAM() >> PAGE_SHIFT);
 			ppl = ((struct page_pid_logger *)mtk_btag_pagelogger) + page_index;
 			spin_lock_irqsave(&mtk_btag_pagelogger_lock, flags);
 			if (page_index < (mtk_btag_system_dram_size >> PAGE_SHIFT)) {
@@ -191,10 +200,11 @@ void mtk_btag_pidlog_write_begin(struct page *p)
 	unsigned long flags;
 	unsigned long page_index;
 
-	if (!p)
+	if (!mtk_btag_pagelogger || !p)
 		return;
 
-	page_index = (unsigned long)(__page_to_pfn(p)) - PHYS_PFN_OFFSET;
+	page_index = (unsigned long)(__page_to_pfn(p)) -
+		(memblock_start_of_DRAM() >> PAGE_SHIFT);
 	ppl = ((struct page_pid_logger *)mtk_btag_pagelogger) + page_index;
 	spin_lock_irqsave(&mtk_btag_pagelogger_lock, flags);
 	if (page_index < (mtk_btag_system_dram_size >> PAGE_SHIFT)) {
@@ -542,10 +552,9 @@ EXPORT_SYMBOL_GPL(mtk_btag_curr_trace);
 /* step to next trace in debugfs ring buffer */
 struct mtk_btag_trace *mtk_btag_next_trace(struct mtk_btag_ringtrace *rt)
 {
+	rt->index++;
 	if (rt->index >= rt->max)
 		rt->index = 0;
-	else
-		rt->index++;
 
 	return mtk_btag_curr_trace(rt);
 }
@@ -845,7 +854,7 @@ static void mtk_btag_pidlogger_init(void)
 
 	spin_lock_init(&mtk_btag_pagelogger_lock);
 
-#ifdef CONFIG_MTK_EXTMEM
+#ifdef CONFIG_MTK_USE_RESERVED_EXT_MEM
 	mtk_btag_pagelogger = extmem_malloc_page_align(size);
 #else
 	mtk_btag_pagelogger = vmalloc(size);
@@ -854,8 +863,8 @@ static void mtk_btag_pidlogger_init(void)
 init:
 	if (mtk_btag_pagelogger)
 		memset(mtk_btag_pagelogger, -1, size);
-
-	pr_warn("[BLOCK_TAG] blockio: fail to allocate mtk_btag_pagelogger\n");
+	else
+		pr_info("[BLOCK_TAG] blockio: fail to allocate mtk_btag_pagelogger\n");
 }
 
 static int mtk_btag_seq_main_show(struct seq_file *seq, void *v)

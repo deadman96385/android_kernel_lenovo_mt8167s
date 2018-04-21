@@ -18,8 +18,8 @@ struct seq_file;
 
 #define TAG	"[clkdbg] "
 
-#define clk_err(fmt, args...)	pr_err(TAG fmt, ##args)
-#define clk_warn(fmt, args...)	pr_warn(TAG fmt, ##args)
+#define clk_err(fmt, args...)	pr_debug(TAG fmt, ##args)
+#define clk_warn(fmt, args...)	pr_debug(TAG fmt, ##args)
 #define clk_info(fmt, args...)	pr_debug(TAG fmt, ##args)
 #define clk_dbg(fmt, args...)	pr_debug(TAG fmt, ##args)
 #define clk_ver(fmt, args...)	pr_debug(TAG fmt, ##args)
@@ -77,6 +77,7 @@ struct clkdbg_ops {
 	const char * const *(*get_all_clk_names)(void);
 	const char * const *(*get_pwr_names)(void);
 	void (*setup_provider_clk)(struct provider_clk *pvdck);
+	u32 (*read_spm_pwr_status)(void);
 };
 
 void set_clkdbg_ops(const struct clkdbg_ops *ops);

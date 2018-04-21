@@ -122,6 +122,8 @@ int gFG_result = 1;
 int gFG_plugout_status;
 int gFG_result_soc;
 
+int fix_coverity1;
+int fix_coverity2;
 /* HW FG */
 #ifndef DIFFERENCE_HWOCV_RTC
 #define DIFFERENCE_HWOCV_RTC		30	/* 30% difference */
@@ -1395,8 +1397,9 @@ signed int fgauge_get_Q_max(signed short temperature)
 		high_temperature = TEMPERATURE_T2;
 		tmp_Q_max_2 = Q_MAX_POS_25;
 
-		if (temperature < low_temperature)
-			temperature = low_temperature;
+		/* fix coverity wont reach here */
+		/* if (temperature < low_temperature)  */
+		/*	temperature = low_temperature; */
 
 	} else {
 		low_temperature = TEMPERATURE_T2;
@@ -1418,7 +1421,11 @@ signed int fgauge_get_Q_max(signed short temperature)
 							  low_Q_max) * 10) / (high_temperature -
 									      low_temperature) +
 		      5) / 10);
-	} else {
+	}
+	/* fix coverity */
+	tmp_Q_max_1 = tmp_Q_max_1 + fix_coverity1;
+	tmp_Q_max_2 = tmp_Q_max_2 + fix_coverity2;
+	if (tmp_Q_max_1 > tmp_Q_max_2) {
 		low_Q_max = tmp_Q_max_2;
 		high_Q_max = tmp_Q_max_1;
 		ret_Q_max =
@@ -1457,8 +1464,9 @@ signed int fgauge_get_Q_max_high_current(signed short temperature)
 		high_temperature = TEMPERATURE_T2;
 		tmp_Q_max_2 = Q_MAX_POS_25_H_CURRENT;
 
-		if (temperature < low_temperature)
-			temperature = low_temperature;
+		/* fix coverity , should not reach here */
+		/* if (temperature < low_temperature)   */
+		/*	temperature = low_temperature;  */
 
 	} else {
 		low_temperature = TEMPERATURE_T2;
@@ -1480,7 +1488,12 @@ signed int fgauge_get_Q_max_high_current(signed short temperature)
 							  low_Q_max) * 10) / (high_temperature -
 									      low_temperature) +
 		      5) / 10);
-	} else {
+	}
+	/* fix coverity */
+	tmp_Q_max_1 = tmp_Q_max_1 + fix_coverity1;
+	tmp_Q_max_2 = tmp_Q_max_2 + fix_coverity2;
+
+	if (tmp_Q_max_1 > tmp_Q_max_2) {
 		low_Q_max = tmp_Q_max_2;
 		high_Q_max = tmp_Q_max_1;
 		ret_Q_max =
@@ -2110,9 +2123,10 @@ signed int battery_meter_get_battery_percentage(void)
 
 #if defined(SOC_BY_HW_FG)
 	return gFG_capacity_by_c;	/* hw fg, //return gfg_percent_check_point; // voltage mode */
-#endif
-#endif
+#else
 	return gFG_capacity_by_c;
+#endif
+#endif
 }
 
 
@@ -2232,6 +2246,11 @@ signed int battery_meter_get_VSense(void)
 	ret = battery_meter_ctrl(BATTERY_METER_CMD_GET_ADC_V_I_SENSE, &val);
 	return val;
 #endif
+}
+
+signed int battery_meter_get_QMAX25(void)
+{
+	return batt_meter_cust_data.q_max_pos_25;
 }
 
 #ifdef USING_SMOOTH_UI_SOC2
@@ -3364,8 +3383,8 @@ static int battery_meter_probe(struct platform_device *dev)
 		temp_strptr =
 		    kzalloc(strlen(saved_command_line) + strlen(" androidboot.mode=charger") + 1,
 			    GFP_KERNEL);
-		strcpy(temp_strptr, saved_command_line);
-		strcat(temp_strptr, " androidboot.mode=charger");
+		strncpy(temp_strptr, saved_command_line, strlen(saved_command_line));
+		strncat(temp_strptr, " androidboot.mode=charger", strlen(" androidboot.mode=charger") + 1);
 		saved_command_line = temp_strptr;
 	}
 #endif

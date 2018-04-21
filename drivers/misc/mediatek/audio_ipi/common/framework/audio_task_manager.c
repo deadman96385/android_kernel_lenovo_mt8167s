@@ -35,13 +35,22 @@
 #include "audio_ipi_queue.h"
 #include "audio_messenger_ipi.h"
 
+/* using for filter ipi message*/
+#include <audio_spkprotect_msg_id.h>
 
 #ifdef CONFIG_MTK_DO /* with DO */
 static DEFINE_MUTEX(audio_load_task_mutex);
+
+#define DO_FEATURE_NAME_CALL "FEATURE_MTK_AURISYS_PHONE_CALL"
+#define DO_FEATURE_NAME_MP3  "FEATURE_MTK_AUDIO_PLAYBACK_MP3"
+#define DO_FEATURE_NAME_VOW  "FEATURE_MTK_VOW"
+
+#define DO_SET_NAME_CALL     "AUDIO_CALL"
+#define DO_SET_NAME_MP3_VOW  "AUDIO_MP3_VOW"
 #endif
 
 
-struct audio_task {
+struct audio_task_t {
 #ifdef CONFIG_MTK_DO /* with DO */
 	char *feature_name;
 	char *do_name;
@@ -49,12 +58,10 @@ struct audio_task {
 	bool is_do_loaded;
 	task_unloaded_t task_unloaded;
 #endif
-	ipi_queue_handler_t *ipi_queue_handler;
+	struct ipi_queue_handler_t *ipi_queue_handler;
 };
 
-typedef struct audio_task audio_task_t;
-
-static audio_task_t g_audio_task_array[TASK_SCENE_SIZE];
+static struct audio_task_t g_audio_task_array[TASK_SCENE_SIZE];
 
 static char *g_current_do_name;
 
@@ -68,22 +75,18 @@ static char *get_feature_name(const task_scene_t task_scene)
 	 *     repo: alps/vendor/mediatek/proprietary/tinysys/freertos/source
 	 *     file: project/CM4_A/mt6797/platform/platform.mk
 	 */
-	char g_feature_name_call[]  = "FEATURE_MTK_AURISYS_PHONE_CALL";
-	char g_feature_name_mp3[]   = "FEATURE_MTK_AUDIO_PLAYBACK_MP3";
-	char g_feature_name_vow[]   = "FEATURE_MTK_VOW";
-
 	char *feature_name = NULL;
 
 
 	switch (task_scene) {
 	case TASK_SCENE_PHONE_CALL:
-		feature_name = g_feature_name_call;
+		feature_name = DO_FEATURE_NAME_CALL;
 		break;
 	case TASK_SCENE_PLAYBACK_MP3:
-		feature_name = g_feature_name_mp3;
+		feature_name = DO_FEATURE_NAME_MP3;
 		break;
 	case TASK_SCENE_VOW:
-		feature_name = g_feature_name_vow;
+		feature_name = DO_FEATURE_NAME_VOW;
 		break;
 	case TASK_SCENE_VOICE_ULTRASOUND:
 	case TASK_SCENE_RECORD:
@@ -106,19 +109,16 @@ static char *get_do_name(const task_scene_t task_scene)
 	 *     repo: alps/vendor/mediatek/proprietary/tinysys/freertos/source
 	 *     file: project/CM4_A/mt6797/platform/dos.mk
 	 */
-	char g_do_name_call[]    = "AUDIO_CALL";
-	char g_do_name_mp3_vow[] = "AUDIO_MP3_VOW";
-
 	char *do_name = NULL;
 
 
 	switch (task_scene) {
 	case TASK_SCENE_PHONE_CALL:
-		do_name = g_do_name_call;
+		do_name = DO_SET_NAME_CALL;
 		break;
 	case TASK_SCENE_PLAYBACK_MP3:
 	case TASK_SCENE_VOW:
-		do_name = g_do_name_mp3_vow;
+		do_name = DO_SET_NAME_MP3_VOW;
 		break;
 	case TASK_SCENE_VOICE_ULTRASOUND:
 	case TASK_SCENE_RECORD:
@@ -175,7 +175,7 @@ int audio_task_register_callback(
 	recv_message_t  recv_message,
 	task_unloaded_t task_unloaded)
 {
-	audio_task_t *task = &g_audio_task_array[task_scene];
+	struct audio_task_t *task = &g_audio_task_array[task_scene];
 
 #ifdef CONFIG_MTK_DO /* with DO */
 	task->feature_name = get_feature_name(task_scene);
@@ -205,7 +205,7 @@ int audio_task_register_callback(
 #ifdef CONFIG_MTK_DO /* with DO */
 static void load_target_tasks(char *target_do_name)
 {
-	audio_task_t *task = NULL;
+	struct audio_task_t *task = NULL;
 	int i = 0;
 
 
@@ -226,7 +226,7 @@ static void load_target_tasks(char *target_do_name)
 static void unload_current_tasks(void)
 {
 
-	audio_task_t *task = NULL;
+	struct audio_task_t *task = NULL;
 	int i = 0;
 
 	for (i = 0; i < TASK_SCENE_SIZE; i++) {
@@ -298,21 +298,28 @@ audio_load_task_exit:
 }
 
 
-
+static bool check_print_msg_info(const struct ipi_msg_t *p_ipi_msg)
+{
+	if (p_ipi_msg->task_scene == TASK_SCENE_SPEAKER_PROTECTION &&
+		p_ipi_msg->msg_id == SPK_PROTECT_DLCOPY)
+		return false;
+	else
+		return true;
+}
 
 
 int audio_send_ipi_msg(
-	ipi_msg_t *p_ipi_msg,
+	struct ipi_msg_t *p_ipi_msg,
 	uint8_t task_scene, /* task_scene_t */
 	uint8_t msg_layer, /* audio_ipi_msg_layer_t */
-	audio_ipi_msg_data_t data_type,
-	audio_ipi_msg_ack_t ack_type,
+	uint8_t data_type, /* audio_ipi_msg_data_t */
+	uint8_t ack_type, /* audio_ipi_msg_ack_t */
 	uint16_t msg_id,
 	uint32_t param1,
 	uint32_t param2,
 	char    *data_buffer)
 {
-	ipi_queue_handler_t *handler = NULL;
+	struct ipi_queue_handler_t *handler = NULL;
 	uint32_t ipi_msg_len = 0;
 
 	if (p_ipi_msg == NULL) {
@@ -343,6 +350,13 @@ int audio_send_ipi_msg(
 	ipi_msg_len = get_message_buf_size(p_ipi_msg);
 	check_msg_format(p_ipi_msg, ipi_msg_len);
 
+	/* if need atomic , direct call send_message_to_scp*/
+	if (msg_layer == AUDIO_IPI_LAYER_KERNEL_TO_SCP_ATOMIC) {
+		if (check_print_msg_info(p_ipi_msg) == true)
+			print_msg_info(__func__, "p_ipi_msg", p_ipi_msg);
+		return send_message_to_scp(p_ipi_msg);
+	}
+
 	handler = get_ipi_queue_handler(p_ipi_msg->task_scene);
 	if (handler == NULL) {
 		AUD_LOG_E("%s(), handler = NULL, return\n", __func__);
@@ -353,9 +367,9 @@ int audio_send_ipi_msg(
 }
 
 
-int audio_send_ipi_filled_msg(ipi_msg_t *p_ipi_msg)
+int audio_send_ipi_filled_msg(struct ipi_msg_t *p_ipi_msg)
 {
-	ipi_queue_handler_t *handler = NULL;
+	struct ipi_queue_handler_t *handler = NULL;
 
 	handler = get_ipi_queue_handler(p_ipi_msg->task_scene);
 	if (handler == NULL) {
@@ -380,7 +394,7 @@ void audio_task_manager_init(void)
 
 void audio_task_manager_deinit(void)
 {
-	audio_task_t *task = NULL;
+	struct audio_task_t *task = NULL;
 	int i = 0;
 
 	for (i = 0; i < TASK_SCENE_SIZE; i++) {

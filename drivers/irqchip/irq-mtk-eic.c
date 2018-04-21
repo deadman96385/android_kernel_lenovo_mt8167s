@@ -180,6 +180,7 @@ static struct deint_des *deint_descriptors;
 static int mt_eint_get_level(unsigned int eint_num);
 static unsigned int mt_eint_flip_edge(struct eint_chip *chip, unsigned int eint_num);
 static unsigned int mt_eint_get_debounce_cnt(unsigned int cur_eint_num);
+static int gpio_to_eint(unsigned int gpio);
 static unsigned long cur_debug_eint;
 #ifdef CONFIG_MTK_SEC_DEINT_SUPPORT
 static unsigned long cur_debug_deint;
@@ -196,6 +197,19 @@ static int is_bulitin_eint_hw_deb(u32 eint_num)
 	return 0;
 }
 
+#if defined(CONFIG_PINCTRL_MTK_COMMON) && defined(CONFIG_MTK_GPIOLIB_STAND)
+int hwgpio_to_vgpio(int gpio)
+{
+	int gpio_base = 0;
+
+	gpio_base = mtk_pctrl_get_gpio_chip_base();
+	if (gpio_base == 0) {
+		pr_err("[EIC] unexpected gpio base %d\n", gpio_base);
+		WARN_ON(1);
+	}
+	return gpio_base + gpio;
+}
+#endif
 
 static void mt_eint_clr_deint_selection(u32 deint_mapped)
 {
@@ -894,21 +908,6 @@ static void mt_eint_en_sw_debounce(unsigned int eint_num)
 		EINT_FUNC.is_deb_en[eint_num] = 1;
 }
 
-/*
- * mt_can_en_debounce: Check the EINT number is able to enable debounce or not
- * @eint_num: the EINT number to set
- */
-static unsigned int mt_can_en_debounce(unsigned int eint_num)
-{
-	unsigned int sens = mt_eint_get_sens(eint_num);
-	/* debounce: debounce time is not 0 && it is not edge sensitive */
-	if (EINT_FUNC.deb_time[eint_num] != 0 && sens != MT_EDGE_SENSITIVE)
-		return 1;
-	dbgmsg("Can't enable debounce of eint_num:%d, deb_time:%d, sens:%d\n",
-	       eint_num, EINT_FUNC.deb_time[eint_num], sens);
-	return 0;
-}
-
  /*
  * mt_eint_set_hw_debounce: Set the de-bounce time for the specified EINT number.
  * @gpio_pin: EINT number to acknowledge
@@ -943,17 +942,6 @@ void mt_eint_set_hw_debounce(unsigned int gpio_pin, unsigned int us)
 	clr_base = EINT_DBNC_CLR_BASE + offset;
 
 	EINT_FUNC.deb_time[eint_num] = us;
-
-	/*
-	 * Don't enable debounce once debounce time is 0 or
-	 * its type is edge sensitive.
-	 */
-	if (!mt_can_en_debounce(eint_num)) {
-		pr_debug("Can't enable debounce of eint_num:%d in %s\n",
-			 eint_num,
-			 __func__);
-		return;
-	}
 
 	/* setp 1: mask the EINT */
 	if (!mt_eint_get_mask(eint_num)) {
@@ -1847,24 +1835,30 @@ EXPORT_SYMBOL(mt_gpio_to_eint);
 static int gpio_to_eint(unsigned int gpio)
 {
 	struct pin_node *p;
+#ifdef CONFIG_PINCTRL_MTK_COMMON
 	int i = 0;
+#endif
 	int eint = -1;
 
+#ifdef CONFIG_PINCTRL_MTK_COMMON
 	/*
 	 * check if this gpio configured as builtin eint
 	 */
 	if (builtin_entry > 0) {
 		for (i = 0; i < builtin_entry; ++i) {
 			if (gpio == builtin_mapping[i].gpio) {
-				if (mt_get_gpio_mode(gpio) ==
-					builtin_mapping[i].func_mode) {
+#ifdef CONFIG_MTK_GPIOLIB_STAND
+				if (mtk_pinctrl_get_gpio_mode_for_eint(gpio) == builtin_mapping[i].func_mode) {
+#else
+				if (mt_get_gpio_mode(gpio) == builtin_mapping[i].func_mode) {
+#endif
 					eint = builtin_mapping[i].builtin_eint;
 					goto done;
 				}
 			}
 		}
 	}
-
+#endif
 	/*
 	 * if not builtin eint, just find the mapping from normal mapping table,
 	 * or just linear map with gpio if no mapping table
@@ -1880,6 +1874,7 @@ static int gpio_to_eint(unsigned int gpio)
 		}
 	} else
 		eint = gpio;
+
 
 done:
 	return eint;
@@ -1929,8 +1924,14 @@ static void mt_eint_irq_ack(struct irq_data *data)
 
 static int mt_eint_get_level(unsigned int eint_num)
 {
-#ifdef CONFIG_GPIOLIB
-	return __gpio_get_value(EINT_FUNC.gpio[eint_num]);
+#ifdef CONFIG_PINCTRL_MTK_COMMON
+	int vgpio = 0;
+#ifdef CONFIG_MTK_GPIOLIB_STAND
+	vgpio = hwgpio_to_vgpio(EINT_FUNC.gpio[eint_num]);
+#else
+	vgpio = EINT_FUNC.gpio[eint_num];
+#endif
+	return __gpio_get_value(vgpio);
 #else
 	return 0;
 #endif

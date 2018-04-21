@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016 MICROTRUST Incorporated
+ * Copyright (c) 2015-2017 MICROTRUST Incorporated
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -12,12 +12,15 @@
  * GNU General Public License for more details.
  */
 
-#define RPMB_IOCTL_SOTER_WRITE_DATA     5
-#define RPMB_IOCTL_SOTER_READ_DATA      6
-#define RPMB_IOCTL_SOTER_GET_CNT        7
+#ifndef __VFS_TEEI_H_
+#define __VFS_TEEI_H_
 
-#define RPMB_BUFF_SIZE                  512
-#define PAGE_SIZE_4K                    (0x1000)
+#define RPMB_IOCTL_SOTER_WRITE_DATA	5
+#define RPMB_IOCTL_SOTER_READ_DATA	6
+#define RPMB_IOCTL_SOTER_GET_CNT	7
+
+#define RPMB_BUFF_SIZE			512
+#define PAGE_SIZE_4K			(0x1000)
 
 
 struct TEEI_vfs_command {
@@ -83,5 +86,6 @@ union TEEI_vfs_response {
 	unsigned long p_dir;
 };
 
-extern char *daulOS_VFS_share_mem;
 extern char *daulOS_VFS_write_share_mem;
+
+#endif /* end of __VFS_TEEI_H_*/

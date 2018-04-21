@@ -30,10 +30,12 @@ enum CMDQ_STACK_TYPE_ENUM {
 	CMDQ_STACK_TYPE_DO_WHILE = 5,
 };
 
-#define CMDQ_DATA_BIT				(62)
-#define CMDQ_BIT_VALUE				(0LL)
-#define CMDQ_BIT_VAR				(1LL)
+#define CMDQ_DATA_BIT			(62)
+#define CMDQ_BIT_VALUE			(0LL)
+#define CMDQ_BIT_VAR			(1LL)
 #define CMDQ_TASK_CPR_INITIAL_VALUE	(0)
+#define CMDQ_REC_DEFAULT_PRIORITY	(100)
+#define CMDQ_REC_MAX_PRIORITY		(0x7FFFFFFF)
 
 struct cmdq_stack_node {
 	uint32_t position;
@@ -51,31 +53,31 @@ struct cmdq_sub_function {
 };
 
 struct cmdqRecStruct {
-	uint64_t engineFlag;
-	int32_t scenario;
-	uint32_t blockSize;	/* command size */
+	u64 engineFlag;
+	s32 scenario;
+	u32 blockSize;	/* command size */
 	void *pBuffer;
-	uint32_t bufferSize;	/* allocated buffer size */
+	u32 bufferSize;	/* allocated buffer size */
 	struct TaskStruct *pRunningTask;	/* running task after flush() or startLoop() */
-	enum CMDQ_HW_THREAD_PRIORITY_ENUM priority;	/* setting high priority. This implies Prefetch ENABLE. */
+	u32 priority;	/* task schedule priority. this is NOT HW thread priority. */
 	bool finalized;		/* set to true after flush() or startLoop() */
-	uint32_t prefetchCount;	/* maintenance prefetch instruction */
+	u32 prefetchCount;	/* maintenance prefetch instruction */
 
 	struct cmdqSecDataStruct secData;	/* secure execution data */
 
 	/* For v3 CPR use */
 	struct cmdq_v3_replace_struct replace_instr;
-	uint8_t local_var_num;
+	u8 local_var_num;
 	struct cmdq_stack_node *if_stack_node;
 	struct cmdq_stack_node *while_stack_node;
+	CMDQ_VARIABLE arg_value;	/* temp data or poll value, wait_timeout start */
 	CMDQ_VARIABLE arg_source;	/* poll source, wait_timeout event */
-	CMDQ_VARIABLE arg_value;	/* poll value, wait_timeout start */
 	CMDQ_VARIABLE arg_timeout;	/* wait_timeout timeout */
 
 	/* profile marker */
-#ifdef CMDQ_PROFILE_MARKER_SUPPORT
 	struct cmdqProfileMarkerStruct profileMarker;
-#endif
+
+	struct CmdqRecExtend ext;
 };
 
 /* typedef dma_addr_t cmdqBackupSlotHandle; */
@@ -221,12 +223,12 @@ extern "C" {
  *     support only when secure OS enabled
  */
 	int32_t cmdq_op_write_reg_secure(struct cmdqRecStruct *handle, uint32_t addr,
-				   enum CMDQ_SEC_ADDR_METADATA_TYPE type, uint32_t baseHandle,
+				   enum CMDQ_SEC_ADDR_METADATA_TYPE type, uint64_t baseHandle,
 				   uint32_t offset, uint32_t size, uint32_t port);
 	int32_t cmdqRecWriteSecure(struct cmdqRecStruct *handle,
 				   uint32_t addr,
 				   enum CMDQ_SEC_ADDR_METADATA_TYPE type,
-				   uint32_t baseHandle,
+				   uint64_t baseHandle,
 				   uint32_t offset, uint32_t size, uint32_t port);
 
 /**
@@ -443,10 +445,10 @@ extern "C" {
 	int32_t cmdq_task_flush_async(struct cmdqRecStruct *handle);
 	int32_t cmdqRecFlushAsync(struct cmdqRecStruct *handle);
 
-	int32_t cmdq_task_flush_async_callback(struct cmdqRecStruct *handle, CmdqAsyncFlushCB callback,
-					  uint32_t userData);
-	int32_t cmdqRecFlushAsyncCallback(struct cmdqRecStruct *handle, CmdqAsyncFlushCB callback,
-					  uint32_t userData);
+	int32_t cmdq_task_flush_async_callback(struct cmdqRecStruct *handle,
+		CmdqAsyncFlushCB callback, u64 user_data);
+	int32_t cmdqRecFlushAsyncCallback(struct cmdqRecStruct *handle,
+		CmdqAsyncFlushCB callback, u64 user_data);
 
 /**
  * Trigger CMDQ to execute the recorded commands in loop.
@@ -514,10 +516,6 @@ extern "C" {
  *
  * Return:
  *     0 for success; else the error code is returned
- *
- * Note:
- *     Please define CMDQ_PROFILE_MARKER_SUPPORT in cmdq_def.h
- *     to enable profile marker.
  */
 	int32_t cmdq_op_profile_marker(struct cmdqRecStruct *handle, const char *tag);
 	int32_t cmdqRecProfileMarker(struct cmdqRecStruct *handle, const char *tag);
@@ -804,6 +802,8 @@ extern "C" {
  */
 	s32 cmdq_op_delay_us(struct cmdqRecStruct *handle, u32 delay_time);
 	s32 cmdq_op_backup_CPR(struct cmdqRecStruct *handle, CMDQ_VARIABLE cpr,
+		cmdqBackupSlotHandle h_backup_slot, uint32_t slot_index);
+	s32 cmdq_op_backup_TPR(struct cmdqRecStruct *handle,
 		cmdqBackupSlotHandle h_backup_slot, uint32_t slot_index);
 
 /**

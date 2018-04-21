@@ -445,9 +445,19 @@ static ssize_t musbfsh_regw_mode_write(struct file *file,
 	data = my_strtoul(tmp2, NULL, 0);
 
 	if (is_mac == 1) {
+		if (offset >= 0x1000) {
+			DBG(0, "Write Mac adddr failed! Offset is too big:0x%x\n", offset);
+			return count;
+		}
+
 		pr_warn("Mac base adddr 0x%lx, Write %d[%d]\n", (unsigned long)musbfsh->mregs, offset, data);
 		musbfsh_writeb(musbfsh->mregs, offset, data);
 	} else {
+		if (offset >= 0x100) {
+			DBG(0, "Write Phy adddr failed! Offset is too big:0x%x\n", offset);
+			return count;
+		}
+
 		pr_warn("Phy base adddr 0x%lx, Write %d[%d]\n",
 		(unsigned long)((void __iomem *)(musbfsh_Device->phy_reg_base + 0x900)), offset, data);
 		USB11PHY_WRITE8(offset, data);
@@ -516,13 +526,24 @@ static ssize_t musbfsh_regr_mode_write(struct file *file,
 
 	offset = my_strtoul(tmp, NULL, 0);
 
-	if (is_mac == 1)
+	if (is_mac == 1) {
+		if (offset >= 0x1000) {
+			DBG(0, "Read Mac base adddr failed! Offset is too big:0x%x\n", offset);
+			return count;
+		}
+
 		pr_warn("Read Mac base adddr 0x%lx, Read %d[%d]\n",
 			(unsigned long)musbfsh->mregs, offset, musbfsh_readb(musbfsh->mregs, offset));
-	else
+	} else {
+		if (offset >= 0x100) {
+			DBG(0, "Read Phy adddr failed! Offset is too big:0x%x\n", offset);
+			return count;
+		}
+
 		pr_warn("Read Phy base adddr 0x%lx, Read %d[%d]\n",
 			(unsigned long)((void __iomem *)(musbfsh_Device->phy_reg_base + 0x900)), offset,
 			USB11PHY_READ8(offset));
+	}
 
 	return count;
 }

@@ -33,9 +33,12 @@
 
 #define DM_MSG_PREFIX "crypt"
 
+#if defined(CONFIG_MTK_HW_FDE)
+#include <mt-plat/mtk_secure_api.h>
 #if defined(CONFIG_MTK_HW_FDE_AES)
 #include <fde_aes.h>
 #include <fde_aes_dbg.h>
+#endif
 #endif
 
 /*
@@ -117,8 +120,7 @@ struct iv_tcw_private {
  * and encrypts / decrypts at the same time.
  */
 enum flags { DM_CRYPT_SUSPENDED, DM_CRYPT_KEY_VALID,
-	     DM_CRYPT_SAME_CPU, DM_CRYPT_NO_OFFLOAD,
-	     DM_CRYPT_EXIT_THREAD};
+	     DM_CRYPT_SAME_CPU, DM_CRYPT_NO_OFFLOAD };
 
 /*
  * The fields in here must be read only after initialization.
@@ -147,7 +149,8 @@ struct crypt_config {
 	char *cipher_string;
 
 #if defined(CONFIG_MTK_HW_FDE)
-	unsigned int hw_fde;
+	int hw_fde;
+	int id;
 #endif
 
 	struct crypt_iv_operations *iv_gen_ops;
@@ -194,6 +197,10 @@ struct crypt_config {
 static void clone_init(struct dm_crypt_io *, struct bio *);
 static void kcryptd_queue_crypt(struct dm_crypt_io *io);
 static u8 *iv_of_dmreq(struct crypt_config *cc, struct dm_crypt_request *dmreq);
+#if defined(CONFIG_MTK_HW_FDE)
+/* use to check if the key has been changed */
+static unsigned int key_idx;
+#endif
 
 /*
  * Use this to access cipher attributes that are the same for each CPU.
@@ -1176,6 +1183,7 @@ static int kcryptd_io_read(struct dm_crypt_io *io, gfp_t gfp)
 	if (cc->hw_fde == 1) {
 		clone->bi_hw_fde = 1;
 		clone->bi_iter.bi_sector = cc->start + io->sector;
+		clone->bi_key_idx = key_idx;
 	}
 #endif
 
@@ -1195,13 +1203,40 @@ static void kcryptd_io_read_work(struct work_struct *work)
 
 #if defined(CONFIG_MTK_HW_FDE)
 
+/*
+ * MTK PATCH:
+ *
+ * Get storage device type (for hw fde on/off decision)
+ * or id (for crypt_config).
+ *
+ * Returns:
+ *   0: Embedded storage, for example: eMMC or UFS.
+ *   1: External storage, for example: SD card.
+ *  -1: Unrecognizable storage.
+ */
+static int crypt_dev_id(const char *path)
+{
+	int type = -1;
+
+	if (strstr(path, "bootdevice")) {
+
+		/* example: /dev/block/platform/bootdevice/by-name/userdata */
+		type = 0;
+
+	} else if (strstr(path, "externdevice") || strstr(path, "vold")) {
+
+		/* example: /dev/block/vold/private:179,2 */
+		type = 1;
+	}
+
+	pr_info("[dm-crypt] dev path: %s, type: %d\n", path, type);
+
+	return type;
+}
+
 static int crypt_is_hw_fde(const char *path)
 {
-	dev_t uninitialized_var(dev);
-	unsigned int major, minor;
-	char dummy;
-
-	pr_debug("%s %d PATH : %s\n", __func__, __LINE__, path);
+	int dev_type;
 
 #if defined(CONFIG_MTK_HW_FDE_AES)
 	if (fde_aes_check_cmd(FDE_AES_EN_SW_CRYPTO, fde_aes_get_sw(), 0)) {
@@ -1210,50 +1245,27 @@ static int crypt_is_hw_fde(const char *path)
 	}
 #endif
 
-	if (sscanf(path, "%u:%u%c", &major, &minor, &dummy) == 2) {
-		/* Extract the major/minor numbers */
-		dev = MKDEV(major, minor);
-		if (MAJOR(dev) != major || MINOR(dev) != minor)
-			return -EOVERFLOW;
-	} else {
-		/* convert the path to a device */
-		struct block_device *bdev = lookup_bdev(path);
+	dev_type = crypt_dev_id(path);
 
-		if (IS_ERR(bdev))
-			return PTR_ERR(bdev);
-		dev = bdev->bd_dev;
-		major = MAJOR(dev);
-		minor = MINOR(dev);
-	}
+	if (dev_type == 0) {
 
-	pr_debug("%s %d Major:Minor %d:%d\n", __func__, __LINE__, major, minor);
+		/* Always support HW FDE in embedded storage if CONFIG_MTK_HW_FDE is true */
+		return 1;
 
-#if defined(CONFIG_MTK_UFS_BOOTING) /* UFS booting */
-	/* UFS device */
-	if (major == SCSI_DISK0_MAJOR ||
-		major == BLOCK_EXT_MAJOR)
+	} else if (dev_type == 1) {
+
+#if defined(CONFIG_MTK_HW_FDE_AES)
+		/* Support HW FDE in external storage by FDE_AES */
 		return 1;
-	#if defined(CONFIG_MTK_HW_FDE_AES)
-	/* SD card */
-	if (major == MMC_BLOCK_MAJOR && minor <= 2)
-		return 1;
-	#endif
-#elif defined(CONFIG_MTK_EMMC_SUPPORT) /* eMMC booting */
-	#if defined(CONFIG_MTK_HW_FDE_AES)
-	/* both eMMC and SD card use HW FDE */
-	if (major == MMC_BLOCK_MAJOR ||
-		major == BLOCK_EXT_MAJOR)
-		return 1;
-	#else
-	/* eMMC device use HW FDE only. SD card cannot use HW FDE */
-	if (major == MMC_BLOCK_MAJOR && minor < CONFIG_MMC_BLOCK_MINORS * 4)
-		return 1;
-	#endif
+#else
+		/* Do not support HW FDE in external storage. */
+		return 0;
 #endif
+
+	}
 
 	return 0;
 }
-
 #endif
 
 static void kcryptd_queue_read(struct dm_crypt_io *io)
@@ -1274,6 +1286,7 @@ static void kcryptd_io_write(struct dm_crypt_io *io)
 	if (cc->hw_fde == 1) {
 		clone->bi_hw_fde = 1;
 		clone->bi_iter.bi_sector = cc->start + io->sector;
+		clone->bi_key_idx = key_idx;
 	}
 #endif
 
@@ -1299,18 +1312,20 @@ continue_locked:
 		if (!RB_EMPTY_ROOT(&cc->write_tree))
 			goto pop_from_list;
 
-		if (unlikely(test_bit(DM_CRYPT_EXIT_THREAD, &cc->flags))) {
-			spin_unlock_irq(&cc->write_thread_wait.lock);
-			break;
-		}
-
-		__set_current_state(TASK_INTERRUPTIBLE);
+		set_current_state(TASK_INTERRUPTIBLE);
 		__add_wait_queue(&cc->write_thread_wait, &wait);
 
 		spin_unlock_irq(&cc->write_thread_wait.lock);
 
+		if (unlikely(kthread_should_stop())) {
+			set_task_state(current, TASK_RUNNING);
+			remove_wait_queue(&cc->write_thread_wait, &wait);
+			break;
+		}
+
 		schedule();
 
+		set_task_state(current, TASK_RUNNING);
 		spin_lock_irq(&cc->write_thread_wait.lock);
 		__remove_wait_queue(&cc->write_thread_wait, &wait);
 		goto continue_locked;
@@ -1571,7 +1586,18 @@ static int crypt_setkey_allcpus(struct crypt_config *cc)
 	subkey_size = (cc->key_size - cc->key_extra_size) >> ilog2(cc->tfms_count);
 
 #if defined(CONFIG_MTK_HW_FDE)
-	if (cc->hw_fde == 0)
+	if (cc->hw_fde == 1) {
+		for (i = 0; i < (cc->key_size>>3); i++)
+			mt_secure_call(MTK_SIP_KERNEL_HW_FDE_KEY,
+				*(u32 *)(cc->key+(i*8)),
+				*(u32 *)(cc->key+(i*8)+4),
+				(cc->id & 0xff) << 24 |
+				(i & 0xff)<<16 | (cc->key_size & 0xffff));
+		key_idx++;
+#if defined(CONFIG_MTK_HW_FDE_AES)
+		fde_aes_set_slot(cc->id);
+#endif
+	} else
 #endif
 	{
 		for (i = 0; i < cc->tfms_count; i++) {
@@ -1599,12 +1625,15 @@ static int crypt_set_key(struct crypt_config *cc, char *key)
 	if (!cc->key_size && strcmp(key, "-"))
 		goto out;
 
+	/* clear the flag since following operations may invalidate previously valid key */
+	clear_bit(DM_CRYPT_KEY_VALID, &cc->flags);
+
 	if (cc->key_size && crypt_decode_key(cc->key, key, cc->key_size) < 0)
 		goto out;
 
-	set_bit(DM_CRYPT_KEY_VALID, &cc->flags);
-
 	r = crypt_setkey_allcpus(cc);
+	if (!r)
+		set_bit(DM_CRYPT_KEY_VALID, &cc->flags);
 
 out:
 	/* Hex key string not needed after here, so wipe it. */
@@ -1630,13 +1659,8 @@ static void crypt_dtr(struct dm_target *ti)
 	if (!cc)
 		return;
 
-	if (cc->write_thread) {
-		spin_lock_irq(&cc->write_thread_wait.lock);
-		set_bit(DM_CRYPT_EXIT_THREAD, &cc->flags);
-		wake_up_locked(&cc->write_thread_wait);
-		spin_unlock_irq(&cc->write_thread_wait.lock);
+	if (cc->write_thread)
 		kthread_stop(cc->write_thread);
-	}
 
 	if (cc->io_queue)
 		destroy_workqueue(cc->io_queue);
@@ -1883,7 +1907,10 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 
 #if defined(CONFIG_MTK_HW_FDE)
 	cc->hw_fde = (crypt_is_hw_fde(argv[3]) == 1)?1:0;
-	pr_debug("%s %d HW FDE:%d\n", __func__, __LINE__, cc->hw_fde);
+	cc->id = ret = crypt_dev_id(argv[3]);
+	if (ret < 0)
+		goto bad;
+	pr_debug("%s %d HW FDE:%d MSDC%d\n", __func__, __LINE__, cc->hw_fde, cc->id);
 #endif
 
 	ret = crypt_ctr_cipher(ti, argv[0], argv[1]);

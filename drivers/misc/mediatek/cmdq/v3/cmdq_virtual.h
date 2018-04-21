@@ -22,17 +22,11 @@ typedef uint32_t(*CmdqGetSubsysLSBArgA) (void);
 /* is a secure thread */
 typedef bool(*CmdqIsSecureThread) (const int32_t thread);
 
-/* is valid notify thread for secure path */
-typedef bool(*CmdqIsValidNotifyThread) (const int32_t thread);
-
 /* is display scenario */
 typedef bool(*CmdqIsDispScenario) (const enum CMDQ_SCENARIO_ENUM scenario);
 
 /* should enable prefetch */
 typedef bool(*CmdqShouldEnablePrefetch) (const enum CMDQ_SCENARIO_ENUM scenario);
-
-/* should profile */
-typedef bool(*CmdqShouldProfile) (const enum CMDQ_SCENARIO_ENUM scenario);
 
 /* display thread index from scenario */
 typedef int (*CmdqDispThread) (enum CMDQ_SCENARIO_ENUM scenario);
@@ -70,9 +64,6 @@ typedef ssize_t(*CmdqPrintStatusClock) (char *buf);
 /* print seq status clock */
 typedef void (*CmdqPrintStatusSeqClock) (struct seq_file *m);
 
-/* enable common clock locked */
-typedef void (*CmdqEnableCommonClockLocked) (bool enable);
-
 /* enable GCE clock locked */
 typedef void (*CmdqEnableGCEClockLocked) (bool enable);
 
@@ -106,10 +97,8 @@ typedef void (*CmdqInitModulePAStat) (void);
 struct cmdqCoreFuncStruct {
 	CmdqGetSubsysLSBArgA getSubsysLSBArgA;
 	CmdqIsSecureThread isSecureThread;
-	CmdqIsValidNotifyThread isValidNotifyThread;
 	CmdqIsDispScenario isDispScenario;
 	CmdqShouldEnablePrefetch shouldEnablePrefetch;
-	CmdqShouldProfile shouldProfile;
 	CmdqDispThread dispThread;
 	CmdqGetThreadID getThreadID;
 	CmdqPriority priority;
@@ -121,7 +110,6 @@ struct cmdqCoreFuncStruct {
 	CmdqModuleEntrySuspend moduleEntrySuspend;
 	CmdqPrintStatusClock printStatusClock;
 	CmdqPrintStatusSeqClock printStatusSeqClock;
-	CmdqEnableCommonClockLocked enableCommonClockLocked;
 	CmdqEnableGCEClockLocked enableGCEClockLocked;
 	CmdqParseErrorModule parseErrorModule;
 	CmdqDumpSMI dumpSMI;

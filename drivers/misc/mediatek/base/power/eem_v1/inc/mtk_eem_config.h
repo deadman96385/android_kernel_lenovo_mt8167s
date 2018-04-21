@@ -20,23 +20,23 @@
 #define EN_DEBUG_LOG       (1) /* enable eem_debug */
 #define EN_SHORT_LOG       (0)
 #define DVT                (0)
-#define EEM_BANK_SOC       (1)
+#define EEM_BANK_SOC       (0)
 #define EARLY_PORTING      (0) /* for detecting real vboot in eem_init01 */
 #define ISRTIMER           (0)
-#define DUMP_DATA_TO_DE    (0)
+#define DUMP_DATA_TO_DE    (1)
 #define EEM_ENABLE         (0)
 #define EEM_FAKE_EFUSE     (0)
 #define UPDATE_TO_UPOWER   (0)
 #define EEM_LOCKTIME_LIMIT (3000)
 /* #define EEM_CUR_VOLT_PROC_SHOW */
-/* #define EEM_OFFSET */
-/* #define EEM_LOG_TIMER */
+#define EEM_OFFSET
+/* #define EEM_LOG_EN */
 /* #define EEM_LOCK_TOO_LONG */
 /* #define EEM_VCORE_IN_SSPM */
 
 /* for early porting */
 /* #define EARLY_PORTING_GPU */
-#define EARLY_PORTING_PPM
+/* #define EARLY_PORTING_PPM */
 /* #define EARLY_PORTING_PMIC */
 /* #define EARLY_PORTING_VCORE */
 /* because thermal still have bug */
@@ -51,7 +51,7 @@
 #define SET_PMIC_VOLT (1)
 #define SET_PMIC_VOLT_TO_DVFS (1)
 #define LOG_INTERVAL	(2LL * NSEC_PER_SEC)
-#define ITurbo (0)
+#define ITurbo (1)
 
 /* fake devinfo for early verification */
 /* big */
@@ -80,10 +80,11 @@
 #define DEVINFO_IDX_8 58
 #define DEVINFO_IDX_9 59
 /* soc */
-#define DEVINFO_10 0x00000000
-#define DEVINFO_11 0x00000000
-#define DEVINFO_IDX_10 62
-#define DEVINFO_IDX_11 63
+#define DEVINFO_10 0x10E097C0
+#define DEVINFO_11 0x004E0063
+#define DEVINFO_IDX_10 68 /* 62 */
+#define DEVINFO_IDX_11 69 /* 63 */
+#define DEVINFO_IDX_VOLT_BIN 122
 
 /* atever */
 #define DEVINFO_IDX_FTPGM 74
@@ -159,7 +160,7 @@
 #define GPU_PMIC_STEP       (120) /* 1.231/1024=0.001202v=120(10uv)*/
 
 /* common part: for big, cci, LL, L*/
-#define VBOOT_VAL        (0x38) /* eem domain: 0x38, volt domain: 0.75.v */
+#define VBOOT_VAL        (0x39) /* eem domain: 0x38, volt domain: 0.75.v */
 #define VMAX_VAL        (0x60) /* eem domain: 0x60, volt domain: 1v*/
 #define VMIN_VAL        (0x2C)  /* eem domain: 0x2C, volt domain: 0.675v*/
 #define VCO_VAL            (0x2C) /* 0x2C */

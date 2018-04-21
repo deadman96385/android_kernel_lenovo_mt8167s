@@ -86,6 +86,7 @@ struct mmc_ext_csd {
 	unsigned int		hpi_cmd;		/* cmd used as HPI */
 	bool			bkops;		/* background support bit */
 	bool			man_bkops_en;	/* manual bkops enable bit */
+	bool			auto_bkops;	/* manual bkops support bit */
 	bool			auto_bkops_en;	/* auto BKOPS enable bit */
 	unsigned int            data_sector_size;       /* 512 bytes or 4KB */
 	unsigned int            data_tag_unit_size;     /* DATA TAG UNIT size */
@@ -121,6 +122,16 @@ struct mmc_ext_csd {
 	u8			raw_pwr_cl_ddr_200_360;	/* 253 */
 	u8			raw_bkops_status;	/* 246 */
 	u8			raw_sectors[4];		/* 212 - 4 bytes */
+	u8			pre_eol_info;		/* 267 */
+	u8			device_life_time_est_typ_a;	/* 268 */
+	u8			device_life_time_est_typ_b;	/* 269 */
+
+#ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
+	#define MMC_CMDQ_MODE_EN	(1)
+	u8			cmdq_support;
+	u8			cmdq_mode_en;
+	u8			cmdq_depth;
+#endif
 
 #ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
 	#define MMC_CMDQ_MODE_EN	(1)

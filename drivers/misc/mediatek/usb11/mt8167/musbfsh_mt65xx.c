@@ -292,7 +292,9 @@ void mt65xx_usb11_phy_recover(void)
 	INFO("[Flow][USB11]%s:%d\n", __func__, __LINE__);
 	INFO("mt65xx_usb11_phy_recover++\r\n");
 	/*4 1. turn on USB reference clock.  */
+	#if !defined(CONFIG_MUSBFSH_IDDIG)
 	enable_phy_clock(true);
+	#endif
 
 	INFO("[Flow][USB11]%s:%d\n", __func__, __LINE__);
 	USB11PHY_CLR8(0x6b, 0x04);
@@ -376,7 +378,7 @@ void mt65xx_usb11_clock_enable(bool enable)
 			enable_phy_clock(enable);
 			INFO("[Flow][USB]enable usb11 clock ++\r\n");
 			enable_mcu_clock(true);
-			clk_enable(usb_clk);
+			/*clk_enable(usb_clk);*/
 			clk_enable(icusb_clk);
 			clock_enabled = true;
 		}
@@ -387,7 +389,7 @@ void mt65xx_usb11_clock_enable(bool enable)
 		} else {
 			INFO("[Flow][USB]disable usb11 clock --\r\n");
 			clk_disable(icusb_clk);
-			clk_disable(usb_clk);
+			/*clk_disable(usb_clk);*/
 			enable_mcu_clock(false);
 			enable_phy_clock(enable);
 			clock_enabled = false;
@@ -509,7 +511,7 @@ static const struct musbfsh_platform_ops mt_usb11_ops = {
 
 static u64 mt_usb11_dmamask = DMA_BIT_MASK(32);
 
-static int __init mt_usb11_probe(struct platform_device *pdev)
+static int mt_usb11_probe(struct platform_device *pdev)
 {
 	struct musbfsh_hdrc_platform_data *pdata = pdev->dev.platform_data;
 	struct platform_device *musbfsh;
@@ -652,7 +654,7 @@ static struct platform_driver mt_usb11_driver = {
 	},
 };
 
-int usb11_init(void)
+int __init usb11_init(void)
 {
 	INFO("[Flow][USB11]%s:%d\n", __func__, __LINE__);
 	return platform_driver_register(&mt_usb11_driver);
@@ -660,7 +662,7 @@ int usb11_init(void)
 
 /*mubsys_initcall(usb11_init);*/
 
-void usb11_exit(void)
+void __exit usb11_exit(void)
 {
 	platform_driver_unregister(&mt_usb11_driver);
 }

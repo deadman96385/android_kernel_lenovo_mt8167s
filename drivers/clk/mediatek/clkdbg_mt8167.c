@@ -259,6 +259,8 @@ static const struct fmeter_clk fclks[] = {
 };
 
 #define PLL_HP_CON0			(rb[apmixed].virt + 0x014)
+#define PLL_TEST_CON1			(rb[apmixed].virt + 0x064)
+#define TEST_DBG_CTRL			(rb[topckgen].virt + 0x38)
 #define FREQ_MTR_CTRL_REG		(rb[topckgen].virt + 0x10)
 #define FREQ_MTR_CTRL_RDATA		(rb[topckgen].virt + 0x14)
 
@@ -286,7 +288,7 @@ static const struct fmeter_clk fclks[] = {
 #define RG_FQMTR_EN     1
 #define RG_FQMTR_RST    1
 
-#define RG_FRMTR_WINDOW     0x100
+#define RG_FRMTR_WINDOW     519
 
 static u32 fmeter_freq(enum FMETER_TYPE type, int k1, int clk)
 {
@@ -303,7 +305,7 @@ static u32 fmeter_freq(enum FMETER_TYPE type, int k1, int clk)
 		RG_FQMTR_FIXCLK_SEL_SET(RG_FQMTR_FIXCLK_26MHZ) |
 		RG_FQMTR_MONCLK_EN_SET(RG_FQMTR_EN));
 
-	udelay(100);
+	udelay(30);
 
 	cnt = clk_readl(FREQ_MTR_CTRL_RDATA);
 	/* reset & reset deassert */
@@ -333,23 +335,38 @@ static const struct fmeter_clk *get_all_fmeter_clks(void)
 	return fclks;
 }
 
+struct bak {
+	u32 pll_hp_con0;
+	u32 pll_test_con1;
+	u32 test_dbg_ctrl;
+};
+
 static void *prepare_fmeter(void)
 {
-	static u32 old_pll_hp_con0;
+	static struct bak regs;
 
-	old_pll_hp_con0 = clk_readl(PLL_HP_CON0);
+	regs.pll_hp_con0 = clk_readl(PLL_HP_CON0);
+	regs.pll_test_con1 = clk_readl(PLL_TEST_CON1);
+	regs.test_dbg_ctrl = clk_readl(TEST_DBG_CTRL);
+
 	clk_writel(PLL_HP_CON0, 0x0);		/* disable PLL hopping */
+	clk_writel_mask(PLL_TEST_CON1, 9, 0, 0x287);
+					/* AD_PLLGP_TST_CK = ARMPLL / 2 */
+	clk_writel_mask(TEST_DBG_CTRL, 7, 0, 0);
+					/* mcusys_debug_mon0 = ARMPLL */
 	udelay(10);
 
-	return &old_pll_hp_con0;
+	return &regs;
 }
 
 static void unprepare_fmeter(void *data)
 {
-	u32 old_pll_hp_con0 = *(u32 *)data;
+	struct bak *regs = data;
 
 	/* restore old setting */
-	clk_writel(PLL_HP_CON0, old_pll_hp_con0);
+	clk_writel(TEST_DBG_CTRL, regs->test_dbg_ctrl);
+	clk_writel(PLL_TEST_CON1, regs->pll_test_con1);
+	clk_writel(PLL_HP_CON0, regs->pll_hp_con0);
 }
 
 static u32 fmeter_freq_op(const struct fmeter_clk *fclk)
@@ -502,6 +519,10 @@ static const char * const *get_all_clk_names(void)
 		"uart2",
 		"bsi",
 		"gcpu_b",
+		"msdc0_infra",
+		"msdc1_infra",
+		"msdc2_infra",
+		"usb_78m",
 		/* TOP3 */
 		"rg_spinor",
 		"rg_msdc2",
@@ -717,6 +738,7 @@ static struct clkdbg_ops clkdbg_mt8167_ops = {
 	.get_all_clk_names = get_all_clk_names,
 	.get_pwr_names = get_pwr_names,
 	.setup_provider_clk = setup_provider_clk,
+	.read_spm_pwr_status = NULL,
 };
 
 static void __init init_custom_cmds(void)

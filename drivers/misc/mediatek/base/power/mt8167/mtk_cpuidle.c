@@ -105,6 +105,60 @@ void __weak switch_armpll_ll_hwmode(int enable) { }
 void __weak switch_armpll_l_hwmode(int enable) { }
 #endif
 
+#define MAX_CORES 4
+#define MAX_CLUSTER 1
+
+inline void read_id(int *cpu_id, int *cluster_id)
+{
+	*cpu_id = read_cpu_id();
+	*cluster_id = read_cluster_id();
+}
+
+struct core_context {
+	unsigned int banked_regs[32];
+	unsigned long long timestamp[5];
+	unsigned long timer_data[8];
+};
+
+struct cluster_context {
+	struct core_context core[MAX_CORES] ____cacheline_aligned;
+	unsigned long dbg_data[40];
+	int l2rstdisable;
+	int l2rstdisable_rfcnt;
+};
+
+struct system_context {
+	struct cluster_context cluster[MAX_CLUSTER];
+	struct _data_poc {
+		void (*cpu_resume_phys)(void);
+		unsigned long l2ctlr;
+	} poc ____cacheline_aligned;
+};
+
+#define system_cluster(system, clusterid)	(&((struct system_context *)system)->cluster[clusterid])
+#define cluster_core(cluster, cpuid)		(&((struct cluster_context *)cluster)->core[cpuid])
+
+struct system_context dormant_data[1];
+
+void *_get_data(int core_or_cluster)
+{
+	int cpuid, clusterid;
+	struct cluster_context *cluster;
+	struct core_context *core;
+
+	read_id(&cpuid, &clusterid);
+
+	cluster = system_cluster(dormant_data, clusterid);
+	if (core_or_cluster == 1)
+		return (void *)cluster;
+
+	core = cluster_core(cluster, cpuid);
+
+	return (void *)core;
+}
+
+#define GET_CORE_DATA()		((struct core_context *)_get_data(0))
+
 void stop_generic_timer(void)
 {
 	write_cntpctl(read_cntpctl() & ~1);
@@ -116,26 +170,26 @@ void start_generic_timer(void)
 }
 
 struct set_and_clear_regs {
-	volatile unsigned int set[32], clear[32];
+	unsigned int set[32], clear[32];
 };
 
 struct interrupt_distributor {
-	volatile unsigned int control;			/* 0x000 */
+	unsigned int control;			/* 0x000 */
 	const unsigned int controller_type;
 	const unsigned int implementer;
 	const char padding1[116];
-	volatile unsigned int security[32];		/* 0x080 */
+	unsigned int security[32];		/* 0x080 */
 	struct set_and_clear_regs enable;		/* 0x100 */
 	struct set_and_clear_regs pending;		/* 0x200 */
 	struct set_and_clear_regs active;		/* 0x300 */
-	volatile unsigned int priority[256];		/* 0x400 */
-	volatile unsigned int target[256];		/* 0x800 */
-	volatile unsigned int configuration[64];	/* 0xC00 */
+	unsigned int priority[256];		/* 0x400 */
+	unsigned int target[256];		/* 0x800 */
+	unsigned int configuration[64];	/* 0xC00 */
 	const char padding3[256];			/* 0xD00 */
-	volatile unsigned int non_security_access_control[64]; /* 0xE00 */
-	volatile unsigned int software_interrupt;	/* 0xF00 */
-	volatile unsigned int sgi_clr_pending[4];	/* 0xF10 */
-	volatile unsigned int sgi_set_pending[4];	/* 0xF20 */
+	unsigned int non_security_access_control[64]; /* 0xE00 */
+	unsigned int software_interrupt;	/* 0xF00 */
+	unsigned int sgi_clr_pending[4];	/* 0xF10 */
+	unsigned int sgi_set_pending[4];	/* 0xF20 */
 	const char padding4[176];
 
 	unsigned const int peripheral_id[4];		/* 0xFE0 */
@@ -178,10 +232,13 @@ static void mt_cluster_restore(int flags)
 
 void mt_cpu_save(void)
 {
+	struct core_context *core;
 	unsigned int sleep_sta;
 	int cpu_idx;
 
 	cpu_idx = read_cpu_id();
+
+	core = GET_CORE_DATA();
 
 	mt_save_generic_timer((unsigned int *)timer_data[cpu_idx], 0x0);
 	stop_generic_timer();
@@ -191,14 +248,21 @@ void mt_cpu_save(void)
 
 	if ((sleep_sta | (1 << cpu_idx)) == 0xff) /* last core */
 		mt_save_dbg_regs((unsigned int *)dbg_data, cpu_idx);
+
+	mt_save_banked_registers(core->banked_regs);
 }
 
 void mt_cpu_restore(void)
 {
+	struct core_context *core;
 	unsigned int sleep_sta;
 	int cpu_idx;
 
 	cpu_idx = read_cpu_id();
+
+	core = GET_CORE_DATA();
+
+	mt_restore_banked_registers(core->banked_regs);
 
 	/* TODO: check this part */
 	sleep_sta = (spm_read(CPUIDLE_CPU_IDLE_STA) >> CPUIDLE_CPU_IDLE_STA_OFFSET) & 0xff;
@@ -226,6 +290,26 @@ void mt_platform_restore_context(int flags)
 		restore_edge_gic_spm_irq(gic_id_base);
 }
 
+#if !defined(CONFIG_ARM64)
+int mt_cpu_dormant_psci(unsigned long flags)
+{
+	int ret = 1;
+	int cpuid, clusterid;
+	unsigned int state;
+
+	read_id(&cpuid, &clusterid);
+
+	state = 0x201 << 16;
+
+	if (psci_ops.cpu_suspend)
+		ret = psci_ops.cpu_suspend(state, virt_to_phys(cpu_resume));
+
+	WARN_ON(1);
+
+	return ret;
+}
+#endif
+
 int mt_cpu_dormant(unsigned long flags)
 {
 	int i, cpu_idx;
@@ -245,8 +329,11 @@ int mt_cpu_dormant(unsigned long flags)
 	mt_platform_save_context(flags);
 
 	MT_CPUIDLE_FOOTPRINT_LOG(cpu_idx, 3);
+#if !defined(CONFIG_ARM64)
+	cpu_suspend(2, mt_cpu_dormant_psci);
+#else
 	arm_cpuidle_suspend(2);
-
+#endif
 	MT_CPUIDLE_FOOTPRINT_LOG(cpu_idx, 12);
 	mt_platform_restore_context(flags);
 

@@ -1,0 +1,38 @@
+/*
+ * Mediatek's MT8167 SoC base device tree for device tree overlay
+ * Copyright (c) 2017 MediaTek Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include "mt8167.dtsi"
+#include "mt6392.dtsi"
+
+/ {
+	/* chosen */
+	chosen {
+		bootargs = "console=ttyS0,921600n1 root=/dev/ram initrd=0x44000200,0x200000";
+	};
+
+	firmware: firmware {
+		android: android {
+			compatible = "android,firmware";
+			fstab: fstab {
+				compatible = "android,fstab";
+			};
+		};
+	};
+
+	odm: odm {
+		compatible = "simple-bus";
+		/* reserved for overlay by odm */
+	};
+};

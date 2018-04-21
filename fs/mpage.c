@@ -79,11 +79,17 @@ static struct bio *mpage_bio_submit(int rw, struct bio *bio)
 		struct page *first_page = bio->bi_io_vec[0].bv_page;
 
 		if (first_page != NULL) {
+			char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
+
+			path = android_fstrace_get_pathname(pathbuf,
+						    MAX_TRACE_PATHBUF_LEN,
+						    first_page->mapping->host);
 			trace_android_fs_dataread_start(
 				first_page->mapping->host,
 				page_offset(first_page),
 				bio->bi_iter.bi_size,
 				current->pid,
+				path,
 				current->comm);
 		}
 	}
@@ -141,7 +147,7 @@ map_buffer_to_page(struct page *page, struct buffer_head *bh, int page_block)
 			SetPageUptodate(page);    
 			return;
 		}
-		create_empty_buffers(page, 1 << inode->i_blkbits, 0);
+		create_empty_buffers(page, i_blocksize(inode), 0);
 	}
 	head = page_buffers(page);
 	page_bh = head;

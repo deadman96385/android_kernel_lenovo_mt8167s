@@ -20,6 +20,7 @@
 #include "vpu_drv.h"
 
 #define VPU_PORT_OF_IOMMU M4U_PORT_VPU
+/* #define VIMVO_CTRL_ENABLE */
 
 /* Common Structure */
 struct vpu_device {
@@ -45,12 +46,22 @@ struct vpu_user {
 	/* to enque/deque must have mutex protection */
 	struct mutex data_mutex;
 	bool running;
-	bool flush;
+	bool deleting;
+	bool flushing;
 	bool locked;
 	/* list of vlist_type(struct vpu_request) */
 	struct list_head enque_list;
 	struct list_head deque_list;
 	wait_queue_head_t deque_wait;
+	uint8_t power_mode;
+	uint8_t power_opp;
+};
+
+struct vpu_shared_memory_param {
+	uint32_t size;
+	bool require_pa;
+	bool require_va;
+	uint32_t fixed_addr;
 };
 
 struct vpu_shared_memory {
@@ -58,6 +69,14 @@ struct vpu_shared_memory {
 	uint64_t va;
 	uint32_t pa;
 	uint32_t length;
+};
+
+enum vpu_power_param {
+	VPU_POWER_PARAM_DYNAMIC,
+	VPU_POWER_PARAM_DVFS_DEBUG,
+	VPU_POWER_PARAM_JTAG,
+	VPU_POWER_PARAM_LOCK,
+	VPU_POWER_PARAM_VOLT_STEP,
 };
 
 #define DECLARE_VLIST(type) \
@@ -147,6 +166,20 @@ int vpu_boot_up(void);
 int vpu_shut_down(void);
 
 /**
+ * vpu_change_power_mode - change power mode
+ * @mode        the power mode
+ */
+int vpu_change_power_mode(uint8_t mode);
+
+/**
+ * vpu_change_power_opp - change the opp.
+ * @index       the OPP index
+ *
+ * May not be changed immediately, depended on the hardware capability.
+ */
+int vpu_change_power_opp(uint8_t index);
+
+/**
  * vpu_hw_load_algo - call vpu program to load algo, by specifying the start address
  * @algo:       the pointer to struct algo, which has right binary-data info.
  */
@@ -192,9 +225,9 @@ void vpu_hw_unlock(struct vpu_user *user);
 /**
  * vpu_alloc_shared_memory - allocate a memory, which shares with VPU
  * @shmem:      return the pointer of struct memory
- * @size:       the size of memory allocation
+ * @param:      the pointer to the parameters of memory allocation
  */
-int vpu_alloc_shared_memory(struct vpu_shared_memory **shmem, int size);
+int vpu_alloc_shared_memory(struct vpu_shared_memory **shmem, struct vpu_shared_memory_param *param);
 
 /**
  * vpu_free_shared_memory - free a memory
@@ -214,6 +247,12 @@ int vpu_ext_be_busy(void);
 int vpu_dump_register(struct seq_file *s);
 
 /**
+ * vpu_dump_buffer_mva - dump the buffer mva information.
+ * @s:          the requeest.
+ */
+int vpu_dump_buffer_mva(struct vpu_request *request);
+
+/**
  * vpu_dump_image_file - dump the binary information stored in flash storage.
  * @s:          the pointer to seq_file.
  */
@@ -225,6 +264,30 @@ int vpu_dump_image_file(struct seq_file *s);
  */
 int vpu_dump_mesg(struct seq_file *s);
 
+/**
+ * vpu_dump_opp_table - dump the OPP table
+ * @s:          the pointer to seq_file.
+ */
+int vpu_dump_opp_table(struct seq_file *s);
+
+/**
+ * vpu_dump_power - dump the power parameters
+ * @s:          the pointer to seq_file.
+ */
+int vpu_dump_power(struct seq_file *s);
+
+/**
+ * vpu_set_power_parameter - set the specific power parameter
+ * @param:      the sepcific parameter to update
+ * @argc:       the number of arguments
+ * @args:       the pointer of arryf of arguments
+ */
+int vpu_set_power_parameter(uint8_t param, int argc, int *args);
+
+
+int vpu_get_vimvo_parameter(uint32_t *values);
+
+
 /* =============================== define in vpu_drv.c  =============================== */
 
 /**
@@ -232,6 +295,13 @@ int vpu_dump_mesg(struct seq_file *s);
  * @ruser:      return the created user.
  */
 int vpu_create_user(struct vpu_user **ruser);
+
+/**
+ * vpu_set_power - set the power mode by a user
+ * @user:       the pointer to user.
+ * @power:      the user's power mode.
+ */
+int vpu_set_power(struct vpu_user *user, struct vpu_power *power);
 
 /**
  * vpu_delete_user - delete vpu user, and remove it from user list
@@ -326,8 +396,8 @@ int vpu_init_reg(struct vpu_device *vpu_dev);
 #define VPU_TAG "[vpu]"
 #define LOG_DBG(format, args...)    pr_debug(VPU_TAG " " format, ##args)
 #define LOG_INF(format, args...)    pr_info(VPU_TAG " " format, ##args)
-#define LOG_WRN(format, args...)    pr_warn(VPU_TAG " " format, ##args)
-#define LOG_ERR(format, args...)    pr_err(VPU_TAG "[error] " format, ##args)
+#define LOG_WRN(format, args...)    pr_debug(VPU_TAG " " format, ##args)
+#define LOG_ERR(format, args...)    pr_debug(VPU_TAG "[error] " format, ##args)
 
 #define PRINT_LINE() pr_info(VPU_TAG " %s (%s:%d)\n", __func__,  __FILE__, __LINE__)
 

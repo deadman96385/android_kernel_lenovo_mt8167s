@@ -43,6 +43,22 @@ config MTK_COMBO_CHIP_MT6632
 	  If unsure, say N.
 	  Mediatek MT6632 module includes BT, FM, GPS, WIFI.
 
+config MTK_COMBO_CHIP_MT7668
+	bool "Mediatek MT7668 device driver support"
+	help
+	  This driver supports the built-in smart phone found in the Mediatek MT7668 chipset.
+	  If you want to use MT7668 driver support, say Y.
+	  If unsure, say N.
+	  Mediatek MT7668 module includes BT, WIFI.
+
+config MTK_COMBO_CHIP_CONSYS_6739
+	bool "MTK MT6739 combo chip support"
+	help
+	  this config is used to decided SOC consys version
+	  in current platform
+	  is
+	  MT6739(BT/WIFI/GPS/FM combo chip)
+
 config MTK_COMBO_CHIP_CONSYS_6757
 	bool "MTK MT6757 combo chip support"
 	help
@@ -50,6 +66,46 @@ config MTK_COMBO_CHIP_CONSYS_6757
 	  in current platform
 	  is
 	  MT6757(BT/WIFI/GPS/FM combo chip)
+
+config MTK_COMBO_CHIP_CONSYS_6763
+	bool "MTK MT6763 combo chip support"
+	help
+	  this config is used to decided SOC consys version
+	  in current platform
+	  is
+	  MT6763(BT/WIFI/GPS/FM combo chip)
+
+config MTK_COMBO_CHIP_CONSYS_6758
+	bool "MTK MT6758 combo chip support"
+	help
+	  this config is used to decided SOC consys version
+	  in current platform
+	  is
+	  MT6758(BT/WIFI/GPS/FM combo chip)
+
+config MTK_COMBO_CHIP_CONSYS_6771
+	bool "MTK MT6771 combo chip support"
+	help
+	  this config is used to decided SOC consys version
+	  in current platform
+	  is
+	  MT6771(BT/WIFI/GPS/FM combo chip)
+
+config MTK_COMBO_CHIP_CONSYS_6759
+	bool "MTK MT6759 combo chip support"
+	help
+	  this config is used to decided SOC consys version
+	  in current platform
+	  is
+	  MT6759(BT/WIFI/GPS/FM combo chip)
+
+config MTK_COMBO_CHIP_CONSYS_6775
+	bool "MTK MT6775 combo chip support"
+	help
+	  this config is used to decided SOC consys version
+	  in current platform
+	  is
+	  MT6775(BT/WIFI/GPS/FM combo chip)
 
 config MTK_COMBO_CHIP_CONSYS_8167
         bool "MTK MT8167 combo chip support"
@@ -67,7 +123,14 @@ config MTK_COMBO_CHIP
 	default "MT6628" if MTK_COMBO_CHIP_MT6628
 	default "MT6630" if MTK_COMBO_CHIP_MT6630
 	default "MT6632" if MTK_COMBO_CHIP_MT6632
+	default "MT7668" if MTK_COMBO_CHIP_MT7668
+	default "CONSYS_6739" if MTK_COMBO_CHIP_CONSYS_6739
 	default "CONSYS_6757" if MTK_COMBO_CHIP_CONSYS_6757
+	default "CONSYS_6763" if MTK_COMBO_CHIP_CONSYS_6763
+	default "CONSYS_6771" if MTK_COMBO_CHIP_CONSYS_6771
+	default "CONSYS_6758" if MTK_COMBO_CHIP_CONSYS_6758
+	default "CONSYS_6759" if MTK_COMBO_CHIP_CONSYS_6759
+	default "CONSYS_6775" if MTK_COMBO_CHIP_CONSYS_6775
 	default "CONSYS_8167" if MTK_COMBO_CHIP_CONSYS_8167
 	help
 	  this feature is used to identify combo chip version or SOC chip

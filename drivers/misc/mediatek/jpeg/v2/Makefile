@@ -15,35 +15,20 @@
 
 ccflags-y = -DSDEBUG_T
 
-ifneq ($(CONFIG_ARCH_MT6735M),y)
+ifeq ($(CONFIG_MACH_MT6757),y)
   ccflags-y += -DJPEG_DEC_DRIVER
 endif
 
-#ccflags-y += -I$(MTK_PATH_SOURCE)/drivers/jpeg/
-ifeq ($(CONFIG_ARCH_MT8173),y)
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/hv1/
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/hv1/mt8173/
-endif
-
-ifneq ($(CONFIG_ARCH_MT8173),y)
-ccflags-y += \
-  -I$(srctree)/drivers/misc/mediatek/cmdq/v2/ \
-  -I$(srctree)/drivers/misc/mediatek/cmdq/v2/$(MTK_PLATFORM)/
-endif
-
-ifeq ($(CONFIG_ARCH_MT8173),y)
-#ccflags-y += -DJPEG_DEV
-ccflags-y += -DJPEG_PM_DOMAIN_ENABLE
-endif
-
-ifeq ($(CONFIG_ARCH_MT6753),y)
-  ccflags-y += -DJPEG_DEC_IRQ_ENHANCE
-endif
-
 ifeq ($(CONFIG_MACH_MT6799),y)
-  ccflags-y += -DJPEG_DRV_MT6799
-  ccflags-y += -I$(srctree)/drivers/misc/mediatek/smi/
+  ccflags-y += -DJPEG_DEC_DRIVER
+  ccflags-y += -DSMI_CG_SUPPORT
 endif
+
+ifeq ($(CONFIG_MACH_MT6739),y)
+  ccflags-y += -DSMI_CG_SUPPORT
+endif
+
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/smi/
 
 #obj-$(CONFIG_MTK_JPEG) += jpeg_driver.o
 obj-y += jpeg_driver.o

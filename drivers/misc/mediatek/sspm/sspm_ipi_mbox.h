@@ -31,13 +31,13 @@ struct _pin_send {
 	struct completion comp_ack;
 
 	unsigned int mbox:3,		/* mailbox number used by the pin */
-				 slot:6,			/* bit position of INT_IRQ or OUT_IRQ */
-				 size:6,			/* register number used to pass argument */
-				 shared:2,		/* shared slot */
+				 slot:6,		/* bit position of INT_IRQ or OUT_IRQ */
+				 size:6,		/* register number used to pass argument */
+				 async:1,		/* pin can use async functions */
 				 retdata:1,		/* return data or not */
-				 lock:3,			/* Linux lock method: 0: mutex; 1: busy wait */
+				 lock:3,		/* Linux lock method: 0: mutex; 1: busy wait */
 				 polling:1,		/* Linux ack polling method */
-				 unused:10;
+				 unused:11;
 	uint32_t *prdata;
 };
 
@@ -71,5 +71,7 @@ struct _mbox_info {
 #define IPI_LOCK_NEW		0x2
 #define IPI_LOCK_CHANGE		0x4
 
+
+__weak void sspm_ipi_timeout_cb(int ipi_id) {}
 
 #endif /* __SSPM_IPI_MBOX_H__ */

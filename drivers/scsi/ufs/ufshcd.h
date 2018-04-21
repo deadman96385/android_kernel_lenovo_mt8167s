@@ -174,8 +174,12 @@ struct ufshcd_lrb {
 	int task_tag;
 	u8 lun; /* UPIU LUN id field is only 8-bit wide */
 	bool intr_cmd;
+	ktime_t issue_time_stamp;
+	ktime_t complete_time_stamp;
 
-#ifdef CONFIG_MTK_HW_FDE
+	bool req_abort_skip;
+
+#if defined(CONFIG_MTK_HW_FDE) || defined(CONFIG_HIE)
 	u32 crypto_en;
 	u32 crypto_cfgid;
 	u32 crypto_dunl;
@@ -296,11 +300,14 @@ struct ufs_hba_variant_ops {
 	int     (*suspend)(struct ufs_hba *, enum ufs_pm_op);
 	int     (*resume)(struct ufs_hba *, enum ufs_pm_op);
 	void	(*dbg_register_dump)(struct ufs_hba *hba);
-/*
-	 * MTK PATCH:
-	 * Auto-hibern8 vops
+
+	/*
+	 * MTK PATCH: Control AH8
+	 *   1: Enable AH8
+	 *   0: Disable AH8.
 	 */
 	void    (*auto_hibern8)(struct ufs_hba *, bool);
+
 	/*
 	 * MTK PATCH:
 	 * DeepIdle and SODI resource request vops
@@ -308,7 +315,16 @@ struct ufs_hba_variant_ops {
 	void	(*deepidle_resource_req)(struct ufs_hba *,
 					unsigned int resource);
 
-	/* SCSI device slave alloc/configure/destroy vops */
+	/*
+	 * MTK PATCH: Lock for deepidle or SODI.
+	 *   1: Lock. Deepidle or SODI is NOT allowed after locked.
+	 *   0: Unlock. Deepidle or SODI is allowed after unlocked.
+	 */
+	void	(*deepidle_lock)(struct ufs_hba *, bool);
+
+	/*
+	 * MTK PATCH: SCSI device slave alloc/configure/destroy.
+	 */
 	int     (*scsi_dev_cfg)(struct scsi_device *, enum ufs_scsi_dev_cfg);
 };
 
@@ -360,6 +376,33 @@ struct ufs_init_prefetch {
 	u32 icc_level;
 };
 
+
+/* UFS Host Controller debug print bitmask */
+#define UFSHCD_DBG_PRINT_CLK_FREQ_EN		UFS_BIT(0)
+#define UFSHCD_DBG_PRINT_UIC_ERR_HIST_EN	UFS_BIT(1)
+#define UFSHCD_DBG_PRINT_HOST_REGS_EN		UFS_BIT(2)
+#define UFSHCD_DBG_PRINT_TRS_EN			UFS_BIT(3)
+#define UFSHCD_DBG_PRINT_TMRS_EN		UFS_BIT(4)
+#define UFSHCD_DBG_PRINT_PWR_EN			UFS_BIT(5)
+#define UFSHCD_DBG_PRINT_HOST_STATE_EN		UFS_BIT(6)
+#define UFSHCD_DBG_PRINT_ABORT_CMD_EN		UFS_BIT(7)
+#define UFSHCD_DBG_PRINT_QCMD_EN		UFS_BIT(8)
+
+#define UFSHCD_DBG_PRINT_ALL						   \
+		(UFSHCD_DBG_PRINT_CLK_FREQ_EN		|		   \
+		 UFSHCD_DBG_PRINT_UIC_ERR_HIST_EN	|		   \
+		 UFSHCD_DBG_PRINT_HOST_REGS_EN | UFSHCD_DBG_PRINT_TRS_EN | \
+		 UFSHCD_DBG_PRINT_TMRS_EN | UFSHCD_DBG_PRINT_PWR_EN |	   \
+		 UFSHCD_DBG_PRINT_HOST_STATE_EN |	   \
+		 UFSHCD_DBG_PRINT_ABORT_CMD_EN)
+
+enum ufs_crypto_state {
+	UFS_CRYPTO_HW_FDE             = (1 << 0),
+	UFS_CRYPTO_HW_FDE_ENCRYPTED   = (1 << 1),
+	UFS_CRYPTO_HW_FBE             = (1 << 2),
+	UFS_CRYPTO_HW_FBE_ENCRYPTED   = (1 << 3),
+};
+
 /**
  * struct ufs_hba - per adapter private structure
  * @mmio_base: UFSHCI base register address
@@ -371,6 +414,7 @@ struct ufs_init_prefetch {
  * @utmrdl_dma_addr: UTMRDL DMA address
  * @host: Scsi_Host instance of the driver
  * @dev: device handle
+ * @sdev_ufs_rpmb: reference to RPMB device W-LU
  * @lrb: local reference block
  * @lrb_in_use: lrb in use
  * @outstanding_tasks: Bits representing outstanding task requests
@@ -430,6 +474,12 @@ struct ufs_hba {
 	 * "UFS device" W-LU.
 	 */
 	struct scsi_device *sdev_ufs_device;
+
+	/*
+	 * MTK Patch: RPMB device
+	 */
+	struct scsi_device *sdev_ufs_rpmb;
+	struct rpmb_dev *rawdev_ufs_rpmb;
 
 	enum ufs_dev_pwr_mode curr_dev_pwr_mode;
 	enum uic_link_state uic_link_state;
@@ -494,6 +544,29 @@ struct ufs_hba {
 	 */
 	#define UFSHCD_QUIRK_BROKEN_UFS_HCI_VERSION		UFS_BIT(5)
 
+	/*
+	 * This quirk needs to be enabled if we apply performance heuristic
+	 * to UFS host.
+	 */
+	#define UFSHCD_QUIRK_UFS_HCI_PERF_HEURISTIC		UFS_BIT(6)
+
+	/*
+	 * This quirk needs to be enabled if device requires hw reset
+	 * if linkup is failed after retries.
+	 */
+	#define UFSHCD_QUIRK_UFS_HCI_DEV_RST_FOR_LINKUP_FAIL		UFS_BIT(7)
+
+	/*
+	 * This quirk needs to be enabled if host needs vendor-specific reset flow.
+	 */
+	#define UFSHCD_QUIRK_UFS_HCI_VENDOR_HOST_RST		UFS_BIT(8)
+
+	/*
+	 * This quirk needs to be enabled if host needs manually disable ah8 before
+	 * ringing any doorbell slots.
+	 */
+	#define UFSHCD_QUIRK_UFS_HCI_DISABLE_AH8_BEFORE_RING_DOORBELL		UFS_BIT(9)
+
 	unsigned int quirks;	/* Deviations from standard UFSHCI spec. */
 
 	wait_queue_head_t tm_wq;
@@ -535,6 +608,12 @@ struct ufs_hba {
 
 	bool wlun_dev_clr_ua;
 
+	/* Number of requests aborts */
+	int req_abort_count;
+
+	/* Bitmask for enabling debug prints */
+	u32 ufshcd_dbg_print;
+
 	struct ufs_pa_layer_attr pwr_info;
 	struct ufs_pwr_mode_info max_pwr_info;
 
@@ -561,15 +640,43 @@ struct ufs_hba {
 	bool is_sys_suspended;
 
 	/* MTK PATCH */
-	u32 manu_id;                          /* record vendor id for vendor-specific configurations */
-	u32 dev_quirks;                       /* device quirks */
+
+	/* record vendor id for vendor-specific configurations */
+	u32 manu_id;
+
+	/* device quirks */
+	u32 dev_quirks;
+
 	struct device_attribute rpm_info_attr;
 	struct device_attribute spm_info_attr;
 
+	/* crypto */
+	/* hw-fde key index */
+	int crypto_hwfde_key_idx;
+	u32 crypto_feature;
+
+	int req_r_cnt;
+	int req_w_cnt;
+	unsigned long req_tag_map;
 
 	int			latency_hist_enabled;
 	struct io_latency_state io_lat_s;
 };
+
+/*
+ * ufshcd_scsi_to_upiu_lun - maps scsi LUN to UPIU LUN
+ * @scsi_lun: scsi LUN id
+ *
+ * Returns UPIU LUN id
+ */
+static inline u8 ufshcd_scsi_to_upiu_lun(unsigned int scsi_lun)
+{
+	if (scsi_is_wlun(scsi_lun))
+		return (scsi_lun & UFS_UPIU_MAX_UNIT_NUM_ID)
+			| UFS_UPIU_WLUN_ID;
+	else
+		return scsi_lun & UFS_UPIU_MAX_UNIT_NUM_ID;
+}
 
 /* Returns true if clocks can be gated. Otherwise false */
 static inline bool ufshcd_is_clkgating_allowed(struct ufs_hba *hba)
@@ -639,6 +746,12 @@ static inline void ufshcd_vops_deepidle_resource_req(struct ufs_hba *hba, unsign
 {
 	if (hba->vops && hba->vops->deepidle_resource_req)
 		hba->vops->deepidle_resource_req(hba, resource);
+}
+
+static inline void ufshcd_vops_deepidle_lock(struct ufs_hba *hba, bool lock)
+{
+	if (hba->vops && hba->vops->deepidle_lock)
+		hba->vops->deepidle_lock(hba, lock);
 }
 
 static inline void ufshcd_vops_scsi_dev_cfg(struct scsi_device *sdev, enum ufs_scsi_dev_cfg op)
@@ -870,6 +983,7 @@ int   ufshcd_get_req_rsp(struct utp_upiu_rsp *ucd_rsp_ptr);
 int   ufshcd_get_rsp_upiu_result(struct utp_upiu_rsp *ucd_rsp_ptr);
 int   ufshcd_get_tr_ocs(struct ufshcd_lrb *lrbp);
 int   ufshcd_make_hba_operational(struct ufs_hba *hba);
+void  ufshcd_print_host_state(struct ufs_hba *hba, u32 mphy_info, struct seq_file *m);
 int   ufshcd_query_attr(struct ufs_hba *hba,
 							enum query_opcode opcode,
 							enum attr_idn idn,

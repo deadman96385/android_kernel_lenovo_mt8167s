@@ -21,8 +21,6 @@
 #endif /* CONFIG_MTK_TINYSYS_SSPM_SUPPORT */
 #include <linux/delay.h>
 
-#define ISL91302A_BUCK_DRV_VERSION	"1.0.0_MTK"
-
 #define ISL91302A_BUCK_MAX	3
 
 struct isl91302a_regulator_info {
@@ -250,7 +248,7 @@ static unsigned int isl91302a_get_mode(
 
 	ret = isl91302a_read_byte(mreg_desc->client, info->mode_reg, &regval);
 	if (ret < 0) {
-		ISL91302A_ERR("%s read mode fail\n", __func__);
+		ISL91302A_PR_ERR("%s read mode fail\n", __func__);
 		return ret;
 	}
 
@@ -271,6 +269,7 @@ static int isl91302a_enable_ipi(struct mtk_simple_regulator_desc *mreg_desc)
 		pr_err("%s only support proc2\n", __func__);
 		return 0;
 	}
+
 	ret = extbuck_ipi_enable(buck_id, 1);
 	pr_info_ratelimited("%s [%s] id(%d), ret(%d)\n", __func__,
 				mreg_desc->rdesc.name, buck_id, ret);
@@ -292,6 +291,7 @@ static int isl91302a_disable_ipi(struct mtk_simple_regulator_desc *mreg_desc)
 		pr_err("%s only support proc2\n", __func__);
 		return 0;
 	}
+
 	ret = extbuck_ipi_enable(buck_id, 0);
 	pr_info_ratelimited("%s [%s] id(%d), ret(%d)\n", __func__,
 				mreg_desc->rdesc.name, buck_id, ret);
@@ -310,6 +310,7 @@ static int isl91302a_is_enabled_ipi(struct mtk_simple_regulator_desc *mreg_desc)
 		pr_err("%s only support proc2\n", __func__);
 		return 0;
 	}
+
 	ret = extbuck_ipi_enable(buck_id, 0xF);
 	pr_info_ratelimited("%s [%s] id(%d), ret(%d)\n", __func__,
 			mreg_desc->rdesc.name, buck_id, ret);
@@ -437,18 +438,20 @@ int isl91302a_regulator_init(struct isl91302a_chip *chip)
 	int ret = 0, i = 0;
 
 	if (chip == NULL) {
-		ISL91302A_ERR("%s Null chip info\n", __func__);
+		ISL91302A_PR_ERR("%s Null chip info\n", __func__);
 		return -1;
 	}
 
 	for (i = 0; i < ARRAY_SIZE(isl91302a_desc_table); i++) {
+#ifndef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
 		isl91302a_desc_table[i].client = chip->spi;
+#endif /* CONFIG_MTK_TINYSYS_SSPM_SUPPORT */
 		isl91302a_desc_table[i].def_init_data =
 					&isl91302a_buck_init_data[i];
 		ret = mtk_simple_regulator_register(&isl91302a_desc_table[i],
 				chip->dev, &isl91302a_regulator_ext_ops, NULL);
 		if (ret < 0) {
-			ISL91302A_ERR("%s register mtk simple regulator fail\n",
+			ISL91302A_PR_ERR("%s register mtk simple regulator fail\n",
 				__func__);
 		}
 		isl91302a_buck_set_ramp_dly(

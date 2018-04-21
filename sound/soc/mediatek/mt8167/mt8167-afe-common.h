@@ -34,6 +34,7 @@ enum {
 	MT8167_AFE_MEMIF_MOD_DAI,
 	MT8167_AFE_MEMIF_HDMI,
 	MT8167_AFE_MEMIF_TDM_IN,
+	MT8167_AFE_MEMIF_VIRTUAL_MRG,
 	MT8167_AFE_MEMIF_NUM,
 	MT8167_AFE_BACKEND_BASE = MT8167_AFE_MEMIF_NUM,
 	MT8167_AFE_IO_MOD_PCM1 = MT8167_AFE_BACKEND_BASE,
@@ -124,6 +125,7 @@ enum {
 	MT8167_AFE_TDM_OUT_HDMI = 0,
 	MT8167_AFE_TDM_OUT_I2S,
 	MT8167_AFE_TDM_OUT_TDM,
+	MT8167_AFE_TDM_OUT_I2S_32BITS,
 };
 
 enum {
@@ -141,6 +143,26 @@ enum {
 	MT8167_AFE_APLL1 = 0,
 	MT8167_AFE_APLL2,
 	MT8167_AFE_APLL_NUM,
+};
+
+enum {
+	MT8167_AFE_HW_DIGITAL_GAIN1,
+	MT8167_AFE_HW_DIGITAL_GAIN2
+};
+enum mt8167_afe_i2s_sample_rate {
+	MT_AFE_I2S_SAMPLERATE_8K = 0,
+	MT_AFE_I2S_SAMPLERATE_11K = 1,
+	MT_AFE_I2S_SAMPLERATE_12K = 2,
+	MT_AFE_I2S_SAMPLERATE_16K = 4,
+	MT_AFE_I2S_SAMPLERATE_22K = 5,
+	MT_AFE_I2S_SAMPLERATE_24K = 6,
+	MT_AFE_I2S_SAMPLERATE_32K = 8,
+	MT_AFE_I2S_SAMPLERATE_44K = 9,
+	MT_AFE_I2S_SAMPLERATE_48K = 10,
+	MT_AFE_I2S_SAMPLERATE_88K = 11,
+	MT_AFE_I2S_SAMPLERATE_96K = 12,
+	MT_AFE_I2S_SAMPLERATE_174K = 13,
+	MT_AFE_I2S_SAMPLERATE_192K = 14,
 };
 
 struct snd_pcm_substream;
@@ -190,6 +212,12 @@ struct mt8167_afe_control_data {
 	bool hdmi_force_clk;
 };
 
+
+struct mt8167_pcm_mrgrx_priv {
+	unsigned int mrgrx_volume;
+	bool prepare_done;
+};
+
 struct mtk_afe {
 	/* address for ioremap audio hardware register */
 	void __iomem *base_addr;
@@ -202,12 +230,14 @@ struct mtk_afe {
 	struct mt8167_afe_be_dai_data be_data[MT8167_AFE_BACKEND_NUM];
 	struct mt8167_afe_control_data ctrl_data;
 	struct clk *clocks[MT8167_CLK_NUM];
+	struct mt8167_pcm_mrgrx_priv *mrgrx_priv;
 	unsigned int *backup_regs;
 	bool suspended;
 	int afe_on_ref_cnt;
 	int adda_afe_on_ref_cnt;
 	int i2s_out_on_ref_cnt;
 	int daibt_on_ref_cnt;
+	int mrgi2s_on_ref_cnt;
 	int irq_mode_ref_cnt[MT8167_AFE_IRQ_NUM];
 	int top_cg_ref_cnt[MT8167_AFE_CG_NUM];
 	int apll_tuner_ref_cnt[MT8167_AFE_APLL_NUM];
@@ -215,7 +245,6 @@ struct mtk_afe {
 	unsigned int i2s_clk_modes[MT8167_AFE_I2S_SETS];
 	unsigned int awb_irq_mode;
 	unsigned int dai_irq_mode;
-	bool apply_6db_gain_in_ul_src;
 	/* locks */
 	spinlock_t afe_ctrl_lock;
 	struct mutex afe_clk_mutex;

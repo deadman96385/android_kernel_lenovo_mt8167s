@@ -36,8 +36,8 @@ static int lastpc_plt_dump(struct lastpc_plt *plt, char *ptr, int len)
 	unsigned int fp_value_32;
 	unsigned int sp_value_32;
 	unsigned long pc_value;
-	unsigned long fp_value;
-	unsigned long sp_value;
+	unsigned long fp_value = 0;
+	unsigned long sp_value = 0;
 	unsigned long size = 0;
 	unsigned long offset = 0;
 	char str[KSYM_SYMBOL_LEN];
@@ -45,11 +45,14 @@ static int lastpc_plt_dump(struct lastpc_plt *plt, char *ptr, int len)
 
 	/* Get PC, FP, SP and save to buf */
 	for (i = 0; i < 4; i++) {
-		pc_value = (unsigned long)lastpc[i][1] << 32 | lastpc[i][0];
+		pc_value = lastpc[i][0];
 		fp_value_32 = lastpc[i][2];
 		sp_value_32 = lastpc[i][3];
+#ifdef CONFIG_ARM64
+		pc_value |= (unsigned long)lastpc[i][1] << 32;
 		fp_value = (unsigned long)lastpc[i][5] << 32 | lastpc[i][4];
 		sp_value = (unsigned long)lastpc[i][7] << 32 | lastpc[i][6];
+#endif
 
 		kallsyms_lookup(pc_value, &size, &offset, NULL, str);
 		ptr +=
@@ -58,9 +61,9 @@ static int lastpc_plt_dump(struct lastpc_plt *plt, char *ptr, int len)
 			    pc_value, str, offset, fp_value, sp_value);
 		ptr += sprintf(ptr,
 			       " FP_32 = 0x%x SP_32 = 0x%x\n", fp_value_32, sp_value_32);
-		pr_err("[LAST PC] CORE_%d PC = 0x%lx(%s), FP = 0x%lx, SP = 0x%lx", i, pc_value,
+		pr_info("[LAST PC] CORE_%d PC = 0x%lx(%s), FP = 0x%lx, SP = 0x%lx", i, pc_value,
 			  str, fp_value, sp_value);
-		pr_err("  FP_32 = 0x%x SP_32 = 0x%x\n", fp_value_32, sp_value_32);
+		pr_info("  FP_32 = 0x%x SP_32 = 0x%x\n", fp_value_32, sp_value_32);
 	}
 
 	return 0;
@@ -96,9 +99,9 @@ static int __init lastpc_init(void)
 		if (tags)
 			memcpy((void *)lastpc, (void *)tags->lastpc, sizeof(lastpc));
 		else
-			pr_warn("[%s] No atag,lastpc found !\n", __func__);
+			pr_info("[%s] No atag,lastpc found !\n", __func__);
 	} else
-		pr_warn("[%s] of_chosen is NULL !\n", __func__);
+		pr_info("[%s] of_chosen is NULL !\n", __func__);
 #endif
 
 	drv = kzalloc(sizeof(struct lastpc_imp), GFP_KERNEL);
@@ -111,7 +114,7 @@ static int __init lastpc_init(void)
 
 	ret = lastpc_register(&drv->plt);
 	if (ret) {
-		pr_err("%s:%d: lastpc_register failed\n", __func__, __LINE__);
+		pr_info("%s:%d: lastpc_register failed\n", __func__, __LINE__);
 		goto register_lastpc_err;
 	}
 

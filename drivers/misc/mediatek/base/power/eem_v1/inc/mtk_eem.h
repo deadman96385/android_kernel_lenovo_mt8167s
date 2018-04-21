@@ -23,47 +23,6 @@
 
 /* Thermal Register Definition */
 
-/* EEM Structure */
-typedef struct {
-	unsigned int ADC_CALI_EN;
-	unsigned int PTPINITEN;
-	unsigned int PTPMONEN;
-
-	unsigned int MDES;
-	unsigned int BDES;
-	unsigned int DCCONFIG;
-	unsigned int DCMDET;
-	unsigned int DCBDET;
-	unsigned int AGECONFIG;
-	unsigned int AGEM;
-	unsigned int AGEDELTA;
-	unsigned int DVTFIXED;
-	unsigned int VCO;
-	unsigned int MTDES;
-	unsigned int MTS;
-	unsigned int BTS;
-
-	unsigned char FREQPCT0;
-	unsigned char FREQPCT1;
-	unsigned char FREQPCT2;
-	unsigned char FREQPCT3;
-	unsigned char FREQPCT4;
-	unsigned char FREQPCT5;
-	unsigned char FREQPCT6;
-	unsigned char FREQPCT7;
-
-	unsigned int DETWINDOW;
-	unsigned int VMAX;
-	unsigned int VMIN;
-	unsigned int DTHI;
-	unsigned int DTLO;
-	unsigned int VBOOT;
-	unsigned int DETMAX;
-
-	unsigned int DCVOFFSETIN;
-	unsigned int AGEVOFFSETIN;
-} PTP_INIT_T;
-
 /* have 10 banks */
 enum eem_ctrl_id {
 	EEM_CTRL_BIG = 0,
@@ -146,7 +105,7 @@ enum {
 /* Global variable for SW EFUSE*/
 /* TODO: FIXME #include "devinfo.h" */
 extern u32 get_devinfo_with_index(u32 index);
-extern const unsigned int reg_dump_addr_off[100];
+extern const unsigned int reg_dump_addr_off[101];
 
 /* Global variabel for Idvfs */
 extern unsigned int infoIdvfs;
@@ -164,6 +123,14 @@ enum eem_state {
 	EEM_CPU_LITTLE_IS_SET_VOLT, /* L */
 };
 
+extern void aee_rr_rec_ptp_devinfo_0(u32 val);
+extern void aee_rr_rec_ptp_devinfo_1(u32 val);
+extern void aee_rr_rec_ptp_devinfo_2(u32 val);
+extern void aee_rr_rec_ptp_devinfo_3(u32 val);
+extern void aee_rr_rec_ptp_devinfo_4(u32 val);
+extern void aee_rr_rec_ptp_devinfo_5(u32 val);
+extern void aee_rr_rec_ptp_devinfo_6(u32 val);
+extern void aee_rr_rec_ptp_devinfo_7(u32 val);
 extern void aee_rr_rec_ptp_e0(u32 val);
 extern void aee_rr_rec_ptp_e1(u32 val);
 extern void aee_rr_rec_ptp_e2(u32 val);
@@ -201,6 +168,14 @@ extern void aee_rr_rec_ptp_temp(u64 val);
 extern void aee_rr_rec_ptp_status(u8 val);
 extern void aee_rr_rec_eem_pi_offset(u8 val);
 
+extern u32 aee_rr_curr_ptp_devinfo_0(void);
+extern u32 aee_rr_curr_ptp_devinfo_1(void);
+extern u32 aee_rr_curr_ptp_devinfo_2(void);
+extern u32 aee_rr_curr_ptp_devinfo_3(void);
+extern u32 aee_rr_curr_ptp_devinfo_4(void);
+extern u32 aee_rr_curr_ptp_devinfo_5(void);
+extern u32 aee_rr_curr_ptp_devinfo_6(void);
+extern u32 aee_rr_curr_ptp_devinfo_7(void);
 extern u32 aee_rr_curr_ptp_e0(void);
 extern u32 aee_rr_curr_ptp_e1(void);
 extern u32 aee_rr_curr_ptp_e2(void);
@@ -247,10 +222,15 @@ extern int spm_mtcmos_ctrl_mfg2(int state);
 extern int mt_eem_status(enum eem_det_id id);
 extern unsigned int get_vcore_ptp_volt(unsigned int uv);
 /* extern void eem_set_pi_offset(enum eem_ctrl_id id, int step); */
+extern void eem_set_pi_efuse(enum eem_ctrl_id id, unsigned int pi_efuse);
 extern unsigned int get_efuse_status(void);
 /* extern unsigned int get_eem_status_for_gpu(void); */
 extern unsigned int mt_eem_vcorefs_set_volt(void);
 extern unsigned char mt_eem_get_turbo(void);
+/* for display workaround */
+extern void mt_eem_vcorefs_update_volt(bool);
+/* for display workaround */
+extern int primary_display_get_dsc_1slice_info(void);
 #if defined(__MTK_SLT_)
 /* extern int mt_ptp_idle_can_enter(void); */
 extern unsigned int ptp_init01_ptp(int id);

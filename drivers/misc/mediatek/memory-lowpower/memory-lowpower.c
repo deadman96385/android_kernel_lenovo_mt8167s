@@ -35,9 +35,9 @@
 
 static struct cma *cma;
 static struct page *cma_pages;
-static DEFINE_MUTEX(memory_lowpower_mutex);
-
 static unsigned long cma_usage_count;
+
+static DEFINE_MUTEX(memory_lowpower_mutex);
 
 #define MEMORY_LOWPOWER_FULLNESS
 #ifdef MEMORY_LOWPOWER_FULLNESS
@@ -61,23 +61,32 @@ bool memory_lowpower_inited(void)
 }
 
 /*
- * memory_lowpower_cma_base - query the cma's base
+ * memory_lowpower_base - query the memory_lowpower base
  */
-phys_addr_t memory_lowpower_cma_base(void)
+phys_addr_t memory_lowpower_base(void)
 {
 	return cma_get_base(cma);
 }
 
+struct single_cma_registration memory_lowpower_registration;
 /*
- * memory_lowpower_cma_size - query the cma's size
+ * memory_lowpower_size - query memory_lowpower size
  */
-phys_addr_t memory_lowpower_cma_size(void)
+phys_addr_t memory_lowpower_size(void)
 {
 #ifndef MEMORY_LOWPOWER_FULLNESS
-	return (phys_addr_t)cma_get_size(cma);
+	return memory_lowpower_registration.size;
 #else
-	return (phys_addr_t)cma_get_size(cma) + grab_lastsize;
+	return memory_lowpower_registration.size + grab_lastsize;
 #endif
+}
+
+/*
+ * memory_lowpower_real_size - query memory_lowpower actual size
+ */
+static phys_addr_t memory_lowpower_real_size(void)
+{
+	return memory_lowpower_registration.size;
 }
 
 /*
@@ -87,27 +96,24 @@ phys_addr_t memory_lowpower_cma_size(void)
  * @pages: Pointer indicates allocated cma buffer.
  * It returns 0 in success, otherwise returns -1
  */
-int get_memory_lowpower_cma_aligned(int count, unsigned int align, struct page **pages)
+int get_memory_lowpower_cma_aligned(int count, unsigned int align, struct page **pages, bool last)
 {
-	int ret = 0;
-
-	mutex_lock(&memory_lowpower_mutex);
-
 #ifdef MEMORY_LOWPOWER_FULLNESS
-	count = min_t(unsigned long, (cma_get_size(cma) >> PAGE_SHIFT) - cma_usage_count, count);
+	if (last)
+		count -= grab_lastsize >> PAGE_SHIFT;
 #endif
 
 	*pages = zmc_cma_alloc(cma, count, align, &memory_lowpower_registration);
 	if (*pages == NULL) {
 		pr_alert("lowpower cma allocation failed\n");
-		ret = -1;
-	} else {
-		cma_usage_count += count;
+		return -1;
 	}
 
+	mutex_lock(&memory_lowpower_mutex);
+	cma_usage_count += count;
 	mutex_unlock(&memory_lowpower_mutex);
 
-	return ret;
+	return 0;
 }
 
 /*
@@ -116,94 +122,91 @@ int get_memory_lowpower_cma_aligned(int count, unsigned int align, struct page *
  * @pages: Pointer indicates allocated cma buffer.
  * It returns 0 in success, otherwise returns -1
  */
-int put_memory_lowpower_cma_aligned(int count, struct page *pages)
+int put_memory_lowpower_cma_aligned(int count, struct page *pages, bool last)
 {
-	int ret = 0;
-
-	mutex_lock(&memory_lowpower_mutex);
-
 #ifdef MEMORY_LOWPOWER_FULLNESS
-	count = min_t(unsigned long, cma_usage_count, count);
+	if (last)
+		count -= grab_lastsize >> PAGE_SHIFT;
 #endif
 
 	if (pages) {
-		ret = cma_release(cma, pages, count);
-		if (!ret) {
+		if (!zmc_cma_release(cma, pages, count)) {
 			pr_err("%s incorrect pages: %p(%lx)\n",
 					__func__,
 					pages, page_to_pfn(pages));
-			ret = -1;
-		} else {
-			cma_usage_count -= count;
-			ret = 0;
+			return -1;
 		}
+		mutex_lock(&memory_lowpower_mutex);
+		cma_usage_count -= count;
+		mutex_unlock(&memory_lowpower_mutex);
 	}
 
-	mutex_unlock(&memory_lowpower_mutex);
-
-	return ret;
+	return 0;
 }
 
 /*
  * get_memory_lowpwer_cma - allocate all cma memory belongs to lowpower cma.
  * It returns 0 in success, otherwise returns -1
+ * (TBD) reference count for cma_pages
  */
 int get_memory_lowpower_cma(void)
 {
-	int ret = 0;
-	int count = cma_get_size(cma) >> PAGE_SHIFT;
+	int count = memory_lowpower_real_size() >> PAGE_SHIFT;
+	struct page *pages;
 
-	if (cma_pages) {
+	mutex_lock(&memory_lowpower_mutex);
+	pages = cma_pages;
+	mutex_unlock(&memory_lowpower_mutex);
+	if (pages) {
 		pr_alert("cma already collected\n");
 		goto out;
 	}
 
-	mutex_lock(&memory_lowpower_mutex);
-
-	cma_pages = zmc_cma_alloc(cma, count, 0, &memory_lowpower_registration);
-
-	if (cma_pages) {
-		pr_debug("%s:%d ok\n", __func__, __LINE__);
-		cma_usage_count += count;
-	} else {
+	pages = zmc_cma_alloc(cma, count, 0, &memory_lowpower_registration);
+	if (!pages) {
 		pr_alert("lowpower cma allocation failed\n");
-		ret = -1;
+		return -1;
 	}
 
+	mutex_lock(&memory_lowpower_mutex);
+	cma_pages = pages;
+	pr_debug("%s:%d ok\n", __func__, __LINE__);
+	cma_usage_count += count;
 	mutex_unlock(&memory_lowpower_mutex);
 
 out:
-	return ret;
+	return 0;
 }
 
 /*
  * put_memory_lowpwer_cma - free all cma memory belongs to lowpower cma.
  * It returns 0 in success, otherwise returns -1
+ * (TBD) reference count for cma_pages
  */
 int put_memory_lowpower_cma(void)
 {
-	int ret = 0;
-	int count = cma_get_size(cma) >> PAGE_SHIFT;
+	int count = memory_lowpower_real_size() >> PAGE_SHIFT;
+	struct page *pages;
 
 	mutex_lock(&memory_lowpower_mutex);
-
-	if (cma_pages) {
-		ret = cma_release(cma, cma_pages, count);
-		if (!ret) {
-			pr_err("%s incorrect pages: %p(%lx)\n",
-					__func__,
-					cma_pages, page_to_pfn(cma_pages));
-			ret = -1;
-		} else {
-			cma_usage_count -= count;
-			cma_pages = 0;
-			ret = 0;
-		}
-	}
-
+	pages = cma_pages;
+	cma_pages = 0;
 	mutex_unlock(&memory_lowpower_mutex);
 
-	return ret;
+	if (pages) {
+		if (!zmc_cma_release(cma, pages, count)) {
+			pr_err("%s incorrect pages: %p(%lx)\n",
+					__func__,
+					pages, page_to_pfn(pages));
+			return -1;
+		}
+
+		mutex_lock(&memory_lowpower_mutex);
+		cma_usage_count -= count;
+		mutex_unlock(&memory_lowpower_mutex);
+	}
+
+	return 0;
 }
 #ifdef MEMORY_LOWPOWER_FULLNESS
 #define TEST_AND_RESERVE_MEMBLOCK(base, size) (!memblock_is_region_reserved(base, size) && \
@@ -242,7 +245,7 @@ static void zmc_memory_lowpower_init(struct cma *zmc_cma)
 	/* try to grab the last pageblock */
 	pr_info("%s: memory-lowpower-fullness\n", __func__);
 	if (cma != NULL)
-		memory_lowpower_fullness(cma_get_base(cma), cma_get_size(cma));
+		memory_lowpower_fullness(memory_lowpower_base(), memory_lowpower_size());
 #endif
 }
 
@@ -255,7 +258,7 @@ struct single_cma_registration memory_lowpower_registration = {
 	.prio = ZMC_MLP,
 };
 
-static int memory_lowpower_init(struct reserved_mem *rmem)
+static int __init memory_lowpower_init(struct reserved_mem *rmem)
 {
 	int ret;
 
@@ -309,7 +312,7 @@ late_initcall(memory_lowpower_sanity_test);
 static int memory_lowpower_show(struct seq_file *m, void *v)
 {
 	phys_addr_t cma_base = cma_get_base(cma);
-	phys_addr_t cma_end = cma_base + cma_get_size(cma);
+	phys_addr_t cma_end = cma_base + memory_lowpower_real_size();
 
 	mutex_lock(&memory_lowpower_mutex);
 
@@ -318,12 +321,12 @@ static int memory_lowpower_show(struct seq_file *m, void *v)
 	else
 		seq_puts(m, "cma freed NULL\n");
 
-	mutex_unlock(&memory_lowpower_mutex);
-
 	seq_printf(m, "cma info: [%pa-%pa] (0x%lx)\n",
 			&cma_base, &cma_end,
-			cma_get_size(cma));
+			(unsigned long)memory_lowpower_real_size());
 	seq_printf(m, "cma usage: %lu\n", cma_usage_count);
+
+	mutex_unlock(&memory_lowpower_mutex);
 
 	return 0;
 }

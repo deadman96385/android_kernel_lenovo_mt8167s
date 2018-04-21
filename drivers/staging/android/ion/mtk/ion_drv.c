@@ -467,6 +467,8 @@ static long ion_sys_ioctl(struct ion_client *client, unsigned int cmd,
 	case ION_SYS_GET_PHYS:
 	{
 		struct ion_handle *kernel_handle;
+		/*phy_addr may be used for input when some port use ion, such as vpu*/
+		ion_phys_addr_t phy_addr = param.get_phys_param.phy_addr;
 
 		kernel_handle = ion_drv_get_handle(client, param.get_phys_param.handle,
 						   param.get_phys_param.kernel_handle, from_kernel);
@@ -475,14 +477,16 @@ static long ion_sys_ioctl(struct ion_client *client, unsigned int cmd,
 			ret = -EINVAL;
 			break;
 		}
+
 		if (ion_phys(client, kernel_handle,
-			     (ion_phys_addr_t *)&param.get_phys_param.phy_addr,
+				&phy_addr,
 				(size_t *)&param.get_phys_param.len) < 0) {
 			param.get_phys_param.phy_addr = 0;
 			param.get_phys_param.len = 0;
 			IONMSG("[ion_sys_ioctl]: Error. Cannot get physical address.\n");
 			ret = -EFAULT;
 		}
+		param.get_phys_param.phy_addr = (unsigned int)phy_addr;
 		ion_drv_put_kernel_handle(kernel_handle);
 	}
 	break;
@@ -495,29 +499,8 @@ static long ion_sys_ioctl(struct ion_client *client, unsigned int cmd,
 	case ION_SYS_DMA_OP:
 		ion_sys_dma_op(client, &param.dma_param, from_kernel);
 		break;
-	case ION_SYS_SET_HANDLE_BACKTRACE: {
-#if  ION_RUNTIME_DEBUGGER
-		unsigned int i;
-		struct ion_handle *kernel_handle;
-
-		kernel_handle = ion_drv_get_handle(client,
-						   -1, param.record_param.handle, from_kernel);
-		if (IS_ERR(kernel_handle)) {
-			IONMSG("ion_set_handle_bt fail!\n");
-			ret = -EINVAL;
-			break;
-		}
-
-		kernel_handle->dbg.pid = (unsigned int)current->pid;
-		kernel_handle->dbg.tgid = (unsigned int)current->tgid;
-		kernel_handle->dbg.backtrace_num = param.record_param.backtrace_num;
-
-		for (i = 0; i < param.record_param.backtrace_num; i++)
-			kernel_handle->dbg.backtrace[i] = param.record_param.backtrace[i];
-		ion_drv_put_kernel_handle(kernel_handle);
-
-#endif
-	}
+	case ION_SYS_SET_HANDLE_BACKTRACE:
+		IONMSG("[ion_dbg][ion_sys_ioctl]: Error. ION_SYS_SET_HANDLE_BACKTRACE not support.\n");
 		break;
 	default:
 		IONMSG("[ion_dbg][ion_sys_ioctl]: Error. Invalid command.\n");
@@ -580,7 +563,7 @@ static int ion_fb_event(struct notifier_block *notifier, unsigned long event, vo
 	case FB_BLANK_HSYNC_SUSPEND:
 	case FB_BLANK_POWERDOWN:
 		IONMSG("%s: + screen-off +\n", __func__);
-		shrink_ion_by_scenario();
+		shrink_ion_by_scenario(1);
 		IONMSG("%s: - screen-off -\n", __func__);
 		break;
 	default:
@@ -679,6 +662,60 @@ int ion_device_destroy_heaps(struct ion_device *dev)
 	return 0;
 }
 
+/*for clients ion mm heap summary size*/
+static int ion_clients_summary_show(struct seq_file *s, void *unused)
+{
+	struct ion_device *dev = g_ion_device;
+	struct rb_node *n, *m;
+	int buffer_size = 0;
+
+	if (!down_read_trylock(&dev->lock))
+		return 0;
+	seq_printf(s, "%-16.s %-8.s %-8.s\n", "client_name", "pid", "size");
+	seq_puts(s, "------------------------------------------\n");
+	for (n = rb_first(&dev->clients); n; n = rb_next(n)) {
+		struct ion_client *client = rb_entry(n, struct ion_client, node);
+		{
+			 {
+				mutex_lock(&client->lock);
+				for (m = rb_first(&client->handles); m; m = rb_next(m)) {
+					struct ion_handle *handle = rb_entry(m, struct ion_handle, node);
+
+					if ((handle->buffer->heap->id == ION_HEAP_TYPE_MULTIMEDIA ||
+					     handle->buffer->heap->id == ION_HEAP_TYPE_MULTIMEDIA_FOR_CAMERA) &&
+						(handle->buffer->handle_count) != 0)
+						buffer_size +=
+						(int)(handle->buffer->size) / (handle->buffer->handle_count);
+				}
+				if (!buffer_size) {
+					mutex_unlock(&client->lock);
+					continue;
+				}
+				seq_printf(s, "%-16s %-8d %-8d\n", client->name, client->pid, buffer_size);
+				buffer_size = 0;
+			mutex_unlock(&client->lock);
+			}
+		}
+	}
+
+	seq_puts(s, "-------------------------------------------\n");
+	up_read(&dev->lock);
+
+	return 0;
+}
+
+static int ion_debug_client_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ion_clients_summary_show, inode->i_private);
+}
+
+static const struct file_operations debug_client_fops = {
+	.open = ion_debug_client_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
 static int ion_drv_probe(struct platform_device *pdev)
 {
 	int i;
@@ -717,6 +754,8 @@ static int ion_drv_probe(struct platform_device *pdev)
 	arch_setup_dma_ops(g_ion_device->dev.this_device, 0, 0, NULL, false);
 	/* debugfs_create_file("ion_profile", 0644, g_ion_device->debug_root, NULL, */
 	/* &debug_profile_fops); */
+	debugfs_create_file("clients_summary", 0644, g_ion_device->clients_debug_root, NULL,
+			    &debug_client_fops);
 	debugfs_create_symlink("ion_mm_heap", g_ion_device->debug_root, "./heaps/ion_mm_heap");
 
 	ion_history_init();
@@ -826,7 +865,8 @@ static int __init ion_init(void)
 	}
 
 #ifdef CONFIG_PM
-	fb_register_client(&ion_fb_notifier_block);
+	if (fb_register_client(&ion_fb_notifier_block))
+		IONMSG("%s fb_register_client failed.\n", __func__);
 #endif
 	return 0;
 }

@@ -114,16 +114,25 @@
 /*******************************************************************************
 * Static variables
 *******************************************************************************/
+#ifdef CONFIG_TOUCHSCREEN_FT5X26_WUXGA
 static unsigned char CTPM_FW[] = {
-
-#include "Acer_JetfireHD_neostra_FT5826S_V16_D03_20160525_app.i"
+	#include "Acer_JetfireLTE_neostra_A10_4G_FT5826S_V85_D04_20170227_app.i"
 };
+#else
+static unsigned char CTPM_FW[] = {
+	#include "Acer_JetfireHD_neostra_FT5826S_V16_D03_20160525_app.i"
+};
+#endif
 
-/* Begin Neostra huangxiaohui add  20160726 */
+#ifdef CONFIG_TOUCHSCREEN_FT5X26_WUXGA
 static unsigned char TAIGUAN_FW[] = {
-
-#include "Acer_JetfireHD_neostra_FT5826S_V40_D03_20161012_app.i"
+      #include "Acer_A10L2_TaiGuan_FT5826S_V51_D04_20170117_app.i"
 };
+#else
+static unsigned char TAIGUAN_FW[] = {
+	#include "Acer_JetfireHD_neostra_FT5826S_V40_D03_20161012_app.i"
+};
+#endif
 
 static u8 vendor_tp_id;
 /* End Neostra huangxiaohui add  20160726 */
@@ -157,23 +166,6 @@ struct fts_Upgrade_Info fts_updateinfo[] = {
 * Global variable or extern global variabls/functions
 *******************************************************************************/
 struct fts_Upgrade_Info fts_updateinfo_curr;
-/*******************************************************************************
-* Static function prototypes
-*******************************************************************************/
-int fts_6x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int fts_6336GU_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int fts_6x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int fts_5x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int fts_5x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int fts_5822_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int fts_5x26_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int  fts_8606_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int fts_3x07_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth);
-int hidi2c_to_stdi2c(struct i2c_client *client);
 
 /************************************************************************
 * Name: hidi2c_to_stdi2c
@@ -194,7 +186,7 @@ int hidi2c_to_stdi2c(struct i2c_client *client)
 	auc_i2c_write_buf[1] = 0xaa;
 	auc_i2c_write_buf[2] = 0x09;
 	bRet = fts_i2c_write(client, auc_i2c_write_buf, 3);
-	msleep(10);
+	usleep_range(10000, 11000);
 	auc_i2c_write_buf[0] = auc_i2c_write_buf[1] = auc_i2c_write_buf[2] = 0;
 	fts_i2c_read(client, auc_i2c_write_buf, 0, auc_i2c_write_buf, 3);
 
@@ -202,7 +194,7 @@ int hidi2c_to_stdi2c(struct i2c_client *client)
 		pr_info("hidi2c_to_stdi2c successful.\n");
 		bRet = 1;
 	} else {
-		pr_err("hidi2c_to_stdi2c error.\n");
+		pr_notice("hidi2c_to_stdi2c error.\n");
 		bRet = 0;
 	}
 
@@ -225,7 +217,7 @@ void fts_update_fw_vendor_id(struct fts_ts_data *data)
 	reg_addr = FTS_REG_FW_VENDOR_ID;
 	err = fts_i2c_read(client, &reg_addr, 1, &data->fw_vendor_id, 1);
 	if (err < 0)
-		dev_err(&client->dev, "fw vendor id read failed");
+		dev_notice(&client->dev, "fw vendor id read failed");
 }
 
 /*******************************************************************************
@@ -244,17 +236,17 @@ void fts_update_fw_ver(struct fts_ts_data *data)
 	reg_addr = FTS_REG_FW_VER;
 	err = fts_i2c_read(client, &reg_addr, 1, &data->fw_ver[0], 1);
 	if (err < 0)
-		dev_err(&client->dev, "fw major version read failed");
+		dev_notice(&client->dev, "fw major version read failed");
 
 	reg_addr = FTS_REG_FW_MIN_VER;
 	err = fts_i2c_read(client, &reg_addr, 1, &data->fw_ver[1], 1);
 	if (err < 0)
-		dev_err(&client->dev, "fw minor version read failed");
+		dev_notice(&client->dev, "fw minor version read failed");
 
 	reg_addr = FTS_REG_FW_SUB_MIN_VER;
 	err = fts_i2c_read(client, &reg_addr, 1, &data->fw_ver[2], 1);
 	if (err < 0)
-		dev_err(&client->dev, "fw sub minor version read failed");
+		dev_notice(&client->dev, "fw sub minor version read failed");
 
 	dev_info(&client->dev, "Firmware version = %d.%d.%d\n",
 		 data->fw_ver[0], data->fw_ver[1], data->fw_ver[2]);
@@ -289,7 +281,7 @@ int fts_ctpm_fw_upgrade_ReadVendorID(struct i2c_client *client, u8 *ucPVendorID)
 		i_ret = hidi2c_to_stdi2c(client);
 		if (i_ret == 0)
 			TPD_DEBUG("hidi2c change to stdi2c fail !\n");
-		msleep(10);
+		usleep_range(10000, 11000);
 		auc_i2c_write_buf[0] = FTS_UPGRADE_55;
 		auc_i2c_write_buf[1] = FTS_UPGRADE_AA;
 		i_ret = fts_i2c_write(client, auc_i2c_write_buf, 2);
@@ -298,7 +290,7 @@ int fts_ctpm_fw_upgrade_ReadVendorID(struct i2c_client *client, u8 *ucPVendorID)
 			continue;
 		}
 		/*********Step 3:check READ-ID***********************/
-		msleep(10);
+		usleep_range(10000, 11000);
 		auc_i2c_write_buf[0] = 0x90;
 		auc_i2c_write_buf[1] = auc_i2c_write_buf[2] = auc_i2c_write_buf[3] = 0x00;
 		reg_val[0] = reg_val[1] = 0x00;
@@ -306,27 +298,28 @@ int fts_ctpm_fw_upgrade_ReadVendorID(struct i2c_client *client, u8 *ucPVendorID)
 		if (reg_val[0] == fts_updateinfo_curr.upgrade_id_1 && reg_val[1] == fts_updateinfo_curr.upgrade_id_2) {
 			TPD_DEBUG("[FTS] Step 3: READ OK CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
-			continue;
 		}
+		dev_notice(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
+		continue;
 	}
 	if (i >= FTS_UPGRADE_LOOP)
 		return -EIO;
 	/*********Step 4: read vendor id from app param area***********************/
-	msleep(10);
+	usleep_range(10000, 11000);
 	auc_i2c_write_buf[0] = 0x03;
 	auc_i2c_write_buf[1] = 0x00;
 	auc_i2c_write_buf[2] = 0xd7;
 	auc_i2c_write_buf[3] = 0x84;
 	for (i = 0; i < FTS_UPGRADE_LOOP; i++) {
 		fts_i2c_write(client, auc_i2c_write_buf, 4);
-		msleep(5);
+		usleep_range(5000, 6000);
 		reg_val[0] = reg_val[1] = 0x00;
 		i_ret = fts_i2c_read(client, auc_i2c_write_buf, 0, reg_val, 2);
 		if (reg_val[0] != 0) {
 			*ucPVendorID = 0;
-			TPD_DEBUG("In upgrade Vendor ID Mismatch, REG1 = 0x%x, REG2 = 0x%x, Definition:0x%x, i_ret=%d\n", reg_val[0], reg_val[1], 0, i_ret);
+			TPD_DEBUG("Vendor ID Mismatch, REG1 = 0x%x, REG2 = 0x%x, Definition:0x%x, i_ret=%d\n",
+				reg_val[0], reg_val[1], 0, i_ret);
 		} else {
 			*ucPVendorID = reg_val[0];
 			TPD_DEBUG("In upgrade Vendor ID, REG1 = 0x%x, REG2 = 0x%x\n", reg_val[0], reg_val[1]);
@@ -342,7 +335,7 @@ int fts_ctpm_fw_upgrade_ReadVendorID(struct i2c_client *client, u8 *ucPVendorID)
 	i_ret = hidi2c_to_stdi2c(client);
 	if (i_ret == 0)
 		TPD_DEBUG("hidi2c change to stdi2c fail !\n");
-	msleep(10);
+	usleep_range(10000, 11000);
 	return 0;
 }
 
@@ -375,7 +368,7 @@ int fts_ctpm_fw_upgrade_ReadProjectCode(struct i2c_client *client, char *pProjec
 		i_ret = hidi2c_to_stdi2c(client);
 		if (i_ret == 0)
 			TPD_DEBUG("hidi2c change to stdi2c fail !\n");
-		msleep(10);
+		usleep_range(10000, 11000);
 		auc_i2c_write_buf[0] = FTS_UPGRADE_55;
 		auc_i2c_write_buf[1] = FTS_UPGRADE_AA;
 		i_ret = fts_i2c_write(client, auc_i2c_write_buf, 2);
@@ -384,7 +377,7 @@ int fts_ctpm_fw_upgrade_ReadProjectCode(struct i2c_client *client, char *pProjec
 			continue;
 		}
 		/*********Step 3:check READ-ID***********************/
-		msleep(10);
+		usleep_range(10000, 11000);
 		auc_i2c_write_buf[0] = 0x90;
 		auc_i2c_write_buf[1] = auc_i2c_write_buf[2] = auc_i2c_write_buf[3] = 0x00;
 		reg_val[0] = reg_val[1] = 0x00;
@@ -392,15 +385,15 @@ int fts_ctpm_fw_upgrade_ReadProjectCode(struct i2c_client *client, char *pProjec
 		if (reg_val[0] == fts_updateinfo_curr.upgrade_id_1 && reg_val[1] == fts_updateinfo_curr.upgrade_id_2) {
 			TPD_DEBUG("[FTS] Step 3: READ OK CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
-			continue;
 		}
+		dev_notice(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
+		continue;
 	}
 	if (i >= FTS_UPGRADE_LOOP)
 		return -EIO;
 	/*********Step 4: read vendor id from app param area***********************/
-	msleep(10);
+	usleep_range(10000, 11000);
 	/*read project code*/
 	auc_i2c_write_buf[0] = 0x03;
 	auc_i2c_write_buf[1] = 0x00;
@@ -422,7 +415,7 @@ int fts_ctpm_fw_upgrade_ReadProjectCode(struct i2c_client *client, char *pProjec
 	i_ret = hidi2c_to_stdi2c(client);
 	if (i_ret == 0)
 		TPD_DEBUG("hidi2c change to stdi2c fail !\n");
-	msleep(10);
+	usleep_range(10000, 11000);
 	return 0;
 }
 
@@ -445,8 +438,8 @@ void fts_get_upgrade_array(void)
 	ret = fts_read_reg(fts_i2c_client, FTS_REG_ID, &chip_id);
 #endif
 	if (ret < 0)
-		printk("[Focal][Touch] read value fail");
-	printk("%s chip_id = %x\n", __func__, chip_id);
+		FTS_ERR("[Focal][Touch] read value fail");
+	FTS_DBG("%s chip_id = %x\n", __func__, chip_id);
 
 	for (i = 0; i < sizeof(fts_updateinfo) / sizeof(struct fts_Upgrade_Info); i++) {
 		if (chip_id == fts_updateinfo[i].CHIP_ID) {
@@ -480,11 +473,12 @@ int fts_ctpm_auto_clb(struct i2c_client *client)
 	/*write command to start calibration */
 	fts_write_reg(client, 2, 0x4);
 	msleep(300);
-	if ((fts_updateinfo_curr.CHIP_ID == 0x11) || (fts_updateinfo_curr.CHIP_ID == 0x12) || (fts_updateinfo_curr.CHIP_ID == 0x13) || (fts_updateinfo_curr.CHIP_ID == 0x14)) {
+	if ((fts_updateinfo_curr.CHIP_ID == 0x11) || (fts_updateinfo_curr.CHIP_ID == 0x12)
+		|| (fts_updateinfo_curr.CHIP_ID == 0x13) || (fts_updateinfo_curr.CHIP_ID == 0x14)) {
 		for (i = 0; i < 100; i++) {
 			fts_read_reg(client, 0x02, &uc_temp);
-			if (0x02 == uc_temp ||
-			    0xFF == uc_temp)
+			if (uc_temp == 0x02 ||
+			    uc_temp == 0xFF)
 				break;
 			msleep(20);
 		}
@@ -512,14 +506,14 @@ int fts_ctpm_auto_clb(struct i2c_client *client)
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int fts_6x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int fts_6x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 	u8 reg_val[2] = {0};
 	u32 i = 0;
 	u32 packet_number;
 	u32 j;
 	u32 temp;
-	u32 lenght;
+	u32 length;
 	u32 fw_length;
 	u8 packet_buf[FTS_PACKET_LENGTH + 6];
 	u8 auc_i2c_write_buf[10];
@@ -530,9 +524,9 @@ int fts_6x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		return -1;
 	}
 
-	if (dw_lenth > 0x11f) {
+	if (dw_length > 0x11f) {
 		fw_length = ((u32)pbt_buf[0x100] << 8) + pbt_buf[0x101];
-		if (dw_lenth < fw_length) {
+		if (dw_length < fw_length) {
 			TPD_DEBUG("[FTS] Fw length is invalid\n");
 			return -1;
 		}
@@ -566,10 +560,9 @@ int fts_6x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 			TPD_DEBUG("[FTS] Step 3: GET CTPM ID OK,ID1 = 0x%x,ID2 = 0x%x\n",
 				  reg_val[0], reg_val[1]);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: GET CTPM ID FAIL,ID1 = 0x%x,ID2 = 0x%x\n",
-				reg_val[0], reg_val[1]);
 		}
+		dev_notice(&client->dev, "[FTS] Step 3: GET CTPM ID FAIL,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
 	}
 	if (i >= FTS_UPGRADE_LOOP)
 		return -EIO;
@@ -606,8 +599,8 @@ int fts_6x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	bt_ecc = 0;
 	TPD_DEBUG("Step 5:write firmware(FW) to ctpm flash\n");
 
-	dw_lenth = fw_length;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+	dw_length = fw_length;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = FTS_FW_WRITE_CMD;
 	packet_buf[1] = 0x00;
 
@@ -615,9 +608,9 @@ int fts_6x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		temp = j * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8) (lenght >> 8);
-		packet_buf[5] = (u8) lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8) (length >> 8);
+		packet_buf[5] = (u8) length;
 
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
@@ -634,19 +627,20 @@ int fts_6x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 			reg_val[0] = 0x00;
 			reg_val[1] = 0x00;
 			fts_i2c_read(client, auc_i2c_write_buf, 4, reg_val, 2);
-			if (0xb0 == (reg_val[0] & 0xf0) && (0x03 + (j % 0x0ffd)) == (((reg_val[0] & 0x0f) << 8) | reg_val[1])) {
+			if ((0xb0 == (reg_val[0] & 0xf0) && (0x03 + (j % 0x0ffd)))
+				&& (0xb0 == (((reg_val[0] & 0x0f) << 8) | reg_val[1]))) {
 				TPD_DEBUG("[FTS] write a block data finished\n");
 				break;
 			}
-			msleep(1);
+			usleep_range(1000, 1100);
 		}
 	}
 
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = packet_number * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
 
@@ -665,11 +659,12 @@ int fts_6x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 			reg_val[0] = 0x00;
 			reg_val[1] = 0x00;
 			fts_i2c_read(client, auc_i2c_write_buf, 4, reg_val, 2);
-			if (0xb0 == (reg_val[0] & 0xf0) && (0x03 + (j % 0x0ffd)) == (((reg_val[0] & 0x0f) << 8) | reg_val[1])) {
+			if ((0xb0 == (reg_val[0] & 0xf0) && (0x03 + (j % 0x0ffd)))
+				&& (0xb0 == (((reg_val[0] & 0x0f) << 8) | reg_val[1]))) {
 				TPD_DEBUG("[FTS] write a block data finished\n");
 				break;
 			}
-			msleep(1);
+			usleep_range(1000, 1100);
 		}
 	}
 
@@ -679,7 +674,7 @@ int fts_6x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	auc_i2c_write_buf[0] = FTS_REG_ECC;
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
 			reg_val[0],
 			bt_ecc);
 		return -EIO;
@@ -700,14 +695,14 @@ int fts_6x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int fts_6336GU_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int fts_6336GU_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 	u8 reg_val[2] = {0};
 	u32 i = 0;
 	u32 packet_number;
 	u32 j;
 	u32 temp;
-	u32 lenght;
+	u32 length;
 	u32 fw_length;
 	u8 packet_buf[FTS_PACKET_LENGTH + 6];
 	u8 auc_i2c_write_buf[10];
@@ -718,9 +713,9 @@ int fts_6336GU_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_le
 		return -1;
 	}
 
-	if (dw_lenth > 0x11f) {
+	if (dw_length > 0x11f) {
 		fw_length = ((u32)pbt_buf[0x100] << 8) + pbt_buf[0x101];
-		if (dw_lenth < fw_length) {
+		if (dw_length < fw_length) {
 			TPD_DEBUG("[FTS] Fw length is invalid\n");
 			return -1;
 		}
@@ -754,10 +749,9 @@ int fts_6336GU_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_le
 			TPD_DEBUG("[FTS] Step 3: GET CTPM ID OK,ID1 = 0x%x,ID2 = 0x%x\n",
 				  reg_val[0], reg_val[1]);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: GET CTPM ID FAIL,ID1 = 0x%x,ID2 = 0x%x\n",
-				reg_val[0], reg_val[1]);
 		}
+		dev_notice(&client->dev, "[FTS] Step 3: GET CTPM ID FAIL,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
 	}
 	if (i >= FTS_UPGRADE_LOOP)
 		return -EIO;
@@ -794,8 +788,8 @@ int fts_6336GU_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_le
 	bt_ecc = 0;
 	TPD_DEBUG("Step 5:write firmware(FW) to ctpm flash\n");
 
-	dw_lenth = fw_length;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+	dw_length = fw_length;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = FTS_FW_WRITE_CMD;
 	packet_buf[1] = 0x00;
 
@@ -803,9 +797,9 @@ int fts_6336GU_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_le
 		temp = j * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8) (lenght >> 8);
-		packet_buf[5] = (u8) lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8) (length >> 8);
+		packet_buf[5] = (u8) length;
 
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
@@ -822,19 +816,20 @@ int fts_6336GU_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_le
 			reg_val[0] = 0x00;
 			reg_val[1] = 0x00;
 			fts_i2c_read(client, auc_i2c_write_buf, 4, reg_val, 2);
-			if (0xb0 == (reg_val[0] & 0xf0) && (0x03 + (j % 0x0ffd)) == (((reg_val[0] & 0x0f) << 8) | reg_val[1])) {
+			if ((0xb0 == (reg_val[0] & 0xf0) && (0x03 + (j % 0x0ffd)))
+				&& (0xb0 == (((reg_val[0] & 0x0f) << 8) | reg_val[1]))) {
 				TPD_DEBUG("[FTS] write a block data finished\n");
 				break;
 			}
-			msleep(1);
+			usleep_range(1000, 1100);
 		}
 	}
 
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = packet_number * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
 
@@ -853,11 +848,12 @@ int fts_6336GU_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_le
 			reg_val[0] = 0x00;
 			reg_val[1] = 0x00;
 			fts_i2c_read(client, auc_i2c_write_buf, 4, reg_val, 2);
-			if (0xb0 == (reg_val[0] & 0xf0) && (0x03 + (j % 0x0ffd)) == (((reg_val[0] & 0x0f) << 8) | reg_val[1])) {
+			if ((0xb0 == (reg_val[0] & 0xf0) && (0x03 + (j % 0x0ffd)))
+				&& (0xb0 == (((reg_val[0] & 0x0f) << 8) | reg_val[1]))) {
 				TPD_DEBUG("[FTS] write a block data finished\n");
 				break;
 			}
-			msleep(1);
+			usleep_range(1000, 1100);
 		}
 	}
 
@@ -867,7 +863,7 @@ int fts_6336GU_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_le
 	auc_i2c_write_buf[0] = FTS_REG_ECC;
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
 			reg_val[0],
 			bt_ecc);
 		return -EIO;
@@ -888,14 +884,14 @@ int fts_6336GU_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_le
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int fts_6x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int fts_6x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 	u8 reg_val[2] = {0};
 	u32 i = 0;
 	u32 packet_number;
 	u32 j;
 	u32 temp;
-	u32 lenght;
+	u32 length;
 	u8 packet_buf[FTS_PACKET_LENGTH + 6];
 	u8 auc_i2c_write_buf[10];
 	u8 bt_ecc;
@@ -916,7 +912,7 @@ int fts_6x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		do {
 			i++;
 			i_ret = fts_i2c_write(client, auc_i2c_write_buf, 2);
-			msleep(5);
+			usleep_range(5000, 6000);
 		} while (i_ret <= 0 && i < 5);
 
 
@@ -931,8 +927,9 @@ int fts_6x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		    && reg_val[1] == fts_updateinfo_curr.upgrade_id_2) {
 			TPD_DEBUG("[FTS] Step 3: CTPM ID OK ,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
 			break;
-		} else
-			dev_err(&client->dev, "[FTS] Step 3: CTPM ID FAIL,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
+		}
+		dev_notice(&client->dev, "[FTS] Step 3: CTPM ID FAIL,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
 	}
 	if (i > FTS_UPGRADE_LOOP)
 		return -EIO;
@@ -955,8 +952,8 @@ int fts_6x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	bt_ecc = 0;
 	TPD_DEBUG("Step 5:write firmware(FW) to ctpm flash\n");
 
-	dw_lenth = dw_lenth - 8;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+	dw_length = dw_length - 8;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = FTS_FW_WRITE_CMD;
 	packet_buf[1] = 0x00;
 
@@ -964,9 +961,9 @@ int fts_6x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		temp = j * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8) (lenght >> 8);
-		packet_buf[5] = (u8) lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8) (length >> 8);
+		packet_buf[5] = (u8) length;
 
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
@@ -977,11 +974,11 @@ int fts_6x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		msleep(FTS_PACKET_LENGTH / 6 + 1);
 	}
 
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = packet_number * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
 
@@ -1003,7 +1000,7 @@ int fts_6x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		temp = 1;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
-		packet_buf[6] = pbt_buf[dw_lenth + i];
+		packet_buf[6] = pbt_buf[dw_length + i];
 		bt_ecc ^= packet_buf[6];
 		fts_i2c_write(client, packet_buf, 7);
 		msleep(20);
@@ -1016,7 +1013,7 @@ int fts_6x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	auc_i2c_write_buf[0] = FTS_REG_ECC;
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n", reg_val[0], bt_ecc);
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n", reg_val[0], bt_ecc);
 		return -EIO;
 	}
 
@@ -1035,14 +1032,14 @@ int fts_6x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int fts_5x26_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int fts_5x26_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 	u8 reg_val[4] = {0};
 	u32 i = 0;
 	u32 packet_number;
 	u32 j;
 	u32 temp;
-	u32 lenght;
+	u32 length;
 	u8 packet_buf[FTS_PACKET_LENGTH + 6];
 	u8 auc_i2c_write_buf[10];
 	u8 bt_ecc;
@@ -1073,10 +1070,10 @@ int fts_5x26_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		if (reg_val[0] == fts_updateinfo_curr.upgrade_id_1 && reg_val[1] == fts_updateinfo_curr.upgrade_id_2) {
 			TPD_DEBUG("[FTS] Step 3: READ OK CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
-			continue;
 		}
+		dev_notice(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
+		continue;
 	}
 
 	if (i >= FTS_UPGRADE_LOOP)
@@ -1097,7 +1094,7 @@ int fts_5x26_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	bt_ecc = 0;
 	TPD_DEBUG("Step 5:write firmware(FW) to ctpm flash\n");
 	temp = 0;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = 0xbf;
 	packet_buf[1] = 0x00;
 
@@ -1105,9 +1102,9 @@ int fts_5x26_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		temp = j * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8) (lenght >> 8);
-		packet_buf[5] = (u8) lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8) (length >> 8);
+		packet_buf[5] = (u8) length;
 
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
@@ -1117,11 +1114,11 @@ int fts_5x26_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		msleep(FTS_PACKET_LENGTH / 6 + 1);
 	}
 
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = packet_number * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
 
@@ -1137,9 +1134,9 @@ int fts_5x26_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	auc_i2c_write_buf[0] = 0xcc;
 	reg_val[0] = reg_val[1] = 0x00;
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
-	printk(KERN_WARNING "Checksum FT5X26:%X %X\n", reg_val[0], bt_ecc);
+	FTS_DBG("Checksum FT5X26:%X %X\n", reg_val[0], bt_ecc);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n", reg_val[0], bt_ecc);
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n", reg_val[0], bt_ecc);
 		return -EIO;
 	}
 
@@ -1167,7 +1164,7 @@ int fts_5x26_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int fts_5x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int fts_5x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 	u8 reg_val[2] = {0};
 	u32 i = 0;
@@ -1176,7 +1173,7 @@ int fts_5x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	u32  packet_number;
 	u32  j;
 	u32  temp;
-	u32  lenght;
+	u32  length;
 	u8	packet_buf[FTS_PACKET_LENGTH + 6];
 	u8	auc_i2c_write_buf[10];
 	u8	bt_ecc;
@@ -1211,13 +1208,13 @@ int fts_5x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		fts_i2c_read(client, auc_i2c_write_buf, 4, reg_val, 2);
 		if (reg_val[0] == fts_updateinfo_curr.upgrade_id_1
 		    && reg_val[1] == fts_updateinfo_curr.upgrade_id_2) {
-			dev_dbg(&client->dev, "[FTS] Step 3: CTPM ID OK,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
+			dev_dbg(&client->dev, "[FTS] Step 3: CTPM ID OK,ID1 = 0x%x,ID2 = 0x%x\n",
+				reg_val[0], reg_val[1]);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: CTPM ID FAILD,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
-			continue;
 		}
-
+		dev_notice(&client->dev, "[FTS] Step 3: CTPM ID FAILED,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
+		continue;
 	}
 
 	if (i >= FTS_UPGRADE_LOOP)
@@ -1252,19 +1249,19 @@ int fts_5x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	bt_ecc = 0;
 
 	if (is_5336_new_bootloader == BL_VERSION_LZ4 || is_5336_new_bootloader == BL_VERSION_Z7)
-		dw_lenth = dw_lenth - 8;
+		dw_length = dw_length - 8;
 	else if (is_5336_new_bootloader == BL_VERSION_GZF)
-		dw_lenth = dw_lenth - 14;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+		dw_length = dw_length - 14;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = FTS_FW_WRITE_CMD;
 	packet_buf[1] = 0x00;
 	for (j = 0; j < packet_number; j++) {
 		temp = j * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8)(temp >> 8);
 		packet_buf[3] = (u8)temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8)(lenght >> 8);
-		packet_buf[5] = (u8)lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8)(length >> 8);
+		packet_buf[5] = (u8)length;
 
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
@@ -1275,12 +1272,12 @@ int fts_5x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		msleep(FTS_PACKET_LENGTH / 6 + 1);
 	}
 
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = packet_number * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8)(temp >> 8);
 		packet_buf[3] = (u8)temp;
 
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8)(temp >> 8);
 		packet_buf[5] = (u8)temp;
 
@@ -1304,10 +1301,10 @@ int fts_5x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 			temp = 1;
 			packet_buf[4] = (u8)(temp >> 8);
 			packet_buf[5] = (u8)temp;
-			packet_buf[6] = pbt_buf[dw_lenth + i];
+			packet_buf[6] = pbt_buf[dw_length + i];
 			bt_ecc ^= packet_buf[6];
 			fts_i2c_write(client, packet_buf, 7);
-			msleep(10);
+			usleep_range(10000, 11000);
 		}
 	} else if (is_5336_new_bootloader == BL_VERSION_GZF) {
 		for (i = 0; i < 12; i++) {
@@ -1320,10 +1317,10 @@ int fts_5x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 			temp = 1;
 			packet_buf[4] = (u8)(temp >> 8);
 			packet_buf[5] = (u8)temp;
-			packet_buf[6] = pbt_buf[dw_lenth + i];
+			packet_buf[6] = pbt_buf[dw_length + i];
 			bt_ecc ^= packet_buf[6];
 			fts_i2c_write(client, packet_buf, 7);
-			msleep(10);
+			usleep_range(10000, 11000);
 		}
 	}
 
@@ -1331,7 +1328,7 @@ int fts_5x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	auc_i2c_write_buf[0] = FTS_REG_ECC;
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n", reg_val[0], bt_ecc);
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n", reg_val[0], bt_ecc);
 		return -EIO;
 	}
 	/*********Step 7: reset the new FW***********************/
@@ -1348,14 +1345,14 @@ int fts_5x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int fts_5822_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int fts_5822_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 	u8 reg_val[4] = {0};
 	u32 i = 0;
 	u32 packet_number;
 	u32 j;
 	u32 temp;
-	u32 lenght;
+	u32 length;
 	u8 packet_buf[FTS_PACKET_LENGTH + 6];
 	u8 auc_i2c_write_buf[10];
 	u8 bt_ecc;
@@ -1376,7 +1373,7 @@ int fts_5822_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		i_ret = hidi2c_to_stdi2c(client);
 		if (i_ret == 0)
 			TPD_DEBUG("HidI2c change to StdI2c fail !\n");
-		msleep(5);
+		usleep_range(5000, 6000);
 		auc_i2c_write_buf[0] = FTS_UPGRADE_55;
 		auc_i2c_write_buf[1] = FTS_UPGRADE_AA;
 		i_ret = fts_i2c_write(client, auc_i2c_write_buf, 2);
@@ -1385,7 +1382,7 @@ int fts_5822_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 			continue;
 		}
 		/*********Step 3:check READ-ID***********************/
-		msleep(1);
+		usleep_range(1000, 1100);
 		auc_i2c_write_buf[0] = 0x90;
 		auc_i2c_write_buf[1] = auc_i2c_write_buf[2] = auc_i2c_write_buf[3] = 0x00;
 		reg_val[0] = reg_val[1] = 0x00;
@@ -1393,10 +1390,10 @@ int fts_5822_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		if (reg_val[0] == fts_updateinfo_curr.upgrade_id_1 && reg_val[1] == fts_updateinfo_curr.upgrade_id_2) {
 			TPD_DEBUG("[FTS] Step 3: READ OK CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
-			continue;
 		}
+		dev_notice(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
+		continue;
 	}
 	if (i >= FTS_UPGRADE_LOOP)
 		return -EIO;
@@ -1413,35 +1410,35 @@ int fts_5822_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 			break;
 		msleep(50);
 	}
-	printk("[FTS][%s] erase app area reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
+	FTS_DBG("[FTS][%s] erase app area reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
 	auc_i2c_write_buf[0] = 0xB0;
-	auc_i2c_write_buf[1] = (u8) ((dw_lenth >> 16) & 0xFF);
-	auc_i2c_write_buf[2] = (u8) ((dw_lenth >> 8) & 0xFF);
-	auc_i2c_write_buf[3] = (u8) (dw_lenth & 0xFF);
+	auc_i2c_write_buf[1] = (u8) ((dw_length >> 16) & 0xFF);
+	auc_i2c_write_buf[2] = (u8) ((dw_length >> 8) & 0xFF);
+	auc_i2c_write_buf[3] = (u8) (dw_length & 0xFF);
 	fts_i2c_write(client, auc_i2c_write_buf, 4);
 	/*********Step 5:write firmware(FW) to ctpm flash*********/
 	bt_ecc = 0;
 	bt_ecc_check = 0;
 	TPD_DEBUG("Step 5:write firmware(FW) to ctpm flash\n");
 	temp = 0;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = 0xbf;
 	packet_buf[1] = 0x00;
 	for (j = 0; j < packet_number; j++) {
 		temp = j * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8) (lenght >> 8);
-		packet_buf[5] = (u8) lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8) (length >> 8);
+		packet_buf[5] = (u8) length;
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
 			bt_ecc_check ^= pbt_buf[j * FTS_PACKET_LENGTH + i];
 			bt_ecc ^= packet_buf[6 + i];
 		}
-		printk("[FTS][%s] bt_ecc = %x\n", __func__, bt_ecc);
+		FTS_DBG("[FTS][%s] bt_ecc = %x\n", __func__, bt_ecc);
 		if (bt_ecc != bt_ecc_check)
-			printk("[FTS][%s] Host checksum error bt_ecc_check = %x\n", __func__, bt_ecc_check);
+			FTS_DBG("[FTS][%s] Host checksum error bt_ecc_check = %x\n", __func__, bt_ecc_check);
 		fts_i2c_write(client, packet_buf, FTS_PACKET_LENGTH + 6);
 		for (i = 0; i < 30; i++) {
 			auc_i2c_write_buf[0] = 0x6a;
@@ -1449,15 +1446,15 @@ int fts_5822_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 			fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 2);
 			if ((j + 0x1000) == (((reg_val[0]) << 8) | reg_val[1]))
 				break;
-			printk("[FTS][%s] reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
-			msleep(1);
+			FTS_DBG("[FTS][%s] reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
+			usleep_range(1000, 1100);
 		}
 	}
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = packet_number * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
 		for (i = 0; i < temp; i++) {
@@ -1466,18 +1463,18 @@ int fts_5822_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 			bt_ecc ^= packet_buf[6 + i];
 		}
 		fts_i2c_write(client, packet_buf, temp + 6);
-		printk("[FTS][%s] bt_ecc = %x\n", __func__, bt_ecc);
+		FTS_DBG("[FTS][%s] bt_ecc = %x\n", __func__, bt_ecc);
 		if (bt_ecc != bt_ecc_check)
-			printk("[FTS][%s] Host checksum error bt_ecc_check = %x\n", __func__, bt_ecc_check);
+			FTS_DBG("[FTS][%s] Host checksum error bt_ecc_check = %x\n", __func__, bt_ecc_check);
 		for (i = 0; i < 30; i++) {
 			auc_i2c_write_buf[0] = 0x6a;
 			reg_val[0] = reg_val[1] = 0x00;
 			fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 2);
-			printk("[FTS][%s] reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
+			FTS_DBG("[FTS][%s] reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
 			if ((j + 0x1000) == (((reg_val[0]) << 8) | reg_val[1]))
 				break;
-			printk("[FTS][%s] reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
-			msleep(1);
+			FTS_DBG("[FTS][%s] reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
+			usleep_range(1000, 1100);
 		}
 	}
 	msleep(50);
@@ -1492,29 +1489,29 @@ int fts_5822_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	auc_i2c_write_buf[1] = (u8)(temp >> 16);
 	auc_i2c_write_buf[2] = (u8)(temp >> 8);
 	auc_i2c_write_buf[3] = (u8)(temp);
-	temp = dw_lenth;
+	temp = dw_length;
 	auc_i2c_write_buf[4] = (u8)(temp >> 8);
 	auc_i2c_write_buf[5] = (u8)(temp);
 	i_ret = fts_i2c_write(client, auc_i2c_write_buf, 6);
-	msleep(dw_lenth / 256);
+	msleep(dw_length / 256);
 	for (i = 0; i < 100; i++) {
 		auc_i2c_write_buf[0] = 0x6a;
 		reg_val[0] = reg_val[1] = 0x00;
 		fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 2);
-		dev_err(&client->dev, "[FTS]--reg_val[0]=%02x reg_val[0]=%02x\n", reg_val[0], reg_val[1]);
+		dev_notice(&client->dev, "[FTS]--reg_val[0]=%02x reg_val[0]=%02x\n", reg_val[0], reg_val[1]);
 		if (0xF0 == reg_val[0] && 0x55 == reg_val[1]) {
-			dev_err(&client->dev, "[FTS]--reg_val[0]=%02x reg_val[0]=%02x\n", reg_val[0], reg_val[1]);
+			dev_notice(&client->dev, "[FTS]--reg_val[0]=%02x reg_val[0]=%02x\n", reg_val[0], reg_val[1]);
 			break;
 		}
-		msleep(1);
+		usleep_range(1000, 1100);
 	}
 	auc_i2c_write_buf[0] = 0x66;
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n", reg_val[0], bt_ecc);
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n", reg_val[0], bt_ecc);
 		return -EIO;
 	}
-	printk(KERN_WARNING "checksum %X %X\n", reg_val[0], bt_ecc);
+	FTS_DBG("checksum %X %X\n", reg_val[0], bt_ecc);
 	/*********Step 7: reset the new FW***********************/
 	TPD_DEBUG("Step 7: reset the new FW\n");
 	auc_i2c_write_buf[0] = 0x07;
@@ -1533,14 +1530,14 @@ int fts_5822_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int fts_5x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int fts_5x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 	u8 reg_val[2] = {0};
 	u32 i = 0;
 	u32 packet_number;
 	u32 j;
 	u32 temp;
-	u32 lenght;
+	u32 length;
 	u8 packet_buf[FTS_PACKET_LENGTH + 6];
 	u8 auc_i2c_write_buf[10];
 	u8 bt_ecc;
@@ -1561,7 +1558,7 @@ int fts_5x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		do {
 			i++;
 			i_ret = fts_i2c_write(client, auc_i2c_write_buf, 2);
-			msleep(5);
+			usleep_range(5000, 6000);
 		} while (i_ret <= 0 && i < 5);
 
 
@@ -1573,10 +1570,12 @@ int fts_5x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 
 		if (reg_val[0] == fts_updateinfo_curr.upgrade_id_1
 		    && reg_val[1] == fts_updateinfo_curr.upgrade_id_2) {
-			TPD_DEBUG("[FTS] Step 3: CTPM ID OK,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
+			TPD_DEBUG("[FTS] Step 3: CTPM ID OK,ID1 = 0x%x,ID2 = 0x%x\n",
+				reg_val[0], reg_val[1]);
 			break;
-		} else
-			dev_err(&client->dev, "[FTS] Step 3: CTPM ID FAIL,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
+		}
+		dev_notice(&client->dev, "[FTS] Step 3: CTPM ID FAIL,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
 	}
 	if (i >= FTS_UPGRADE_LOOP)
 		return -EIO;
@@ -1593,17 +1592,17 @@ int fts_5x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	/*********Step 5:write firmware(FW) to ctpm flash*********/
 	bt_ecc = 0;
 	TPD_DEBUG("Step 5:write firmware(FW) to ctpm flash\n");
-	dw_lenth = dw_lenth - 8;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+	dw_length = dw_length - 8;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = FTS_FW_WRITE_CMD;
 	packet_buf[1] = 0x00;
 	for (j = 0; j < packet_number; j++) {
 		temp = j * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8) (lenght >> 8);
-		packet_buf[5] = (u8) lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8) (length >> 8);
+		packet_buf[5] = (u8) length;
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
 			bt_ecc ^= packet_buf[6 + i];
@@ -1611,11 +1610,11 @@ int fts_5x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		fts_i2c_write(client, packet_buf, FTS_PACKET_LENGTH + 6);
 		msleep(FTS_PACKET_LENGTH / 6 + 1);
 	}
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = packet_number * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
 		for (i = 0; i < temp; i++) {
@@ -1634,7 +1633,7 @@ int fts_5x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		temp = 1;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
-		packet_buf[6] = pbt_buf[dw_lenth + i];
+		packet_buf[6] = pbt_buf[dw_length + i];
 		bt_ecc ^= packet_buf[6];
 		fts_i2c_write(client, packet_buf, 7);
 		msleep(20);
@@ -1645,7 +1644,7 @@ int fts_5x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	auc_i2c_write_buf[0] = FTS_REG_ECC;
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
 			reg_val[0],
 			bt_ecc);
 		return -EIO;
@@ -1665,14 +1664,14 @@ int fts_5x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int  fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int  fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 	u8 reg_val[4] = {0};
 	u32 i = 0;
 	u32 packet_number;
 	u32 j;
 	u32 temp;
-	u32 lenght;
+	u32 length;
 	u8 packet_buf[FTS_PACKET_LENGTH + 6];
 	u8 auc_i2c_write_buf[10];
 	u8 bt_ecc;
@@ -1696,7 +1695,7 @@ int  fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 
 		if (i_ret == 0)
 			TPD_DEBUG("[FTS] hid change to i2c fail !\n");
-		msleep(10);
+		usleep_range(10000, 11000);
 		auc_i2c_write_buf[0] = FTS_UPGRADE_55;
 		auc_i2c_write_buf[1] = FTS_UPGRADE_AA;
 		i_ret = fts_i2c_write(client, auc_i2c_write_buf, 2);
@@ -1705,7 +1704,7 @@ int  fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 			continue;
 		}
 		/*********Step 3:check READ-ID***********************/
-		msleep(1);
+		usleep_range(1000, 1100);
 		auc_i2c_write_buf[0] = FTS_READ_ID_REG;
 		auc_i2c_write_buf[1] = auc_i2c_write_buf[2] = auc_i2c_write_buf[3] = 0x00;
 		reg_val[0] = reg_val[1] = 0x00;
@@ -1713,13 +1712,13 @@ int  fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 
 		if (reg_val[0] == fts_updateinfo_curr.upgrade_id_1
 		    && reg_val[1] == fts_updateinfo_curr.upgrade_id_2) {
-			TPD_DEBUG("[FTS] Step 3: READ OK CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
+			TPD_DEBUG("[FTS] Step 3: READ OK CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+				reg_val[0], reg_val[1]);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n", reg_val[0], reg_val[1]);
-
-			continue;
 		}
+		dev_notice(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
+		continue;
 	}
 	if (i >= FTS_UPGRADE_LOOP)
 		return -EIO;
@@ -1736,17 +1735,17 @@ int  fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 			break;
 		msleep(50);
 	}
-	printk("[FTS][%s] erase app area reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
+	FTS_DBG("[FTS][%s] erase app area reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
 	auc_i2c_write_buf[0] = 0xB0;
-	auc_i2c_write_buf[1] = (u8) ((dw_lenth >> 16) & 0xFF);
-	auc_i2c_write_buf[2] = (u8) ((dw_lenth >> 8) & 0xFF);
-	auc_i2c_write_buf[3] = (u8) (dw_lenth & 0xFF);
+	auc_i2c_write_buf[1] = (u8) ((dw_length >> 16) & 0xFF);
+	auc_i2c_write_buf[2] = (u8) ((dw_length >> 8) & 0xFF);
+	auc_i2c_write_buf[3] = (u8) (dw_length & 0xFF);
 	fts_i2c_write(client, auc_i2c_write_buf, 4);
 	/*********Step 5:write firmware(FW) to ctpm flash*********/
 	bt_ecc = 0;
 	TPD_DEBUG("Step 5:write firmware(FW) to ctpm flash\n");
 	temp = 0;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = FTS_FW_WRITE_CMD;
 	packet_buf[1] = 0x00;
 
@@ -1754,9 +1753,9 @@ int  fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 		temp = j * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8) (lenght >> 8);
-		packet_buf[5] = (u8) lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8) (length >> 8);
+		packet_buf[5] = (u8) length;
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
 			bt_ecc ^= packet_buf[6 + i];
@@ -1764,24 +1763,25 @@ int  fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 		fts_i2c_write(client, packet_buf, FTS_PACKET_LENGTH + 6);
 		msleep(20);
 		/*
-		for(i = 0;i < 30;i++)
-		{
-			auc_i2c_write_buf[0] = 0x6a;
-			reg_val[0] = reg_val[1] = 0x00;
-			fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 2);
-			if ((j + 0x1000) == (((reg_val[0]) << 8) | reg_val[1]))
-			{
-				break;
-			}
-			printk("[FTS][%s] reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
-			msleep(1);
-		}*/
+		*for(i = 0;i < 30;i++)
+		*{
+		*	auc_i2c_write_buf[0] = 0x6a;
+		*	reg_val[0] = reg_val[1] = 0x00;
+		*	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 2);
+		*	if ((j + 0x1000) == (((reg_val[0]) << 8) | reg_val[1]))
+		*	{
+		*		break;
+		*	}
+		*	FTS_DBG("[FTS][%s] reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
+		*	usleep_range(1000, 1100);
+		*}
+		*/
 	}
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = packet_number * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
 		for (i = 0; i < temp; i++) {
@@ -1793,11 +1793,11 @@ int  fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 			auc_i2c_write_buf[0] = 0x6a;
 			reg_val[0] = reg_val[1] = 0x00;
 			fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 2);
-			printk("[FTS][%s] reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
+			FTS_DBG("[FTS][%s] reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
 			if ((j + 0x1000) == (((reg_val[0]) << 8) | reg_val[1]))
 				break;
-			printk("[FTS][%s] reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
-			msleep(1);
+			FTS_DBG("[FTS][%s] reg_val[0] = %x reg_val[1] = %x\n", __func__, reg_val[0], reg_val[1]);
+			usleep_range(1000, 1100);
 
 		}
 	}
@@ -1816,34 +1816,34 @@ int  fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 	auc_i2c_write_buf[1] = (u8)(temp >> 16);
 	auc_i2c_write_buf[2] = (u8)(temp >> 8);
 	auc_i2c_write_buf[3] = (u8)(temp);
-	temp = dw_lenth;
+	temp = dw_length;
 	auc_i2c_write_buf[4] = (u8)(temp >> 8);
 	auc_i2c_write_buf[5] = (u8)(temp);
 	i_ret = fts_i2c_write(client, auc_i2c_write_buf, 6);
-	msleep(dw_lenth / 256);
+	msleep(dw_length / 256);
 
 	for (i = 0; i < 100; i++) {
 		auc_i2c_write_buf[0] = 0x6a;
 		reg_val[0] = reg_val[1] = 0x00;
 		fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 2);
-		dev_err(&client->dev, "[FTS]--reg_val[0]=%02x reg_val[0]=%02x\n", reg_val[0], reg_val[1]);
+		dev_notice(&client->dev, "[FTS]--reg_val[0]=%02x reg_val[0]=%02x\n", reg_val[0], reg_val[1]);
 		if (0xF0 == reg_val[0] && 0x55 == reg_val[1]) {
-			dev_err(&client->dev, "[FTS]--reg_val[0]=%02x reg_val[0]=%02x\n", reg_val[0], reg_val[1]);
+			dev_notice(&client->dev, "[FTS]--reg_val[0]=%02x reg_val[0]=%02x\n", reg_val[0], reg_val[1]);
 			break;
 		}
-		msleep(1);
+		usleep_range(1000, 1100);
 
 	}
 	auc_i2c_write_buf[0] = 0x66;
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
 			reg_val[0],
 			bt_ecc);
 
 		return -EIO;
 	}
-	printk(KERN_WARNING "checksum %X %X\n", reg_val[0], bt_ecc);
+	FTS_DBG("checksum %X %X\n", reg_val[0], bt_ecc);
 	/*********Step 7: reset the new FW***********************/
 	TPD_DEBUG("Step 7: reset the new FW\n");
 	auc_i2c_write_buf[0] = FTS_REG_RESET_FW;
@@ -1862,7 +1862,7 @@ int  fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int  fts_8606_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int  fts_8606_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 
 	u8 reg_val[4] = {0};
@@ -1870,14 +1870,14 @@ int  fts_8606_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 	u32 packet_number;
 	u32 j;
 	u32 temp;
-	u32 lenght;
+	u32 length;
 	u8 packet_buf[FTS_PACKET_LENGTH + 6];
 	u8 auc_i2c_write_buf[10];
 	u8 bt_ecc;
 	int i_ret;
 
-	TPD_DEBUG("8606 dw_lenth= %d", dw_lenth);
-	if (dw_lenth > 0x10000 || dw_lenth == 0)
+	TPD_DEBUG("8606 dw_length= %d", dw_length);
+	if (dw_length > 0x10000 || dw_length == 0)
 		return -EIO;
 
 	for (i = 0; i < 20; i++) {
@@ -1894,7 +1894,7 @@ int  fts_8606_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 		}
 
 		/*********Step 3:check READ-ID***********************/
-		msleep(1);
+		usleep_range(1000, 1100);
 		auc_i2c_write_buf[0] = 0x90;
 		auc_i2c_write_buf[1] = auc_i2c_write_buf[2] = auc_i2c_write_buf[3] =
 					   0x00;
@@ -1907,12 +1907,10 @@ int  fts_8606_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 						&& reg_val[1] == 0x07)) {
 			msleep(50);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
-				reg_val[0], reg_val[1]);
-
-			continue;
 		}
+		dev_notice(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
+		continue;
 	}
 
 	if (i >= FTS_UPGRADE_LOOP)
@@ -1922,7 +1920,7 @@ int  fts_8606_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 	bt_ecc = 0;
 	TPD_DEBUG("Step 5:write firmware(FW) to ctpm flash\n");
 	temp = 0;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = 0xae;
 	packet_buf[1] = 0x00;
 
@@ -1930,9 +1928,9 @@ int  fts_8606_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 		temp = j * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8) (lenght >> 8);
-		packet_buf[5] = (u8) lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8) (length >> 8);
+		packet_buf[5] = (u8) length;
 
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
@@ -1941,11 +1939,11 @@ int  fts_8606_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 		fts_i2c_write(client, packet_buf, FTS_PACKET_LENGTH + 6);
 	}
 
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = packet_number * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
 
@@ -1962,7 +1960,7 @@ int  fts_8606_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 	auc_i2c_write_buf[0] = 0xcc;
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n", reg_val[0], bt_ecc);
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n", reg_val[0], bt_ecc);
 		return -EIO;
 	}
 	TPD_DEBUG("checksum %X %X\n", reg_val[0], bt_ecc);
@@ -1986,7 +1984,7 @@ int  fts_8606_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 	u8 reg_val[4] = {0};
 	u8 reg_val_id[4] = {0};
@@ -1994,7 +1992,7 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 	u32 packet_number;
 	u32 j;
 	u32 temp;
-	u32 lenght;
+	u32 length;
 	u8 packet_buf[FTS_PACKET_LENGTH + 6];
 	u8 auc_i2c_write_buf[10];
 	u8 bt_ecc;
@@ -2006,21 +2004,21 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 	reg_val_id[0] = 0x00;
 
 	i_ret = fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val_id, 1);
-	if (dw_lenth == 0)
+	if (dw_length == 0)
 
 
 		return -EIO;
 
 	if (0x81 == (int)reg_val_id[0]) {
-		if (dw_lenth > 1024 * 60)
+		if (dw_length > 1024 * 60)
 			return -EIO;
 	} else if (0x80 == (int)reg_val_id[0]) {
-		if (dw_lenth > 1024 * 64)
+		if (dw_length > 1024 * 64)
 			return -EIO;
 	}
 
 	for (i = 0; i < FTS_UPGRADE_LOOP; i++) {
-		msleep(10);
+		usleep_range(10000, 11000);
 		auc_i2c_write_buf[0] = FTS_UPGRADE_55;
 		auc_i2c_write_buf[1] = FTS_UPGRADE_AA;
 		i_ret = fts_i2c_write(client, auc_i2c_write_buf, 2);
@@ -2030,7 +2028,7 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 		}
 
 		/*********Step 3:check READ-ID***********************/
-		msleep(1);
+		usleep_range(1000, 1100);
 		auc_i2c_write_buf[0] = 0x90;
 		auc_i2c_write_buf[1] = auc_i2c_write_buf[2] = auc_i2c_write_buf[3] = 0x00;
 
@@ -2043,12 +2041,10 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 			TPD_DEBUG("[FTS] Step 3: READ OK CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
 				  reg_val[0], reg_val[1]);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
-				reg_val[0], reg_val[1]);
-
-			continue;
 		}
+		dev_notice(&client->dev, "[FTS] Step 3: CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
+		continue;
 	}
 
 	if (i >= FTS_UPGRADE_LOOP)
@@ -2070,7 +2066,7 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 		fts_i2c_write(client, cmd, 2);
 	}
 
-	for (i = 0; i < dw_lenth ; i++)
+	for (i = 0; i < dw_length ; i++)
 		Checksum ^= pbt_buf[i];
 	msleep(50);
 
@@ -2092,7 +2088,7 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 	TPD_DEBUG("Step 5:write firmware(FW) to ctpm flash\n");
 
 	temp = 0;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = 0xbf;
 
 	for (j = 0; j < packet_number; j++) {
@@ -2100,9 +2096,9 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 		packet_buf[1] = (u8) (temp >> 16);
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8) (lenght >> 8);
-		packet_buf[5] = (u8) lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8) (length >> 8);
+		packet_buf[5] = (u8) length;
 
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
@@ -2117,17 +2113,17 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 
 			if ((j + 0x1000) == (((reg_val[0]) << 8) | reg_val[1]))
 				break;
-			msleep(1);
+			usleep_range(1000, 1100);
 
 		}
 	}
 
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = 0x1000 + packet_number * FTS_PACKET_LENGTH;
 		packet_buf[1] = (u8) (temp >> 16);
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
 
@@ -2144,7 +2140,7 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 
 			if ((j + 0x1000) == (((reg_val[0]) << 8) | reg_val[1]))
 				break;
-			msleep(1);
+			usleep_range(1000, 1100);
 
 		}
 	}
@@ -2164,16 +2160,16 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 	auc_i2c_write_buf[2] = (u8)(temp >> 8);
 	auc_i2c_write_buf[3] = (u8)(temp);
 
-	if (dw_lenth > LEN_FLASH_ECC_MAX)
+	if (dw_length > LEN_FLASH_ECC_MAX)
 		temp = LEN_FLASH_ECC_MAX;
 	else {
-		temp = dw_lenth;
+		temp = dw_length;
 		TPD_DEBUG("Step 6_1: read out checksum\n");
 	}
 	auc_i2c_write_buf[4] = (u8)(temp >> 8);
 	auc_i2c_write_buf[5] = (u8)(temp);
 	i_ret = fts_i2c_write(client, auc_i2c_write_buf, 6);
-	msleep(dw_lenth / 256);
+	msleep(dw_length / 256);
 
 	for (i = 0; i < 100; i++) {
 		auc_i2c_write_buf[0] = 0x6a;
@@ -2182,22 +2178,22 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 
 		if (0xF0 == reg_val[0] && 0x55 == reg_val[1])
 			break;
-		msleep(1);
+		usleep_range(1000, 1100);
 
 	}
 	/* ---------------------------------------------------------------------- */
-	if (dw_lenth > LEN_FLASH_ECC_MAX) {
+	if (dw_length > LEN_FLASH_ECC_MAX) {
 		temp = LEN_FLASH_ECC_MAX;/* ??? 0x1000+LEN_FLASH_ECC_MAX */
 		auc_i2c_write_buf[0] = 0x65;
 		auc_i2c_write_buf[1] = (u8)(temp >> 16);
 		auc_i2c_write_buf[2] = (u8)(temp >> 8);
 		auc_i2c_write_buf[3] = (u8)(temp);
-		temp = dw_lenth - LEN_FLASH_ECC_MAX;
+		temp = dw_length - LEN_FLASH_ECC_MAX;
 		auc_i2c_write_buf[4] = (u8)(temp >> 8);
 		auc_i2c_write_buf[5] = (u8)(temp);
 		i_ret = fts_i2c_write(client, auc_i2c_write_buf, 6);
 
-		msleep(dw_lenth / 256);
+		msleep(dw_length / 256);
 
 		for (i = 0; i < 100; i++) {
 			auc_i2c_write_buf[0] = 0x6a;
@@ -2206,14 +2202,14 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 
 			if (0xF0 == reg_val[0] && 0x55 == reg_val[1])
 				break;
-			msleep(1);
+			usleep_range(1000, 1100);
 
 		}
 	}
 	auc_i2c_write_buf[0] = 0x66;
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
 			reg_val[0],
 			bt_ecc);
 
@@ -2235,7 +2231,7 @@ int  fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int  fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int  fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 
 	u8 reg_val[4] = {0};
@@ -2243,14 +2239,14 @@ int  fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 	u32 packet_number;
 	u32 j;
 	u32 temp;
-	u32 lenght;
+	u32 length;
 	u8 packet_buf[FTS_PACKET_LENGTH + 6];
 	u8 auc_i2c_write_buf[10];
 	u8 bt_ecc;
 	int i_ret;
 
-	TPD_DEBUG("8716 dw_lenth= %d", dw_lenth);
-	if (dw_lenth > 0x10000 || dw_lenth == 0)
+	TPD_DEBUG("8716 dw_length= %d", dw_length);
+	if (dw_length > 0x10000 || dw_length == 0)
 		return -EIO;
 
 	for (i = 0; i < 20; i++) {
@@ -2264,7 +2260,7 @@ int  fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 		if (i_ret == 0)
 			TPD_DEBUG("[FTS] hid change to i2c fail !\n");
 
-		msleep(10);
+		usleep_range(10000, 11000);
 
 		auc_i2c_write_buf[0] = FTS_UPGRADE_55;
 		i_ret = fts_i2c_write(client, auc_i2c_write_buf, 1);
@@ -2274,7 +2270,7 @@ int  fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 		}
 
 		/********* Step 3:check READ-ID ***********************/
-		msleep(1);
+		usleep_range(1000, 1100);
 		auc_i2c_write_buf[0] = 0x90;
 		auc_i2c_write_buf[1] = auc_i2c_write_buf[2] = auc_i2c_write_buf[3] =
 					   0x00;
@@ -2287,12 +2283,10 @@ int  fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 			TPD_DEBUG("[FTS] Step 3: READ CTPM ID OK,ID1 = 0x%x,ID2 = 0x%x\n",
 				  reg_val[0], reg_val[1]);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: READ CTPM ID FAIL,ID1 = 0x%x,ID2 = 0x%x\n",
-				reg_val[0], reg_val[1]);
-
-			continue;
 		}
+		dev_notice(&client->dev, "[FTS] Step 3: READ CTPM ID FAIL,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
+		continue;
 	}
 
 	if (i >= FTS_UPGRADE_LOOP)
@@ -2303,7 +2297,7 @@ int  fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 	TPD_DEBUG("Step 5:write firmware(FW) to ctpm flash\n");
 
 	temp = 0;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = 0xae;
 	packet_buf[1] = 0x00;
 
@@ -2311,9 +2305,9 @@ int  fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 		temp = j * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8) (lenght >> 8);
-		packet_buf[5] = (u8) lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8) (length >> 8);
+		packet_buf[5] = (u8) length;
 
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
@@ -2322,11 +2316,11 @@ int  fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 		fts_i2c_write(client, packet_buf, FTS_PACKET_LENGTH + 6);
 	}
 
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = packet_number * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
 
@@ -2341,13 +2335,13 @@ int  fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 	/* send the opration head */
 	TPD_DEBUG("Step 6: read out checksum\n");
 	auc_i2c_write_buf[0] = 0xcc;
-	msleep(2);
+	usleep_range(2000, 2100);
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n", reg_val[0], bt_ecc);
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n", reg_val[0], bt_ecc);
 		return -EIO;
 	}
-	printk(KERN_WARNING "checksum %X %X\n", reg_val[0], bt_ecc);
+	FTS_DBG("checksum %X %X\n", reg_val[0], bt_ecc);
 	msleep(100);
 
 	/********* Step 6: start app ***********************/
@@ -2366,7 +2360,7 @@ int  fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 	u8 reg_val[4] = {0};
 	u8 reg_val_id[4] = {0};
@@ -2374,7 +2368,7 @@ int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 	u32 packet_number;
 	u32 j;
 	u32 temp;
-	u32 lenght;
+	u32 length;
 	u8 packet_buf[FTS_PACKET_LENGTH + 6];
 	u8 auc_i2c_write_buf[10];
 	u8 bt_ecc;
@@ -2391,20 +2385,20 @@ int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 
 	i_ret = fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val_id, 1);
 
-	if (dw_lenth == 0)
+	if (dw_length == 0)
 		return -EIO;
 
 	if (0x81 == (int)reg_val_id[0]) {
-		if (dw_lenth > 1024 * 60)
+		if (dw_length > 1024 * 60)
 			return -EIO;
 	} else if (0x80 == (int)reg_val_id[0]) {
-		if (dw_lenth > 1024 * 64)
+		if (dw_length > 1024 * 64)
 			return -EIO;
 	}
 
 	for (i = 0; i < FTS_UPGRADE_LOOP; i++) {
 		/********* Step 1:Reset  CTPM *****/
-		msleep(10);
+		usleep_range(10000, 11000);
 		auc_i2c_write_buf[0] = FTS_UPGRADE_55;
 		auc_i2c_write_buf[1] = FTS_UPGRADE_AA;
 		i_ret = fts_i2c_write(client, auc_i2c_write_buf, 2);
@@ -2414,7 +2408,7 @@ int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 		}
 
 		/********* Step 3:check READ-ID ***********************/
-		msleep(1);
+		usleep_range(1000, 1100);
 		auc_i2c_write_buf[0] = 0x90;
 		auc_i2c_write_buf[1] = auc_i2c_write_buf[2] = auc_i2c_write_buf[3] = 0x00;
 
@@ -2423,15 +2417,15 @@ int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 		fts_i2c_read(client, auc_i2c_write_buf, 4, reg_val, 2);
 
 		if ((reg_val[0] == fts_updateinfo_curr.upgrade_id_1
-		     && reg_val[1] == fts_updateinfo_curr.upgrade_id_2)/*|| (reg_val[0] == 0x87 && reg_val[1] == 0xA6)*/) {
+		     && reg_val[1] == fts_updateinfo_curr.upgrade_id_2)
+		     /*|| (reg_val[0] == 0x87 && reg_val[1] == 0xA6)*/) {
 			TPD_DEBUG("[FTS] Step 3: READ OK CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
 				  reg_val[0], reg_val[1]);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: READ FAIL CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
-				reg_val[0], reg_val[1]);
-			continue;
 		}
+		dev_notice(&client->dev, "[FTS] Step 3: READ FAIL CTPM ID,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
+		continue;
 	}
 	if (i >= FTS_UPGRADE_LOOP)
 		return -EIO;
@@ -2450,7 +2444,7 @@ int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 		cmd[1] = 0x0B;
 		fts_i2c_write(client, cmd, 2);
 	}
-	for (i = 0; i < dw_lenth ; i++)
+	for (i = 0; i < dw_length ; i++)
 
 		Checksum ^= pbt_buf[i];
 	msleep(50);
@@ -2474,16 +2468,16 @@ int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 	TPD_DEBUG("Step 5:write firmware(FW) to ctpm flash\n");
 
 	temp = 0;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = 0xbf;
 	for (j = 0; j < packet_number; j++) {
 		temp = 0x1000 + j * FTS_PACKET_LENGTH;
 		packet_buf[1] = (u8) (temp >> 16);
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8) (lenght >> 8);
-		packet_buf[5] = (u8) lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8) (length >> 8);
+		packet_buf[5] = (u8) length;
 
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
@@ -2498,17 +2492,17 @@ int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 
 			if ((j + 0x22 + 0x1000) == (((reg_val[0]) << 8) | reg_val[1]))
 				break;
-			msleep(1);
+			usleep_range(1000, 1100);
 
 		}
 	}
 
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = 0x1000 + packet_number * FTS_PACKET_LENGTH;
 		packet_buf[1] = (u8) (temp >> 16);
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
 
@@ -2525,7 +2519,7 @@ int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 
 			if ((j + 0x22 + 0x1000) == (((reg_val[0]) << 8) | reg_val[1]))
 				break;
-			msleep(1);
+			usleep_range(1000, 1100);
 
 		}
 	}
@@ -2547,16 +2541,16 @@ int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 	auc_i2c_write_buf[2] = (u8)(temp >> 8);
 	auc_i2c_write_buf[3] = (u8)(temp);
 
-	if (dw_lenth > LEN_FLASH_ECC_MAX)
+	if (dw_length > LEN_FLASH_ECC_MAX)
 		temp = LEN_FLASH_ECC_MAX;
 	else {
-		temp = dw_lenth;
+		temp = dw_length;
 		TPD_DEBUG("Step 6_1: read out checksum\n");
 	}
 	auc_i2c_write_buf[4] = (u8)(temp >> 8);
 	auc_i2c_write_buf[5] = (u8)(temp);
 	i_ret = fts_i2c_write(client, auc_i2c_write_buf, 6);
-	msleep(dw_lenth / 256);
+	msleep(dw_length / 256);
 
 	for (i = 0; i < 100; i++) {
 		auc_i2c_write_buf[0] = 0x6a;
@@ -2565,22 +2559,22 @@ int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 
 		if (0xF0 == reg_val[0] && 0x55 == reg_val[1])
 			break;
-		msleep(1);
+		usleep_range(1000, 1100);
 
 	}
 	/* ---------------------------------------------------------------------- */
-	if (dw_lenth > LEN_FLASH_ECC_MAX) {
+	if (dw_length > LEN_FLASH_ECC_MAX) {
 		temp = LEN_FLASH_ECC_MAX;
 		auc_i2c_write_buf[0] = 0x65;
 		auc_i2c_write_buf[1] = (u8)(temp >> 16);
 		auc_i2c_write_buf[2] = (u8)(temp >> 8);
 		auc_i2c_write_buf[3] = (u8)(temp);
-		temp = dw_lenth - LEN_FLASH_ECC_MAX;
+		temp = dw_length - LEN_FLASH_ECC_MAX;
 		auc_i2c_write_buf[4] = (u8)(temp >> 8);
 		auc_i2c_write_buf[5] = (u8)(temp);
 		i_ret = fts_i2c_write(client, auc_i2c_write_buf, 6);
 
-		msleep(dw_lenth / 256);
+		msleep(dw_length / 256);
 
 		for (i = 0; i < 100; i++) {
 			auc_i2c_write_buf[0] = 0x6a;
@@ -2589,18 +2583,18 @@ int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 
 			if (0xF0 == reg_val[0] && 0x55 == reg_val[1])
 				break;
-			msleep(1);
+			usleep_range(1000, 1100);
 
 		}
 	}
 	auc_i2c_write_buf[0] = 0x66;
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
 			reg_val[0], bt_ecc);
 		return -EIO;
 	}
-	printk(KERN_WARNING "checksum %X %X\n", reg_val[0], bt_ecc);
+	FTS_DBG("checksum %X %X\n", reg_val[0], bt_ecc);
 	/********* Step 7: reset the new FW ***********************/
 	TPD_DEBUG("Step 7: reset the new FW\n");
 	auc_i2c_write_buf[0] = 0x07;
@@ -2617,14 +2611,14 @@ int  fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_len
 * Output: no
 * Return: fail <0
 ***********************************************************************/
-int fts_3x07_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lenth)
+int fts_3x07_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length)
 {
 	u8 reg_val[2] = {0};
 	u32 i = 0;
 	u32 packet_number;
 	u32 j;
 	u32 temp;
-	u32 lenght;
+	u32 length;
 	u32 fw_length;
 	u8 packet_buf[FTS_PACKET_LENGTH + 6];
 	u8 auc_i2c_write_buf[10];
@@ -2635,9 +2629,9 @@ int fts_3x07_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		return -1;
 	}
 
-	if (dw_lenth > 0x11f) {
+	if (dw_length > 0x11f) {
 		fw_length = ((u32)pbt_buf[0x100] << 8) + pbt_buf[0x101];
-		if (dw_lenth < fw_length) {
+		if (dw_length < fw_length) {
 			TPD_DEBUG("[FTS] Fw length is invalid\n");
 			return -1;
 		}
@@ -2671,10 +2665,10 @@ int fts_3x07_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 			TPD_DEBUG("[FTS] Step 3: GET CTPM ID OK,ID1 = 0x%x,ID2 = 0x%x\n",
 				  reg_val[0], reg_val[1]);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3: GET CTPM ID FAIL,ID1 = 0x%x,ID2 = 0x%x\n",
-				reg_val[0], reg_val[1]);
 		}
+		dev_notice(&client->dev, "[FTS] Step 3: GET CTPM ID FAIL,ID1 = 0x%x,ID2 = 0x%x\n",
+			reg_val[0], reg_val[1]);
+
 	}
 	if (i >= FTS_UPGRADE_LOOP)
 		return -EIO;
@@ -2711,8 +2705,8 @@ int fts_3x07_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	bt_ecc = 0;
 	TPD_DEBUG("Step 5:write firmware(FW) to ctpm flash\n");
 
-	dw_lenth = fw_length;
-	packet_number = (dw_lenth) / FTS_PACKET_LENGTH;
+	dw_length = fw_length;
+	packet_number = (dw_length) / FTS_PACKET_LENGTH;
 	packet_buf[0] = FTS_FW_WRITE_CMD;
 	packet_buf[1] = 0x00;
 
@@ -2720,9 +2714,9 @@ int fts_3x07_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 		temp = j * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		lenght = FTS_PACKET_LENGTH;
-		packet_buf[4] = (u8) (lenght >> 8);
-		packet_buf[5] = (u8) lenght;
+		length = FTS_PACKET_LENGTH;
+		packet_buf[4] = (u8) (length >> 8);
+		packet_buf[5] = (u8) length;
 
 		for (i = 0; i < FTS_PACKET_LENGTH; i++) {
 			packet_buf[6 + i] = pbt_buf[j * FTS_PACKET_LENGTH + i];
@@ -2739,19 +2733,20 @@ int fts_3x07_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 			reg_val[0] = 0x00;
 			reg_val[1] = 0x00;
 			fts_i2c_read(client, auc_i2c_write_buf, 4, reg_val, 2);
-			if (0xb0 == (reg_val[0] & 0xf0) && (0x03 + (j % 0x0ffd)) == (((reg_val[0] & 0x0f) << 8) | reg_val[1])) {
+			if ((0xb0 == (reg_val[0] & 0xf0) && (0x03 + (j % 0x0ffd)))
+				&& (0xb0 == (((reg_val[0] & 0x0f) << 8) | reg_val[1]))) {
 				TPD_DEBUG("[FTS] write a block data finished\n");
 				break;
 			}
-			msleep(1);
+			usleep_range(1000, 1100);
 		}
 	}
 
-	if ((dw_lenth) % FTS_PACKET_LENGTH > 0) {
+	if ((dw_length) % FTS_PACKET_LENGTH > 0) {
 		temp = packet_number * FTS_PACKET_LENGTH;
 		packet_buf[2] = (u8) (temp >> 8);
 		packet_buf[3] = (u8) temp;
-		temp = (dw_lenth) % FTS_PACKET_LENGTH;
+		temp = (dw_length) % FTS_PACKET_LENGTH;
 		packet_buf[4] = (u8) (temp >> 8);
 		packet_buf[5] = (u8) temp;
 
@@ -2770,11 +2765,12 @@ int fts_3x07_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 			reg_val[0] = 0x00;
 			reg_val[1] = 0x00;
 			fts_i2c_read(client, auc_i2c_write_buf, 4, reg_val, 2);
-			if (0xb0 == (reg_val[0] & 0xf0) && (0x03 + (j % 0x0ffd)) == (((reg_val[0] & 0x0f) << 8) | reg_val[1])) {
+			if ((0xb0 == (reg_val[0] & 0xf0) && (0x03 + (j % 0x0ffd)))
+				&& (0xb0 == (((reg_val[0] & 0x0f) << 8) | reg_val[1]))) {
 				TPD_DEBUG("[FTS] write a block data finished\n");
 				break;
 			}
-			msleep(1);
+			usleep_range(1000, 1100);
 		}
 	}
 
@@ -2784,7 +2780,7 @@ int fts_3x07_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 	auc_i2c_write_buf[0] = FTS_REG_ECC;
 	fts_i2c_read(client, auc_i2c_write_buf, 1, reg_val, 1);
 	if (reg_val[0] != bt_ecc) {
-		dev_err(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
+		dev_notice(&client->dev, "[FTS]--ecc error! FW=%02x bt_ecc=%02x\n",
 			reg_val[0],
 			bt_ecc);
 		return -EIO;
@@ -2807,8 +2803,8 @@ int fts_3x07_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_lent
 * Return: 0
 ***********************************************************************/
 /*
-note:the firmware default path is sdcard.
-	if you want to change the dir, please modify by yourself.
+* note:the firmware default path is sdcard.
+*	if you want to change the dir, please modify by yourself.
 */
 static int fts_ReadFirmware(char *firmware_name, unsigned char *firmware_buf)
 {
@@ -2825,7 +2821,7 @@ static int fts_ReadFirmware(char *firmware_name, unsigned char *firmware_buf)
 	if (pfile == NULL)
 		pfile = filp_open(filepath, O_RDONLY, 0);
 	if (IS_ERR(pfile)) {
-		pr_err("error occured while opening file %s.\n", filepath);
+		pr_notice("error occurred while opening file %s.\n", filepath);
 		return -EIO;
 	}
 	inode = pfile->f_path.dentry->d_inode;
@@ -2853,26 +2849,28 @@ int fts_ctpm_fw_upgrade_with_app_file(struct i2c_client *client, char *firmware_
 	int i_ret = 0;
 	int fwsize = 0;
 
-	printk("**********fts_ctpm_fw_upgrade_with_app_file start****************\n");
+	FTS_DBG("**********fts_ctpm_fw_upgrade_with_app_file start****************\n");
 
 	if (fwsize <= 0) {
-		dev_err(&client->dev, "%s ERROR:Get firmware size failed\n", __func__);
+		dev_notice(&client->dev, "%s ERROR:Get firmware size failed\n", __func__);
 		return -EIO;
 	}
 	if (fwsize < 8 || fwsize > 54 * 1024) {
-		dev_err(&client->dev, "FW length error\n");
+		dev_notice(&client->dev, "FW length error\n");
 		return -EIO;
 	}
 	/*=========FW upgrade========================*/
-	pbt_buf = (unsigned char *)kmalloc(fwsize + 1, GFP_ATOMIC);
+	pbt_buf = kmalloc(fwsize + 1, GFP_ATOMIC);
 	if (fts_ReadFirmware(firmware_name, pbt_buf)) {
-		dev_err(&client->dev, "%s() - ERROR: request_firmware failed\n", __func__);
+		dev_notice(&client->dev, "%s() - ERROR: request_firmware failed\n", __func__);
 		kfree(pbt_buf);
 		return -EIO;
 	}
-	if ((fts_updateinfo_curr.CHIP_ID == 0x55) || (fts_updateinfo_curr.CHIP_ID == 0x08) || (fts_updateinfo_curr.CHIP_ID == 0x0a))
+	if ((fts_updateinfo_curr.CHIP_ID == 0x55) || (fts_updateinfo_curr.CHIP_ID == 0x08)
+		|| (fts_updateinfo_curr.CHIP_ID == 0x0a))
 		i_ret = fts_5x06_ctpm_fw_upgrade(client, pbt_buf, fwsize);
-	else if ((fts_updateinfo_curr.CHIP_ID == 0x11) || (fts_updateinfo_curr.CHIP_ID == 0x12) || (fts_updateinfo_curr.CHIP_ID == 0x13) || (fts_updateinfo_curr.CHIP_ID == 0x14))
+	else if ((fts_updateinfo_curr.CHIP_ID == 0x11) || (fts_updateinfo_curr.CHIP_ID == 0x12)
+		|| (fts_updateinfo_curr.CHIP_ID == 0x13) || (fts_updateinfo_curr.CHIP_ID == 0x14))
 		i_ret = fts_5x36_ctpm_fw_upgrade(client, pbt_buf, fwsize);
 	else if ((fts_updateinfo_curr.CHIP_ID == 0x06))
 		i_ret = fts_6x06_ctpm_fw_upgrade(client, pbt_buf, fwsize);
@@ -2891,7 +2889,7 @@ int fts_ctpm_fw_upgrade_with_app_file(struct i2c_client *client, char *firmware_
 		i_ret = fts_8606_writepram(client, aucFW_PRAM_BOOT, sizeof(aucFW_PRAM_BOOT));
 
 		if (i_ret != 0) {
-			dev_err(&client->dev, "%s:fts_8606_writepram failed. err.\n", __func__);
+			dev_notice(&client->dev, "%s:fts_8606_writepram failed. err.\n", __func__);
 			return -EIO;
 		}
 
@@ -2901,7 +2899,7 @@ int fts_ctpm_fw_upgrade_with_app_file(struct i2c_client *client, char *firmware_
 		i_ret = fts_8716_writepram(client, aucFW_PRAM_BOOT, sizeof(aucFW_PRAM_BOOT));
 
 		if (i_ret != 0) {
-			dev_err(&client->dev, "%s:fts_8716_writepram failed. err.\n", __func__);
+			dev_notice(&client->dev, "%s:fts_8716_writepram failed. err.\n", __func__);
 			return -EIO;
 		}
 
@@ -2909,7 +2907,7 @@ int fts_ctpm_fw_upgrade_with_app_file(struct i2c_client *client, char *firmware_
 	} else if ((fts_updateinfo_curr.CHIP_ID == 0x0E))
 		i_ret = fts_3x07_ctpm_fw_upgrade(client, pbt_buf, fwsize);
 	if (i_ret != 0)
-		dev_err(&client->dev, "%s() - ERROR:[FTS] upgrade failed..\n",
+		dev_notice(&client->dev, "%s() - ERROR:[FTS] upgrade failed..\n",
 			__func__);
 	else if (fts_updateinfo_curr.AUTO_CLB == AUTO_CLB_NEED)
 		fts_ctpm_auto_clb(client);
@@ -2928,43 +2926,41 @@ int fts_ctpm_fw_upgrade_with_app_file(struct i2c_client *client, char *firmware_
 /* Begin Neostra huangxiaohui mod  20160726 */
 int fts_ctpm_get_i_file_ver(void)
 {
-	u16 ui_sz;
+	u16 ui_sz = 0;
 	u8 uc_host_fm_ver = 0x00;
 
-	printk("[FTS] hxh fts_ctpm_get_i_file_ver tp_vendor_id = 0x%x\n", vendor_tp_id);
+	FTS_DBG("[FTS] hxh fts_ctpm_get_i_file_ver tp_vendor_id = 0x%x\n", vendor_tp_id);
 
 	if (vendor_tp_id == 0x7b) {
 
 		ui_sz = sizeof(CTPM_FW);
 		uc_host_fm_ver = CTPM_FW[0x010A];
-		printk("[FTS] hxh tp_vendor_id==0x%x\n", uc_host_fm_ver);
+		FTS_DBG("[FTS] hxh tp_vendor_id==0x%x\n", uc_host_fm_ver);
 
 	} else if ((vendor_tp_id == 0x3e)) {
 		ui_sz = sizeof(TAIGUAN_FW);
 		uc_host_fm_ver = TAIGUAN_FW[0x010A];
-		printk("[FTS] hxh tp_vendor_id==0x%x\n", uc_host_fm_ver);
+		FTS_DBG("[FTS] hxh tp_vendor_id==0x%x\n", uc_host_fm_ver);
 	}
 
 	if (ui_sz > 2) {
-		if (fts_updateinfo_curr.CHIP_ID == 0x58) {
+		if (fts_updateinfo_curr.CHIP_ID == 0x58)
 			return uc_host_fm_ver;	/* 0x010A + 0x1C00 */
-		}
-
 	}
 
 	/*
-	ui_sz = sizeof(CTPM_FW);
-	if (ui_sz > 2)
-	{
-	    if(fts_updateinfo_curr.CHIP_ID==0x36)
-		return CTPM_FW[0x10A];
-	    else if(fts_updateinfo_curr.CHIP_ID==0x86  || fts_updateinfo_curr.CHIP_ID==0x87)
-		return CTPM_FW[0x10E];
-	    else if(fts_updateinfo_curr.CHIP_ID==0x58)
-		return CTPM_FW[0x010A];	//0x010A + 0x1C00
-	    else
-		return CTPM_FW[ui_sz - 2];
-	}
+	* ui_sz = sizeof(CTPM_FW);
+	* if (ui_sz > 2)
+	* {
+	*		if(fts_updateinfo_curr.CHIP_ID==0x36)
+	*			return CTPM_FW[0x10A];
+	*		else if(fts_updateinfo_curr.CHIP_ID==0x86  || fts_updateinfo_curr.CHIP_ID==0x87)
+	*			return CTPM_FW[0x10E];
+	*		else if(fts_updateinfo_curr.CHIP_ID==0x58)
+	*			return CTPM_FW[0x010A];	//0x010A + 0x1C00
+	*		else
+	*		return CTPM_FW[ui_sz - 2];
+	* }
 	*/
 	return 0x00;
 }
@@ -3013,7 +3009,7 @@ int fts_ctpm_update_project_setting(struct i2c_client *client)
 	do {
 		i++;
 		i_ret = fts_i2c_write(client, auc_i2c_write_buf, 2);
-		msleep(5);
+		usleep_range(5000, 6000);
 	} while (i_ret <= 0 && i < 5);
 
 
@@ -3041,8 +3037,8 @@ int fts_ctpm_update_project_setting(struct i2c_client *client)
 	buf[3] = 0x0;
 
 	fts_i2c_read(client, buf, 4, buf, FTS_SETTING_BUF_LEN);
-	dev_dbg(&client->dev, "[FTS] old setting: uc_i2c_addr = 0x%x,\
-			uc_io_voltage = %d, uc_panel_factory_id = 0x%x\n",
+	dev_dbg(&client->dev,
+	"[FTS] old setting: uc_i2c_addr = 0x%x, uc_io_voltage = %d, uc_panel_factory_id = 0x%x\n",
 		buf[0], buf[2], buf[4]);
 
 	/*--------- Step 4:erase project setting --------------*/
@@ -3093,10 +3089,12 @@ int fts_ctpm_fw_upgrade_with_i_file(struct i2c_client *client)
 	/*judge the fw that will be upgraded
 	* if illegal, then stop upgrade and return.
 	*/
-	if ((fts_updateinfo_curr.CHIP_ID == 0x11) || (fts_updateinfo_curr.CHIP_ID == 0x12) || (fts_updateinfo_curr.CHIP_ID == 0x13) || (fts_updateinfo_curr.CHIP_ID == 0x14)
-	    || (fts_updateinfo_curr.CHIP_ID == 0x55) || (fts_updateinfo_curr.CHIP_ID == 0x06) || (fts_updateinfo_curr.CHIP_ID == 0x0a) || (fts_updateinfo_curr.CHIP_ID == 0x08)) {
+	if ((fts_updateinfo_curr.CHIP_ID == 0x11) || (fts_updateinfo_curr.CHIP_ID == 0x12)
+		|| (fts_updateinfo_curr.CHIP_ID == 0x13) || (fts_updateinfo_curr.CHIP_ID == 0x14)
+		|| (fts_updateinfo_curr.CHIP_ID == 0x55) || (fts_updateinfo_curr.CHIP_ID == 0x06)
+		|| (fts_updateinfo_curr.CHIP_ID == 0x0a) || (fts_updateinfo_curr.CHIP_ID == 0x08)) {
 		if (fw_len < 8 || fw_len > 32 * 1024) {
-			dev_err(&client->dev, "%s:FW length error\n", __func__);
+			dev_notice(&client->dev, "%s:FW length error\n", __func__);
 			return -EIO;
 		}
 
@@ -3106,41 +3104,43 @@ int fts_ctpm_fw_upgrade_with_i_file(struct i2c_client *client)
 			/*FW upgrade */
 			pbt_buf = CTPM_FW;
 			/*call the upgrade function */
-			if ((fts_updateinfo_curr.CHIP_ID == 0x55) || (fts_updateinfo_curr.CHIP_ID == 0x08) || (fts_updateinfo_curr.CHIP_ID == 0x0a))
+			if ((fts_updateinfo_curr.CHIP_ID == 0x55) || (fts_updateinfo_curr.CHIP_ID == 0x08)
+				|| (fts_updateinfo_curr.CHIP_ID == 0x0a))
 				i_ret = fts_5x06_ctpm_fw_upgrade(client, pbt_buf, sizeof(CTPM_FW));
-			else if ((fts_updateinfo_curr.CHIP_ID == 0x11) || (fts_updateinfo_curr.CHIP_ID == 0x12) || (fts_updateinfo_curr.CHIP_ID == 0x13) || (fts_updateinfo_curr.CHIP_ID == 0x14))
+			else if ((fts_updateinfo_curr.CHIP_ID == 0x11) || (fts_updateinfo_curr.CHIP_ID == 0x12)
+				|| (fts_updateinfo_curr.CHIP_ID == 0x13) || (fts_updateinfo_curr.CHIP_ID == 0x14))
 				i_ret = fts_5x36_ctpm_fw_upgrade(client, pbt_buf, sizeof(CTPM_FW));
 			else if ((fts_updateinfo_curr.CHIP_ID == 0x06))
 				i_ret = fts_6x06_ctpm_fw_upgrade(client, pbt_buf, sizeof(CTPM_FW));
 			if (i_ret != 0)
-				dev_err(&client->dev, "%s:upgrade failed. err.\n", __func__);
+				dev_notice(&client->dev, "%s:upgrade failed. err.\n", __func__);
 			else if (fts_updateinfo_curr.AUTO_CLB == AUTO_CLB_NEED)
 				fts_ctpm_auto_clb(client);
 		} else {
-			dev_err(&client->dev, "%s:FW format error\n", __func__);
+			dev_notice(&client->dev, "%s:FW format error\n", __func__);
 			return -EBADFD;
 		}
 	} else if ((fts_updateinfo_curr.CHIP_ID == 0x36)) {
 		if (fw_len < 8 || fw_len > 32 * 1024) {
-			dev_err(&client->dev, "%s:FW length error\n", __func__);
+			dev_notice(&client->dev, "%s:FW length error\n", __func__);
 			return -EIO;
 		}
 		pbt_buf = CTPM_FW;
 		i_ret = fts_6x36_ctpm_fw_upgrade(client, pbt_buf, sizeof(CTPM_FW));
 		if (i_ret != 0)
-			dev_err(&client->dev, "%s:upgrade failed. err.\n", __func__);
+			dev_notice(&client->dev, "%s:upgrade failed. err.\n", __func__);
 	} else if ((fts_updateinfo_curr.CHIP_ID == 0x64)) {
 		if (fw_len < 8 || fw_len > 48 * 1024) {
-			dev_err(&client->dev, "%s:FW length error\n", __func__);
+			dev_notice(&client->dev, "%s:FW length error\n", __func__);
 			return -EIO;
 		}
 		pbt_buf = CTPM_FW;
 		i_ret = fts_6336GU_ctpm_fw_upgrade(client, pbt_buf, sizeof(CTPM_FW));
 		if (i_ret != 0)
-			dev_err(&client->dev, "%s:upgrade failed. err.\n", __func__);
+			dev_notice(&client->dev, "%s:upgrade failed. err.\n", __func__);
 	} else if ((fts_updateinfo_curr.CHIP_ID == 0x54)) {
 		if (fw_len < 8 || fw_len > 54 * 1024) {
-			pr_err("FW length error\n");
+			pr_notice("FW length error\n");
 			return -EIO;
 		}
 		/*FW upgrade*/
@@ -3148,7 +3148,7 @@ int fts_ctpm_fw_upgrade_with_i_file(struct i2c_client *client)
 		/*call the upgrade function*/
 		i_ret = fts_5x46_ctpm_fw_upgrade(client, pbt_buf, sizeof(CTPM_FW));
 		if (i_ret != 0)
-			dev_err(&client->dev, "[FTS] upgrade failed. err=%d.\n", i_ret);
+			dev_notice(&client->dev, "[FTS] upgrade failed. err=%d.\n", i_ret);
 		else {
 #ifdef AUTO_CLB
 			fts_ctpm_auto_clb(client);  /*start auto CLB*/
@@ -3156,7 +3156,7 @@ int fts_ctpm_fw_upgrade_with_i_file(struct i2c_client *client)
 		}
 	} else if ((fts_updateinfo_curr.CHIP_ID == 0x58)) {
 		if (fw_len < 8 || fw_len > 54 * 1024) {
-			pr_err("FW length error\n");
+			pr_notice("FW length error\n");
 			return -EIO;
 		}
 
@@ -3165,7 +3165,7 @@ int fts_ctpm_fw_upgrade_with_i_file(struct i2c_client *client)
 		/*call the upgrade function*/
 		i_ret = fts_5822_ctpm_fw_upgrade(client, pbt_buf, sizeof(CTPM_FW));
 		if (i_ret != 0)
-			dev_err(&client->dev, "[FTS] upgrade failed. err=%d.\n", i_ret);
+			dev_notice(&client->dev, "[FTS] upgrade failed. err=%d.\n", i_ret);
 		else {
 #ifdef AUTO_CLB
 			fts_ctpm_auto_clb(client);  /*start auto CLB*/
@@ -3173,7 +3173,7 @@ int fts_ctpm_fw_upgrade_with_i_file(struct i2c_client *client)
 		}
 	} else if ((fts_updateinfo_curr.CHIP_ID == 0x59)) {
 		if (fw_len < 8 || fw_len > 54 * 1024) {
-			pr_err("FW length error\n");
+			pr_notice("FW length error\n");
 			return -EIO;
 		}
 
@@ -3182,7 +3182,7 @@ int fts_ctpm_fw_upgrade_with_i_file(struct i2c_client *client)
 		/*call the upgrade function*/
 		i_ret = fts_5x26_ctpm_fw_upgrade(client, pbt_buf, sizeof(CTPM_FW));
 		if (i_ret != 0)
-			dev_err(&client->dev, "[FTS] upgrade failed. err=%d.\n", i_ret);
+			dev_notice(&client->dev, "[FTS] upgrade failed. err=%d.\n", i_ret);
 		else {
 #ifdef AUTO_CLB
 			fts_ctpm_auto_clb(client);  /*start auto CLB*/
@@ -3195,14 +3195,14 @@ int fts_ctpm_fw_upgrade_with_i_file(struct i2c_client *client)
 		i_ret = fts_8606_writepram(client, aucFW_PRAM_BOOT, sizeof(aucFW_PRAM_BOOT));
 
 		if (i_ret != 0) {
-			dev_err(&client->dev, "%s:upgrade failed. err.\n", __func__);
+			dev_notice(&client->dev, "%s:upgrade failed. err.\n", __func__);
 			return -EIO;
 		}
 
 		i_ret =  fts_8606_ctpm_fw_upgrade(client, pbt_buf, sizeof(CTPM_FW));
 
 		if (i_ret != 0)
-			dev_err(&client->dev, "[FTS] upgrade failed. err=%d.\n", i_ret);
+			dev_notice(&client->dev, "[FTS] upgrade failed. err=%d.\n", i_ret);
 		else {
 #ifdef AUTO_CLB
 			fts_ctpm_auto_clb(client);  /*start auto CLB*/
@@ -3215,14 +3215,14 @@ int fts_ctpm_fw_upgrade_with_i_file(struct i2c_client *client)
 		i_ret = fts_8716_writepram(client, aucFW_PRAM_BOOT, sizeof(aucFW_PRAM_BOOT));
 
 		if (i_ret != 0) {
-			dev_err(&client->dev, "%s:upgrade failed. err.\n", __func__);
+			dev_notice(&client->dev, "%s:upgrade failed. err.\n", __func__);
 			return -EIO;
 		}
 
 		i_ret =  fts_8716_ctpm_fw_upgrade(client, pbt_buf, sizeof(CTPM_FW));
 
 		if (i_ret != 0)
-			dev_err(&client->dev, "[FTS] upgrade failed. err=%d.\n", i_ret);
+			dev_notice(&client->dev, "[FTS] upgrade failed. err=%d.\n", i_ret);
 		else {
 #ifdef AUTO_CLB
 			fts_ctpm_auto_clb(client);  /*start auto CLB*/
@@ -3230,13 +3230,13 @@ int fts_ctpm_fw_upgrade_with_i_file(struct i2c_client *client)
 		}
 	} else if ((fts_updateinfo_curr.CHIP_ID == 0x0E)) {
 		if (fw_len < 8 || fw_len > 32 * 1024) {
-			dev_err(&client->dev, "%s:FW length error\n", __func__);
+			dev_notice(&client->dev, "%s:FW length error\n", __func__);
 			return -EIO;
 		}
 		pbt_buf = CTPM_FW;
 		i_ret = fts_3x07_ctpm_fw_upgrade(client, pbt_buf, sizeof(CTPM_FW));
 		if (i_ret != 0)
-			dev_err(&client->dev, "%s:upgrade failed. err.\n", __func__);
+			dev_notice(&client->dev, "%s:upgrade failed. err.\n", __func__);
 	}
 	return i_ret;
 }
@@ -3254,7 +3254,7 @@ int taiguan_fw_upgrade_with_i_file(struct i2c_client *client)
 
 	if ((fts_updateinfo_curr.CHIP_ID == 0x58)) {
 		if (fw_len < 8 || fw_len > 54 * 1024) {
-			pr_err("FW length error\n");
+			pr_notice("FW length error\n");
 			return -EIO;
 		}
 
@@ -3263,7 +3263,7 @@ int taiguan_fw_upgrade_with_i_file(struct i2c_client *client)
 		/*call the upgrade function*/
 		i_ret = fts_5822_ctpm_fw_upgrade(client, pbt_buf, sizeof(TAIGUAN_FW));
 		if (i_ret != 0)
-			dev_err(&client->dev, "[FTS] upgrade failed. err=%d.\n", i_ret);
+			dev_notice(&client->dev, "[FTS] upgrade failed. err=%d.\n", i_ret);
 		else {
 #ifdef AUTO_CLB
 			fts_ctpm_auto_clb(client);  /*start auto CLB*/
@@ -3275,9 +3275,6 @@ int taiguan_fw_upgrade_with_i_file(struct i2c_client *client)
 }
 /* End Neostra huangxiaohui add  20160726 */
 
-
-
-extern void fts_get_upgrade_array(void);
 #if 0
 static unsigned char ft5x46_ctpm_VidFWid_get_from_boot(struct i2c_client *client)
 {
@@ -3299,14 +3296,14 @@ static unsigned char ft5x46_ctpm_VidFWid_get_from_boot(struct i2c_client *client
 		mt_set_gpio_mode(GPIO_CTP_RST_PIN, GPIO_CTP_RST_PIN_M_GPIO);
 		mt_set_gpio_dir(GPIO_CTP_RST_PIN, GPIO_DIR_OUT);
 		mt_set_gpio_out(GPIO_CTP_RST_PIN, GPIO_OUT_ZERO);
-		msleep(5);
+		usleep_range(5000, 6000);
 		mt_set_gpio_mode(GPIO_CTP_RST_PIN, GPIO_CTP_RST_PIN_M_GPIO);
 		mt_set_gpio_dir(GPIO_CTP_RST_PIN, GPIO_DIR_OUT);
 		mt_set_gpio_out(GPIO_CTP_RST_PIN, GPIO_OUT_ONE);
 #else
 		/*write 0xaa to register 0xfc */
 		fts_write_reg(client, 0xfc, FTS_UPGRADE_AA);
-		msleep(5);
+		usleep_range(5000, 6000);
 
 		/*write 0x55 to register 0xfc */
 		fts_write_reg(client, 0xfc, FTS_UPGRADE_55);
@@ -3318,7 +3315,7 @@ static unsigned char ft5x46_ctpm_VidFWid_get_from_boot(struct i2c_client *client
 			msleep(fts_updateinfo_curr.delay_55 - (i - 15) * 2);
 
 		i_ret = hidi2c_to_stdi2c(client);
-		msleep(5);
+		usleep_range(5000, 6000);
 
 		/*********Step 2:Enter upgrade mode *****/
 		DBG("[FTS] Step 2:Enter upgrade mode\n");
@@ -3328,12 +3325,12 @@ static unsigned char ft5x46_ctpm_VidFWid_get_from_boot(struct i2c_client *client
 		do {
 			j++;
 			i_ret = fts_i2c_Write(client, auc_i2c_write_buf, 2);
-			msleep(5);
+			usleep_range(5000, 6000);
 		} while (i_ret <= 0 && j < 5);
 #else
 		auc_i2c_write_buf[0] = FTS_UPGRADE_55;
 		fts_i2c_write(client, auc_i2c_write_buf, 1);
-		msleep(5);
+		usleep_range(5000, 6000);
 		auc_i2c_write_buf[0] = FTS_UPGRADE_AA;
 		fts_i2c_write(client, auc_i2c_write_buf, 1);
 #endif
@@ -3352,10 +3349,11 @@ static unsigned char ft5x46_ctpm_VidFWid_get_from_boot(struct i2c_client *client
 			DBG("[FTS] Step 3 ok: CTPM ID,ID1 = 0x%x,ID2 = 0x%x ,0x%x, 0x%x:\n",
 			    reg_val[0], reg_val[1], fts_updateinfo_curr.upgrade_id_1, fts_updateinfo_curr.upgrade_id_2);
 			break;
-		} else {
-			dev_err(&client->dev, "[FTS] Step 3 fail: CTPM ID,ID1 = 0x%x,ID2 = 0x%x, 0x%x, 0x%x:\n",
-				reg_val[0], reg_val[1], fts_updateinfo_curr.upgrade_id_1, fts_updateinfo_curr.upgrade_id_2);
 		}
+		dev_notice(&client->dev, "[FTS] Step 3 fail: CTPM ID,ID1 = 0x%x,ID2 = 0x%x, 0x%x, 0x%x:\n",
+			reg_val[0], reg_val[1], fts_updateinfo_curr.upgrade_id_1,
+			fts_updateinfo_curr.upgrade_id_2);
+
 #endif
 	}
 	if (i >= FTS_UPGRADE_LOOP) {
@@ -3417,36 +3415,37 @@ int fts_ctpm_auto_upgrade(struct i2c_client *client)
 	fts_read_reg(client, FTS_REG_FW_VER, &uc_tp_fm_ver);
 	fts_read_reg(client, FTS_REG_VENDOR_ID, &uc_tp_vendor_id);
 	vendor_tp_id = uc_tp_vendor_id;
-	printk("[FTS] uc_tp_fm_ver = 0x%x, uc_tp_vendor_id = 0x%x\n", uc_tp_fm_ver, uc_tp_vendor_id);
+	FTS_DBG("[FTS] uc_tp_fm_ver = 0x%x, uc_tp_vendor_id = 0x%x\n", uc_tp_fm_ver, uc_tp_vendor_id);
 
 #if 0
 	if ((uc_tp_vendor_id != FTS_Vendor_1_ID) && (uc_tp_vendor_id != FTS_Vendor_2_ID)) {
 		uc_boot_vendor_id = ft5x46_ctpm_VidFWid_get_from_boot(client);
-		printk("[FTS] uc_boot_vendor_id= 0x%x!\n", uc_boot_vendor_id);
+		FTS_DBG("[FTS] uc_boot_vendor_id= 0x%x!\n", uc_boot_vendor_id);
 		if ((uc_boot_vendor_id == FTS_Vendor_1_ID) || (uc_boot_vendor_id == FTS_Vendor_2_ID)) {
 			uc_tp_fm_ver = 0;/* force to upgrade the FW */
 			uc_tp_vendor_id = uc_boot_vendor_id;
 		} else {
-			printk("[FTS] FW .i unmatched,stop upgrade\n");
+			FTS_DBG("[FTS] FW .i unmatched,stop upgrade\n");
 			return -EIO;/* FW unmatched */
 		}
 	}
 #endif
 
 	uc_host_fm_ver = fts_ctpm_get_i_file_ver();
-	printk("[FTS] uc_host_fm_ver = 0x%x\n", uc_host_fm_ver);
-
-	if ((uc_tp_fm_ver == FTS_REG_FW_VER) || (uc_tp_fm_ver < uc_host_fm_ver)) { /* Neostra huangxiaohui add for taiguan new FW version:0x40 */
+	FTS_DBG("[FTS] uc_host_fm_ver = 0x%x\n", uc_host_fm_ver);
+	/* Neostra huangxiaohui add for taiguan new FW version:0x40 */
+	if ((uc_tp_fm_ver == FTS_REG_FW_VER) || (uc_tp_fm_ver < uc_host_fm_ver)) {
 
 		msleep(100);
-		dev_dbg(&client->dev, "[FTS] uc_tp_fm_ver = 0x%x, uc_host_fm_ver = 0x%x\n", uc_tp_fm_ver, uc_host_fm_ver);
+		dev_dbg(&client->dev, "[FTS] uc_tp_fm_ver = 0x%x, uc_host_fm_ver = 0x%x\n",
+			uc_tp_fm_ver, uc_host_fm_ver);
 		/* Beging Neostra huangxiaohui mod  20160726 */
-		printk("--->>hxh begin TP upgrade\n");
+		FTS_DBG("--->>hxh begin TP upgrade\n");
 		if (uc_tp_vendor_id == 0x7b) {
-			printk("--->>hxh pingbo TP upgrade\n");
+			FTS_DBG("--->>hxh pingbo TP upgrade\n");
 			i_ret = fts_ctpm_fw_upgrade_with_i_file(client);
 		} else if ((uc_tp_vendor_id == 0x3e)) {
-			printk("--->>hxh taiguan TP upgrade\n");
+			FTS_DBG("--->>hxh taiguan TP upgrade\n");
 			i_ret = taiguan_fw_upgrade_with_i_file(client);
 		}
 		/* End Neostra huangxiaohui mod  20160726 */
@@ -3454,10 +3453,10 @@ int fts_ctpm_auto_upgrade(struct i2c_client *client)
 			msleep(300);
 			uc_host_fm_ver = fts_ctpm_get_i_file_ver();
 			dev_dbg(&client->dev, "[FTS] upgrade to new version 0x%x\n", uc_host_fm_ver);
-			printk("[FTS] upgrade to new version 0x%x\n", uc_host_fm_ver);
+			FTS_DBG("[FTS] upgrade to new version 0x%x\n", uc_host_fm_ver);
 		} else {
-			pr_err("[FTS] upgrade failed ret=%d.\n", i_ret);
-			printk("[FTS] upgrade failed ret=%d.\n", i_ret);
+			pr_notice("[FTS] upgrade failed ret=%d.\n", i_ret);
+			FTS_DBG("[FTS] upgrade failed ret=%d.\n", i_ret);
 			return -EIO;
 		}
 	}

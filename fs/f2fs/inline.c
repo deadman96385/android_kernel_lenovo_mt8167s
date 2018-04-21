@@ -85,9 +85,16 @@ int f2fs_read_inline_data(struct inode *inode, struct page *page)
 {
 	struct page *ipage;
 
-	trace_android_fs_dataread_start(inode, page_offset(page),
-					PAGE_SIZE, current->pid,
-					current->comm);
+	if (trace_android_fs_dataread_start_enabled()) {
+		char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
+
+		path = android_fstrace_get_pathname(pathbuf,
+						    MAX_TRACE_PATHBUF_LEN,
+						    inode);
+		trace_android_fs_dataread_start(inode, page_offset(page),
+						PAGE_SIZE, current->pid,
+						path, current->comm);
+	}
 
 	ipage = get_node_page(F2FS_I_SB(inode), inode->i_ino);
 	if (IS_ERR(ipage)) {
@@ -314,7 +321,7 @@ struct f2fs_dir_entry *find_in_inline_dir(struct inode *dir,
 	if (IS_ERR(ipage))
 		return NULL;
 
-	namehash = f2fs_dentry_hash(&name);
+	namehash = f2fs_dentry_hash(&name, fname);
 
 	inline_dentry = inline_data_addr(ipage);
 
@@ -479,7 +486,7 @@ int f2fs_add_inline_entry(struct inode *dir, const struct qstr *name,
 
 	f2fs_wait_on_page_writeback(ipage, NODE);
 
-	name_hash = f2fs_dentry_hash(name);
+	name_hash = f2fs_dentry_hash(name, NULL);
 	make_dentry_ptr(NULL, &d, (void *)dentry_blk, 2);
 	f2fs_update_dentry(ino, mode, &d, name, name_hash, bit_pos);
 

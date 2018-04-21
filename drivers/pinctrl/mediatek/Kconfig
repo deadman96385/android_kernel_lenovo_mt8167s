@@ -49,11 +49,49 @@ config PINCTRL_MT6397
 	select PINCTRL_MTK_COMMON
 endif
 
+config PINCTRL_MT6739
+	bool "Mediatek MT6739 pin control"
+	default n
+	depends on !ARCH_MEDIATEK && MACH_MT6739
+	select PINCTRL_MTK_COMMON
+	select MTK_EINT_MULTI_TRIGGER_DESIGN
+
 config PINCTRL_MT6757
 	bool "Mediatek MT6757 pin control"
 	default n
 	depends on !ARCH_MEDIATEK && (MACH_KIBOPLUS || MACH_MT6757)
 	select PINCTRL_MTK_COMMON
+
+config PINCTRL_MT6758
+	bool "Mediatek MT6758 pin control"
+	default n
+	depends on !ARCH_MEDIATEK && MACH_MT6758
+	select PINCTRL_MTK_COMMON
+
+config PINCTRL_MT6759
+	bool "Mediatek MT6759 pin control"
+	default n
+	depends on !ARCH_MEDIATEK && MACH_MT6759
+	select PINCTRL_MTK_COMMON
+
+config PINCTRL_MT6763
+	bool "Mediatek MT6763 pin control"
+	default n
+	depends on !ARCH_MEDIATEK && MACH_MT6763
+	select PINCTRL_MTK_COMMON
+
+config PINCTRL_MT6771
+	bool "Mediatek MT6771 pin control"
+	default n
+	depends on (!ARCH_MEDIATEK) && (MACH_MT6771)
+	select PINCTRL_MTK_COMMON
+
+config PINCTRL_MT6775
+	bool "Mediatek MT6775 pin control"
+	default n
+	depends on (!ARCH_MEDIATEK) && (MACH_MT6775)
+	select PINCTRL_MTK_COMMON
+	select MTK_EINT_MULTI_TRIGGER_DESIGN
 
 config PINCTRL_MT6799
 	bool "Mediatek MT699 pin control"
@@ -61,3 +99,13 @@ config PINCTRL_MT6799
 	depends on !ARCH_MEDIATEK && (MACH_MT6799)
 	select PINCTRL_MTK_COMMON
 
+# For EINT multi-trigger design
+config MTK_EINT_MULTI_TRIGGER_DESIGN
+	bool "Mediatek EINT multi-trigger design"
+	depends on PINCTRL_MTK
+	default n
+	help
+	  On MTK EINT design, a GPIO pin is connected to 2 EINT pin in order to
+	  save pins for assignments.
+	  Which EINT pin is actually occupied by a GPIO
+	  is described in *pins and it is decided in run time.

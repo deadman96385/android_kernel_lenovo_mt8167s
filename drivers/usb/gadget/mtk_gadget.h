@@ -16,7 +16,8 @@
 
 extern bool usb_cable_connected(void);
 extern void composite_setup_complete(struct usb_ep *ep, struct usb_request *req);
-#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT) || defined(CONFIG_MTK_MD_DIRECT_LOGGING_SUPPORT)
+
+#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT)
 typedef enum {
 	DIRECT_STATE_NONE = 0,
 	DIRECT_STATE_ENABLING,
@@ -175,16 +176,6 @@ typedef struct _ufpm_md_fast_path_common_rsp {
 	u8 reserved[2];
 } __packed ufpm_md_fast_path_common_rsp_t;
 
-extern u8 musb_get_usb_addr(void);
-extern int musb_enable_md_fast_path(u32 mode);
-extern int musb_disable_md_fast_path(ufpm_md_fast_path_common_req_t *req);
-extern int musb_activate_md_fast_path(ufpm_activate_md_func_req_t *req);
-extern int musb_deactivate_md_fast_path(ufpm_md_fast_path_common_req_t *req);
-extern int musb_send_md_ep0_msg(ufpm_send_md_ep0_msg_t *req, u32 msg_id);
-#endif
-
-#ifdef CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT
-
 typedef enum {
 	RNDIS_NETWORK_TYPE_NONE = 0,
 	RNDIS_NETWORK_TYPE_MOBILE,
@@ -192,37 +183,12 @@ typedef enum {
 } rndis_network_type_enum;
 
 extern int rndis_get_direct_tethering_state(struct usb_function *f);
-extern int rndis_send_ep0_response(struct rndis_params *params, u32 ep0_data_len, void *ep0Buffer);
-extern void rndis_get_pkt_info(struct rndis_params *params, u32 *maxPacketsPerTransfer, u32 *maxTransferSize);
+extern rndis_resp_t *rndis_add_md_response(struct rndis_params *params,
+					u32 length);
+extern void rndis_get_pkt_info(struct rndis_params *params,
+		u32 *maxPacketsPerTransfer, u32 *maxTransferSize);
 extern void rndis_get_net_stats(struct rndis_params *params, tethering_net_stats_t *net_stats);
 extern void rndis_set_net_stats(struct rndis_params *params, tethering_net_stats_t *net_stats);
-#endif
-
-#ifdef CONFIG_MTK_MD_DIRECT_LOGGING_SUPPORT
-#define USB_ACM_IOCTL_CMD_DIRECT_ON			0x01
-#define USB_ACM_IOCTL_CMD_DIRECT_OFF		0x02
-#define USB_ACM_IOCTL_CMD_QUERY_STATE		0x03
-#define USB_ACM_IOCTL_CMD_QUERY_TX_EMPTY	0x04
-
-typedef enum {
-	USB_ACM_IOCTL_DIRECT_ACTIVATING = 1,
-	USB_ACM_IOCTL_DIRECT_ACTIVATED,
-	USB_ACM_IOCTL_DIRECT_DEACTIVATING,
-	USB_ACM_IOCTL_DIRECT_DEACTIVATED
-} usb_acm_ioctl_direct_state;
-
-typedef enum {
-	USB_ACM_IOCTL_TX_EMPTY = 1,
-	USB_ACM_IOCTL_TX_NON_EMPTY
-} usb_acm_ioctl_tx_status;
-
-extern void acm_enable_direct_feature(struct usb_function *f);
-extern bool acm_activate_direct_logging(struct usb_function *f, bool suspend);
-extern int acm_deactivate_direct_logging(struct usb_function *f);
-extern int acm_set_direct_logging(struct usb_function *f, bool direct);
-extern int acm_get_direct_logging_state(struct usb_function *f);
-extern u8 acm_get_direct_state(struct usb_function *f);
-extern bool acm_check_tx_fifo_empty(struct usb_function *f);
 #endif
 
 #endif

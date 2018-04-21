@@ -21,6 +21,16 @@ config TOUCHSCREEN_MTK
 	  To compile this dirver as a module, choose M here: the
 	  module will be called.
 
+config TOUCHSCREEN_PHYSICAL_ROTATION_WITH_LCM
+	bool "MediaTek Touch Panel Rotation With LCM"
+	default y
+	help
+	  Say N here if touch panel is not physical rotated as LCM does.
+	  Physically rotated means that this driver will map
+	  the reported coordination to diagonal position.
+
+	  If unsure, say Y.
+
 config TOUCHSCREEN_MTK_GT1151
 	bool "GT1151 for Mediatek package"
 	default n
@@ -43,8 +53,29 @@ config TOUCHSCREEN_MTK_GT911
 
 source "drivers/input/touchscreen/mediatek/GT911/Kconfig"
 
+config TOUCHSCREEN_MTK_GT9157
+	bool "GT9157 for Mediatek package"
+	help
+	  Say Y here if you have GT9157 touch panel.
+	  If unsure, say N.
+	  To compile this dirver as a module, choose M here: the
+	  module will be called
+
+source "drivers/input/touchscreen/mediatek/GT9157/Kconfig"
+
 config TOUCHSCREEN_FT5X26
 	bool "FT5X26 for Mediatek package"
+	default n
+	help
+	  Say Y here if you have FT5X26 touch panel.
+
+	  If unsure, say N.
+
+	  To compile this dirver as a module, choose M here: the
+	  module will be called.
+
+config TOUCHSCREEN_FT5X26_WUXGA
+	bool "FT5X26 WUXGA for Mediatek package"
 	default n
 	help
 	  Say Y here if you have FT5X26 touch panel.

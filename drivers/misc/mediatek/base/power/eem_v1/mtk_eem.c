@@ -101,6 +101,7 @@
 	#include "mtk_unified_power.h"
 	#endif
 
+	#include "mtk_ppm_internal.h"
 	#if 0
 	#include  "mt-plat/elbrus/include/mach/mt_cpufreq_api.h"
 	#include "mach/mt_ppm_api.h"
@@ -134,6 +135,21 @@
 * define variables for legacy and sspm eem
 ****************************************
 */
+#if ITurbo
+unsigned int ctrl_ITurbo = 0, ITurboRun;
+/* static unsigned int ITurbo_offset[16]; */
+
+/* CPU callback */
+static int _mt_eem_cpu_CB(struct notifier_block *nfb,	unsigned long action, void *hcpu);
+static struct notifier_block __refdata _mt_eem_cpu_notifier = {
+	.notifier_call = _mt_eem_cpu_CB,
+};
+#endif /* ITurbo */
+
+#if (EEM_ENABLE_TINYSYS_SSPM)
+static unsigned int eem_to_sspm(unsigned int cmd, struct eem_ipi_data *eem_data);
+#endif
+
 #if !(EEM_ENABLE_TINYSYS_SSPM)
 
 	#if EEM_ENABLE
@@ -149,15 +165,10 @@
 	*/
 	/* static unsigned int ctrl_VCORE_Volt_Enable;*/
 
-	#if ITurbo
-	unsigned int ctrl_ITurbo = 0, ITurboRun;
-	static unsigned int ITurbo_offset[16];
-	#endif /* ITurbo */
-
 	static int isGPUDCBDETOverflow, is2LDCBDETOverflow;
 	static int isLDCBDETOverflow, isCCIDCBDETOverflow;
 	/* static unsigned int ateVer; */
-
+	#ifndef EARLY_PORTING_PMIC
 	/* for setting pmic pwm mode and auto mode */
 	struct regulator *eem_regulator_proc1;
 	struct regulator *eem_regulator_proc2;
@@ -165,6 +176,7 @@
 	static unsigned int eem_vproc1_is_enabled_by_eem;
 	static unsigned int eem_vproc2_is_enabled_by_eem;
 	static unsigned int eem_vgpu_is_enabled_by_eem;
+	#endif
 	#if 0 /* no record table */
 	u32 *recordRef;
 	#endif
@@ -193,15 +205,6 @@
 	#ifdef __KERNEL__
 	DEFINE_MUTEX(record_mutex);
 
-	#if ITurbo/* irene */
-	/* CPU callback */
-	static int __cpuinit _mt_eem_cpu_CB(struct notifier_block *nfb,
-					unsigned long action, void *hcpu);
-	static struct notifier_block __refdata _mt_eem_cpu_notifier = {
-		.notifier_call = _mt_eem_cpu_CB,
-	};
-	#endif /* if ITurbo */
-
 	#endif /*ifdef __KERNEL */
 	static struct eem_devinfo eem_devinfo;
 
@@ -214,13 +217,13 @@
 
 	/* Global variable for I DVFS use */
 	unsigned int infoIdvfs;
+	static DEFINE_SPINLOCK(eem_spinlock);
+
 #else /* if EEM_ENABLE_TINYSYS_SSPM */
-	/* #define EEM_LOG_TIMER*/
 	/* #define NR_FREQ 8 */ /* for sspm struct eem_det */
 	phys_addr_t eem_log_phy_addr, eem_log_virt_addr;
 	uint32_t eem_log_size;
 	static unsigned int eem_disable = 1;
-	/* static unsigned int checkEfuse; */
 	struct eem_log *eem_logs;
 
 #endif /* if EEM_ENABLE_TINYSYS_SSPM */
@@ -229,46 +232,85 @@
 * common variables for legacy and sspm ptp
 *******************************************
 */
-static DEFINE_SPINLOCK(eem_spinlock);
-
 #if (defined(__KERNEL__) && !defined(CONFIG_MTK_CLKMGR)) && !(EARLY_PORTING)
 	struct clk *clk_mfg_core1, *clk_mfg_core0;
 #endif
 
-#if 1
-/* SOC Voltage (10uv)*/
-unsigned int vcore_opp[VCORE_NR_FREQ][4] = {
-	{90000, 102500, 100000, 97500},/* 80000 */
-	{90000, 97500, 95000, 92500}, /* 80000 */
-	{80000, 87500, 85000, 82500}, /* 70000 */
-	{80000, 87500, 85000, 82500}, /* 65000 */
+/* SOC E1 Voltage (10uv)*/
+static unsigned int vcore_opp_1[VCORE_NR_FREQ][4] = {
+	{90000, 0, 0, 0},
+	{90000, 0, 0, 0},
+	{80000, 0, 0, 0},
+	{80000, 0, 0, 0},
 };
-#else
-unsigned int vcore_opp[VCORE_NR_FREQ][4] = {
-	{90000, 102500, 100000, 97500},/* 80000 */
-	{90000, 97500, 95000, 92500}, /* 80000 */
-	{80000, 87500, 85000, 82500}, /* 70000 */
-	{80000, 87500, 85000, 82500}, /* 65000 */
+/* SOC E2 Voltage (10uv)*/
+static unsigned int vcore_opp_2[VCORE_NR_FREQ][4] = {
+	{84375, 81875, 79375, 76875},
+	{79375, 76875, 74375, 71875},
+	{74375, 73750, 71250, 68750},
+	{69375, 66875, 64375, 61875},
 };
-#endif
 
+/* ptr that points to E1 or E2 opp table */
+unsigned int (*vcore_opp)[VCORE_NR_FREQ];
+/* final vcore opp table */
 unsigned int eem_vcore[VCORE_NR_FREQ];
+/* record index for vcore opp table from efuse */
 unsigned int eem_vcore_index[VCORE_NR_FREQ] = {0};
-
+static unsigned int eem_chip_ver;
 static int eem_log_en;
+static unsigned int eem_checkEfuse = 1;
 /* static unsigned int informGpuEEMisReady;*/
 
 /* Global variable for slow idle*/
-volatile unsigned int ptp_data[3] = {0, 0, 0};
+unsigned int ptp_data[3] = {0, 0, 0};
 #ifdef CONFIG_OF
 void __iomem *eem_base;
 static u32 eem_irq_number;
 #endif
 
+/* Definition for Picachu */
+#define PI_PTP1_MTDES_START_BIT	0
+#define PI_PTP1_BDES_START_BIT	8
+#define PI_PTP1_MDES_START_BIT	16
+
 /*=============================================================
 * common functions for both ap and sspm eem
 *=============================================================
 */
+static void get_vcore_opp(void)
+{
+	eem_chip_ver = mt_get_chip_sw_ver();
+	/* chip ver = 0 if E1 */
+	if (eem_chip_ver == CHIP_SW_VER_01)
+		vcore_opp = &vcore_opp_1[0];
+	else
+		vcore_opp = &vcore_opp_2[0];
+
+	eem_debug("chip ver=%d\n", eem_chip_ver);
+}
+
+#if !EEM_BANK_SOC
+static void get_soc_efuse(void)
+{
+	unsigned int soc_efuse;
+	/* if E2, use volt bin */
+	if (eem_chip_ver == CHIP_SW_VER_01)
+		soc_efuse = 0;
+	else
+		soc_efuse = get_devinfo_with_index(DEVINFO_IDX_VOLT_BIN);
+
+	aee_rr_rec_ptp_devinfo_0((unsigned int)soc_efuse);
+	eem_error("[VCORE] - Kernel Got efuse 0x%0X\n", soc_efuse);
+	eem_vcore_index[0] = GET_BITS_VAL(7:6, soc_efuse);
+	eem_vcore_index[1] = GET_BITS_VAL(5:4, soc_efuse);
+	eem_vcore_index[2] = GET_BITS_VAL(3:2, soc_efuse);
+	eem_vcore_index[3] = GET_BITS_VAL(1:0, soc_efuse);
+	eem_error("eem_vcore_index:%d, %d, %d, %d\n", eem_vcore_index[0], eem_vcore_index[1],
+				eem_vcore_index[2], eem_vcore_index[3]);
+}
+#endif
+
 static struct eem_det *id_to_eem_det(enum eem_det_id id)
 {
 	if (likely(id < NR_EEM_DET))
@@ -332,10 +374,20 @@ static void mt_eem_disable_mtcmos(void)
 	eem_debug("mt_eem_disable_mtcmos done\n");
 }
 
+void eem_set_pi_efuse(enum eem_ctrl_id id, unsigned int pi_efuse)
+{
+	struct eem_det *det = id_to_eem_det(id);
+
+	det->pi_efuse = pi_efuse;
+}
+
 static int get_devinfo(void)
 {
 	int ret = 0;
 	int *val;
+	int i = 0;
+	struct eem_det *det;
+	unsigned int mtdes_idx, bdes_mdes_idx;
 
 	/* if legacy eem, save efuse data into eem_devinfo */
 	/* if sspm eem, save efuse data into logs */
@@ -362,11 +414,18 @@ static int get_devinfo(void)
 		/* l */
 		val[8] = get_devinfo_with_index(DEVINFO_IDX_8);
 		val[9] = get_devinfo_with_index(DEVINFO_IDX_9);
-		/* soc */
-		val[10] = get_devinfo_with_index(DEVINFO_IDX_10);
-		val[11] = get_devinfo_with_index(DEVINFO_IDX_11);
-
 		val[12] = get_devinfo_with_index(DEVINFO_IDX_FTPGM);
+
+		if (GET_BITS_VAL(23:20, eem_logs->hw_res[12]) >= 5) {
+			/* soc */
+			/* apply 2L devinfo to soc devinfo to run iTurbo*/
+			val[10] = get_devinfo_with_index(DEVINFO_IDX_10);
+			val[11] = get_devinfo_with_index(DEVINFO_IDX_11);
+		} else {
+			val[10] = val[6];
+			val[11] = val[7];
+		}
+
 		#if EEM_FAKE_EFUSE
 		/* for verification */
 		val[0] = DEVINFO_0;
@@ -429,6 +488,33 @@ static int get_devinfo(void)
 	val[11] = 0x005500C0;
 	val[12] = 0;
 	#endif
+
+	/* Update MTDES/BDES/MDES if they are modified by PICACHU. */
+	for_each_det(det) {
+
+		if (!det->pi_efuse)
+			continue;
+
+		if (det->ctrl_id == EEM_CTRL_SOC)
+			bdes_mdes_idx = 10;
+		else
+			bdes_mdes_idx = (det->ctrl_id << 1);
+
+		mtdes_idx = bdes_mdes_idx + 1;
+
+		/* Update MTDES */
+		val[mtdes_idx] = (val[mtdes_idx] & 0xFF00FFFF) |
+		(((det->pi_efuse >> PI_PTP1_MTDES_START_BIT) & 0xff) << 16);
+
+		/* Update BDES */
+		val[bdes_mdes_idx] = (val[bdes_mdes_idx] & 0xFFFFFF00) |
+		((det->pi_efuse >> PI_PTP1_BDES_START_BIT) & 0xff);
+
+		/* Update MDES */
+		val[bdes_mdes_idx] = (val[bdes_mdes_idx] & 0xFFFF00FF) |
+		(((det->pi_efuse >> PI_PTP1_BDES_START_BIT) & 0x0000FF00));
+	}
+
 	eem_debug("M_HW_RES0 = 0x%08X\n", val[0]);
 	eem_debug("M_HW_RES1 = 0x%08X\n", val[1]);
 	eem_debug("M_HW_RES2 = 0x%08X\n", val[2]);
@@ -441,21 +527,27 @@ static int get_devinfo(void)
 	eem_debug("M_HW_RES9 = 0x%08X\n", val[9]);
 	eem_debug("M_HW_RES10 = 0x%08X\n", val[10]);
 	eem_debug("M_HW_RES11 = 0x%08X\n", val[11]);
-	FUNC_ENTER(FUNC_LV_HELP);
-	#if 0
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
+
 	/* NR_HW_RES_FOR_BANK =  12 for 6 banks efuse */
-	for (i = 0; i < NR_HW_RES_FOR_BANK; i++) {
+	for (i = 0; i < NR_HW_RES_FOR_BANK-2; i++) {
 		if (val[i] == 0) {
 			ret = 1;
-			infoIdvfs = 0x55;
-			checkEfuse = 0;
+			/* infoIdvfs = 0x55; */
+			eem_checkEfuse = 0;
 			eem_error("No EEM EFUSE available, will turn off EEM (val[%d] !!\n", i);
+			for_each_det(det)
+				det->disabled = 1;
 			break;
 		}
 	}
+
+	#if ITurbo
+	/* Read E-Fuse to control ITurbo mode */
+	ctrl_ITurbo = 1; /* eem_devinfo.BIG_TURBO; */
 	#endif
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 	return ret;
 }
 
@@ -475,6 +567,118 @@ unsigned char mt_eem_get_turbo(void)
 
 	return ret;
 }
+
+#if ITurbo
+static int _mt_eem_cpu_CB(struct notifier_block *nfb,	unsigned long action, void *hcpu)
+{
+	#if !(EEM_ENABLE_TINYSYS_SSPM)
+	unsigned long flags;
+	#endif
+
+	#if (EEM_ENABLE_TINYSYS_SSPM)
+	unsigned int ipi_ret = 0;
+	struct eem_ipi_data eem_data;
+	#endif
+
+	unsigned int cpu = (unsigned long)hcpu;
+	unsigned int online_cpus = num_online_cpus();
+	struct device *dev;
+	/* struct eem_det *det; */
+	enum mt_eem_cpu_id cluster_id;
+
+	/* CPU mask - Get on-line cpus per-cluster */
+	struct cpumask eem_cpumask;
+	struct cpumask cpu_online_cpumask;
+	unsigned int cpus, big_cpus;
+
+	if (ctrl_ITurbo < 2) {
+		eem_debug("Default I-Turbo off (%d) !!", ctrl_ITurbo);
+		return NOTIFY_OK;
+	}
+	/* eem_debug("I-Turbo start to run (%d) !!", ctrl_ITurbo); */
+
+	/* Current active CPU is belong which cluster */
+	cluster_id = arch_get_cluster_id(cpu);
+
+	/* How many active CPU in this cluster, present by bit mask
+	*	ex:	B	L	LL
+	*		00	1111	0000
+	*/
+	arch_get_cluster_cpus(&eem_cpumask, cluster_id);
+
+	/* How many active CPU online in this cluster, present by number */
+	cpumask_and(&cpu_online_cpumask, &eem_cpumask, cpu_online_mask);
+	cpus = cpumask_weight(&cpu_online_cpumask);
+
+	if (eem_log_en)
+		eem_error("@%s():%d, cpu = %d, act = %lu, on_cpus = %d, clst = %d, clst_cpu = %d\n"
+		, __func__, __LINE__, cpu, action, online_cpus, cluster_id, cpus);
+
+	dev = get_cpu_device(cpu);
+
+	if (dev) {
+		arch_get_cluster_cpus(&eem_cpumask, MT_EEM_CPU_B);
+		cpumask_and(&cpu_online_cpumask, &eem_cpumask, cpu_online_mask);
+		big_cpus = cpumask_weight(&cpu_online_cpumask);
+
+		switch (action) {
+		case CPU_POST_DEAD:
+			if ((ITurboRun == 0) && (big_cpus == 0) && (cluster_id == MT_EEM_CPU_B)) {
+				if (eem_log_en)
+					eem_debug("ITurbo(1) DEAD (%d) B_cc(%d)\n", online_cpus, big_cpus);
+				#if !(EEM_ENABLE_TINYSYS_SSPM)
+				mt_ptp_lock(&flags);
+				#endif
+				ITurboRun = 1;
+				/* apply SOC voltage table */
+				/* det = id_to_eem_det(EEM_DET_SOC); */
+				/* eem_set_eem_volt(det); */
+				#if (EEM_ENABLE_TINYSYS_SSPM)
+				eem_data.u.data.arg[0] = ITurboRun;
+				ipi_ret = eem_to_sspm(IPI_EEM_ITURBORUN_WRITE, &eem_data);
+				#endif
+
+				#if !(EEM_ENABLE_TINYSYS_SSPM)
+				mt_ptp_unlock(&flags);
+				#endif
+			} else {
+				if (eem_log_en)
+					eem_error("Turbo(%d)ed !! DEAD (%d), BIG_cc(%d)\n",
+						ITurboRun, online_cpus, big_cpus);
+			}
+		break;
+
+		case CPU_UP_PREPARE:
+			if ((ITurboRun == 1) && (cluster_id == MT_EEM_CPU_B) && (big_cpus == 0)) {
+				if (eem_log_en)
+					eem_error("ITurbo(0) UP (%d), BIG_cc(%d)\n", online_cpus, big_cpus);
+				#if !(EEM_ENABLE_TINYSYS_SSPM)
+				mt_ptp_lock(&flags);
+				#endif
+				ITurboRun = 0;
+				/* apply 2L voltage table */
+				/* det = id_to_eem_det(EEM_DET_2L); */
+				/* eem_set_eem_volt(det); */
+				#if (EEM_ENABLE_TINYSYS_SSPM)
+				eem_data.u.data.arg[0] = ITurboRun;
+				ipi_ret = eem_to_sspm(IPI_EEM_ITURBORUN_WRITE, &eem_data);
+				#endif
+
+				#if !(EEM_ENABLE_TINYSYS_SSPM)
+				mt_ptp_unlock(&flags);
+				#endif
+			} else {
+				if (eem_log_en)
+					eem_error("ITurbo(%d)ed !! UP (%d), BIG_cc(%d)\n",
+						ITurboRun, online_cpus, big_cpus);
+			}
+		break;
+		}
+	}
+	return NOTIFY_OK;
+}
+#endif /* if ITurbo */
+
 /*============================================================
  * function declarations of EEM detectors
  *============================================================
@@ -495,7 +699,7 @@ static void inherit_base_det_transfer_fops(struct eem_det *det)
 	/*
 	 * Inherit ops from eem_det_base_ops if ops in det is NULL
 	 */
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	#define INIT_OP(ops, func)					\
 		do {							\
@@ -508,7 +712,7 @@ static void inherit_base_det_transfer_fops(struct eem_det *det)
 	INIT_OP(det->ops, pmic_2_volt);
 	INIT_OP(det->ops, eem_2_pmic);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 #if defined(CONFIG_EEM_AEE_RR_REC) && !(EARLY_PORTING)
@@ -542,7 +746,7 @@ static void _mt_eem_aee_init(void)
 
 #ifndef EARLY_PORTING_THERMAL
 int __attribute__((weak))
-tscpu_get_temp_by_bank(thermal_bank_name ts_bank)
+tscpu_get_temp_by_bank(enum thermal_bank_name ts_bank)
 {
 	eem_error("cannot find %s (thermal has not ready yet!)\n", __func__);
 	return 0;
@@ -560,14 +764,14 @@ static struct eem_ctrl *id_to_eem_ctrl(enum eem_ctrl_id id)
 void base_ops_enable(struct eem_det *det, int reason)
 {
 	/* FIXME: UNDER CONSTRUCTION */
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	det->disabled &= ~reason;
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 void base_ops_switch_bank(struct eem_det *det, enum eem_phase phase)
 {
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	/* 803f0000 + det->ctrl_id = enable ctrl's swcg clock */
 	/* 003f0000 + det->ctrl_id = disable ctrl's swcg clock */
 	if (phase == EEM_PHASE_INIT01)
@@ -578,12 +782,12 @@ void base_ops_switch_bank(struct eem_det *det, enum eem_phase phase)
 								BITS(2:0, det->ctrl_id)) & 0x0fffffff));
 
 	/* eem_write_field(EEMCORESEL, 2:0, det->ctrl_id);*/
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 void base_ops_disable_locked(struct eem_det *det, int reason)
 {
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	switch (reason) {
 	case BY_MON_ERROR:
@@ -631,39 +835,39 @@ void base_ops_disable_locked(struct eem_det *det, int reason)
 
 	eem_debug("Disable EEM[%s] done. reason=[%d]\n", det->name, det->disabled);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 void base_ops_disable(struct eem_det *det, int reason)
 {
 	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	mt_ptp_lock(&flags);
 	det->ops->switch_bank(det, NR_EEM_PHASE);
 	det->ops->disable_locked(det, reason);
 	mt_ptp_unlock(&flags);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 int base_ops_init01(struct eem_det *det)
 {
 	/* struct eem_ctrl *ctrl = id_to_eem_ctrl(det->ctrl_id); */
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (unlikely(!HAS_FEATURE(det, FEA_INIT01))) {
 		eem_debug("det %s has no INIT01\n", det->name);
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -1;
 	}
 
 	#if 0
 	if (det->disabled & BY_PROCFS) {
 		eem_debug("[%s] Disabled by PROCFS\n", __func__);
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -2;
 	}
 	#endif
@@ -672,25 +876,25 @@ int base_ops_init01(struct eem_det *det)
 	/* det->ops->dump_status(det); */
 	det->ops->set_phase(det, EEM_PHASE_INIT01);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
 
 int base_ops_init02(struct eem_det *det)
 {
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (unlikely(!HAS_FEATURE(det, FEA_INIT02))) {
 		eem_debug("det %s has no INIT02\n", det->name);
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -1;
 	}
 
 	if (det->disabled & BY_INIT_ERROR) {
 		eem_error("[%s] Disabled by INIT_ERROR\n", ((char *)(det->name) + 8));
 		det->ops->dump_status(det);
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -2;
 	}
 	eem_debug("DCV = 0x%08X, AGEV = 0x%08X\n", det->DCVOFFSETIN, det->AGEVOFFSETIN);
@@ -698,7 +902,7 @@ int base_ops_init02(struct eem_det *det)
 	/* det->ops->dump_status(det); */
 	det->ops->set_phase(det, EEM_PHASE_INIT02);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -707,20 +911,20 @@ int base_ops_mon_mode(struct eem_det *det)
 {
 	#if defined(CONFIG_THERMAL) && !defined(EARLY_PORTING_THERMAL)
 	struct TS_PTPOD ts_info;
-	thermal_bank_name ts_bank;
+	enum thermal_bank_name ts_bank;
 	#endif
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!HAS_FEATURE(det, FEA_MON)) {
 		eem_error("det %s has no MON mode\n", det->name);
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -1;
 	}
 
 	if (det->disabled & BY_INIT_ERROR) {
 		eem_error("[%s] Disabled BY_INIT_ERROR\n", ((char *)(det->name) + 8));
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -2;
 	}
 
@@ -744,14 +948,14 @@ int base_ops_mon_mode(struct eem_det *det)
 	#if 0
 	if ((det->EEMINITEN == 0x0) || (det->EEMMONEN == 0x0)) {
 		eem_error("EEMINITEN = 0x%08X, EEMMONEN = 0x%08X\n", det->EEMINITEN, det->EEMMONEN);
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return 1;
 	}
 	#endif
 	/* det->ops->dump_status(det); */
 	det->ops->set_phase(det, EEM_PHASE_MON);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -761,14 +965,14 @@ int base_ops_get_status(struct eem_det *det)
 	int status;
 	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	mt_ptp_lock(&flags);
 	det->ops->switch_bank(det, NR_EEM_PHASE);
 	status = (eem_read(EEMEN) != 0) ? 1 : 0;
 	mt_ptp_unlock(&flags);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return status;
 }
@@ -777,7 +981,7 @@ void base_ops_dump_status(struct eem_det *det)
 {
 	unsigned int i;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	eem_isr_info("[%s]\n",			det->name);
 
@@ -826,7 +1030,7 @@ void base_ops_dump_status(struct eem_det *det)
 	for (i = 0; i < det->num_freq_tbl; i++)
 		eem_isr_info("volt_tbl_pmic[%d] = %d\n", i, det->volt_tbl_pmic[i]);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 void base_ops_set_phase(struct eem_det *det, enum eem_phase phase)
@@ -834,7 +1038,7 @@ void base_ops_set_phase(struct eem_det *det, enum eem_phase phase)
 	unsigned int i, filter, val;
 	/* unsigned long flags; */
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	/* mt_ptp_lock(&flags); */
 
@@ -971,7 +1175,7 @@ void base_ops_set_phase(struct eem_det *det, enum eem_phase phase)
 #if defined(__MTK_SLT_)
 		mdelay(200);
 #endif
-		udelay(100); /* all banks' phase cannot be set without delay */
+		udelay(250); /* all banks' phase cannot be set without delay */
 		break;
 
 	case EEM_PHASE_INIT02:
@@ -989,7 +1193,7 @@ void base_ops_set_phase(struct eem_det *det, enum eem_phase phase)
 #if defined(__MTK_SLT_)
 		mdelay(200);
 #endif
-		udelay(100); /* all banks' phase cannot be set without delay */
+		udelay(200); /* all banks' phase cannot be set without delay */
 		break;
 
 	case EEM_PHASE_MON:
@@ -1004,13 +1208,13 @@ void base_ops_set_phase(struct eem_det *det, enum eem_phase phase)
 	}
 	/* mt_ptp_unlock(&flags); */
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 int base_ops_get_temp(struct eem_det *det)
 {
 #if defined(CONFIG_THERMAL) && !defined(EARLY_PORTING_THERMAL)
-	thermal_bank_name ts_bank;
+	enum thermal_bank_name ts_bank;
 
 	ts_bank = det_to_id(det);
 	#ifdef __KERNEL__
@@ -1030,43 +1234,43 @@ int base_ops_get_temp(struct eem_det *det)
 
 int base_ops_get_volt(struct eem_det *det)
 {
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	eem_debug("[%s] default func\n", __func__);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
 
 int base_ops_set_volt(struct eem_det *det)
 {
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	eem_debug("[%s] default func\n", __func__);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
 
 void base_ops_restore_default_volt(struct eem_det *det)
 {
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	eem_debug("[%s] default func\n", __func__);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 void base_ops_get_freq_table(struct eem_det *det)
 {
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	det->freq_tbl[0] = 100;
 	det->num_freq_tbl = 1;
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 void base_ops_get_orig_volt_table(struct eem_det *det)
 {
-	FUNC_ENTER(FUNC_LV_HELP);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 #ifdef __KERNEL__
@@ -1085,14 +1289,14 @@ static long long eem_get_current_time_us(void)
 */
 static void mt_ptp_lock(unsigned long *flags)
 {
-	/* FUNC_ENTER(FUNC_LV_HELP); */
+	/* FUNC_ENTER(EEM_FUNC_LV_HELP); */
 	/* FIXME: lock with MD32 */
 	/* get_md32_semaphore(SEMAPHORE_PTP); */
 #ifdef __KERNEL__
 	spin_lock_irqsave(&eem_spinlock, *flags);
 	eem_pTime_us = eem_get_current_time_us();
 #endif
-	/* FUNC_EXIT(FUNC_LV_HELP); */
+	/* FUNC_EXIT(EEM_FUNC_LV_HELP); */
 }
 #ifdef __KERNEL__
 EXPORT_SYMBOL(mt_ptp_lock);
@@ -1100,7 +1304,7 @@ EXPORT_SYMBOL(mt_ptp_lock);
 
 static void mt_ptp_unlock(unsigned long *flags)
 {
-	/* FUNC_ENTER(FUNC_LV_HELP); */
+	/* FUNC_ENTER(EEM_FUNC_LV_HELP); */
 #ifdef __KERNEL__
 	eem_cTime_us = eem_get_current_time_us();
 	EEM_IS_TOO_LONG();
@@ -1108,7 +1312,7 @@ static void mt_ptp_unlock(unsigned long *flags)
 	/* FIXME: lock with MD32 */
 	/* release_md32_semaphore(SEMAPHORE_PTP); */
 #endif
-	/* FUNC_EXIT(FUNC_LV_HELP); */
+	/* FUNC_EXIT(EEM_FUNC_LV_HELP); */
 }
 #ifdef __KERNEL__
 EXPORT_SYMBOL(mt_ptp_unlock);
@@ -1119,16 +1323,16 @@ int mt_ptp_idle_can_enter(void)
 {
 	struct eem_ctrl *ctrl;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	for_each_ctrl(ctrl) {
 		if (atomic_read(&ctrl->in_init)) {
-			FUNC_EXIT(FUNC_LV_HELP);
+			FUNC_EXIT(EEM_FUNC_LV_HELP);
 			return 0;
 		}
 	}
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 1;
 }
@@ -1143,7 +1347,7 @@ static enum hrtimer_restart eem_log_timer_func(struct hrtimer *timer)
 {
 	struct eem_det *det;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	for_each_det(det) {
 		if (det->ctrl_id == EEM_CTRL_SOC)
@@ -1189,7 +1393,7 @@ static enum hrtimer_restart eem_log_timer_func(struct hrtimer *timer)
 	}
 
 	hrtimer_forward_now(timer, ns_to_ktime(LOG_INTERVAL));
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return HRTIMER_RESTART;
 }
@@ -1202,7 +1406,7 @@ static int eem_volt_thread_handler(void *data)
 	struct eem_ctrl *ctrl = (struct eem_ctrl *)data;
 	struct eem_det *det = id_to_eem_det(ctrl->det_id);
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	#ifdef __KERNEL__
 	do {
 		wait_event_interruptible(ctrl->wq, ctrl->volt_update);
@@ -1272,7 +1476,7 @@ static int eem_volt_thread_handler(void *data)
 
 	} while (!kthread_should_stop());
 	#endif
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -1282,7 +1486,7 @@ static void inherit_base_det(struct eem_det *det)
 	/*
 	 * Inherit ops from eem_det_base_ops if ops in det is NULL
 	 */
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	#define INIT_OP(ops, func)					\
 		do {							\
@@ -1309,12 +1513,12 @@ static void inherit_base_det(struct eem_det *det)
 	INIT_OP(det->ops, pmic_2_volt);
 	INIT_OP(det->ops, eem_2_pmic);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 static void eem_init_ctrl(struct eem_ctrl *ctrl)
 {
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	/* init_completion(&ctrl->init_done); */
 	/* atomic_set(&ctrl->in_init, 0); */
 	#ifdef __KERNEL__
@@ -1328,7 +1532,7 @@ static void eem_init_ctrl(struct eem_ctrl *ctrl)
 			eem_error("Create %s thread failed: %ld\n", ctrl->name, PTR_ERR(ctrl->thread));
 	}
 	#endif
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 static void eem_init_det(struct eem_det *det, struct eem_devinfo *devinfo)
@@ -1336,7 +1540,7 @@ static void eem_init_det(struct eem_det *det, struct eem_devinfo *devinfo)
 	enum eem_det_id det_id = det_to_id(det);
 	/* unsigned int binLevel; */
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	eem_debug("eem_init_det: det=%s, id=%d\n", ((char *)(det->name) + 8), det_id);
 
 	inherit_base_det(det);
@@ -1481,7 +1685,6 @@ static void eem_init_det(struct eem_det *det, struct eem_devinfo *devinfo)
 		break;
 
 	 /* for DVT SOC input values are the same as CCI*/
-	#if EEM_BANK_SOC
 	case EEM_DET_SOC:
 		det->MDES	= devinfo->SOC_MDES;
 		det->BDES	= devinfo->SOC_BDES;
@@ -1492,7 +1695,7 @@ static void eem_init_det(struct eem_det *det, struct eem_devinfo *devinfo)
 		det->AGEDELTA	= devinfo->SOC_AGEDELTA;
 		det->MTDES	= devinfo->SOC_MTDES;
 		break;
-	#endif
+
 	default:
 		eem_debug("[%s]: Unknown det_id %d\n", __func__, det_id);
 		break;
@@ -1509,7 +1712,7 @@ static void eem_init_det(struct eem_det *det, struct eem_devinfo *devinfo)
 	if (det->ops->get_freq_table)
 		det->ops->get_freq_table(det);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 #if UPDATE_TO_UPOWER
@@ -1567,10 +1770,10 @@ static void eem_set_eem_volt(struct eem_det *det)
 	unsigned i;
 	int cur_temp, low_temp_offset;
 	struct eem_ctrl *ctrl = id_to_eem_ctrl(det->ctrl_id);
-	#if ITurbo
+	#if 0 /* ITurbo */
 	ITurboRunSet = 0;
 	#endif
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	cur_temp = det->ops->get_temp(det);
 
@@ -1587,7 +1790,7 @@ static void eem_set_eem_volt(struct eem_det *det)
 
 	ctrl->volt_update |= EEM_VOLT_UPDATE;
 
-	#if ITurbo
+	#if 0 /* ITurbo */
 	if (cur_temp <= 33000) {
 		if ((det->ctrl_id == EEM_CTRL_L) && (ITurboRun == 1))
 			ITurboRunSet = 0;
@@ -1629,7 +1832,7 @@ static void eem_set_eem_volt(struct eem_det *det)
 			break;
 
 		case EEM_CTRL_L:
-			#if ITurbo
+			#if 0 /* ITurbo */
 			if (ITurboRunSet == 1) {
 				ITurbo_offset[i] = det->ops->volt_2_eem(det, MAX_ITURBO_OFFSET + det->eem_v_base) *
 						(det->volt_tbl[i] - det->volt_tbl[NR_FREQ-1]) /
@@ -1642,7 +1845,7 @@ static void eem_set_eem_volt(struct eem_det *det)
 			(unsigned int)(clamp(
 				det->ops->eem_2_pmic(det,
 					(det->volt_tbl[i] + det->volt_offset + low_temp_offset
-					#if ITurbo
+					#if 0 /* ITurbo */
 					- ITurbo_offset[i]
 					#endif
 				))+det->pi_offset,
@@ -1751,7 +1954,7 @@ static void eem_set_eem_volt(struct eem_det *det)
 	#endif
 #endif
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 static void eem_restore_eem_volt(struct eem_det *det)
@@ -1775,8 +1978,8 @@ static void eem_restore_eem_volt(struct eem_det *det)
 		#endif
 	#endif
 
-	FUNC_ENTER(FUNC_LV_HELP);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 
 #if 0
@@ -1786,25 +1989,25 @@ static void mt_eem_reg_dump_locked(void)
 	unsigned int addr;
 
 	for (addr = (unsigned int)EEM_DESCHAR; addr <= (unsigned int)EEM_SMSTATE1; addr += 4)
-		eem_isr_info("0x%08X = 0x%08X\n", addr, *(volatile unsigned int *)addr);
+		eem_isr_info("0x%08X = 0x%08X\n", addr, *(unsigned int *)addr);
 
 	addr = (unsigned int)EEMCORESEL;
-	eem_isr_info("0x%08X = 0x%08X\n", addr, *(volatile unsigned int *)addr);
+	eem_isr_info("0x%08X = 0x%08X\n", addr, *(unsigned int *)addr);
 #else
 	unsigned long addr;
 
 	for (addr = (unsigned long)EEM_DESCHAR; addr <= (unsigned long)EEM_SMSTATE1; addr += 4)
-		eem_isr_info("0x %lu = 0x %lu\n", addr, *(volatile unsigned long *)addr);
+		eem_isr_info("0x %lu = 0x %lu\n", addr, *(unsigned long *)addr);
 
 	addr = (unsigned long)EEMCORESEL;
-	eem_isr_info("0x %lu = 0x %lu\n", addr, *(volatile unsigned long *)addr);
+	eem_isr_info("0x %lu = 0x %lu\n", addr, *(unsigned long *)addr);
 #endif
 }
 #endif
 
 static inline void handle_init01_isr(struct eem_det *det)
 {
-	FUNC_ENTER(FUNC_LV_LOCAL);
+	FUNC_ENTER(EEM_FUNC_LV_LOCAL);
 
 	eem_isr_info("mode = init1 %s-isr\n", ((char *)(det->name) + 8));
 
@@ -1857,7 +2060,7 @@ static inline void handle_init01_isr(struct eem_det *det)
 	eem_write(EEMINTSTS, 0x1);
 	/* det->ops->init02(det); */
 
-	FUNC_EXIT(FUNC_LV_LOCAL);
+	FUNC_EXIT(EEM_FUNC_LV_LOCAL);
 }
 
 static unsigned int interpolate(unsigned int y1, unsigned int y0,
@@ -1935,7 +2138,7 @@ static inline void handle_init02_isr(struct eem_det *det)
 	unsigned int i;
 	/* struct eem_ctrl *ctrl = id_to_eem_ctrl(det->ctrl_id); */
 
-	FUNC_ENTER(FUNC_LV_LOCAL);
+	FUNC_ENTER(EEM_FUNC_LV_LOCAL);
 
 	eem_error("mode = init2 %s-isr\n", ((char *)(det->name) + 8));
 
@@ -2099,12 +2302,12 @@ static inline void handle_init02_isr(struct eem_det *det)
 	/* atomic_dec(&ctrl->in_init); */
 	/* complete(&ctrl->init_done); */
 	det->ops->mon_mode(det);
-	FUNC_EXIT(FUNC_LV_LOCAL);
+	FUNC_EXIT(EEM_FUNC_LV_LOCAL);
 }
 
 static inline void handle_init_err_isr(struct eem_det *det)
 {
-	FUNC_ENTER(FUNC_LV_LOCAL);
+	FUNC_ENTER(EEM_FUNC_LV_LOCAL);
 	eem_error("====================================================\n");
 	eem_error("EEM init err: EEMEN(%p) = 0x%X, EEMINTSTS(%p) = 0x%X\n",
 			 EEMEN, eem_read(EEMEN),
@@ -2135,7 +2338,7 @@ TODO: FIXME
 #endif
 	det->ops->disable_locked(det, BY_INIT_ERROR);
 
-	FUNC_EXIT(FUNC_LV_LOCAL);
+	FUNC_EXIT(EEM_FUNC_LV_LOCAL);
 }
 
 static inline void handle_mon_mode_isr(struct eem_det *det)
@@ -2146,7 +2349,7 @@ static inline void handle_mon_mode_isr(struct eem_det *det)
 	unsigned long long temp_cur = (unsigned long long)aee_rr_curr_ptp_temp();
 	#endif
 
-	FUNC_ENTER(FUNC_LV_LOCAL);
+	FUNC_ENTER(EEM_FUNC_LV_LOCAL);
 
 	eem_error("mode = mon %s-isr\n", ((char *)(det->name) + 8));
 
@@ -2387,7 +2590,7 @@ static inline void handle_mon_mode_isr(struct eem_det *det)
 			infoIdvfs = 0xff;
 
 		#if ITurbo
-		if (det->ctrl_id == EEM_CTRL_L)
+		/* if (det->ctrl_id == EEM_CTRL_SOC) */
 			ctrl_ITurbo = (ctrl_ITurbo == 0) ? 0 : 2;
 		#endif
 
@@ -2397,7 +2600,7 @@ out:
 	/* Clear EEM INIT interrupt EEMINTSTS = 0x00ff0000 */
 	eem_write(EEMINTSTS, 0x00ff0000);
 
-	FUNC_EXIT(FUNC_LV_LOCAL);
+	FUNC_EXIT(EEM_FUNC_LV_LOCAL);
 }
 
 static inline void handle_mon_err_isr(struct eem_det *det)
@@ -2406,7 +2609,7 @@ static inline void handle_mon_err_isr(struct eem_det *det)
 		unsigned int i;
 	#endif
 
-	FUNC_ENTER(FUNC_LV_LOCAL);
+	FUNC_ENTER(EEM_FUNC_LV_LOCAL);
 
 	/* EEM Monitor mode error handler */
 	eem_error("====================================================\n");
@@ -2464,14 +2667,14 @@ static inline void handle_mon_err_isr(struct eem_det *det)
 #endif
 	det->ops->disable_locked(det, BY_MON_ERROR);
 
-	FUNC_EXIT(FUNC_LV_LOCAL);
+	FUNC_EXIT(EEM_FUNC_LV_LOCAL);
 }
 
 static inline void eem_isr_handler(struct eem_det *det)
 {
 	unsigned int eemintsts, eemen;
 
-	FUNC_ENTER(FUNC_LV_LOCAL);
+	FUNC_ENTER(EEM_FUNC_LV_LOCAL);
 
 	eemintsts = eem_read(EEMINTSTS);
 	eemen = eem_read(EEMEN);
@@ -2499,7 +2702,7 @@ static inline void eem_isr_handler(struct eem_det *det)
 			handle_mon_err_isr(det);
 	}
 
-	FUNC_EXIT(FUNC_LV_LOCAL);
+	FUNC_EXIT(EEM_FUNC_LV_LOCAL);
 }
 #ifdef __KERNEL__
 static irqreturn_t eem_isr(int irq, void *dev_id)
@@ -2511,7 +2714,7 @@ int ptp_isr(void)
 	struct eem_det *det = NULL;
 	int i;
 
-	FUNC_ENTER(FUNC_LV_MODULE);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
 
 	/* mt_ptp_lock(&flags); */
 
@@ -2560,163 +2763,20 @@ int ptp_isr(void)
 
 	/* mt_ptp_unlock(&flags); */
 
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 #ifdef __KERNEL__
 	return IRQ_HANDLED;
 #else
 	return 0;
 #endif
 }
-#if ITurbo
-#ifdef __KERNEL__
-#define ITURBO_CPU_NUM 1
-static int __cpuinit _mt_eem_cpu_CB(struct notifier_block *nfb,
-					unsigned long action, void *hcpu)
-{
-	unsigned long flags;
-	unsigned int cpu = (unsigned long)hcpu;
-	unsigned int online_cpus = num_online_cpus();
-	struct device *dev;
-	struct eem_det *det;
-	enum mt_eem_cpu_id cluster_id;
-
-	/* CPU mask - Get on-line cpus per-cluster */
-	struct cpumask eem_cpumask;
-	struct cpumask cpu_online_cpumask;
-	unsigned int cpus, big_cpus;
-
-	if (ctrl_ITurbo < 2) {
-		eem_debug("Default I-Turbo off (%d) !!", ctrl_ITurbo);
-		return NOTIFY_OK;
-	}
-	eem_debug("I-Turbo start to run (%d) !!", ctrl_ITurbo);
-
-	/* Current active CPU is belong which cluster */
-	cluster_id = arch_get_cluster_id(cpu);
-
-	/* How many active CPU in this cluster, present by bit mask
-	*	ex:	B	L	LL
-	*		00	1111	0000
-	*/
-	arch_get_cluster_cpus(&eem_cpumask, cluster_id);
-
-	/* How many active CPU online in this cluster, present by number */
-	cpumask_and(&cpu_online_cpumask, &eem_cpumask, cpu_online_mask);
-	cpus = cpumask_weight(&cpu_online_cpumask);
-
-	if (eem_log_en)
-		eem_error("@%s():%d, cpu = %d, act = %lu, on_cpus = %d, clst = %d, clst_cpu = %d\n"
-		, __func__, __LINE__, cpu, action, online_cpus, cluster_id, cpus);
-
-	dev = get_cpu_device(cpu);
-
-	if (dev) {
-		det = id_to_eem_det(EEM_DET_BIG);
-		arch_get_cluster_cpus(&eem_cpumask, MT_EEM_CPU_B);
-		cpumask_and(&cpu_online_cpumask, &eem_cpumask, cpu_online_mask);
-		big_cpus = cpumask_weight(&cpu_online_cpumask);
-
-		switch (action) {
-		case CPU_POST_DEAD:
-			if ((ITurboRun == 0) && (big_cpus == ITURBO_CPU_NUM) && (cluster_id == MT_EEM_CPU_B)) {
-				if (eem_log_en)
-					eem_debug("Turbo(1) DEAD (%d) BIG_cc(%d)\n", online_cpus, big_cpus);
-				mt_ptp_lock(&flags);
-				ITurboRun = 1;
-				/* Revise BIG private table */
-				/* [25:21]=dcmdiv, [20:12]=DDS, [11:7]=clkdiv, [6:4]=postdiv, [3:0]=CFindex */
-#if 0 /* no record table */
-				det->recordRef[0] =
-					((*(recordTbl + (48 * 8) + 0) & 0x1F) << 21) |
-					((*(recordTbl + (48 * 8) + 1) & 0x1FF) << 12) |
-					((*(recordTbl + (48 * 8) + 2) & 0x1F) << 7) |
-					((*(recordTbl + (48 * 8) + 3) & 0x7) << 4) |
-					(*(recordTbl + (48 * 8) + 4) & 0xF);
-#endif
-				eem_set_eem_volt(det);
-				mt_ptp_unlock(&flags);
-			} else {
-				if (eem_log_en)
-					eem_error("Turbo(%d)ed !! DEAD (%d), BIG_cc(%d)\n",
-						ITurboRun, online_cpus, big_cpus);
-			}
-		break;
-
-		case CPU_DOWN_PREPARE:
-			if ((ITurboRun == 1) && (big_cpus == ITURBO_CPU_NUM) && (cluster_id == MT_EEM_CPU_B)) {
-				if (eem_log_en)
-					eem_error("Turbo(0) DP (%d) BIG_cc(%d)\n", online_cpus, big_cpus);
-				mt_ptp_lock(&flags);
-				ITurboRun = 0;
-				/* Restore BIG private table */
-#if 0 /* no record table */
-				det->recordRef[0] =
-					((*(recordTbl + (48 * 8) + 0) & 0x1F) << 21) |
-					((*(recordTbl + (48 * 8) + 1) & 0x1FF) << 12) |
-					((*(recordTbl + (48 * 8) + 2) & 0x1F) << 7) |
-					((*(recordTbl + (48 * 8) + 3) & 0x7) << 4) |
-					(*(recordTbl + (48 * 8) + 4) & 0xF);
-#endif
-				eem_set_eem_volt(det);
-				mt_ptp_unlock(&flags);
-			} else {
-				if (eem_log_en)
-					eem_error("Turbo(%d)ed !! DP (%d), BIG_cc(%d)\n",
-						ITurboRun, online_cpus, big_cpus);
-			}
-		break;
-
-		case CPU_UP_PREPARE:
-			if ((ITurboRun == 0) && (cpu == 8) && (big_cpus == 0)) {
-				eem_error("Turbo(1) UP (%d), BIG_cc(%d)\n", online_cpus, big_cpus);
-				mt_ptp_lock(&flags);
-				ITurboRun = 1;
-				/* Revise BIG private table */
-#if 0 /* no record table*/
-				det->recordRef[0] =
-					((*(recordTbl + (48 * 8) + 0) & 0x1F) << 21) |
-					((*(recordTbl + (48 * 8) + 1) & 0x1FF) << 12) |
-					((*(recordTbl + (48 * 8) + 2) & 0x1F) << 7) |
-					((*(recordTbl + (48 * 8) + 3) & 0x7) << 4) |
-					(*(recordTbl + (48 * 8) + 4) & 0xF);
-#endif
-				eem_set_eem_volt(det);
-				mt_ptp_unlock(&flags);
-			} else if ((ITurboRun == 1) && (big_cpus == ITURBO_CPU_NUM) && (cluster_id == MT_EEM_CPU_B)) {
-				if (eem_log_en)
-					eem_error("Turbo(0) UP (%d), BIG_cc(%d)\n", online_cpus, big_cpus);
-				mt_ptp_lock(&flags);
-				ITurboRun = 0;
-				/* Restore BIG private table */
-#if 0 /* no record table */
-				det->recordRef[0] =
-					((*(recordTbl + (48 * 8) + 0) & 0x1F) << 21) |
-					((*(recordTbl + (48 * 8) + 1) & 0x1FF) << 12) |
-					((*(recordTbl + (48 * 8) + 2) & 0x1F) << 7) |
-					((*(recordTbl + (48 * 8) + 3) & 0x7) << 4) |
-					(*(recordTbl + (48 * 8) + 4) & 0xF);
-#endif
-				eem_set_eem_volt(det);
-				mt_ptp_unlock(&flags);
-			} else {
-				if (eem_log_en)
-					eem_error("Turbo(%d)ed !! UP (%d), BIG_cc(%d)\n",
-						ITurboRun, online_cpus, big_cpus);
-			}
-		break;
-		}
-	}
-	return NOTIFY_OK;
-}
-#endif /* ifdef __KERNEL__*/
-#endif /* if ITurbo */
 
 void eem_init02(void)
 {
 	struct eem_det *det;
 	struct eem_ctrl *ctrl;
 
-	FUNC_ENTER(FUNC_LV_LOCAL);
+	FUNC_ENTER(EEM_FUNC_LV_LOCAL);
 
 	for_each_det_ctrl(det, ctrl) {
 		if (HAS_FEATURE(det, FEA_INIT02)) {
@@ -2728,10 +2788,11 @@ void eem_init02(void)
 		}
 	}
 
-	FUNC_EXIT(FUNC_LV_LOCAL);
+	FUNC_EXIT(EEM_FUNC_LV_LOCAL);
 }
 
 /* get regulator reference */
+#ifndef EARLY_PORTING_PMIC
 static int eem_buck_get(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -2842,7 +2903,9 @@ static void eem_buck_disable(void)
 static void eem_buck_set_mode(unsigned int mode)
 {
 	unsigned int final_mode;
+	#if EEM_BANK_SOC /* if DVT, set pwm mode for soc to run ptp soc det */
 	int ret = 0;
+	#endif
 
 	final_mode = (mode == 1) ? REGULATOR_MODE_FAST : REGULATOR_MODE_NORMAL;
 	/* set pwm mode for each buck */
@@ -2860,6 +2923,7 @@ static void eem_buck_set_mode(unsigned int mode)
 		#endif
 	#endif /* if EEM_BANK_SOC */
 }
+#endif /* ifndef EARLY_PORTING_PMIC */
 
 void eem_init01(void)
 {
@@ -2867,7 +2931,7 @@ void eem_init01(void)
 	struct eem_ctrl *ctrl;
 	unsigned int out = 0, timeout = 0;
 
-	FUNC_ENTER(FUNC_LV_LOCAL);
+	FUNC_ENTER(EEM_FUNC_LV_LOCAL);
 
 	for_each_det_ctrl(det, ctrl) {
 		unsigned long flag;
@@ -2927,10 +2991,10 @@ void eem_init01(void)
 	mt_eem_enable_big_cluster(0);
 
 	/* set non PWM mode*/
-	#if !EARLY_PORTING
+	#ifndef EARLY_PORTING_PMIC
 		eem_buck_set_mode(0);
 		eem_buck_disable();
-	#endif /* ifndef EARLY_PORTING */
+	#endif /* ifndef EARLY_PORTING_PMIC */
 
 	#ifdef __KERNEL__
 	mt_eem_disable_mtcmos();
@@ -2981,7 +3045,7 @@ void eem_init01(void)
 		timeout++;
 	}
 	eem_init02();
-	FUNC_EXIT(FUNC_LV_LOCAL);
+	FUNC_EXIT(EEM_FUNC_LV_LOCAL);
 }
 
 #if EN_EEM
@@ -2995,7 +3059,7 @@ static char *readline(struct file *fp)
 	static int line_end;
 	char *ret;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 empty:
 
 	if (line_start >= buf_end) {
@@ -3025,7 +3089,7 @@ empty:
 	ret = &buf[line_start];
 	line_start = line_end + 1;
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return ret;
 }
@@ -3046,7 +3110,7 @@ static int eem_probe(struct platform_device *pdev)
 	struct device_node *node = NULL;
 	#endif
 
-	FUNC_ENTER(FUNC_LV_MODULE);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
 
 	#ifdef CONFIG_OF
 	node = pdev->dev.of_node;
@@ -3110,7 +3174,7 @@ static int eem_probe(struct platform_device *pdev)
 	#endif
 
 	/* set PWM mode*/
-	#if !EARLY_PORTING
+	#ifndef EARLY_PORTING_PMIC
 		/* get regulator reference */
 		ret = eem_buck_get(pdev);
 		if (ret != 0)
@@ -3118,7 +3182,7 @@ static int eem_probe(struct platform_device *pdev)
 
 		eem_buck_enable();
 		eem_buck_set_mode(1);
-	#endif /* ifndef EARLY_PORTING */
+	#endif /* ifndef EARLY_PORTING_PMIC */
 
 	/* for slow idle */
 	ptp_data[0] = 0xffffffff;
@@ -3153,7 +3217,7 @@ static int eem_probe(struct platform_device *pdev)
 	#endif
 
 	eem_debug("eem_probe ok\n");
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 
 	return 0;
 }
@@ -3163,8 +3227,8 @@ static int eem_suspend(struct platform_device *pdev, pm_message_t state)
 	/*
 	*kthread_stop(eem_volt_thread);
 	*/
-	FUNC_ENTER(FUNC_LV_MODULE);
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 
 	return 0;
 }
@@ -3177,7 +3241,7 @@ static int eem_resume(struct platform_device *pdev)
 		eem_debug("[%s]: failed to create eem volt thread\n", __func__);
 	#endif
 
-	FUNC_ENTER(FUNC_LV_MODULE);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
 
 #if 0
 	#ifdef __KERNEL__
@@ -3186,7 +3250,7 @@ static int eem_resume(struct platform_device *pdev)
 #endif
 
 	eem_init02();
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 
 	return 0;
 }
@@ -3242,7 +3306,7 @@ void eem_init01_ctp(unsigned int id)
 	struct eem_ctrl *ctrl;
 	unsigned int out = 0, timeout = 0;
 
-	FUNC_ENTER(FUNC_LV_LOCAL);
+	FUNC_ENTER(EEM_FUNC_LV_LOCAL);
 
 	for_each_det_ctrl(det, ctrl) {
 		if (HAS_FEATURE(det, FEA_INIT01)) {
@@ -3284,7 +3348,7 @@ void eem_init01_ctp(unsigned int id)
 	*/
 	eem_init02();
 
-	FUNC_EXIT(FUNC_LV_LOCAL);
+	FUNC_EXIT(EEM_FUNC_LV_LOCAL);
 }
 
 void ptp_init01_ptp(int id)
@@ -3299,8 +3363,8 @@ int mt_eem_opp_num(enum eem_det_id id)
 {
 	struct eem_det *det = id_to_eem_det(id);
 
-	FUNC_ENTER(FUNC_LV_API);
-	FUNC_EXIT(FUNC_LV_API);
+	FUNC_ENTER(EEM_FUNC_LV_API);
+	FUNC_EXIT(EEM_FUNC_LV_API);
 
 	return det->num_freq_tbl;
 }
@@ -3311,12 +3375,12 @@ void mt_eem_opp_freq(enum eem_det_id id, unsigned int *freq)
 	struct eem_det *det = id_to_eem_det(id);
 	int i = 0;
 
-	FUNC_ENTER(FUNC_LV_API);
+	FUNC_ENTER(EEM_FUNC_LV_API);
 
 	for (i = 0; i < det->num_freq_tbl; i++)
 		freq[i] = det->freq_tbl[i];
 
-	FUNC_EXIT(FUNC_LV_API);
+	FUNC_EXIT(EEM_FUNC_LV_API);
 }
 EXPORT_SYMBOL(mt_eem_opp_freq);
 
@@ -3325,7 +3389,7 @@ void mt_eem_opp_status(enum eem_det_id id, unsigned int *temp, unsigned int *vol
 	struct eem_det *det = id_to_eem_det(id);
 	int i = 0;
 
-	FUNC_ENTER(FUNC_LV_API);
+	FUNC_ENTER(EEM_FUNC_LV_API);
 
 #if defined(__KERNEL__) && defined(CONFIG_THERMAL) && !(EARLY_PORTING)
 	*temp = tscpu_get_temp_by_bank(id);
@@ -3335,7 +3399,7 @@ void mt_eem_opp_status(enum eem_det_id id, unsigned int *temp, unsigned int *vol
 	for (i = 0; i < det->num_freq_tbl; i++)
 		volt[i] = det->ops->pmic_2_volt(det, det->volt_tbl_pmic[i]);
 
-	FUNC_EXIT(FUNC_LV_API);
+	FUNC_EXIT(EEM_FUNC_LV_API);
 }
 EXPORT_SYMBOL(mt_eem_opp_status);
 
@@ -3346,13 +3410,13 @@ int mt_eem_status(enum eem_det_id id)
 {
 	struct eem_det *det = id_to_eem_det(id);
 
-	FUNC_ENTER(FUNC_LV_API);
+	FUNC_ENTER(EEM_FUNC_LV_API);
 
 	WARN_ON(!det); /*BUG_ON(!det);*/
 	WARN_ON(!det->ops); /*BUG_ON(!det->ops);*/
 	WARN_ON(!det->ops->get_status); /* BUG_ON(!det->ops->get_status);*/
 
-	FUNC_EXIT(FUNC_LV_API);
+	FUNC_EXIT(EEM_FUNC_LV_API);
 
 	return det->ops->get_status(det);
 }
@@ -3370,7 +3434,7 @@ static int eem_debug_proc_show(struct seq_file *m, void *v)
 {
 	struct eem_det *det = (struct eem_det *)m->private;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	/* FIXME: EEMEN sometimes is disabled temp */
 	seq_printf(m, "[%s] %s (%d)\n",
@@ -3379,7 +3443,7 @@ static int eem_debug_proc_show(struct seq_file *m, void *v)
 		   det->ops->get_status(det)
 		   );
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -3395,10 +3459,10 @@ static ssize_t eem_debug_proc_write(struct file *file,
 	char *buf = (char *) __get_free_page(GFP_USER);
 	struct eem_det *det = (struct eem_det *)PDE_DATA(file_inode(file));
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!buf) {
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -ENOMEM;
 	}
 
@@ -3430,7 +3494,7 @@ static ssize_t eem_debug_proc_write(struct file *file,
 
 out:
 	free_page((unsigned long)buf);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return (ret < 0) ? ret : count;
 }
@@ -3447,7 +3511,7 @@ static int eem_dump_proc_show(struct seq_file *m, void *v)
 		int j;
 	#endif
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	#if 0
 	eem_detectors[EEM_DET_BIG].ops->dump_status(&eem_detectors[EEM_DET_BIG]);
 	eem_detectors[EEM_DET_L].ops->dump_status(&eem_detectors[EEM_DET_L]);
@@ -3514,7 +3578,7 @@ static int eem_dump_proc_show(struct seq_file *m, void *v)
 			#endif
 		}
 	}
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 	return 0;
 }
 /*
@@ -3525,7 +3589,7 @@ static int eem_cur_volt_proc_show(struct seq_file *m, void *v)
 	struct eem_det *det = (struct eem_det *)m->private;
 	u32 rdata = 0, i;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	rdata = det->ops->get_volt(det);
 
@@ -3554,7 +3618,7 @@ static int eem_cur_volt_proc_show(struct seq_file *m, void *v)
 		}
 		#endif
 	}
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -3570,10 +3634,10 @@ static ssize_t eem_cur_volt_proc_write(struct file *file,
 	unsigned int voltValue = 0, voltProc = 0, voltSram = 0, voltPmic = 0, index = 0;
 	struct eem_det *det = (struct eem_det *)PDE_DATA(file_inode(file));
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!buf) {
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -ENOMEM;
 	}
 
@@ -3627,7 +3691,7 @@ static ssize_t eem_cur_volt_proc_write(struct file *file,
 
 out:
 	free_page((unsigned long)buf);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return (ret < 0) ? ret : count;
 }
@@ -3640,7 +3704,7 @@ static int eem_status_proc_show(struct seq_file *m, void *v)
 	int i;
 	struct eem_det *det = (struct eem_det *)m->private;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	seq_printf(m, "bank = %d, (%d) - (",
 		   det->ctrl_id, det->ops->get_temp(det));
@@ -3652,7 +3716,7 @@ static int eem_status_proc_show(struct seq_file *m, void *v)
 		seq_printf(m, "%d, ", det->freq_tbl[i]);
 	seq_printf(m, "%d)\n", det->freq_tbl[i]);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -3662,9 +3726,9 @@ static int eem_status_proc_show(struct seq_file *m, void *v)
 
 static int eem_log_en_proc_show(struct seq_file *m, void *v)
 {
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	seq_printf(m, "%d\n", eem_log_en);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -3675,10 +3739,10 @@ static ssize_t eem_log_en_proc_write(struct file *file,
 	int ret;
 	char *buf = (char *) __get_free_page(GFP_USER);
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!buf) {
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -ENOMEM;
 	}
 
@@ -3721,7 +3785,7 @@ static ssize_t eem_log_en_proc_write(struct file *file,
 
 out:
 	free_page((unsigned long)buf);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return (ret < 0) ? ret : count;
 }
@@ -3733,11 +3797,11 @@ static int eem_offset_proc_show(struct seq_file *m, void *v)
 {
 	struct eem_det *det = (struct eem_det *)m->private;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	seq_printf(m, "%d\n", det->volt_offset);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -3754,10 +3818,10 @@ static ssize_t eem_offset_proc_write(struct file *file,
 	struct eem_det *det = (struct eem_det *)PDE_DATA(file_inode(file));
 	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!buf) {
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -ENOMEM;
 	}
 
@@ -3786,7 +3850,7 @@ static ssize_t eem_offset_proc_write(struct file *file,
 
 out:
 	free_page((unsigned long)buf);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return (ret < 0) ? ret : count;
 }
@@ -3799,11 +3863,13 @@ static int eem_iturbo_en_proc_show(struct seq_file *m, void *v)
 {
 	int i;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	seq_printf(m, "%s\n", ((ctrl_ITurbo) ? "Enable" : "Disable"));
+	#if 0
 	for (i = 0; i < NR_FREQ; i++)
 		seq_printf(m, "ITurbo_offset[%d] = %d (0.00625 per step)\n", i, ITurbo_offset[i]);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
+	#endif
 
 	return 0;
 }
@@ -3815,10 +3881,10 @@ static ssize_t eem_iturbo_en_proc_write(struct file *file,
 	unsigned int value;
 	char *buf = (char *) __get_free_page(GFP_USER);
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!buf) {
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -ENOMEM;
 	}
 
@@ -3861,7 +3927,7 @@ static ssize_t eem_iturbo_en_proc_write(struct file *file,
 
 out:
 	free_page((unsigned long)buf);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return (ret < 0) ? ret : count;
 }
@@ -3872,7 +3938,7 @@ static int eem_vcore_volt_proc_show(struct seq_file *m, void *v)
 	unsigned int i = 0;
 	struct eem_det *det = (struct eem_det *)m->private;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	for (i = 0; i < VCORE_NR_FREQ; i++) {
 		/* transfer 10uv to uv before showing*/
 		seq_printf(m, "%d ", det->ops->pmic_2_volt(det, get_vcore_ptp_volt(i)) * 10);
@@ -3880,7 +3946,7 @@ static int eem_vcore_volt_proc_show(struct seq_file *m, void *v)
 	}
 	seq_puts(m, "\n");
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -3894,10 +3960,10 @@ static ssize_t eem_vcore_volt_proc_write(struct file *file,
 	unsigned int index = 0;
 	unsigned int newVolt = 0;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!buf) {
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -ENOMEM;
 	}
 
@@ -3938,7 +4004,7 @@ static ssize_t eem_vcore_volt_proc_write(struct file *file,
 
 out:
 	free_page((unsigned long)buf);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return (ret < 0) ? ret : count;
 }
@@ -3946,9 +4012,9 @@ out:
 static int eem_vcore_enable_proc_show(struct seq_file *m, void *v)
 {
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	seq_printf(m, "%d\n", ctrl_VCORE_Volt_Enable);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -3962,10 +4028,10 @@ static ssize_t eem_vcore_enable_proc_write(struct file *file,
 	unsigned int enable = 0;
 	int i = 0;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!buf) {
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -ENOMEM;
 	}
 
@@ -4018,13 +4084,13 @@ static ssize_t eem_vcore_enable_proc_write(struct file *file,
 
 out:
 	free_page((unsigned long)buf);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return (ret < 0) ? ret : count;
 }
 #endif
 
-#define PROC_FOPS_RW(name)					\
+#define EEM_PROC_FOPS_RW(name)					\
 	static int name ## _proc_open(struct inode *inode,	\
 		struct file *file)				\
 	{							\
@@ -4040,7 +4106,7 @@ out:
 		.write		  = name ## _proc_write,			\
 	}
 
-#define PROC_FOPS_RO(name)					\
+#define EEM_PROC_FOPS_RO(name)					\
 	static int name ## _proc_open(struct inode *inode,	\
 		struct file *file)				\
 	{							\
@@ -4055,19 +4121,19 @@ out:
 		.release		= single_release,			\
 	}
 
-#define PROC_ENTRY(name)	{__stringify(name), &name ## _proc_fops}
+#define EEM_PROC_ENTRY(name)	{__stringify(name), &name ## _proc_fops}
 
-PROC_FOPS_RW(eem_debug);
-PROC_FOPS_RO(eem_status);
-PROC_FOPS_RO(eem_cur_volt);
-PROC_FOPS_RW(eem_offset);
-PROC_FOPS_RO(eem_dump);
-PROC_FOPS_RW(eem_log_en);
-PROC_FOPS_RW(eem_vcore_volt);
-/* PROC_FOPS_RW(eem_vcore_enable);*/
+EEM_PROC_FOPS_RW(eem_debug);
+EEM_PROC_FOPS_RO(eem_status);
+EEM_PROC_FOPS_RO(eem_cur_volt);
+EEM_PROC_FOPS_RW(eem_offset);
+EEM_PROC_FOPS_RO(eem_dump);
+EEM_PROC_FOPS_RW(eem_log_en);
+EEM_PROC_FOPS_RW(eem_vcore_volt);
+/* EEM_PROC_FOPS_RW(eem_vcore_enable);*/
 
 #if ITurbo
-PROC_FOPS_RW(eem_iturbo_en);
+EEM_PROC_FOPS_RW(eem_iturbo_en);
 #endif
 
 static int create_procfs(void)
@@ -4083,34 +4149,34 @@ static int create_procfs(void)
 	};
 
 	struct pentry det_entries_vcore[] = {
-		PROC_ENTRY(eem_vcore_volt),
-		/* PROC_ENTRY(eem_debug), */
+		EEM_PROC_ENTRY(eem_vcore_volt),
+		/* EEM_PROC_ENTRY(eem_debug), */
 	};
 
 	struct pentry det_entries[] = {
-		PROC_ENTRY(eem_debug),
-		PROC_ENTRY(eem_status),
-		PROC_ENTRY(eem_cur_volt),
-		PROC_ENTRY(eem_offset),
+		EEM_PROC_ENTRY(eem_debug),
+		EEM_PROC_ENTRY(eem_status),
+		EEM_PROC_ENTRY(eem_cur_volt),
+		EEM_PROC_ENTRY(eem_offset),
 	};
 
 	struct pentry eem_entries[] = {
-		PROC_ENTRY(eem_dump),
-		PROC_ENTRY(eem_log_en),
-		/* PROC_ENTRY(eem_vcore_enable), */
+		EEM_PROC_ENTRY(eem_dump),
+		EEM_PROC_ENTRY(eem_log_en),
+		/* EEM_PROC_ENTRY(eem_vcore_enable), */
 		#if ITurbo
-		PROC_ENTRY(eem_iturbo_en),
+		EEM_PROC_ENTRY(eem_iturbo_en),
 		#endif
 	};
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	/* create procfs root /proc/eem */
 	eem_dir = proc_mkdir("eem", NULL);
 
 	if (!eem_dir) {
 		eem_error("[%s]: mkdir /proc/eem failed\n", __func__);
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -1;
 	}
 
@@ -4119,7 +4185,7 @@ static int create_procfs(void)
 	det_dir = proc_mkdir(det->name, eem_dir);
 	if (!det_dir) {
 		eem_debug("[%s]: mkdir /proc/eem/%s failed\n", __func__, det->name);
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -2;
 	}
 
@@ -4130,19 +4196,19 @@ static int create_procfs(void)
 			det_entries_vcore[i].fops, det)) {
 			eem_debug("[%s]: create /proc/eem/%s/%s failed\n", __func__,
 				det->name, det_entries_vcore[i].name);
-			FUNC_EXIT(FUNC_LV_HELP);
+			FUNC_EXIT(EEM_FUNC_LV_HELP);
 			return -3;
 				}
 	}
 
-	/* if ctrl_EEM_Enable =1, create other banks procfs */
-	if (ctrl_EEM_Enable != 0) {
+	/* if ctrl_EEM_Enable =1, and has efuse value, create other banks procfs */
+	if (ctrl_EEM_Enable != 0 && eem_checkEfuse == 1) {
 		for (i = 0; i < ARRAY_SIZE(eem_entries); i++) {
 			if (!proc_create(eem_entries[i].name, S_IRUGO | S_IWUSR | S_IWGRP,
 						eem_dir, eem_entries[i].fops)) {
 				eem_error("[%s]: create /proc/eem/%s failed\n", __func__,
 							eem_entries[i].name);
-				FUNC_EXIT(FUNC_LV_HELP);
+				FUNC_EXIT(EEM_FUNC_LV_HELP);
 				return -3;
 			}
 		}
@@ -4158,7 +4224,7 @@ static int create_procfs(void)
 
 			if (!det_dir) {
 				eem_debug("[%s]: mkdir /proc/eem/%s failed\n", __func__, det->name);
-				FUNC_EXIT(FUNC_LV_HELP);
+				FUNC_EXIT(EEM_FUNC_LV_HELP);
 				return -2;
 			}
 
@@ -4169,14 +4235,14 @@ static int create_procfs(void)
 					det_entries[i].fops, det)) {
 					eem_debug("[%s]: create /proc/eem/%s/%s failed\n", __func__,
 						det->name, det_entries[i].name);
-				FUNC_EXIT(FUNC_LV_HELP);
+				FUNC_EXIT(EEM_FUNC_LV_HELP);
 				return -3;
 				}
 			}
 		}
 	} /* if (ctrl_EEM_Enable != 0) */
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 	return 0;
 }
 #endif /* CONFIG_PROC_FS */
@@ -4317,7 +4383,7 @@ static unsigned int  mt_eem_update_vcore_volt(unsigned int index, unsigned int n
 	unsigned int ret = 0;
 	unsigned int volt_pmic = 0;
 
-	FUNC_ENTER(FUNC_LV_MODULE);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
 
 	det = &eem_detectors[EEM_DET_SOC];
 	volt_pmic = det->ops->volt_2_pmic(det, newVolt);
@@ -4349,7 +4415,7 @@ static unsigned int  mt_eem_update_vcore_volt(unsigned int index, unsigned int n
 	ret = spm_vcorefs_pwarp_cmd();
 	#endif
 
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 	return ret;
 }
 
@@ -4366,12 +4432,12 @@ void eem_set_pi_offset(enum eem_ctrl_id id, int step)
 }
 #endif
 
-/*
+#if 0
 unsigned int get_efuse_status(void)
 {
-	return checkEfuse;
+	return eem_checkEfuse;
 }
-*/
+#endif
 
 #if 0 /* gpu dvfs no need this anymore */
 unsigned int get_eem_status_for_gpu(void)
@@ -4453,23 +4519,15 @@ static int __init dt_get_ptp_devinfo(unsigned long node, const char *uname, int 
 			vcore0, vcore1, vcore2);
 	}
 	#endif
-	#if !EEM_BANK_SOC
-	unsigned int soc_efuse;
-	#endif
 	int i = 0;
 	struct eem_det *det;
 
-	FUNC_ENTER(FUNC_LV_MODULE);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
+
+	get_vcore_opp();
 
 	#if !EEM_BANK_SOC
-	/* Read EFUSE */
-	/* soc_efuse = get_devinfo_with_index(54);*/
-	soc_efuse = 0;
-	eem_error("[VCORE] - Kernel Got efuse 0x%0X\n", soc_efuse);
-	eem_vcore_index[0] = (soc_efuse >> 4) & 0x03;
-	eem_vcore_index[1] = (soc_efuse >> 2) & 0x03;
-	eem_vcore_index[2] = soc_efuse & 0x03;
-	eem_vcore_index[3] = 0;
+	get_soc_efuse();
 	#endif
 
 	det = id_to_eem_det(EEM_DET_SOC);
@@ -4477,7 +4535,7 @@ static int __init dt_get_ptp_devinfo(unsigned long node, const char *uname, int 
 
 	if (det->ops->volt_2_pmic) {
 		for (i = 0; i < VCORE_NR_FREQ; i++)
-			eem_vcore[i] = det->ops->volt_2_pmic(det, vcore_opp[i][eem_vcore_index[i]]);
+			eem_vcore[i] = det->ops->volt_2_pmic(det, *(vcore_opp[i]+eem_vcore_index[i]));
 	}
 
 	/* bottom up compare each volt to ensure each opp is in descending order */
@@ -4490,7 +4548,7 @@ static int __init dt_get_ptp_devinfo(unsigned long node, const char *uname, int 
 	eem_error("Got vcore volt(pmic): 0x%x 0x%x 0x%x 0x%x\n",
 				eem_vcore[0], eem_vcore[1], eem_vcore[2], eem_vcore[3]);
 
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 	return 1;
 }
 
@@ -4570,17 +4628,12 @@ int __init eem_init(void)
 	create_procfs();
 	#endif
 	/* process_voltage_bin(&eem_devinfo); */ /* LTE voltage bin use I-Chang */
-	if (ctrl_EEM_Enable == 0) {
+	if (ctrl_EEM_Enable == 0 || eem_checkEfuse == 0) {
 		/* informGpuEEMisReady = 1; */
 		eem_error("ctrl_EEM_Enable = 0x%X\n", ctrl_EEM_Enable);
-		FUNC_EXIT(FUNC_LV_MODULE);
+		FUNC_EXIT(EEM_FUNC_LV_MODULE);
 		return 0;
 	}
-
-	#if ITurbo
-	/* Read E-Fuse to control ITurbo mode */
-	ctrl_ITurbo = eem_devinfo.BIG_TURBO;
-	#endif
 
 	#ifdef __KERNEL__
 	/* init timer for log / volt */
@@ -4595,7 +4648,7 @@ int __init eem_init(void)
 
 	if (err) {
 		eem_debug("EEM driver callback register failed..\n");
-		FUNC_EXIT(FUNC_LV_MODULE);
+		FUNC_EXIT(EEM_FUNC_LV_MODULE);
 		return err;
 	}
 
@@ -4604,9 +4657,9 @@ int __init eem_init(void)
 
 static void __exit eem_exit(void)
 {
-	FUNC_ENTER(FUNC_LV_MODULE);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
 	eem_debug("eem de-initialization\n");
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 }
 
 #ifdef __KERNEL__
@@ -4619,181 +4672,174 @@ late_initcall(eem_init); /* late_initcall */
 #else /*if EEM_ENABLE_TINYSYS_SSPM */
 
 #define EEM_IPI_SEND_DATA_LEN 4 /* size of cmd and args = 4 slot */
-/* ipi_send() return code
- * IPI_DONE 0
- * IPI_RETURN 1
- * IPI_BUSY -1
- * IPI_TIMEOUT_AVL -2
- * IPI_TIMEOUT_ACK -3
- * IPI_MODULE_ID_ERROR -4
- * IPI_HW_ERROR -5
- */
 static unsigned int eem_to_sspm(unsigned int cmd, struct eem_ipi_data *eem_data)
 {
 	unsigned int ackData = 0;
 	unsigned int len = EEM_IPI_SEND_DATA_LEN;
 	unsigned int ret;
-	#define IPI_ID IPI_ID_PTPOD /* IPI_ID_VCORE_DVFS */
-	FUNC_ENTER(FUNC_LV_MODULE);
+
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
 	switch (cmd) {
 	case IPI_EEM_INIT:
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_INIT) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			break;
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_INIT) ret:%d - %d\n", ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
 
 	case IPI_EEM_PROBE:
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_PROBE) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			break;
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_PROBE) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
 
 	case IPI_EEM_INIT01:
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_INIT01) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			break;
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_INIT01) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
 
 	case IPI_EEM_INIT02:
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_INIT02) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			break;
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_INIT02) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
+
 	#ifdef EEM_VCORE_IN_SSPM
 	case IPI_EEM_VCORE_GET_VOLT:
-			eem_data->cmd = cmd;
-			/* defined at sspm_ipi.h, id is difined at elbrus/sspm_ipi_pin.h */
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_VCORE_GET_VOLT) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			break;
+		eem_data->cmd = cmd;
+		/* defined at sspm_ipi.h, id is difined at elbrus/sspm_ipi_pin.h */
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_VCORE_GET_VOLT) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
 	#endif
 
 	#if 0
 	case IPI_EEM_GPU_DVFS_GET_STATUS:
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_GPU_DVFS_GET_STATUS) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			break;
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_GPU_DVFS_GET_STATUS) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
 	#endif
 
-	case IPI_EEM_DEBUG_PROC_SHOW:
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_DEBUG_PROC_SHOW) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-
-			break;
-
 	case IPI_EEM_DEBUG_PROC_WRITE:
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_DEBUG_PROC_WRITE) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			break;
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_DEBUG_PROC_WRITE) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
 
-	#ifdef EEM_LOG_TIMER
+	#ifdef EEM_LOG_EN
 	case IPI_EEM_LOGEN_PROC_SHOW:
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_LOGEN_PROC_SHOW) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			eem_debug("eem_to_sspm (logen): ret %d\n", ackData);
-			break;
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_LOGEN_PROC_SHOW) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
 
 	case IPI_EEM_LOGEN_PROC_WRITE:
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_LOGEN_PROC_WRITE) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			break;
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_LOGEN_PROC_WRITE) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
 	#endif
 
 	#ifdef EEM_OFFSET
 	case IPI_EEM_OFFSET_PROC_WRITE:
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_OFFSET_PROC_WRITE) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			break;
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_OFFSET_PROC_WRITE) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
+	#endif
+
+	#if ITurbo
+	case IPI_EEM_ITURBORUN_WRITE:
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_ITURBORUN_WRITE) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
 	#endif
 
 	case IPI_EEM_VCORE_INIT:
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_VCORE_INIT) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			break;
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_VCORE_INIT) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
+
 	case IPI_EEM_VCORE_UPDATE_PROC_WRITE:
-			/* ackData will be 0 if set newVolt successfully*/
-			/* ackData will be 1 if newVolt is illegal */
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_VCORE_UPDATE_PROC_WRITE) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			break;
+		/* ackData will be 0 if set newVolt successfully*/
+		/* ackData will be 1 if newVolt is illegal */
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_VCORE_UPDATE_PROC_WRITE) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
 
 	#ifdef EEM_CUR_VOLT_PROC_SHOW
 	case IPI_EEM_CUR_VOLT_PROC_SHOW:
-			eem_data->cmd = cmd;
-			ret = sspm_ipi_send_sync(IPI_ID, IPI_OPT_LOCK_POLLING, eem_data, len, &ackData);
-			if (ret != 0)
-				eem_error("sspm_ipi_send_sync error(IPI_EEM_CUR_VOLT_PROC_SHOW) ret:%d - %d\n",
-							ret, ackData);
-			else if (ackData < 0)
-				eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
-			break;
+		eem_data->cmd = cmd;
+		ret = sspm_ipi_send_sync(IPI_ID_PTPOD, IPI_OPT_POLLING, eem_data, len, &ackData, 1);
+		if (ret != 0)
+			eem_error("sspm_ipi_send_sync error(IPI_EEM_CUR_VOLT_PROC_SHOW) ret:%d - %d\n",
+						ret, ackData);
+		else if (ackData < 0)
+			eem_error("cmd(%d) return error(%d)\n", cmd, ackData);
+		break;
 	#endif
+
 	default:
 			eem_error("cmd(%d) wrong!!\n", cmd);
 			break;
 	}
 
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 	return ackData;
 }
 
@@ -4809,12 +4855,10 @@ static unsigned int eem_to_sspm(unsigned int cmd, struct eem_ipi_data *eem_data)
  */
 static int eem_debug_proc_show(struct seq_file *m, void *v)
 {
-	struct eem_ipi_data eem_data;
 	int ret = 0;
 	struct eem_det *det = (struct eem_det *)m->private;
-	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_MODULE);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
 
 	/* if eem is not enabled yet, show vcore ptp eem_debug only */
 	if (eem_disable) {
@@ -4823,20 +4867,18 @@ static int eem_debug_proc_show(struct seq_file *m, void *v)
 		   "disabled"
 		   );
 	} else {
-		spin_lock_irqsave(&eem_spinlock, flags);
-		memset(&eem_data, 0, sizeof(struct eem_ipi_data));
-		eem_data.u.data.arg[0] = det_to_id(det);
-		/* return det EEMEN by det->ops->get_status */
-		ret = eem_to_sspm(IPI_EEM_DEBUG_PROC_SHOW, &eem_data);
-		spin_unlock_irqrestore(&eem_spinlock, flags);
+		if ((det->ctrl_id == EEM_CTRL_SOC) && (det->features == 0))
+			ret = 1;
+		else
+			ret = det->disabled;
 
 		seq_printf(m, "[%s] %s (0x%X)\n",
 		   ((char *)(det->name) + 8),
-		   ret ? "disabled" : "enable",
+		   ret ? "disable" : "enable",
 		   ret
 		   );
 	}
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 	return 0;
 
 }
@@ -4857,12 +4899,11 @@ static ssize_t eem_debug_proc_write(struct file *file,
 	struct eem_det *det = (struct eem_det *)PDE_DATA(file_inode(file));
 	struct eem_ipi_data eem_data;
 	int ipi_ret = 0;
-	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!buf) {
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -ENOMEM;
 	}
 
@@ -4880,18 +4921,17 @@ static ssize_t eem_debug_proc_write(struct file *file,
 
 	if (!kstrtoint(buf, 10, &enabled)) {
 		ret = 0;
-		spin_lock_irqsave(&eem_spinlock, flags);
 		memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 		eem_data.u.data.arg[0] = det_to_id(det);
 		eem_data.u.data.arg[1] = enabled;
 		ipi_ret = eem_to_sspm(IPI_EEM_DEBUG_PROC_WRITE, &eem_data);
-		spin_unlock_irqrestore(&eem_spinlock, flags);
+		det->disabled = enabled;
 	} else
 		ret = -EINVAL;
 
 out:
 	free_page((unsigned long)buf);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return (ret < 0) ? ret : count;
 
@@ -4904,20 +4944,17 @@ static int eem_cur_volt_proc_show(struct seq_file *m, void *v)
 {
 	struct eem_det *det = (struct eem_det *)m->private;
 	u32 i;
-	unsigned long flags;
 	struct eem_ipi_data eem_data;
 	unsigned char num_freq_tbl;
 	unsigned int locklimit = 0, ret;
 	unsigned char lock;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
-	spin_lock_irqsave(&eem_spinlock, flags);
 	memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 	eem_data.u.data.arg[0] = det_to_id(det);
 	/* return det current volt by det->ops->get_volt */
 	ret = eem_to_sspm(IPI_EEM_CUR_VOLT_PROC_SHOW, &eem_data);
-	spin_unlock_irqrestore(&eem_spinlock, flags);
 
 	/* rdata = det->ops->get_volt(det); */
 	while (1) {
@@ -4960,7 +4997,7 @@ static int eem_cur_volt_proc_show(struct seq_file *m, void *v)
 			i, det->volt_tbl_pmic[i], det->ops->pmic_2_volt(det, det->volt_tbl_pmic[i]));
 	}
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -4981,7 +5018,7 @@ static int eem_dump_proc_show(struct seq_file *m, void *v)
 	#endif
 	/* unsigned int ipi_ret; */
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	/*
 	*eem_detectors[EEM_DET_BIG].ops->dump_status(&eem_detectors[EEM_DET_BIG]);
 	*eem_detectors[EEM_DET_L].ops->dump_status(&eem_detectors[EEM_DET_L]);
@@ -4997,21 +5034,16 @@ static int eem_dump_proc_show(struct seq_file *m, void *v)
 	*		);
 	*/
 
-	for (i = 0; i < NR_HW_RES_FOR_BANK; i++) {
-			seq_printf(m, "M_HW_RES%d\t=0x%08X\n", i, eem_logs->hw_res[i]);
-			eem_debug("M_HW_RES%d\t=0x%08X\n", i, eem_logs->hw_res[i]);
-	}
+	for (i = 0; i < NR_HW_RES_FOR_BANK; i++)
+		seq_printf(m, "M_HW_RES%d\t=0x%08X\n", i, eem_logs->hw_res[i]);
 
 	for_each_det(det) {
 		lock = eem_logs->det_log[det->ctrl_id].lock;
 		locklimit++;
-		eem_debug("det(%d) lock=%d\n", det->ctrl_id, lock);
+		/* eem_debug("det(%d) lock=%d\n", det->ctrl_id, lock); */
 
 		det->num_freq_tbl = eem_logs->det_log[det->ctrl_id].num_freq_tbl;
-		#if !EEM_BANK_SOC
-		if (det->ctrl_id == EEM_CTRL_SOC)
-			break; /* break out while loop, read next det */
-		#endif
+
 		for (i = EEM_PHASE_INIT01; i < NR_EEM_PHASE; i++) {
 			/* seq_printf(m, "Bank_number = %d\n", det->ctrl_id); */
 			seq_printf(m, "Bank_number = %d\n", det->ctrl_id);
@@ -5100,9 +5132,9 @@ static int eem_dump_proc_show(struct seq_file *m, void *v)
 			#endif
 		} /* for init1 to mon*/
 		lock = eem_logs->det_log[det->ctrl_id].lock;
-		eem_debug("det(%d) lock=%d\n", det->ctrl_id, lock);
+		/* eem_debug("det(%d) lock=%d\n", det->ctrl_id, lock);*/
 	} /* for_each_det */
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -5117,7 +5149,7 @@ static int eem_status_proc_show(struct seq_file *m, void *v)
 	struct eem_det *det = (struct eem_det *)m->private;
 	struct eem_ipi_data eem_data;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	seq_printf(m, "bank = %d, (%d) - (",
 		   det->ctrl_id, det->ops->get_temp(det));
@@ -5129,7 +5161,7 @@ static int eem_status_proc_show(struct seq_file *m, void *v)
 		seq_printf(m, "%d, ", det->freq_tbl[i]);
 	seq_printf(m, "%d)\n", det->freq_tbl[i]);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -5138,20 +5170,17 @@ static int eem_status_proc_show(struct seq_file *m, void *v)
 /*
  * set EEM log enable by procfs interface
  */
-#ifdef EEM_LOG_TIMER
+#ifdef EEM_LOG_EN
 static int eem_log_en_proc_show(struct seq_file *m, void *v)
 {
 	struct eem_ipi_data eem_data;
 	unsigned int ipi_ret = 0;
-	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_HELP);
-	spin_lock_irqsave(&eem_spinlock, flags);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 	ipi_ret = eem_to_sspm(IPI_EEM_LOGEN_PROC_SHOW, &eem_data);
 	seq_printf(m, "%d\n", ipi_ret);
-	spin_unlock_irqrestore(&eem_spinlock, flags);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -5164,12 +5193,11 @@ static ssize_t eem_log_en_proc_write(struct file *file,
 	char *buf = (char *) __get_free_page(GFP_USER);
 	struct eem_ipi_data eem_data;
 	unsigned int ipi_ret = 0;
-	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!buf) {
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -ENOMEM;
 	}
 
@@ -5193,18 +5221,16 @@ static ssize_t eem_log_en_proc_write(struct file *file,
 	}
 
 	ret = 0;
-	spin_lock_irqsave(&eem_spinlock, flags);
 	memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 	eem_data.u.data.arg[0] = eem_log_en;
 	ipi_ret = eem_to_sspm(IPI_EEM_LOGEN_PROC_WRITE, &eem_data);
-	spin_unlock_irqrestore(&eem_spinlock, flags);
 out:
 	free_page((unsigned long)buf);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return (ret < 0) ? ret : count;
 }
-#endif /*ifdef EEM_LOG_TIMER */
+#endif /*ifdef EEM_LOG_EN */
 
 /*
  * show EEM offset
@@ -5214,9 +5240,9 @@ static int eem_offset_proc_show(struct seq_file *m, void *v)
 {
 	struct eem_det *det = (struct eem_det *)m->private;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	seq_printf(m, "%d\n", det->volt_offset);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -5234,12 +5260,11 @@ static ssize_t eem_offset_proc_write(struct file *file,
 	struct eem_det *det = (struct eem_det *)PDE_DATA(file_inode(file));
 	unsigned int ipi_ret = 0;
 	struct eem_ipi_data eem_data;
-	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!buf) {
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -ENOMEM;
 	}
 
@@ -5257,14 +5282,13 @@ static ssize_t eem_offset_proc_write(struct file *file,
 
 	if (!kstrtoint(buf, 10, &offset)) {
 		ret = 0;
-		spin_lock_irqsave(&eem_spinlock, flags);
 		memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 		eem_data.u.data.arg[0] = det_to_id(det);
 		eem_data.u.data.arg[1] = offset;
 		ipi_ret = eem_to_sspm(IPI_EEM_OFFSET_PROC_WRITE, &eem_data);
-		spin_unlock_irqrestore(&eem_spinlock, flags);
 		/* to show in eem_offset_proc_show */
-		det->volt_offset = offset;
+		det->volt_offset = (signed char)offset;
+		eem_debug("set volt_offset %d(%d)\n", offset, det->volt_offset);
 	} else {
 		ret = -EINVAL;
 		eem_debug("bad argument_1!! argument should be \"0\"\n");
@@ -5272,11 +5296,95 @@ static ssize_t eem_offset_proc_write(struct file *file,
 
 out:
 	free_page((unsigned long)buf);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return (ret < 0) ? ret : count;
 }
 #endif
+
+/*
+ * set EEM ITurbo enable by procfs interface
+ */
+#if ITurbo
+static int eem_iturbo_en_proc_show(struct seq_file *m, void *v)
+{
+	/* int i; */
+
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
+	seq_printf(m, "%s\n", ((ctrl_ITurbo) ? "Enable" : "Disable"));
+	#if 0
+	for (i = 0; i < NR_FREQ; i++)
+		seq_printf(m, "ITurbo_offset[%d] = %d (0.00625 per step)\n", i, ITurbo_offset[i]);
+	#endif
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
+
+	return 0;
+}
+
+static ssize_t eem_iturbo_en_proc_write(struct file *file,
+					 const char __user *buffer, size_t count, loff_t *pos)
+{
+	int ret;
+	unsigned int value;
+	char *buf = (char *) __get_free_page(GFP_USER);
+	unsigned int ipi_ret = 0;
+	struct eem_ipi_data eem_data;
+
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
+
+	if (!buf) {
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
+		return -ENOMEM;
+	}
+
+	ret = -EINVAL;
+
+	if (count >= PAGE_SIZE)
+		goto out;
+
+	ret = -EFAULT;
+
+	if (copy_from_user(buf, buffer, count))
+		goto out;
+
+	buf[count] = '\0';
+
+	ret = -EINVAL;
+
+	if (kstrtoint(buf, 10, &value)) {
+		eem_debug("bad argument!! Should be \"0\" or \"1\"\n");
+		goto out;
+	}
+
+	ret = 0;
+	/* memset(&eem_data, 0, sizeof(struct eem_ipi_data)); */
+
+	switch (value) {
+	case 0:
+		eem_debug("eem ITurbo disabled.\n");
+		ctrl_ITurbo = 0;
+		ITurboRun = 0;
+		eem_data.u.data.arg[0] = ITurboRun;
+		ipi_ret = eem_to_sspm(IPI_EEM_ITURBORUN_WRITE, &eem_data);
+		break;
+
+	case 1:
+		eem_debug("eem ITurbo enabled.\n");
+		ctrl_ITurbo = 2;
+		break;
+
+	default:
+		eem_debug("bad argument!! Should be \"0\" or \"1\"\n");
+		ret = -EINVAL;
+	}
+
+out:
+	free_page((unsigned long)buf);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
+
+	return (ret < 0) ? ret : count;
+}
+#endif /* if ITurbo */
 
 static int eem_vcore_volt_proc_show(struct seq_file *m, void *v)
 {
@@ -5284,14 +5392,14 @@ static int eem_vcore_volt_proc_show(struct seq_file *m, void *v)
 	unsigned int i = 0;
 	struct eem_det *det = (struct eem_det *)m->private;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	for (i = 0; i < VCORE_NR_FREQ; i++)
 		seq_printf(m, "%d ", det->ops->pmic_2_volt(det, get_vcore_ptp_volt(i)) * 10);
 
 	seq_puts(m, "\n");
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -5327,12 +5435,11 @@ static ssize_t eem_vcore_volt_proc_write(struct file *file,
 	unsigned int index = 0;
 	unsigned int newVolt = 0;
 	struct eem_ipi_data eem_data;
-	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!buf) {
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -ENOMEM;
 	}
 
@@ -5365,13 +5472,11 @@ static ssize_t eem_vcore_volt_proc_write(struct file *file,
 		}
 		#endif
 		eem_error("set eem_vcore[%d]=%d\n", index, newVolt);
-		spin_lock_irqsave(&eem_spinlock, flags);
 		memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 		eem_data.u.data.arg[0] = index;
 		eem_data.u.data.arg[1] = newVolt;
 		/* ret 0 */
 		ret = eem_to_sspm(IPI_EEM_VCORE_UPDATE_PROC_WRITE, &eem_data);
-		spin_unlock_irqrestore(&eem_spinlock, flags);
 	} else {
 		ret = -EINVAL;
 		eem_debug("bad argument!! argument should be \"0\"1\n");
@@ -5379,7 +5484,7 @@ static ssize_t eem_vcore_volt_proc_write(struct file *file,
 
 out:
 	free_page((unsigned long)buf);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return (ret < 0) ? ret : count;
 }
@@ -5388,19 +5493,16 @@ static int eem_vcore_enable_proc_show(struct seq_file *m, void *v)
 {
 	struct eem_ipi_data eem_data;
 	unsigned int ipi_ret = 0;
-	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
-	spin_lock_irqsave(&eem_spinlock, flags);
 	memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 	/* eem_data.u.data.arg[0] = det_to_id(det); */
 	/* return ctrl_VCORE_Volt_Enable from sspm */
 	ipi_ret = eem_to_sspm(IPI_EEM_VCORE_ENABLE_PROC_SHOW, &eem_data);
-	spin_unlock_irqrestore(&eem_spinlock, flags);
 	seq_printf(m, "%d\n", ipi_ret);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return 0;
 }
@@ -5415,12 +5517,11 @@ static ssize_t eem_vcore_enable_proc_write(struct file *file,
 	/* unsigned int i = 0; */
 	struct eem_ipi_data eem_data;
 	unsigned int ipi_ret = 0;
-	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	if (!buf) {
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -ENOMEM;
 	}
 
@@ -5443,21 +5544,19 @@ static ssize_t eem_vcore_enable_proc_write(struct file *file,
 
 	ret = 0;
 
-	spin_lock_irqsave(&eem_spinlock, flags);
 	memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 	eem_data.u.data.arg[0] = enable;
 	ipi_ret = eem_to_sspm(IPI_EEM_VCORE_ENABLE_PROC_WRITE, &eem_data);
-	spin_unlock_irqrestore(&eem_spinlock, flags);
 
 out:
 	free_page((unsigned long)buf);
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 
 	return (ret < 0) ? ret : count;
 }
 #endif
 
-#define PROC_FOPS_RW(name)					\
+#define EEM_PROC_FOPS_RW(name)					\
 	static int name ## _proc_open(struct inode *inode,	\
 		struct file *file)				\
 	{							\
@@ -5473,7 +5572,7 @@ out:
 		.write		  = name ## _proc_write,			\
 	}
 
-#define PROC_FOPS_RO(name)					\
+#define EEM_PROC_FOPS_RO(name)					\
 	static int name ## _proc_open(struct inode *inode,	\
 		struct file *file)				\
 	{							\
@@ -5488,22 +5587,28 @@ out:
 		.release		= single_release,			\
 	}
 
-#define PROC_ENTRY(name)	{__stringify(name), &name ## _proc_fops}
+#define EEM_PROC_ENTRY(name)	{__stringify(name), &name ## _proc_fops}
 
-PROC_FOPS_RW(eem_debug);
-PROC_FOPS_RW(eem_vcore_volt);
-/* PROC_FOPS_RO(eem_status); */
+EEM_PROC_FOPS_RW(eem_debug);
+EEM_PROC_FOPS_RW(eem_vcore_volt);
+/* EEM_PROC_FOPS_RO(eem_status); */
 #ifdef EEM_CUR_VOLT_PROC_SHOW
-PROC_FOPS_RO(eem_cur_volt);
+EEM_PROC_FOPS_RO(eem_cur_volt);
 #endif
 
 #ifdef EEM_OFFSET
-PROC_FOPS_RW(eem_offset);
+EEM_PROC_FOPS_RW(eem_offset);
 #endif
 
-PROC_FOPS_RO(eem_dump);
-/* PROC_FOPS_RW(eem_log_en);*/
-/* PROC_FOPS_RW(eem_vcore_enable); */
+#if ITurbo
+EEM_PROC_FOPS_RW(eem_iturbo_en);
+#endif
+
+EEM_PROC_FOPS_RO(eem_dump);
+#ifdef EEM_LOG_EN
+EEM_PROC_FOPS_RW(eem_log_en);
+#endif
+/* EEM_PROC_FOPS_RW(eem_vcore_enable); */
 
 static int create_procfs(void)
 {
@@ -5518,36 +5623,39 @@ static int create_procfs(void)
 	};
 
 	struct pentry det_entries_vcore[] = {
-		PROC_ENTRY(eem_debug),
-		PROC_ENTRY(eem_vcore_volt),
+		/* EEM_PROC_ENTRY(eem_debug),*/
+		EEM_PROC_ENTRY(eem_vcore_volt),
 	};
 
 	struct pentry det_entries[] = {
-		PROC_ENTRY(eem_debug),
-		/* PROC_ENTRY(eem_status),*/
+		EEM_PROC_ENTRY(eem_debug),
+		/* EEM_PROC_ENTRY(eem_status),*/
 		#ifdef EEM_CUR_VOLT_PROC_SHOW
-		PROC_ENTRY(eem_cur_volt),
+		EEM_PROC_ENTRY(eem_cur_volt),
 		#endif
 		#ifdef EEM_OFFSET
-		PROC_ENTRY(eem_offset),
+		EEM_PROC_ENTRY(eem_offset),
 		#endif
 	};
 
 	struct pentry eem_entries[] = {
-		PROC_ENTRY(eem_dump),
-		#ifdef EEM_LOG_TIMER
-		PROC_ENTRY(eem_log_en),
+		EEM_PROC_ENTRY(eem_dump),
+		#ifdef EEM_LOG_EN
+		EEM_PROC_ENTRY(eem_log_en),
+		#endif
+		#if ITurbo
+		EEM_PROC_ENTRY(eem_iturbo_en),
 		#endif
 	};
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	/* create procfs root /proc/eem */
 	eem_dir = proc_mkdir("eem", NULL);
 
 	if (!eem_dir) {
 		eem_error("[%s]: mkdir /proc/eem failed\n", __func__);
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -1;
 	}
 
@@ -5556,7 +5664,7 @@ static int create_procfs(void)
 	det_dir = proc_mkdir(det->name, eem_dir);
 	if (!det_dir) {
 		eem_debug("[%s]: mkdir /proc/eem/%s failed\n", __func__, det->name);
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -2;
 	}
 
@@ -5567,32 +5675,32 @@ static int create_procfs(void)
 			det_entries_vcore[i].fops, det)) {
 			eem_debug("[%s]: create /proc/eem/%s/%s failed\n", __func__,
 				det->name, det_entries_vcore[i].name);
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -3;
 				}
 	}
 
-	/* if eem_disable =0, create other banks procfs */
-	if (eem_disable == 0) {
+	/* if eem is enabled and has efuse value, create other banks procfs */
+	if (eem_disable == 0 && eem_checkEfuse == 1) {
 		for (i = 0; i < ARRAY_SIZE(eem_entries); i++) {
 			if (!proc_create(eem_entries[i].name, S_IRUGO | S_IWUSR | S_IWGRP,
 						eem_dir, eem_entries[i].fops)) {
 				eem_error("[%s]: create /proc/eem/%s failed\n", __func__,
 							eem_entries[i].name);
-				FUNC_EXIT(FUNC_LV_HELP);
+				FUNC_EXIT(EEM_FUNC_LV_HELP);
 				return -3;
 			}
 		}
 
 		for_each_det(det) {
-			if (det->ctrl_id == EEM_CTRL_SOC)
+			if (det->ctrl_id == EEM_CTRL_SOC || det->ctrl_id == EEM_CTRL_BANK5)
 				continue;
 
 			det_dir = proc_mkdir(det->name, eem_dir);
 
 			if (!det_dir) {
 				eem_debug("[%s]: mkdir /proc/eem/%s failed\n", __func__, det->name);
-				FUNC_EXIT(FUNC_LV_HELP);
+				FUNC_EXIT(EEM_FUNC_LV_HELP);
 				return -2;
 			}
 
@@ -5603,14 +5711,14 @@ static int create_procfs(void)
 					det_entries[i].fops, det)) {
 					eem_debug("[%s]: create /proc/eem/%s/%s failed\n", __func__,
 						det->name, det_entries[i].name);
-				FUNC_EXIT(FUNC_LV_HELP);
+				FUNC_EXIT(EEM_FUNC_LV_HELP);
 				return -3;
 				}
 			}
 		}
 	} /* if (eem_disable == 0) */
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 	return 0;
 }
 #if 0
@@ -5625,15 +5733,15 @@ static int create_procfs_vcore(void)
 	};
 
 	struct pentry eem_entries[] = {
-		PROC_ENTRY(eem_vcore_volt),
+		EEM_PROC_ENTRY(eem_vcore_volt),
 	};
 
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 	eem_dir = proc_mkdir("eem", NULL);
 
 	if (!eem_dir) {
 		eem_error("[%s]: mkdir /proc/eem failed\n", __func__);
-		FUNC_EXIT(FUNC_LV_HELP);
+		FUNC_EXIT(EEM_FUNC_LV_HELP);
 		return -1;
 	}
 
@@ -5641,11 +5749,11 @@ static int create_procfs_vcore(void)
 		if (!proc_create(eem_entries[i].name, S_IRUGO | S_IWUSR | S_IWGRP,
 			eem_dir, eem_entries[i].fops)) {
 			eem_error("[%s]: create /proc/eem/%s failed\n", __func__, eem_entries[i].name);
-			FUNC_EXIT(FUNC_LV_HELP);
+			FUNC_EXIT(EEM_FUNC_LV_HELP);
 			return -3;
 		}
 	}
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 	return 0;
 }
 #endif
@@ -5656,7 +5764,7 @@ static void inherit_base_det(struct eem_det *det)
 	/*
 	 * Inherit ops from eem_det_base_ops if ops in det is NULL
 	 */
-	FUNC_ENTER(FUNC_LV_HELP);
+	FUNC_ENTER(EEM_FUNC_LV_HELP);
 
 	#define INIT_OP(ops, func)					\
 		do {							\
@@ -5669,66 +5777,79 @@ static void inherit_base_det(struct eem_det *det)
 	INIT_OP(det->ops, pmic_2_volt);
 	INIT_OP(det->ops, eem_2_pmic);
 
-	FUNC_EXIT(FUNC_LV_HELP);
+	FUNC_EXIT(EEM_FUNC_LV_HELP);
 }
 /* done at arch_init */
+static int vcorefs_level3_volt;
 static int __init vcore_ptp_init(void)
 {
 	int i = 0;
 	struct eem_det *det;
-	#if !EEM_BANK_SOC
-	unsigned int soc_efuse;
-	#endif
+
+	get_vcore_opp();
 
 	eem_log_phy_addr = sspm_reserve_mem_get_phys(PTPOD_MEM_ID);
 	eem_log_virt_addr = sspm_reserve_mem_get_virt(PTPOD_MEM_ID);
 	eem_log_size = sspm_reserve_mem_get_size(PTPOD_MEM_ID);
 	eem_logs = (struct eem_log *)eem_log_virt_addr;
 
-	/* if voltage bin, choose idx from efuse */
-	/* if PTP bin, index will be 0 for each opp */
 	#if !EEM_BANK_SOC
-	soc_efuse = get_devinfo_with_index(54);
-	eem_error("[VCORE] - Kernel Got efuse 0x%0X\n", soc_efuse);
-	eem_vcore_index[0] = (soc_efuse >> 4) & 0x03;
-	eem_vcore_index[1] = (soc_efuse >> 2) & 0x03;
-	eem_vcore_index[2] = soc_efuse & 0x03;
-	eem_vcore_index[3] = 0;
-	/* eem_vcore_index[4] = 0; */
+	get_soc_efuse();
 	#endif
 
 	det = id_to_eem_det(EEM_DET_SOC);
 	inherit_base_det(det);
 
 	for (i = 0; i < VCORE_NR_FREQ; i++)
-		eem_vcore[i] = det->ops->volt_2_pmic(det, vcore_opp[i][eem_vcore_index[i]]);
+		eem_vcore[i] = det->ops->volt_2_pmic(det, *(vcore_opp[i]+eem_vcore_index[i]));
 
 	/* bottom up compare each volt to ensure each opp is in descending order */
 	for (i = VCORE_NR_FREQ - 2; i >= 0; i--)
 		eem_vcore[i] = (eem_vcore[i] < eem_vcore[i+1]) ? eem_vcore[i+1] : eem_vcore[i];
 
 	for (i = 0; i < VCORE_NR_FREQ; i++)
-		eem_logs->det_log[EEM_DET_SOC].volt_tbl_pmic[i] = eem_vcore[i];
+		eem_logs->det_log[EEM_DET_BANK5].volt_tbl_pmic[i] = eem_vcore[i];
+
+	/* MT6799 workaround for display:
+	* If primary_display_get_dsc_1slice_info() return 1,
+	*  replace vcore opp3 to opp2
+	*/
+	vcorefs_level3_volt = get_vcore_ptp_volt(OPP_3);
+	if (primary_display_get_dsc_1slice_info() == 1)
+		mt_eem_vcorefs_update_volt(true);
 
 	eem_error("Got vcore volt(pmic): 0x%x 0x%x 0x%x 0x%x\n",
-				eem_logs->det_log[EEM_DET_SOC].volt_tbl_pmic[0],
-				eem_logs->det_log[EEM_DET_SOC].volt_tbl_pmic[1],
-				eem_logs->det_log[EEM_DET_SOC].volt_tbl_pmic[2],
-				eem_logs->det_log[EEM_DET_SOC].volt_tbl_pmic[3]);
+				eem_logs->det_log[EEM_DET_BANK5].volt_tbl_pmic[0],
+				eem_logs->det_log[EEM_DET_BANK5].volt_tbl_pmic[1],
+				eem_logs->det_log[EEM_DET_BANK5].volt_tbl_pmic[2],
+				eem_logs->det_log[EEM_DET_BANK5].volt_tbl_pmic[3]);
 	return 0;
+}
+
+void mt_eem_vcorefs_update_volt(bool screen)
+{
+	int vcorefs_level2_volt;
+
+	if (screen) {
+		vcorefs_level2_volt = get_vcore_ptp_volt(OPP_2);
+		eem_logs->det_log[EEM_DET_SOC].volt_tbl_pmic[OPP_3] = vcorefs_level2_volt;
+		spm_msdc_wqhd_workaround(1);
+	} else {
+		eem_logs->det_log[EEM_DET_SOC].volt_tbl_pmic[OPP_3] = vcorefs_level3_volt;
+		spm_msdc_wqhd_workaround(0);
+	}
+
+	mt_eem_vcorefs_set_volt();
 }
 
 /* return ack from sspm spm_vcorefs_pwarp_cmd */
 unsigned int mt_eem_vcorefs_set_volt(void)
 {
-	unsigned long flags;
 	struct eem_ipi_data eem_data;
 	int ret = 0;
 
-	spin_lock_irqsave(&eem_spinlock, flags);
 	memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 	ret = eem_to_sspm(IPI_EEM_VCORE_INIT, &eem_data);
-	spin_unlock_irqrestore(&eem_spinlock, flags);
 	return ret;
 }
 
@@ -5738,22 +5859,19 @@ unsigned int get_vcore_ptp_volt(unsigned int seg)
 #if 0
 	struct eem_ipi_data eem_data;
 	int ret = 0;
-	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_MODULE);
-	spin_lock_irqsave(&eem_spinlock, flags);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
 	memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 	eem_data.u.data.arg[0] = seg;
 	ret = eem_to_sspm(IPI_EEM_VCORE_GET_VOLT, &eem_data);
-	spin_unlock_irqrestore(&eem_spinlock, flags);
 
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 	return ret;
 
 	eem_debug("get_vcore_ptp_volt: %d\n",
 				eem_logs->det_log[EEM_DET_SOC].volt_tbl_pmic[seg]);
 #endif
-	return eem_logs->det_log[EEM_DET_SOC].volt_tbl_pmic[seg];
+	return eem_logs->det_log[EEM_DET_BANK5].volt_tbl_pmic[seg];
 }
 
 #if 0 /* gpu dvfs no need this anymore */
@@ -5761,16 +5879,13 @@ unsigned int get_eem_status_for_gpu(void)
 {
 	struct eem_ipi_data eem_data;
 	int ret = 0;
-	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_MODULE);
-	spin_lock_irqsave(&eem_spinlock, flags);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
 	memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 	eem_data.u.data.arg[0] = 0;
 	ret = eem_to_sspm(IPI_EEM_GPU_DVFS_GET_STATUS, &eem_data);
-	spin_unlock_irqrestore(&eem_spinlock, flags);
 
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 	return ret;
 }
 #endif
@@ -5789,18 +5904,28 @@ static void eem_init_postprocess(void)
 	ptp_data[0] = 0;
 }
 
+/* push reg_dump_addr_off[] into eem log */
+#if DUMP_DATA_TO_DE
+static void mt_eem_push_reg_off_to_eemlog(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(reg_dump_addr_off); i++)
+		eem_logs->reg_dump_data_off[i] = reg_dump_addr_off[i];
+}
+#endif
+
 static int eem_probe(struct platform_device *pdev)
 {
 	int ret;
 	struct eem_ipi_data eem_data;
-	unsigned long flags;
 	struct eem_det *det;
 	#ifdef CONFIG_OF
 	struct device_node *node = NULL;
 	#endif
 	/* unsigned int code = mt_get_chip_hw_code(); */
 
-	FUNC_ENTER(FUNC_LV_MODULE);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
 
 	#ifdef CONFIG_OF
 	node = pdev->dev.of_node;
@@ -5819,15 +5944,16 @@ static int eem_probe(struct platform_device *pdev)
 	}
 	#endif
 
+#if DUMP_DATA_TO_DE
+	mt_eem_push_reg_off_to_eemlog();
+#endif
 	/* for slow idle */
 	ptp_data[0] = 0xffffffff;
 
 	/* let ptp to disable gpu dvfs and enable vgpu buck */
-	spin_lock_irqsave(&eem_spinlock, flags);
 	memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 	eem_data.u.data.arg[0] = 0;
 	ret = eem_to_sspm(IPI_EEM_PROBE, &eem_data);
-	spin_unlock_irqrestore(&eem_spinlock, flags);
 
 	eem_debug("IPI PROBE done\n");
 	/* enable big cluster and enable gpu clock */
@@ -5841,21 +5967,17 @@ static int eem_probe(struct platform_device *pdev)
 	#endif/*ifdef __KERNEL__*/
 
 	/* let ptp run init01 */
-	spin_lock_irqsave(&eem_spinlock, flags);
 	memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 	eem_data.u.data.arg[0] = 0;
 	ret = eem_to_sspm(IPI_EEM_INIT01, &eem_data);
-	spin_unlock_irqrestore(&eem_spinlock, flags);
 
 	/* disable big cluster and disable gpu clock */
 	eem_init_postprocess();
 
 	/* let ptp to enable gpu dvfs*/
-	spin_lock_irqsave(&eem_spinlock, flags);
 	memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 	eem_data.u.data.arg[0] = 0;
 	ret = eem_to_sspm(IPI_EEM_INIT02, &eem_data);
-	spin_unlock_irqrestore(&eem_spinlock, flags);
 
 	for_each_det(det)
 		inherit_base_det(det);
@@ -5881,9 +6003,12 @@ static int eem_probe(struct platform_device *pdev)
 					eem_logs->det_log[det->ctrl_id].volt_tbl_init2[1],
 					eem_logs->det_log[det->ctrl_id].volt_tbl_init2[0]);
 	}
-	eem_debug("eem_probe ok\n");
-	FUNC_EXIT(FUNC_LV_MODULE);
-
+	#if ITurbo
+	register_hotcpu_notifier(&_mt_eem_cpu_notifier);
+	ctrl_ITurbo = (ctrl_ITurbo == 0) ? 0 : 2;
+	#endif
+	eem_debug("for SSPM eem_probe ok\n");
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 	return 0;
 }
 static int eem_suspend(struct platform_device *pdev, pm_message_t state)
@@ -5891,8 +6016,8 @@ static int eem_suspend(struct platform_device *pdev, pm_message_t state)
 	/*
 	*kthread_stop(eem_volt_thread);
 	*/
-	FUNC_ENTER(FUNC_LV_MODULE);
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 
 	return 0;
 }
@@ -5907,7 +6032,7 @@ static int eem_resume(struct platform_device *pdev)
 	*}
 	*/
 
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 
 	return 0;
 }
@@ -5935,10 +6060,10 @@ static int __init eem_init(void)
 {
 	int err = 0;
 	struct eem_ipi_data eem_data;
-	unsigned long flags;
 
-	FUNC_ENTER(FUNC_LV_MODULE);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
 
+	eem_debug("chip ver=%d\n", eem_chip_ver);
 	memset(&eem_data, 0, sizeof(struct eem_ipi_data));
 
 	eem_data.u.data.arg[0] = eem_log_phy_addr;
@@ -5952,19 +6077,20 @@ static int __init eem_init(void)
 	/* read efuse data to dram log */
 	get_devinfo();
 
-	spin_lock_irqsave(&eem_spinlock, flags);
 	eem_disable = eem_to_sspm(IPI_EEM_INIT, &eem_data);
-	spin_unlock_irqrestore(&eem_spinlock, flags);
+
+	if (eem_chip_ver == CHIP_SW_VER_01)
+		eem_disable = 1;
 
 	#ifdef __KERNEL__
 	create_procfs();
 	#endif
 
 	/* use eem_disable to decide what procfs to create */
-	if (eem_disable > 0) {
+	if (eem_disable > 0 || eem_checkEfuse == 0) {
 		eem_error("EEM disabled\n");
 		/* informGpuEEMisReady = 1;*/
-		FUNC_EXIT(FUNC_LV_MODULE);
+		FUNC_EXIT(EEM_FUNC_LV_MODULE);
 		return 0;
 	}
 	/* reg platform device driver */
@@ -5972,11 +6098,11 @@ static int __init eem_init(void)
 
 	if (err) {
 		eem_debug("EEM driver callback register failed..\n");
-		FUNC_EXIT(FUNC_LV_MODULE);
+		FUNC_EXIT(EEM_FUNC_LV_MODULE);
 		return err;
 	}
 
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 
 	return 0;
 
@@ -5984,9 +6110,9 @@ static int __init eem_init(void)
 
 static void __exit eem_exit(void)
 {
-	FUNC_ENTER(FUNC_LV_MODULE);
+	FUNC_ENTER(EEM_FUNC_LV_MODULE);
 	eem_debug("eem de-initialization\n");
-	FUNC_EXIT(FUNC_LV_MODULE);
+	FUNC_EXIT(EEM_FUNC_LV_MODULE);
 }
 
 /* init at subsys_initcall after

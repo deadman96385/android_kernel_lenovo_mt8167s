@@ -203,9 +203,9 @@ static int thp_threshold_tj;
 
 #endif
 
-static U32 calefuse1;
-static U32 calefuse2;
-static U32 calefuse3;
+static u32 calefuse1;
+static u32 calefuse2;
+static u32 calefuse3;
 
 /* +ASC+ */
 #if CPT_ADAPTIVE_AP_COOLER
@@ -283,24 +283,24 @@ int last_CPU2_t;
 
 static int g_tc_resume;		/* default=0,read temp */
 
-static S32 g_adc_ge_t;
-static S32 g_adc_oe_t;
-static S32 g_o_vtsmcu1;
-static S32 g_o_vtsmcu2;
-static S32 g_o_vtsmcu3;
-static S32 g_o_vtsmcu4;
-static S32 g_o_vtsabb;
-static S32 g_degc_cali;
-static S32 g_adc_cali_en_t;
-static S32 g_o_slope;
-static S32 g_o_slope_sign;
-static S32 g_id;
+static s32 g_adc_ge_t;
+static s32 g_adc_oe_t;
+static s32 g_o_vtsmcu1;
+static s32 g_o_vtsmcu2;
+static s32 g_o_vtsmcu3;
+static s32 g_o_vtsmcu4;
+static s32 g_o_vtsabb;
+static s32 g_degc_cali;
+static s32 g_adc_cali_en_t;
+static s32 g_o_slope;
+static s32 g_o_slope_sign;
+static s32 g_id;
 
-static S32 g_ge = 1;
-static S32 g_oe = 1;
-static S32 g_gain = 1;
+static s32 g_ge = 1;
+static s32 g_oe = 1;
+static s32 g_gain = 1;
 
-static S32 g_x_roomt[THERMAL_SENSOR_NUM] = { 0 };
+static s32 g_x_roomt[THERMAL_SENSOR_NUM] = { 0 };
 
 static int Num_of_OPP;
 
@@ -339,7 +339,7 @@ static struct hrtimer ts_tempinfo_hrtimer;
 	} while (0)
 
 static void tscpu_reset_thermal(void);
-static S32 temperature_to_raw_room(U32 ret);
+static s32 temperature_to_raw_room(u32 ret);
 static void set_tc_trigger_hw_protect(int temperature, int temperature2);
 static void tscpu_config_all_tc_hw_protect(int temperature, int temperature2);
 static void thermal_initial(void);
@@ -598,7 +598,7 @@ void get_thermal_slope_intercept(struct TS_PTPOD *ts_info, enum thermal_bank_nam
 {
 	unsigned int temp0, temp1, temp2;
 	struct TS_PTPOD ts_ptpod;
-	S32 x_roomt;
+	s32 x_roomt;
 
 	tscpu_dprintk("get_thermal_slope_intercept\n");
 
@@ -675,7 +675,7 @@ static void dump_spm_reg(void)
 
 static irqreturn_t thermal_interrupt_handler(int irq, void *dev_id)
 {
-	U32 ret = 0;
+	u32 ret = 0;
 	unsigned long flags;
 
 	mt_thermal_lock(&flags);
@@ -786,16 +786,16 @@ static void thermal_reset_and_initial(void)
 
 	THERMAL_WRAP_WR32(0x800, TEMPADCMUX);
 	/* this value will be stored to TEMPPNPMUXADDR (TEMPSPARE0) automatically by hw */
-	THERMAL_WRAP_WR32((UINT32) AUXADC_CON1_CLR_P, TEMPADCMUXADDR);
+	THERMAL_WRAP_WR32((u32) AUXADC_CON1_CLR_P, TEMPADCMUXADDR);
 	/* AHB address for auxadc mux selection */
 	/* THERMAL_WRAP_WR32(0x1100100C, TEMPADCMUXADDR); AHB address for auxadc mux selection */
 
 	THERMAL_WRAP_WR32(0x800, TEMPADCEN);	/* AHB value for auxadc enable */
-	THERMAL_WRAP_WR32((UINT32) AUXADC_CON1_SET_P, TEMPADCENADDR);
+	THERMAL_WRAP_WR32((u32) AUXADC_CON1_SET_P, TEMPADCENADDR);
 	/* AHB address for auxadc enable (channel 0 immediate mode selected) */
 
-	THERMAL_WRAP_WR32((UINT32) AUXADC_DAT11_P, TEMPADCVALIDADDR);	/* AHB address for auxadc valid bit */
-	THERMAL_WRAP_WR32((UINT32) AUXADC_DAT11_P, TEMPADCVOLTADDR);	/* AHB address for auxadc voltage output */
+	THERMAL_WRAP_WR32((u32) AUXADC_DAT11_P, TEMPADCVALIDADDR);	/* AHB address for auxadc valid bit */
+	THERMAL_WRAP_WR32((u32) AUXADC_DAT11_P, TEMPADCVOLTADDR);	/* AHB address for auxadc voltage output */
 	/* THERMAL_WRAP_WR32(0x11001040, TEMPADCVALIDADDR);  AHB address for auxadc valid bit */
 	/* THERMAL_WRAP_WR32(0x11001040, TEMPADCVOLTADDR);   AHB address for auxadc voltage output */
 
@@ -1114,7 +1114,7 @@ void mtkts_dump_cali_info(void)
 
 static void thermal_cal_prepare(void)
 {
-	U32 temp0 = 0, temp1 = 0, temp2 = 0;
+	u32 temp0 = 0, temp1 = 0, temp2 = 0;
 
 	temp0 = get_devinfo_with_index(61);
 	temp1 = get_devinfo_with_index(60);
@@ -1167,9 +1167,9 @@ static void thermal_cal_prepare(void)
 	mtkts_dump_cali_info();
 }
 
-static void thermal_cal_prepare_2(U32 ret)
+static void thermal_cal_prepare_2(u32 ret)
 {
-	S32 format_1 = 0, format_2 = 0, format_3 = 0, format_4 = 0, format_5 = 0;
+	s32 format_1 = 0, format_2 = 0, format_3 = 0, format_4 = 0, format_5 = 0;
 
 	/* tscpu_printk("thermal_cal_prepare_2\n"); */
 
@@ -1199,16 +1199,16 @@ static void thermal_cal_prepare_2(U32 ret)
 
 #if THERMAL_CONTROLLER_HW_TP
 
-static S32 temperature_to_raw_room(U32 ret)
+static s32 temperature_to_raw_room(u32 ret)
 {
 	/* Ycurr = [(Tcurr - DEGC_cali/2)*(165+O_slope)*(18/15)*(1/10000)+X_roomtabb]*Gain*4096 + OE */
 
-	S32 t_curr = ret;
-	S32 format_1 = 0;
-	S32 format_2 = 0;
-	S32 format_3[THERMAL_SENSOR_NUM] = { 0 };
-	S32 format_4[THERMAL_SENSOR_NUM] = { 0 };
-	S32 i, index = 0, temp = 0;
+	s32 t_curr = ret;
+	s32 format_1 = 0;
+	s32 format_2 = 0;
+	s32 format_3[THERMAL_SENSOR_NUM] = { 0 };
+	s32 format_4[THERMAL_SENSOR_NUM] = { 0 };
+	s32 i, index = 0, temp = 0;
 
 
 	/* tscpu_dprintk("temperature_to_raw_room\n"); */
@@ -1252,15 +1252,15 @@ static S32 temperature_to_raw_room(U32 ret)
 #endif
 
 
-static S32 raw_to_temperature_roomt(U32 ret, enum thermal_sensor_name ts_name)
+static s32 raw_to_temperature_roomt(u32 ret, enum thermal_sensor_name ts_name)
 {
-	S32 t_current = 0;
-	S32 y_curr = ret;
-	S32 format_1 = 0;
-	S32 format_2 = 0;
-	S32 format_3 = 0;
-	S32 format_4 = 0;
-	S32 xtoomt = 0;
+	s32 t_current = 0;
+	s32 y_curr = ret;
+	s32 format_1 = 0;
+	s32 format_2 = 0;
+	s32 format_3 = 0;
+	s32 format_4 = 0;
+	s32 xtoomt = 0;
 
 
 	xtoomt = g_x_roomt[ts_name];
@@ -3569,7 +3569,7 @@ static const struct file_operations mtktscpu_fastpoll_fops = {
 static void thermal_initial(void)
 {
 	unsigned long flags;
-	UINT32 temp = 0;
+	u32 temp = 0;
 
 	/* tscpu_thermal_clock_on(); */
 
@@ -3876,8 +3876,8 @@ void tscpu_start_thermal_timer(void)
 
 static int thermal_fast_init(void)
 {
-	UINT32 temp = 0;
-	UINT32 cunt = 0;
+	u32 temp = 0;
+	u32 cunt = 0;
 
 	/* tscpu_printk( "thermal_fast_init\n"); */
 
@@ -3906,11 +3906,11 @@ static int thermal_fast_init(void)
 	DRV_WriteReg32(TEMPADCVOLTADDR, 0x1100B428);	/* AHB address for auxadc voltage output */
 
 #else
-	DRV_WriteReg32(TEMPPNPMUXADDR, (UINT32) PTPSPARE0_P);	/* AHB address for pnp sensor mux selection */
-	DRV_WriteReg32(TEMPADCMUXADDR, (UINT32) PTPSPARE0_P);	/* AHB address for auxadc mux selection */
-	DRV_WriteReg32(TEMPADCENADDR, (UINT32) PTPSPARE1_P);	/* AHB address for auxadc enable */
-	DRV_WriteReg32(TEMPADCVALIDADDR, (UINT32) PTPSPARE2_P);	/* AHB address for auxadc valid bit */
-	DRV_WriteReg32(TEMPADCVOLTADDR, (UINT32) PTPSPARE2_P);	/* AHB address for auxadc voltage output */
+	DRV_WriteReg32(TEMPPNPMUXADDR, (u32) PTPSPARE0_P);	/* AHB address for pnp sensor mux selection */
+	DRV_WriteReg32(TEMPADCMUXADDR, (u32) PTPSPARE0_P);	/* AHB address for auxadc mux selection */
+	DRV_WriteReg32(TEMPADCENADDR, (u32) PTPSPARE1_P);	/* AHB address for auxadc enable */
+	DRV_WriteReg32(TEMPADCVALIDADDR, (u32) PTPSPARE2_P);	/* AHB address for auxadc valid bit */
+	DRV_WriteReg32(TEMPADCVOLTADDR, (u32) PTPSPARE2_P);	/* AHB address for auxadc voltage output */
 #endif
 	DRV_WriteReg32(TEMPRDCTRL, 0x0);	/* read valid & voltage are at the same register */
 	/* indicate where the valid bit is (the 12th bit is valid bit and 1 is valid) */

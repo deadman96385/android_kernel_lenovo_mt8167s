@@ -11,7 +11,6 @@
  * GNU General Public License for more details.
  */
 
-
 #ifndef _DT_BINDINGS_POWER_MT8167_POWER_H
 #define _DT_BINDINGS_POWER_MT8167_POWER_H
 

@@ -144,8 +144,8 @@ static int idle_switch[NR_TYPES] = {
 static u32 dpidle_condition_mask[NR_GRPS] = {
 	0x00000037, /* CG_CTRL0: */
 	0x808FB2FC, /* CG_CTRL1: */
-	0x017F7F17, /* CG_CTRL2: */
-	0x000430FD, /* CG_CTRL8: */
+	0x017F7F16, /* CG_CTRL2: */
+	0x0004303D, /* CG_CTRL8: */
 	0x000F0203, /* CG_MMSYS0: */
 	0x003FC03C, /* CG_MMSYS1: */
 	0x000003E1, /* CG_IMGSYS: */
@@ -159,8 +159,8 @@ static u32 dpidle_condition_mask[NR_GRPS] = {
 static u32 soidle_condition_mask[NR_GRPS] = {
 	0x00000026, /* CG_CTRL0: */
 	0x808FB2F8, /* CG_CTRL1: */
-	0x017F7F07, /* CG_CTRL2: */
-	0x000430ED, /* CG_CTRL8: */
+	0x017F7F06, /* CG_CTRL2: */
+	0x0004302D, /* CG_CTRL8: */
 	0x00000200, /* CG_MMSYS0: */
 	0x003F0000, /* CG_MMSYS1: */
 	0x000003E1, /* CG_IMGSYS: */
@@ -403,7 +403,11 @@ void __attribute__((weak)) bus_dcm_disable(void)
 
 static bool is_valid_reg(void __iomem *addr)
 {
+#ifdef CONFIG_ARM64
 	return ((u64)addr & 0xf0000000) || (((u64)addr >> 32) & 0xf0000000);
+#else
+	return (u32)addr & 0xf0000000;
+#endif
 }
 
 unsigned int __attribute__((weak)) spm_get_cpu_pwr_status(void)
@@ -472,8 +476,7 @@ static void get_all_clock_state(u32 clks[NR_GRPS])
 	if (sys_is_on(SYS_ISP))
 		clks[CG_IMGSYS] = 0xffffffff;
 
-	if (sys_is_on(SYS_MFG_ASYNC) && sys_is_on(SYS_MFG_2D) &&
-			sys_is_on(SYS_MFG_3D))
+	if (sys_is_on(SYS_MFG_2D) || sys_is_on(SYS_MFG_3D))
 		clks[CG_MFGSYS] = 0xffffffff;
 
 	if (sys_is_on(SYS_VDE)) {
@@ -484,8 +487,8 @@ static void get_all_clock_state(u32 clks[NR_GRPS])
 	if (sys_is_on(SYS_ISP) && is_valid_reg(imgsys_base))
 		clks[CG_IMGSYS] = ~idle_readl(IMG_CG_CON);
 
-	if (sys_is_on(SYS_MFG_ASYNC) && sys_is_on(SYS_MFG_2D) &&
-			sys_is_on(SYS_MFG_3D) && is_valid_reg(mfgsys_base))
+	if ((sys_is_on(SYS_MFG_2D) || sys_is_on(SYS_MFG_3D)) &&
+			is_valid_reg(mfgsys_base))
 		clks[CG_MFGSYS] = ~idle_readl(MFG_CG_CON);
 
 	if (sys_is_on(SYS_VDE) && is_valid_reg(vdecsys_base)) {
@@ -1676,7 +1679,7 @@ int rgidle_enter(int cpu)
 }
 EXPORT_SYMBOL(rgidle_enter);
 
-static int __init get_base_from_node(
+static int get_base_from_node(
 	const char *cmp, void __iomem **pbase, int idx)
 {
 	struct device_node *node;
@@ -1693,7 +1696,7 @@ static int __init get_base_from_node(
 	return 0;
 }
 
-static void __init iomap_init(void)
+static void iomap_init(void)
 {
 	get_base_from_node("mediatek,mt8167-topckgen", &topckgen_base, 0);
 	get_base_from_node("mediatek,mt8167-scpsys", &scpsys_base, 0);

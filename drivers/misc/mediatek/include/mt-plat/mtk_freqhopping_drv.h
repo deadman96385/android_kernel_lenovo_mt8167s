@@ -41,7 +41,7 @@ struct mt_fh_hal_driver {
 	void (*fh_pll_set)(int, int, int);
 	int (*fh_pll_get)(int, int);
 #endif
-	fh_pll_t *fh_pll;
+	struct fh_pll_t *fh_pll;
 	struct freqhopping_ssc *fh_usrdef;
 	unsigned int mempll;
 	unsigned int lvdspll;
@@ -104,18 +104,18 @@ enum FH_DEVCTL_CMD_ID {
 
 
 /* define structure for correspoinding ctlid */
-typedef struct {
+struct FH_IO_PROC_READ_T {
 	struct seq_file *m;
 	void *v;
-	fh_pll_t *pll;
-} FH_IO_PROC_READ_T;
+	struct fh_pll_t *pll;
+};
 
 struct mt_fh_hal_driver *mt_get_fh_hal_drv(void);
 
 #define FH_BUG_ON(x) \
 do {    \
 	if ((x)) \
-		pr_err("BUGON %s:%d %s:%d\n", __func__, __LINE__, current->comm, current->pid); \
+		pr_notice("BUGON %s:%d %s:%d\n", __func__, __LINE__, current->comm, current->pid); \
 } while (0)
 
 #endif

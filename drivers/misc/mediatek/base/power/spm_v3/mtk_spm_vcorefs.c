@@ -26,6 +26,7 @@
 #endif
 
 #include <mt-plat/upmu_common.h>
+#include <mt-plat/mtk_chip.h>
 
 #include <mtk_spm_misc.h>
 #include <mtk_spm_vcore_dvfs.h>
@@ -46,9 +47,10 @@
  * only for internal debug
  */
 #define SPM_VCOREFS_TAG	"[VcoreFS] "
-#define spm_vcorefs_err(fmt, args...)	pr_err(SPM_VCOREFS_TAG fmt, ##args)
-#define spm_vcorefs_warn(fmt, args...)	pr_warn(SPM_VCOREFS_TAG fmt, ##args)
-#define spm_vcorefs_debug(fmt, args...)	pr_debug(SPM_VCOREFS_TAG fmt, ##args)
+#define spm_vcorefs_err spm_vcorefs_info
+#define spm_vcorefs_warn spm_vcorefs_info
+#define spm_vcorefs_debug spm_vcorefs_info
+#define spm_vcorefs_info(fmt, args...)	pr_notice(SPM_VCOREFS_TAG fmt, ##args)
 
 void __iomem *dvfsrc_base;
 
@@ -56,7 +58,7 @@ u32 plat_channel_num;
 u32 plat_chip_ver;
 
 #ifdef CONFIG_MTK_SMI_EXT
-mmdvfs_lcd_size_enum plat_lcd_resolution;
+enum mmdvfs_lcd_size_enum plat_lcd_resolution;
 #else
 int plat_lcd_resolution;
 #endif
@@ -591,7 +593,7 @@ static struct pwr_ctrl vcorefs_ctrl = {
 	.reg_spm_cksel3_req = 0,
 
 	/* SPM_SRC_MASK */
-	.reg_csyspwreq_mask = 0,
+	.reg_csyspwreq_mask = 1,
 	.reg_md_srcclkena_0_infra_mask_b = 0,
 	.reg_md_srcclkena_1_infra_mask_b = 0,
 	.reg_md_apsrc_req_0_infra_mask_b = 0,
@@ -916,17 +918,28 @@ u32 spm_vcorefs_get_MD_status(void)
 	return spm_read(MD2SPM_DVFS_CON);
 }
 
-static void spm_dvfsfw_init(void)
+void spm_msdc_wqhd_workaround(bool screen)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&__spm_lock, flags);
 
-	mt_secure_call(MTK_SIP_KERNEL_SPM_VCOREFS_ARGS, VCOREFS_SMC_CMD_0, BOOT_UP_OPP, plat_channel_num);
+	mt_secure_call(MTK_SIP_KERNEL_SPM_VCOREFS_ARGS, VCOREFS_SMC_CMD_2, screen, 0);
+
+	spin_unlock_irqrestore(&__spm_lock, flags);
+}
+
+static void spm_dvfsfw_init(int curr_opp, u32 channel)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&__spm_lock, flags);
+
+	mt_secure_call(MTK_SIP_KERNEL_SPM_VCOREFS_ARGS, VCOREFS_SMC_CMD_0, curr_opp, channel);
 
 	spin_unlock_irqrestore(&__spm_lock, flags);
 
-	spm_vcorefs_warn("DVFS_LEVEL: 0x%x, BOOT_UP_OPP: %u\n", spm_read(DVFS_LEVEL), BOOT_UP_OPP);
+	spm_vcorefs_warn("DVFS_LEVEL: 0x%x, curr_opp: %u, channel:%d\n", spm_read(DVFS_LEVEL), curr_opp, channel);
 }
 
 void __spm_sync_vcore_dvfs_power_control(struct pwr_ctrl *dest_pwr_ctrl, const struct pwr_ctrl *src_pwr_ctrl)
@@ -1013,22 +1026,34 @@ static int spm_trigger_dvfs(int kicker, int opp, bool fix)
 	else
 		mask = dvfs_mask[opp];
 
-	if (plat_channel_num == 2)
-		dvfs_level[OPP_1] = 0x8;
-	else if (plat_channel_num == 4)
-		dvfs_level[OPP_1] = 0x4;
+	if (plat_chip_ver == CHIP_SW_VER_01) {
+		if (plat_channel_num == 2)
+			dvfs_level[OPP_1] = 0x8;
+		else if (plat_channel_num == 4)
+			dvfs_level[OPP_1] = 0x4;
+	}
 
 #if 1
 	/* check DVFS idle */
 	r = wait_spm_complete_by_condition(is_dvfs_in_progress(), SPM_DVFS_TIMEOUT);
 	if (r < 0) {
 		spm_vcorefs_dump_dvfs_regs(NULL);
-		aee_kernel_warning("SPM Warring", "Vcore DVFS timeout warning");
+		/* aee_kernel_warning("SPM Warring", "Vcore DVFS timeout warning"); */
 		return -1;
 	}
 #endif
 
-	spm_write(DVFSRC_CPU_LEVEL_MASK, (spm_read(DVFSRC_CPU_LEVEL_MASK) & ~(0xf)) | mask);
+	if (plat_chip_ver == CHIP_SW_VER_01) {
+		spm_write(DVFSRC_CPU_LEVEL_MASK, (spm_read(DVFSRC_CPU_LEVEL_MASK) & ~(0xf)) | mask);
+	} else {
+		if (opp == OPP_1) {
+			spm_write(DVFSRC_DEBUG_EN, spm_read(DVFSRC_DEBUG_EN) | (0x2 << 4));
+			spm_write(DVFSRC_CPU_LEVEL_MASK, (spm_read(DVFSRC_CPU_LEVEL_MASK) & ~(0xf)));
+		} else {
+			spm_write(DVFSRC_CPU_LEVEL_MASK, (spm_read(DVFSRC_CPU_LEVEL_MASK) & ~(0xf)) | mask);
+			spm_write(DVFSRC_DEBUG_EN, spm_read(DVFSRC_DEBUG_EN) & ~(0x3 << 4));
+		}
+	}
 
 	vcorefs_crit_mask(log_mask(), kicker, "[%s] fix: %d, opp: %d, CPU_LEVEL_MASK: 0x%x (v:%d)(r:%d)(c:%d)\n",
 				__func__, fix, opp, spm_read(DVFSRC_CPU_LEVEL_MASK),
@@ -1043,7 +1068,7 @@ static int spm_trigger_dvfs(int kicker, int opp, bool fix)
 
 	if (r < 0) {
 		spm_vcorefs_dump_dvfs_regs(NULL);
-		aee_kernel_warning("SPM Warring", "Vcore DVFS timeout warning");
+		/* aee_kernel_warning("SPM Warring", "Vcore DVFS timeout warning"); */
 		return -1;
 	}
 #endif
@@ -1060,73 +1085,49 @@ void spm_dvfsrc_set_channel_bw(enum dvfsrc_channel channel)
 		spm_write(DVFSRC_CHOOSE, spm_read(DVFSRC_CHOOSE) & ~(1U << 0)); /* DVFS mapping table by channel*/
 		spm_write(DVFSRC_ENABLE, spm_read(DVFSRC_ENABLE) & ~(1U << 2)); /* BW by channel */
 
-		/* FIXME 11/12 */
-		if (1) {
+		if (plat_chip_ver == CHIP_SW_VER_01) {
 			/* E1 C+G jump level */
-			spm_write(DVFSRC_SIGNAL_CTRL, 0xc032a2);
+			spm_write(DVFSRC_SIGNAL_CTRL, 0xc00aa2);
 		} else {
 			/* E2 C+G jump level */
-			spm_write(DVFSRC_SIGNAL_CTRL, 0x8032a2);
+			spm_write(DVFSRC_SIGNAL_CTRL, 0x800aa2);
 		}
 
-		/* FIXME 11/12 */
-		if (1) {
-			/* E1 HRT WQHD/FHD */
+		if (plat_chip_ver == CHIP_SW_VER_01) {
 			spm_write(DVFSRC_M3733, 0xa60b4); /* >5.3G to opp0 */
 			spm_write(DVFSRC_M3200, 0xa6087); /* >5.3G to opp0 */
 			spm_write(DVFSRC_M1600, 0x3205a); /* >1.6G to opp2 */
 		} else {
-			#ifdef CONFIG_MTK_SMI_EXT
-			/* panel resolution */
-			if (plat_lcd_resolution == MMDVFS_LCD_SIZE_WQHD) {
-				/* E2 HRT WQHD */
-				spm_write(DVFSRC_M3733, 0xc80b4); /* >6.4G to opp0 */
-				spm_write(DVFSRC_M3200, 0xa6087); /* >5.3G to opp1 */
-				spm_write(DVFSRC_M1600, 0x6405a); /* >3.2G to opp2 */
-			} else if (plat_lcd_resolution == MMDVFS_LCD_SIZE_FHD) {
-				/* E2 HRT FHD */
-				spm_write(DVFSRC_M3733, 0xc80b4); /* >6.4G to opp0 */
-				spm_write(DVFSRC_M3200, 0xa6087); /* >5.3G to opp1 */
-				spm_write(DVFSRC_M1600, 0x5305a); /* >2.7G to opp2 */
-			}
-			#endif
+			spm_write(DVFSRC_M3733, 0xc83ff); /* >12.8G to opp0 */
+			spm_write(DVFSRC_M3200, 0xa63ff); /* >10.7G to opp1 */
+			spm_write(DVFSRC_M1600, 0x643ff); /* >6.4G to opp2 */
 		}
 
 		break;
 	case DVFSRC_CHANNEL_4:
-		spm_write(DVFSRC_CHOOSE, spm_read(DVFSRC_CHOOSE) | (1U << 0));
+		if (plat_chip_ver == CHIP_SW_VER_01)
+			spm_write(DVFSRC_CHOOSE, spm_read(DVFSRC_CHOOSE) | (1U << 0));
+		else
+			spm_write(DVFSRC_CHOOSE, spm_read(DVFSRC_CHOOSE) & ~(1U << 0));
+
 		spm_write(DVFSRC_ENABLE, spm_read(DVFSRC_ENABLE) | (1U << 2));
 
-		/* FIXME 11/12 */
-		if (1) {
+		if (plat_chip_ver == CHIP_SW_VER_01) {
 			/* E1 C+G jump level*/
-			spm_write(DVFSRC_SIGNAL_CTRL, 0xc032a2);
+			spm_write(DVFSRC_SIGNAL_CTRL, 0xc00aa2);
 		} else {
 			/* E2 C+G jump level */
-			spm_write(DVFSRC_SIGNAL_CTRL, 0xc032a2);
+			spm_write(DVFSRC_SIGNAL_CTRL, 0xc00aa2);
 		}
 
-		/* FIXME 11/12 */
-		if (1) {
-			/* E1 HRT WQHD/FHD */
+		if (plat_chip_ver == CHIP_SW_VER_01) {
 			spm_write(DVFSRC_M3733, 0xa60b4); /* >10.6G to opp0 */
 			spm_write(DVFSRC_M3200, 0xa6087); /* >10.6G to opp0 */
 			spm_write(DVFSRC_M1600, 0x3205a); /* >3.2G to opp2 */
 		} else {
-			#ifdef CONFIG_MTK_SMI_EXT
-			/* panel resolution */
-			if (plat_lcd_resolution == MMDVFS_LCD_SIZE_WQHD) {
-				/* E2 HRT WQHD */
-				spm_write(DVFSRC_M3733, 0xa60b4); /* >10.6G to opp0 */
-				spm_write(DVFSRC_M3200, 0xa6087); /* >10.6G to opp0 */
-				spm_write(DVFSRC_M1600, 0x6405a); /* >6.4G to opp2 */
-			} else if (plat_lcd_resolution == MMDVFS_LCD_SIZE_FHD) {
-				/* E2 HRT FHD */
-				spm_write(DVFSRC_M3733, 0xa60b4); /* >10.6G to opp0 */
-				spm_write(DVFSRC_M3200, 0xa6087); /* >10.6G to opp0 */
-				spm_write(DVFSRC_M1600, 0x5305a); /* >5.3G to opp2 */
-			}
-			#endif
+			spm_write(DVFSRC_M3733, 0xc83ff); /* >12.8G to opp0 */
+			spm_write(DVFSRC_M3200, 0xa63ff); /* >10.7G to opp0 */
+			spm_write(DVFSRC_M1600, 0x643ff); /* >6.4G to opp2 */
 		}
 
 		break;
@@ -1168,6 +1169,22 @@ int spm_dvfs_flag_init(void)
 	return flag;
 }
 
+void dvfsrc_md_scenario_update(bool suspend)
+{
+	if (plat_chip_ver == CHIP_SW_VER_01)
+		return;
+
+#if 1
+	if (suspend) {
+		spm_write(DVFSRC_MD_LEVEL_CTRL, 0x3FFF);
+		spm_write(DVFSRC_MD_LEVEL_CTRL_2, 0x3FFF);
+	} else {
+		spm_write(DVFSRC_MD_LEVEL_CTRL, 0x1);
+		spm_write(DVFSRC_MD_LEVEL_CTRL_2, 0x1);
+	}
+#endif
+}
+
 static void dvfsrc_init(void)
 {
 	unsigned long flags;
@@ -1183,11 +1200,10 @@ static void dvfsrc_init(void)
 	spm_write(DVFSRC_DEBUG_EN, 0x49);
 	spm_write(DVFSRC_CHANNEL_MASK, 0x201fffff);
 	spm_write(DVFSRC_LEVEL_JMP_METHOD, 0x32C801fc);
-	spm_write(DVFSRC_BANDWIDTH_CONST1, 0x04100000);
-	spm_write(DVFSRC_BANDWIDTH_CONST2, 0x04104000);
+	spm_write(DVFSRC_BANDWIDTH_CONST1, 0x41000000);
+	spm_write(DVFSRC_BANDWIDTH_CONST2, 0x40140000);
 
-	/* FIXME 11/12 */
-	if (1)
+	if (plat_chip_ver == CHIP_SW_VER_01)
 		spm_write(DVFSRC_MD_LEVEL_MASK, 0xffff0001);
 	else
 		spm_write(DVFSRC_MD_LEVEL_MASK, 0xffff0001);
@@ -1213,6 +1229,7 @@ static void dvfsrc_init(void)
 	spm_write(DVFSRC_MD_LEVEL_CTRL_2, 0x1);
 
 	spm_write(DVFSRC_CPU_LEVEL_MASK, (spm_read(DVFSRC_CPU_LEVEL_MASK) & ~(0xf)) | dvfs_mask[BOOT_UP_OPP]);
+	spm_write(DVFSRC_CPU_LEVEL_MASK, 0x03000010);
 
 	/* enable DVFSRC */
 	spm_write(DVFSRC_ENABLE, spm_read(DVFSRC_ENABLE) | (0x3));
@@ -1244,6 +1261,20 @@ dvfsrc_exit:
 	spm_vcorefs_warn("spm_dvfsrc_register_init: dvfsrc_base = %p\n", dvfsrc_base);
 }
 
+static void spm_check_status_before_dvfs(void)
+{
+	int flag;
+
+	if (spm_read(PCM_REG15_DATA) != 0x0)
+		return;
+
+	flag = spm_dvfs_flag_init();
+
+	spm_dvfsfw_init(spm_vcorefs_get_opp(), plat_channel_num);
+
+	spm_go_to_vcorefs(flag);
+}
+
 int spm_set_vcore_dvfs(struct kicker_config *krconf)
 {
 	unsigned long flags;
@@ -1252,6 +1283,8 @@ int spm_set_vcore_dvfs(struct kicker_config *krconf)
 	bool fix = (((1U << krconf->kicker) & autok_kir_group) || krconf->kicker == KIR_SYSFSX) &&
 									krconf->opp != OPP_UNREQ;
 	int opp = fix ? krconf->opp : krconf->dvfs_opp;
+
+	spm_check_status_before_dvfs();
 
 	spm_vcorefs_footprint(SPM_VCOREFS_ENTER);
 
@@ -1289,8 +1322,8 @@ void spm_go_to_vcorefs(int spm_flags)
 
 static void plat_info_init(void)
 {
-	/* FIXME chip version */
-	plat_chip_ver = 46;
+	/* HW chip version */
+	plat_chip_ver = mt_get_chip_sw_ver();
 
 	/* lcd resolution */
 	#ifdef CONFIG_MTK_SMI_EXT
@@ -1323,8 +1356,8 @@ void spm_vcorefs_init(void)
 	if (is_vcorefs_feature_enable()) {
 		flag = spm_dvfs_flag_init();
 		vcorefs_init_opp_table();
-		spm_dvfsfw_init(); /* kernel/ATF */
-		spm_go_to_vcorefs(flag); /* kernel/ATF */
+		spm_dvfsfw_init(BOOT_UP_OPP, plat_channel_num);
+		spm_go_to_vcorefs(flag);
 		dvfsrc_init();
 		vcorefs_late_init_dvfs();
 		spm_vcorefs_warn("[%s] DONE\n", __func__);

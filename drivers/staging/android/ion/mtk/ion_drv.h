@@ -113,7 +113,7 @@ struct ion_sys_get_phys_param {
 	unsigned long len;
 };
 
-#define ION_MM_DBG_NAME_LEN 16
+#define ION_MM_DBG_NAME_LEN 48
 #define ION_MM_SF_BUF_INFO_LEN 16
 
 struct ion_sys_client_name {
@@ -189,7 +189,6 @@ struct ion_mm_data {
 	union {
 		struct ion_mm_config_buffer_param config_buffer_param;
 		struct ion_mm_buf_debug_info buf_debug_info_param;
-		struct ion_mm_sf_buf_info sf_buf_info_param;
 	};
 };
 
@@ -242,7 +241,7 @@ int ion_device_destroy_heaps(struct ion_device *dev);
 
 struct ion_heap *ion_sec_heap_create(struct ion_platform_heap *unused);
 void ion_sec_heap_destroy(struct ion_heap *heap);
-
+void ion_sec_heap_dump_info(void);
 #endif
 
 #endif

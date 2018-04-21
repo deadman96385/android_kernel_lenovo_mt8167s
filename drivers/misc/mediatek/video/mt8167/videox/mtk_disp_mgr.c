@@ -97,13 +97,9 @@
 #include "extd_hdmi.h"
 #endif
 #include "external_display.h"
+#include "compat_mtk_disp_mgr.h"
 
-enum ePREPARE_FENCE_TYPE {
-	PREPARE_INPUT_FENCE,
-	PREPARE_OUTPUT_FENCE,
-	PREPARE_PRESENT_FENCE
-};
-
+#include "ddp_debug.h"
 
 static dev_t mtk_disp_mgr_devno;
 static struct cdev *mtk_disp_mgr_cdev;
@@ -415,6 +411,14 @@ int _ioctl_create_session(unsigned long arg)
 		return -EFAULT;
 	}
 
+#ifdef OVL_TIME_SHARING
+	if (config.type == DISP_SESSION_MEMORY) {
+		/* need into secure world when wfd connect */
+		force_ovl_sec = 1;
+		DISPMSG("force_ovl_sec = 1\n");
+	}
+#endif
+
 #ifdef CONFIG_MTK_GMO_RAM_OPTIMIZE
 	if (config.type == DISP_SESSION_MEMORY) {
 		if (init_ext_decouple_buffers() < 0) {
@@ -469,6 +473,14 @@ int _ioctl_destroy_session(unsigned long arg)
 		DISPMSG("[FB]: copy_from_user failed! line:%d\n", __LINE__);
 		return -EFAULT;
 	}
+
+#ifdef OVL_TIME_SHARING
+	if (config.type == DISP_SESSION_MEMORY) {
+		/* need into normal world when wfd disconnect */
+		force_ovl_sec = 0;
+		DISPMSG("force_ovl_sec = 0\n");
+	}
+#endif
 
 #ifdef CONFIG_MTK_GMO_RAM_OPTIMIZE
 	if (config.type == DISP_SESSION_MEMORY) {
@@ -542,9 +554,11 @@ int _ioctl_trigger_session(unsigned long arg)
 			mmprofile_log_ex(ddp_mmp_get_events()->present_fence_set, MMPROFILE_FLAG_PULSE,
 				       config.present_fence_idx, 0);
 		}
-		dprec_trigger(&session_info->event_trigger, 5, 0);
+		if (session_info)
+			dprec_trigger(&session_info->event_trigger, 5, 0);
 		primary_display_merge_session_cmd(&config);
-		dprec_trigger(&session_info->event_trigger, 5, 10);
+		if (session_info)
+			dprec_trigger(&session_info->event_trigger, 5, 10);
 		primary_display_trigger(0, NULL, 0);
 	} else if (DISP_SESSION_TYPE(session_id) == DISP_SESSION_EXTERNAL) {
 #if defined(CONFIG_MTK_HDMI_SUPPORT) || defined(CONFIG_MTK_EPD_SUPPORT)
@@ -628,7 +642,7 @@ int _ioctl_prepare_present_fence(unsigned long arg)
 	}
 
 	if (DISP_SESSION_TYPE(preset_fence_struct.session_id) != DISP_SESSION_PRIMARY) {
-		DISPERR("non-primary ask for present fence! session=0x%x\n",
+		DISPCHECK("non-primary ask for present fence! session=0x%x\n",
 			preset_fence_struct.session_id);
 		data.fence = MTK_FB_INVALID_FENCE_FD;
 		data.value = 0;
@@ -669,7 +683,7 @@ int _ioctl_prepare_present_fence(unsigned long arg)
 
 #endif
 
-int _ioctl_prepare_buffer(unsigned long arg, enum ePREPARE_FENCE_TYPE type)
+int _ioctl_prepare_buffer(unsigned long arg, enum PREPARE_FENCE_TYPE type)
 {
 	int ret = 0;
 	void __user *argp = (void __user *)arg;
@@ -1209,7 +1223,11 @@ static int set_memory_buffer(struct disp_session_input_config *input)
 		if (input->config[i].layer_enable)
 			mtkfb_update_buf_info(input->session_id, input->config[i].layer_id,
 					      input->config[i].next_buff_idx, 0,
-					      input->config[i].frm_sequence);
+					      input->config[i].frm_sequence
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+					      , dst_mva, input->config[i].security
+#endif
+					      );
 
 
 		if (session_info)
@@ -1304,7 +1322,11 @@ static int set_external_buffer(struct disp_session_input_config *input)
 			mva_offset = (x + y * pitch) * Bpp;
 			mtkfb_update_buf_info(input->session_id, input->config[i].layer_id,
 					      input->config[i].next_buff_idx, mva_offset,
-					      input->config[i].frm_sequence);
+					      input->config[i].frm_sequence
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+					      , dst_mva, input->config[i].security
+#endif
+					      );
 #ifdef CONFIG_MTK_HDMI_3D_SUPPORT
 			mtkfb_update_buf_info_new(input->session_id, mva_offset,
 						  (struct disp_input_config *) input->config);
@@ -1440,7 +1462,11 @@ static int set_primary_buffer(struct disp_session_input_config *input)
 			mva_offset = (x + y * pitch) * Bpp;
 			mtkfb_update_buf_info(input->session_id, input->config[i].layer_id,
 					      input->config[i].next_buff_idx, mva_offset,
-					      input->config[i].frm_sequence);
+					      input->config[i].frm_sequence
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+					      , dst_mva, input->config[i].security
+#endif
+					      );
 			fence_msg_len += sprintf(fence_msg_buf + fence_msg_len,
 						 "S+/PL%d/e%d/id%d/%dx%d(%d,%d)(%d,%d)/%s/%d/0x%08lx/mva0x%08lx/sec%d\n",
 						 input->config[i].layer_id, input->config[i].layer_enable,
@@ -1473,6 +1499,8 @@ static int set_primary_buffer(struct disp_session_input_config *input)
 
 		} else {
 			captured_session_input[DISP_SESSION_PRIMARY - 1].config[layer_id] = input->config[i];
+			memcpy(&(captured_session_input[DISP_SESSION_PRIMARY - 1].ccorr_config),
+					&(input->ccorr_config), sizeof(input->ccorr_config));
 		}
 		up(&dal_sem);
 #endif
@@ -1488,6 +1516,7 @@ static int set_primary_buffer(struct disp_session_input_config *input)
 #ifndef CONFIG_ALL_IN_TRIGGER_STAGE
 	primary_display_config_input_multiple(input);
 #endif
+
 	return 0;
 
 }
@@ -1521,7 +1550,7 @@ int _ioctl_set_input_buffer(unsigned long arg)
 			if (session_input->config[i].layer_id == 0) {
 				session_input->config[i].security = DISP_SECURE_BUFFER;
 				if (secure_handle == 0)
-					secure_handle = alloc_sec_buffer(1920*1080*4);
+					secure_handle = alloc_sec_buffer(1920*1200*4);
 				session_input->config[i].src_phy_addr = (void *)secure_handle;
 			}
 		}
@@ -1529,6 +1558,19 @@ int _ioctl_set_input_buffer(unsigned long arg)
 		if (secure_handle) {
 			free_sec_buffer(secure_handle);
 			secure_handle = 0;
+		}
+	}
+
+	if (force_ovl_en&0x80) {
+		unsigned int disable_layer_id = (~force_ovl_en)&0xf;
+		unsigned int layer_id;
+
+		for (i = 0; i < session_input->config_layer_num; i++) {
+			layer_id = session_input->config[i].layer_id;
+			if ((1<<layer_id)&disable_layer_id) {
+				session_input->config[i].layer_enable = 0;
+				mtkfb_release_layer_fence(session_id, layer_id);
+			}
 		}
 	}
 
@@ -1669,7 +1711,11 @@ int _ioctl_set_output_buffer(unsigned long arg)
 		mtkfb_update_buf_info(session_output.session_id,
 				      disp_sync_get_output_interface_timeline_id(),
 				      session_output.config.buff_idx, 0,
-				      session_output.config.frm_sequence);
+				      session_output.config.frm_sequence
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+				      , dst_mva, session_output.config.security
+#endif
+				      );
 		if (session_info)
 			dprec_submit(&session_info->event_setoutput, session_output.config.buff_idx, dst_mva);
 
@@ -1718,7 +1764,11 @@ int _ioctl_set_output_buffer(unsigned long arg)
 
 		mtkfb_update_buf_info(session_output.session_id, disp_sync_get_output_timeline_id(),
 				      session_output.config.buff_idx, 0,
-				      session_output.config.frm_sequence);
+				      session_output.config.frm_sequence
+#ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
+				      , dst_mva, session_output.config.security
+#endif
+				      );
 
 		if (session_info)
 			dprec_submit(&session_info->event_setoutput, session_output.config.buff_idx, dst_mva);
@@ -1820,6 +1870,8 @@ int _ioctl_get_display_caps(unsigned long arg)
 #ifdef OVL_TIME_SHARING
 	caps_info.disp_feature |= DISP_FEATURE_TIME_SHARING;
 #endif
+	caps_info.is_support_frame_cfg_ioctl = 0;
+	caps_info.disp_feature |= DISP_FEATURE_NO_PARGB;
 
 	DISPMSG("%s mode:%d, pass:%d, max_layer_num:%d\n",
 		__func__, caps_info.output_mode, caps_info.output_pass, caps_info.max_layer_num);
@@ -1859,9 +1911,17 @@ int _ioctl_wait_vsync(unsigned long arg)
 			DISPERR("ioctl_wait_for_vsync ,primary_display fail, ret = %d.\n", ret);
 	}
 #else
+	if (DISP_SESSION_TYPE(vsync_config.session_id) == DISP_SESSION_PRIMARY) {
 		ret = primary_display_wait_for_vsync(&vsync_config);
-	if (ret != 0)
-		DISPERR("primary_display_wait_for_vsync fail, ret = %d.\n", ret);
+		if (ret != 0)
+			DISPERR("primary_display_wait_for_vsync fail, ret = %d.\n", ret);
+#if defined(CONFIG_MTK_HDMI_SUPPORT) || defined(CONFIG_MTK_EPD_SUPPORT)
+	} else if (DISP_SESSION_TYPE(vsync_config.session_id) == DISP_SESSION_EXTERNAL) {
+		ret = ext_disp_wait_for_vsync(&vsync_config, vsync_config.session_id);
+		if (ret != 0)
+			DISPERR("ext_disp_wait_for_vsync fail, ret = %d.\n", ret);
+#endif
+	}
 #endif
 	if (session_info)
 		dprec_done(&session_info->event_waitvsync, 0, 0);
@@ -2161,30 +2221,6 @@ long mtk_disp_mgr_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	return ret;
 }
-
-#ifdef CONFIG_COMPAT
-static long mtk_disp_mgr_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-{
-	long ret = -ENOIOCTLCMD;
-
-	switch (cmd) {
-
-		/* add cases here for 32bit/64bit conversion */
-		/* ... */
-
-	default:
-		/*
-		*DISPERR("mtk_disp_mgr_compat_ioctl, file=0x%x, cmd=0x%x(%s), arg=0x%lx, "
-			   "cmd nr=0x%08x, cmd size=0x%08x\n", file, cmd, _session_ioctl_spy(cmd), arg,
-			   (unsigned int)_IOC_NR(cmd), (unsigned int)_IOC_SIZE(cmd));
-		*/
-		return mtk_disp_mgr_ioctl(file, cmd, arg);
-	}
-
-	return ret;
-}
-#endif
-
 
 static const struct file_operations mtk_disp_mgr_fops = {
 	.owner = THIS_MODULE,

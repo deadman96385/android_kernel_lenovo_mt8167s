@@ -19,6 +19,7 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/irqdomain.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
 #include <linux/io.h>
@@ -146,7 +147,11 @@ static DEVICE_ATTR(pmic_access, 0664, show_pmic_access, store_pmic_access);	/* 6
 
 void PMIC_INIT_SETTING_V1(void)
 {
-	/* do in preloader */
+#ifdef CONFIG_MTK_PMIC_VMCH_PG_DISABLE
+	unsigned int ret = 0;
+
+	ret = pmic_config_interface(0x48, 0x1, 0x1, 12);	/* [10]: VMCH_PG_ENB; */
+#endif
 }
 
 static void pmic_low_power_setting(void)
@@ -251,9 +256,38 @@ void upmu_set_vcn35_on_ctrl_wifi(unsigned int val)
 	}
 }
 
+static irqreturn_t thr_h_int_handler(int irq, void *dev_id)
+{
+	unsigned int ret = 0;
+	unsigned int val = 0;
+
+	pr_info("%s!\n", __func__);
+
+	/* Read PMIC test register to get VMCH PG status */
+	pmic_config_interface(0x134, 0x0102, 0xFFFF, 0);
+	ret = pmic_read_interface(0x132, &val, 0x1, 2);
+	if (val == 0) {
+		/* VMCH is not good */
+		pmic_config_interface(0x506, 0x0, 0x1, 14);
+		pr_notice("%s: VMCH not good with status: 0x%x, turn off!\n",
+			__func__, upmu_get_reg_value(0x132));
+	}
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t thr_l_int_handler(int irq, void *dev_id)
+{
+	pr_info("%s!\n", __func__);
+
+	return IRQ_HANDLED;
+}
+
 static int mt6392_pmic_probe(struct platform_device *dev)
 {
+	struct resource *res;
 	int ret_val = 0;
+	int irq_thr_l, irq_thr_h;
 	struct mt6397_chip *mt6392_chip = dev_get_drvdata(dev->dev.parent);
 
 	pr_debug("[Power/PMIC] ******** MT6392 pmic driver probe!! ********\n");
@@ -269,6 +303,38 @@ static int mt6392_pmic_probe(struct platform_device *dev)
 
 	/* pmic low power setting */
 	pmic_low_power_setting();
+
+	res = platform_get_resource(dev, IORESOURCE_IRQ, 0);
+	if (!res) {
+		dev_info(&dev->dev, "no IRQ resource\n");
+		return -ENODEV;
+	}
+
+	irq_thr_l = irq_create_mapping(mt6392_chip->irq_domain, res->start);
+	if (irq_thr_l <= 0)
+		return -EINVAL;
+
+	ret_val = request_threaded_irq(irq_thr_l, NULL,
+				   thr_l_int_handler,
+				   IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+				   "mt6397-thr_l", &dev->dev);
+	if (ret_val) {
+		dev_info(&dev->dev, "Failed to request mt6397-thr_l IRQ: %d: %d\n",
+			irq_thr_l, ret_val);
+	}
+
+	irq_thr_h = irq_create_mapping(mt6392_chip->irq_domain, res->end);
+	if (irq_thr_h <= 0)
+		return -EINVAL;
+
+	ret_val = request_threaded_irq(irq_thr_h, NULL,
+				   thr_h_int_handler,
+				   IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+				   "mt6397-thr_h", &dev->dev);
+	if (ret_val) {
+		dev_info(&dev->dev, "Failed to request mt6397-thr_h IRQ: %d: %d\n",
+			irq_thr_h, ret_val);
+	}
 
 	device_create_file(&(dev->dev), &dev_attr_pmic_access);
 	return 0;

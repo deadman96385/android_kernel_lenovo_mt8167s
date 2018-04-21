@@ -139,10 +139,9 @@ struct usb_ep_ops {
 	int (*fifo_status) (struct usb_ep *ep);
 	void (*fifo_flush) (struct usb_ep *ep);
 
-#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT) || defined(CONFIG_MTK_MD_DIRECT_LOGGING_SUPPORT)
+#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT)
 	void (*suspend_control)(struct usb_ep *ep);
 	void (*resume_control)(struct usb_ep *ep);
-	int (*fifo_empty)(struct usb_ep *ep);
 #endif
 };
 
@@ -532,7 +531,7 @@ static inline void usb_ep_fifo_flush(struct usb_ep *ep)
 		ep->ops->fifo_flush(ep);
 }
 
-#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT) || defined(CONFIG_MTK_MD_DIRECT_LOGGING_SUPPORT)
+#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT)
 static inline void usb_ep_suspend_control(struct usb_ep *ep)
 {
 	if (ep->ops->suspend_control)
@@ -543,14 +542,6 @@ static inline void usb_ep_resume_control(struct usb_ep *ep)
 {
 	if (ep->ops->resume_control)
 		ep->ops->resume_control(ep);
-}
-
-static inline int usb_ep_fifo_empty(struct usb_ep *ep)
-{
-	if (ep->ops->fifo_empty)
-		return ep->ops->fifo_empty(ep);
-
-	return -ENOTSUPP;
 }
 #endif
 
@@ -588,6 +579,9 @@ struct usb_gadget_ops {
 	struct usb_ep *(*match_ep)(struct usb_gadget *,
 			struct usb_endpoint_descriptor *,
 			struct usb_ss_ep_comp_descriptor *);
+#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT)
+	int	(*get_address)(struct usb_gadget *);
+#endif
 };
 
 /**
@@ -620,6 +614,10 @@ struct usb_gadget_ops {
  *	only supports HNP on a different root port.
  * @b_hnp_enable: OTG device feature flag, indicating that the A-Host
  *	enabled HNP support.
+ * @hnp_polling_support: OTG device feature flag, indicating if the OTG device
+ *	in peripheral mode can support HNP polling.
+ * @host_request_flag: OTG device feature flag, indicating if A-Peripheral
+ *	or B-Peripheral wants to take host role.
  * @quirk_ep_out_aligned_size: epout requires buffer size to be aligned to
  *	MaxPacketSize.
  * @is_selfpowered: if the gadget is self-powered.
@@ -667,6 +665,8 @@ struct usb_gadget {
 	unsigned			b_hnp_enable:1;
 	unsigned			a_hnp_support:1;
 	unsigned			a_alt_hnp_support:1;
+	unsigned			hnp_polling_support:1;
+	unsigned			host_request_flag:1;
 	unsigned			quirk_ep_out_aligned_size:1;
 	unsigned			quirk_altset_not_supp:1;
 	unsigned			quirk_stall_not_supp:1;
@@ -1015,6 +1015,22 @@ static inline int usb_gadget_activate(struct usb_gadget *gadget)
 	return 0;
 }
 
+#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT)
+/**
+ * usb_gadget_get_number - returns the current address
+ * @gadget: controller that reports the address
+ *
+ * Returns the usb address,	or negative errno if this device
+ * doesn't support this capability.
+ */
+static inline int usb_gadget_get_address(struct usb_gadget *gadget)
+{
+	if (!gadget->ops->get_address)
+		return -EOPNOTSUPP;
+	return gadget->ops->get_address(gadget);
+}
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 /**
@@ -1097,11 +1113,6 @@ struct usb_gadget_driver {
 	void			(*suspend)(struct usb_gadget *);
 	void			(*resume)(struct usb_gadget *);
 	void			(*reset)(struct usb_gadget *);
-#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT) || defined(CONFIG_MTK_MD_DIRECT_LOGGING_SUPPORT)
-	int			(*md_msg_hdlr)(struct usb_gadget *, int, void *);
-	bool			(*md_status_qry)(struct usb_gadget *);
-#endif
-
 	/* FIXME support safe rmmod */
 	struct device_driver	driver;
 };

@@ -336,6 +336,7 @@ static inline void update_cpu_capacity(unsigned int cpuid) {}
 
 static DEFINE_PER_CPU(atomic_long_t, cpu_freq_capacity);
 static DEFINE_PER_CPU(atomic_long_t, cpu_max_freq);
+static DEFINE_PER_CPU(atomic_long_t, cpu_min_freq);
 
 /* cpufreq callback function setting current cpu frequency */
 void arch_scale_set_curr_freq(int cpu, unsigned long freq)
@@ -357,6 +358,25 @@ void arch_scale_set_max_freq(int cpu, unsigned long freq)
 	atomic_long_set(&per_cpu(cpu_max_freq, cpu), freq);
 }
 
+void arch_scale_set_min_freq(int cpu, unsigned long freq)
+{
+	atomic_long_set(&per_cpu(cpu_min_freq, cpu), freq);
+}
+
+unsigned long arch_scale_get_max_freq(int cpu)
+{
+	unsigned long max = atomic_long_read(&per_cpu(cpu_max_freq, cpu));
+
+	return max;
+}
+
+unsigned long arch_scale_get_min_freq(int cpu)
+{
+	unsigned long min = atomic_long_read(&per_cpu(cpu_min_freq, cpu));
+
+	return min;
+}
+
 unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
 {
 	unsigned long curr = atomic_long_read(&per_cpu(cpu_freq_capacity, cpu));
@@ -370,13 +390,6 @@ unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
 unsigned long arch_get_max_cpu_capacity(int cpu)
 {
 	return per_cpu(cpu_scale, cpu);
-}
-
-unsigned long arch_scale_get_max_freq(int cpu)
-{
-	unsigned long max = atomic_long_read(&per_cpu(cpu_max_freq, cpu));
-
-	return max;
 }
 
 unsigned long arch_get_cur_cpu_capacity(int cpu)
@@ -734,7 +747,7 @@ const struct sched_group_energy *cpu_cluster_energy(int cpu)
 	addr_ptr_tbl_info = upower_get_tbl();
 	ptr_tbl_info = *addr_ptr_tbl_info;
 
-	ptr_tbl = ptr_tbl_info[UPOWER_BANK_CLS_LL+cluster_id].p_upower_tbl;
+	ptr_tbl = ptr_tbl_info[UPOWER_BANK_CLS_BASE+cluster_id].p_upower_tbl;
 
 	cpu_cluster_ptr->nr_cap_states = ptr_tbl->row_num;
 	cpu_cluster_ptr->cap_states = ptr_tbl->row;
@@ -750,8 +763,6 @@ const struct sched_group_energy *cpu_core_energy(int cpu)
 	int cluster_id = cpu_topology[cpu].socket_id;
 	struct sched_group_energy *cpu_core_ptr;
 #ifdef CONFIG_MTK_UNIFY_POWER
-	struct upower_tbl_info **addr_ptr_tbl_info;
-	struct upower_tbl_info *ptr_tbl_info;
 	struct upower_tbl *ptr_tbl;
 #endif
 
@@ -765,10 +776,7 @@ const struct sched_group_energy *cpu_core_energy(int cpu)
 		return NULL;
 
 #ifdef CONFIG_MTK_UNIFY_POWER
-	addr_ptr_tbl_info = upower_get_tbl();
-	ptr_tbl_info = *addr_ptr_tbl_info;
-
-	ptr_tbl = ptr_tbl_info[UPOWER_BANK_LL+cluster_id].p_upower_tbl;
+	ptr_tbl = upower_get_core_tbl(cpu);
 
 	cpu_core_ptr->nr_cap_states = ptr_tbl->row_num;
 	cpu_core_ptr->cap_states = ptr_tbl->row;
@@ -1047,9 +1055,11 @@ void __init arch_get_hmp_domains(struct list_head *hmp_domains_list)
 		arch_get_cluster_cpus(&cpu_mask, id);
 		domain = (struct hmp_domain *)
 			kmalloc(sizeof(struct hmp_domain), GFP_KERNEL);
-		cpumask_copy(&domain->possible_cpus, &cpu_mask);
-		cpumask_and(&domain->cpus, cpu_online_mask, &domain->possible_cpus);
-		list_add(&domain->hmp_domains, hmp_domains_list);
+		if (domain) {
+			cpumask_copy(&domain->possible_cpus, &cpu_mask);
+			cpumask_and(&domain->cpus, cpu_online_mask, &domain->possible_cpus);
+			list_add(&domain->hmp_domains, hmp_domains_list);
+		}
 	}
 }
 #else
@@ -1072,3 +1082,17 @@ unsigned long get_cpu_orig_capacity(unsigned int cpu)
 }
 #endif
 
+#ifdef CONFIG_MTK_UNIFY_POWER
+static int
+update_all_cpu_capacity(void)
+{
+	int cpu;
+
+	for (cpu = 0; cpu < nr_cpu_ids ; cpu++)
+		update_cpu_capacity(cpu);
+
+	return 0;
+}
+
+late_initcall_sync(update_all_cpu_capacity)
+#endif

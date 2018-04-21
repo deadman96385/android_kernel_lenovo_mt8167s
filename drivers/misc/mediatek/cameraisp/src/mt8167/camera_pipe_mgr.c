@@ -44,6 +44,8 @@
 /* #include <mach/mt_freqhopping.h> */ /* Not support mmdvfs */
 /* ----------------------------------------------------------------------------- */
 static CAM_PIPE_MGR_STRUCT CamPipeMgr;
+static MUINT32 Keep_PipeMask;
+static bool Flush_before;
 /* ------------------------------------------------------------------------------ */
 static void CamPipeMgr_GetTime(MUINT32 *pSec, MUINT32 *pUSec)
 {
@@ -210,7 +212,8 @@ static void CamPipeMgr_StorePipeInfo(MUINT32 PipeMask)
 			if (CamPipeMgr.PipeInfo[i].Pid == 0 && CamPipeMgr.PipeInfo[i].Tgid == 0) {
 				CamPipeMgr.PipeInfo[i].Pid = current->pid;
 				CamPipeMgr.PipeInfo[i].Tgid = current->tgid;
-				strcpy(CamPipeMgr.PipeInfo[i].ProcName, current->comm);
+				strncpy(CamPipeMgr.PipeInfo[i].ProcName, current->comm,
+					sizeof(CamPipeMgr.PipeInfo[i].ProcName)-1);
 				CamPipeMgr_GetTime(&(CamPipeMgr.PipeInfo[i].TimeS),
 						   &(CamPipeMgr.PipeInfo[i].TimeUS));
 			} else {
@@ -238,7 +241,8 @@ static void CamPipeMgr_RemovePipeInfo(MUINT32 PipeMask)
 			if (CamPipeMgr.PipeInfo[i].Pid != 0 && CamPipeMgr.PipeInfo[i].Tgid != 0) {
 				CamPipeMgr.PipeInfo[i].Pid = 0;
 				CamPipeMgr.PipeInfo[i].Tgid = 0;
-				strcpy(CamPipeMgr.PipeInfo[i].ProcName, CAM_PIPE_MGR_PROC_NAME);
+				strncpy(CamPipeMgr.PipeInfo[i].ProcName, CAM_PIPE_MGR_PROC_NAME,
+					sizeof(CamPipeMgr.PipeInfo[i].ProcName)-1);
 			} else {
 				LOG_WRN
 				    ("PipeMask(0x%lX),Pipe(%ld,%s),Pid(%d),Tgid(%d),Time(%ld.%06ld)",
@@ -321,7 +325,7 @@ static int CamPipeMgr_Open(struct inode *pInode, struct file *pFile)
 		pProc = (CAM_PIPE_MGR_PROC_STRUCT *) pFile->private_data;
 		pProc->Pid = 0;
 		pProc->Tgid = 0;
-		strcpy(pProc->ProcName, CAM_PIPE_MGR_PROC_NAME);
+		strncpy(pProc->ProcName, CAM_PIPE_MGR_PROC_NAME, sizeof(pProc->ProcName)-1);
 		pProc->PipeMask = 0;
 		pProc->TimeS = Sec;
 		pProc->TimeUS = USec;
@@ -458,9 +462,15 @@ static int CamPipeMgr_Flush(struct file *pFile, fl_owner_t Id)
 					   pProc->TimeUS);
 					 */
 					CamPipeMgr_SpinLock();
+					Keep_PipeMask = pProc->PipeMask;
+					Flush_before = true;
 					Unlock.PipeMask = pProc->PipeMask;
 					CamPipeMgr_UnlockPipe(&Unlock);
 					pProc->PipeMask = 0;
+					LOG_WRN("Force to unlock pipe - (0x%x/0x%x/0x%x)",
+						(unsigned int)(Keep_PipeMask),
+						(unsigned int)(Unlock.PipeMask),
+						(unsigned int)(pProc->PipeMask));
 					CamPipeMgr_SpinUnlock();
 				}
 			}
@@ -539,7 +549,8 @@ static long CamPipeMgr_Ioctl(struct file *pFile, unsigned int Cmd, unsigned long
 					/**/	if (pProc->Tgid == 0) {
 							pProc->Pid = current->pid;
 							pProc->Tgid = current->tgid;
-							strcpy(pProc->ProcName, current->comm);
+							strncpy(pProc->ProcName, current->comm,
+								sizeof(pProc->ProcName)-1);
 							CamPipeMgr_SpinUnlock();
 					/**/		if (CamPipeMgr.LogMask & Lock.PipeMask) {
 								LOG_MSG
@@ -596,13 +607,14 @@ static long CamPipeMgr_Ioctl(struct file *pFile, unsigned int Cmd, unsigned long
 					/* Store info before clear. */
 					Pid = pProc->Pid;
 					Tgid = pProc->Tgid;
-					strcpy(ProcName, pProc->ProcName);
+				strncpy(ProcName, pProc->ProcName, sizeof(ProcName)-1);
 					/*  */
 					pProc->PipeMask &= (~Unlock.PipeMask);
 					if (pProc->PipeMask == 0) {
 						pProc->Pid = 0;
 						pProc->Tgid = 0;
-						strcpy(pProc->ProcName, CAM_PIPE_MGR_PROC_NAME);
+					strncpy(pProc->ProcName, CAM_PIPE_MGR_PROC_NAME,
+						sizeof(pProc->ProcName)-1);
 					}
 					CamPipeMgr_SpinUnlock();
 					if (CamPipeMgr.LogMask & Unlock.PipeMask) {
@@ -620,14 +632,35 @@ static long CamPipeMgr_Ioctl(struct file *pFile, unsigned int Cmd, unsigned long
 					CamPipeMgr_SpinUnlock();
 					if ((CamPipeMgr.LogMask & Unlock.PipeMask) ||
 					    (CamPipeMgr.Mode.ScenSw == CAM_PIPE_MGR_SCEN_SW_NONE)) {
-						LOG_ERR
-						    ("UNLOCK:Sw(%d),Hw(%d),UPM(0x%X),PLT(0x%lX) fail, it was not locked before",
-						     CamPipeMgr.Mode.ScenSw, CamPipeMgr.Mode.ScenHw,
-						     Unlock.PipeMask,
-						     (unsigned long)CamPipeMgr.
-						     PipeLockTable[CamPipeMgr.Mode.ScenHw]);
-					}
+					LOG_ERR
+						("UNLOCK:Sw(%d),Hw(%d),UPM(0x%X/0x%X/0x%X),PLT(0x%lX)",
+						CamPipeMgr.Mode.ScenSw, CamPipeMgr.Mode.ScenHw,
+						(unsigned int)(pProc->PipeMask), (unsigned int)(Unlock.PipeMask),
+						(unsigned int)(Keep_PipeMask),
+						(unsigned long)CamPipeMgr.
+						PipeLockTable[CamPipeMgr.Mode.ScenHw]);
+					LOG_ERR
+						("fail, it was not locked before");
+				}
+				CamPipeMgr_SpinLock();
+				if (Flush_before || (pProc->PipeMask & Keep_PipeMask)) {
+					LOG_WRN("WRN, FLUSH before(%d), MASK(0x%X/0x%X/0x%X)",
+						Flush_before, (unsigned int)(pProc->PipeMask),
+						(unsigned int)(Unlock.PipeMask),
+						(unsigned int)(Keep_PipeMask));
+					Keep_PipeMask &= ~(pProc->PipeMask);
+					Unlock.PipeMask &=  ~(pProc->PipeMask);
+					LOG_WRN("WRN_2, FLUSH before(%d), MASK(0x%X/0x%X/0x%X)",
+						Flush_before, (unsigned int)(pProc->PipeMask),
+						(unsigned int)(Unlock.PipeMask),
+						(unsigned int)(Keep_PipeMask));
+					if ((int)Keep_PipeMask == 0)
+						Flush_before = false;
+					Ret = 0;
+				} else {
 					Ret = -EFAULT;
+				}
+				CamPipeMgr_SpinUnlock();
 				}
 			} else {
 				LOG_ERR("UNLOCK:copy_from_user fail");
@@ -1239,22 +1272,28 @@ static int CamPipeMgr_Probe(struct platform_device *pDev)
 	init_waitqueue_head(&(CamPipeMgr.WaitQueueHead));
 	CamPipeMgr.Mode.ScenSw = CAM_PIPE_MGR_SCEN_SW_NONE;
 	CamPipeMgr.Mode.ScenHw = CAM_PIPE_MGR_SCEN_HW_NONE;
+	Keep_PipeMask = 0x0;
+	Flush_before = false;
 	/*  */
 	for (i = 0; i < CAM_PIPE_MGR_PIPE_AMOUNT; i++) {
 		CamPipeMgr.PipeInfo[i].Pid = 0;
 		CamPipeMgr.PipeInfo[i].Tgid = 0;
-		strcpy(CamPipeMgr.PipeInfo[i].ProcName, CAM_PIPE_MGR_PROC_NAME);
+		strncpy(CamPipeMgr.PipeInfo[i].ProcName, CAM_PIPE_MGR_PROC_NAME,
+			sizeof(CamPipeMgr.PipeInfo[i].ProcName)-1);
 		CamPipeMgr.PipeInfo[i].TimeS = 0;
 		CamPipeMgr.PipeInfo[i].TimeUS = 0;
 	}
 	/*  */
-	strcpy(CamPipeMgr.PipeName[CAM_PIPE_MGR_PIPE_CAM_IO], CAM_PIPE_MGR_PIPE_NAME_CAM_IO);
-	strcpy(CamPipeMgr.PipeName[CAM_PIPE_MGR_PIPE_POST_PROC], CAM_PIPE_MGR_PIPE_NAME_POST_PROC);
-	strcpy(CamPipeMgr.PipeName[CAM_PIPE_MGR_PIPE_XDP_CAM], CAM_PIPE_MGR_PIPE_NAME_XDP_CAM);
+	strncpy(CamPipeMgr.PipeName[CAM_PIPE_MGR_PIPE_CAM_IO], CAM_PIPE_MGR_PIPE_NAME_CAM_IO,
+		sizeof(CamPipeMgr.PipeName[CAM_PIPE_MGR_PIPE_CAM_IO])-1);
+	strncpy(CamPipeMgr.PipeName[CAM_PIPE_MGR_PIPE_POST_PROC], CAM_PIPE_MGR_PIPE_NAME_POST_PROC,
+		sizeof(CamPipeMgr.PipeName[CAM_PIPE_MGR_PIPE_POST_PROC])-1);
+	strncpy(CamPipeMgr.PipeName[CAM_PIPE_MGR_PIPE_XDP_CAM], CAM_PIPE_MGR_PIPE_NAME_XDP_CAM,
+		sizeof(CamPipeMgr.PipeName[CAM_PIPE_MGR_PIPE_XDP_CAM])-1);
 	/*  */
 	CamPipeMgr_UpdatePipeLockTable(CamPipeMgr.Mode.ScenSw);
-	CamPipeMgr.LogMask = 0;/*(CAM_PIPE_MGR_PIPE_MASK_CAM_IO |
-			      CAM_PIPE_MGR_PIPE_MASK_POST_PROC | CAM_PIPE_MGR_PIPE_MASK_XDP_CAM);*/ /* reduce log */
+	CamPipeMgr.LogMask = (CAM_PIPE_MGR_PIPE_MASK_CAM_IO |
+			      CAM_PIPE_MGR_PIPE_MASK_POST_PROC | CAM_PIPE_MGR_PIPE_MASK_XDP_CAM);
 	/*  */
 	LOG_MSG("CamPipeMgr_Probe X");
 	return Ret;

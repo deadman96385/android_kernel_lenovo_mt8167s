@@ -12,14 +12,8 @@
 */
 
 #include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/init.h>
-#include <linux/list.h>
-#include <linux/io.h>
 /*#include <linux/usb/nop-usb-xceiv.h>*/
-#include <linux/switch.h>
-#include <linux/i2c.h>
+
 #ifndef CONFIG_OF
 #include <mach/irqs.h>
 #endif
@@ -29,6 +23,8 @@
 #include <linux/usb/usb_phy_generic.h>
 #include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
+#include <linux/of_address.h>
+
 #include "musbhsdma.h"
 #include <mt-plat/upmu_common.h>
 /*#include <mach/mt_pm_ldo.h>*/
@@ -42,41 +38,18 @@ struct clk *usb_clk;
 struct clk *icusb_clk;
 #endif
 #include "usb20.h"
-#include <linux/delay.h>
+
 #ifdef CONFIG_OF
-#include <linux/of_irq.h>
-#include <linux/of_address.h>
 #ifndef CONFIG_MTK_LEGACY
-#include <linux/regulator/consumer.h>
 #endif
 #endif
 /*#include <mach/mt_boot_common.h>*/
+#include <mt-plat/mtk_boot_common.h>
 
-/* default value 0 */
-static int usb_rdy;
 #ifdef CONFIG_MTK_UART_USB_SWITCH
 struct regmap *mt_regmap;
 #endif
-
-#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-static bool usb_shutdown;
-#endif
-
-void set_usb_rdy(void)
-{
-	DBG(0, "set usb_rdy, wake up bat\n");
-	usb_rdy = 1;
-#ifdef CONFIG_MTK_SMART_BATTERY
-	wake_up_bat();
-#endif
-}
-kal_bool is_usb_rdy(void)
-{
-	if (usb_rdy)
-		return KAL_TRUE;
-	else
-		return KAL_FALSE;
-}
+struct work_struct musb_do_idle_work;
 
 /*static bool platform_init_first = true;*/
 static u32 cable_mode = CABLE_MODE_NORMAL;
@@ -88,8 +61,9 @@ static struct regulator *reg;
 /*extern CHARGER_TYPE mt_get_charger_type(void);*/
 /*add for linux kernel 3.10*/
 #ifdef CONFIG_OF
-u32 usb_irq_number1;
-unsigned long usb_phy_base;
+
+void __iomem *usb_phy_base;
+
 #endif
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH
@@ -150,11 +124,6 @@ static const struct of_device_id apusb_of_ids[] = {
 	{},
 };
 
-static struct platform_device mt_usb_device = {
-	.name	  = "mt_usb",
-	.id		  = -1,
-};
-
 #if defined(CONFIG_USB_MTK_ACM_TEMP)
 static struct platform_device usbacm_temp_device = {
 	.name	  = "USB_ACM_Temp_Driver",
@@ -168,12 +137,36 @@ MODULE_DEVICE_TABLE(of, apusb_of_ids);
 
 static struct timer_list musb_idle_timer;
 
-static void musb_do_idle(unsigned long _musb)
+static inline u8 musb_rbyte(const void __iomem *addr, unsigned offset)
 {
-	struct musb	*musb = (void *)_musb;
+	u8 rc = 0;
+
+	usb_enable_clock(true);
+	DBG(1, "[MUSB]:access %s function when usb clock is off 0x%X\n", __func__, offset);
+	rc = readb(addr + offset);
+	usb_enable_clock(false);
+
+	return rc;
+}
+
+u8 musb_readB(const void __iomem *addr, unsigned offset)
+{
+	u8 rc = 0;
+
+	if (!mtk_usb_power)
+		rc = musb_rbyte(addr, offset);
+	else
+		rc = musb_readb(addr, offset);
+	return rc;
+}
+
+static void musb_idle_work_func(struct work_struct *work)
+{
+	struct musb	*musb = mtk_musb;
 	unsigned long	flags;
 	u8	devctl;
 
+	DBG(0, "%s:%d\n", __func__, __LINE__);
 #if !defined(CONFIG_POWER_EXT)
 	if (musb->is_active) {
 		DBG(0, "%s active, igonre do_idle\n",
@@ -182,12 +175,19 @@ static void musb_do_idle(unsigned long _musb)
 	}
 #endif
 
+#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+		if (!mtk_usb_power) {
+			DBG(0, "musb already disable\n");
+			mt_usb_clock_prepare(musb);
+		}
+#endif
+
 	spin_lock_irqsave(&musb->lock, flags);
 
 	switch (musb->xceiv->otg->state) {
 	case OTG_STATE_B_PERIPHERAL:
 	case OTG_STATE_A_WAIT_BCON:
-		devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+		devctl = musb_readB(musb->mregs, MUSB_DEVCTL);
 		if (devctl & MUSB_DEVCTL_BDEVICE) {
 			musb->xceiv->otg->state = OTG_STATE_B_IDLE;
 			MUSB_DEV_MODE(musb);
@@ -197,7 +197,7 @@ static void musb_do_idle(unsigned long _musb)
 		}
 		break;
 	case OTG_STATE_A_HOST:
-		devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+		devctl = musb_readB(musb->mregs, MUSB_DEVCTL);
 		if (devctl &  MUSB_DEVCTL_BDEVICE)
 			musb->xceiv->otg->state = OTG_STATE_B_IDLE;
 		else
@@ -208,7 +208,20 @@ static void musb_do_idle(unsigned long _musb)
 	}
 	spin_unlock_irqrestore(&musb->lock, flags);
 
+#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+		if (!mtk_usb_power) {
+			DBG(0, "done\n");
+			mt_usb_clock_unprepare(musb);
+		}
+#endif
+
 	DBG(0, "otg_state %s\n", otg_state_string(musb->xceiv->otg->state));
+}
+
+static void musb_do_idle(unsigned long _musb)
+{
+	DBG(0, "schedule work to do musb_do_idle\n");
+	schedule_work(&musb_do_idle_work);
 }
 
 static void mt_usb_try_idle(struct musb *musb, unsigned long timeout)
@@ -221,8 +234,8 @@ static void mt_usb_try_idle(struct musb *musb, unsigned long timeout)
 
 	/* Never idle if active, or when VBUS timeout is not set as host */
 	if (musb->is_active || ((musb->a_wait_bcon == 0)
-			&& (musb->state == OTG_STATE_A_WAIT_BCON))) {
-		DBG(2, "%s active, deleting timer\n", otg_state_string(musb->state));
+			&& (musb->xceiv->otg->state == OTG_STATE_A_WAIT_BCON))) {
+		DBG(2, "%s active, deleting timer\n", otg_state_string(musb->xceiv->otg->state));
 		del_timer(&musb_idle_timer);
 		last_timer = jiffies;
 		return;
@@ -239,7 +252,7 @@ static void mt_usb_try_idle(struct musb *musb, unsigned long timeout)
 	last_timer = timeout;
 
 	DBG(2, "%s inactive, for idle timer for %lu ms\n",
-		otg_state_string(musb->state),
+		otg_state_string(musb->xceiv->otg->state),
 		(unsigned long)jiffies_to_msecs(timeout - jiffies));
 
 	mod_timer(&musb_idle_timer, timeout);
@@ -254,6 +267,10 @@ static void mt_usb_enable(struct musb *musb)
 	if (musb->power == true)
 		return;
 
+	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+		mt_usb_clock_prepare(musb);
+	#endif
+
 	flags = musb_readl(musb->mregs, USB_L1INTM);
 
 	/* mask ID pin, so "open clock" and "set flag" won't be interrupted. ISR may call clock_disable.*/
@@ -267,9 +284,6 @@ static void mt_usb_enable(struct musb *musb)
 		*/
 
 	mdelay(10);
-	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-	mt_usb_clock_prepare();
-	#endif
 
 	usb_phy_recover();
 
@@ -297,7 +311,7 @@ static void mt_usb_disable(struct musb *musb)
 
 	usb_phy_savecurrent();
 	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-	mt_usb_clock_unprepare();
+		mt_usb_clock_unprepare(musb);
 	#endif
 
 	/* update musb->power & mtk_usb_power in the same time */
@@ -331,9 +345,13 @@ bool mt_usb_is_device(void)
 }
 
 #ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-void mt_usb_clock_prepare(void)
+int usb20_clk_prepared_cnt;
+void mt_usb_clock_prepare(struct musb *musb)
 {
 	int retval = 0;
+
+	++usb20_clk_prepared_cnt;
+	DBG(1, "prepared cnt:%d\n", usb20_clk_prepared_cnt);
 
 	DBG(1, "usb_power = %d\n", mtk_usb_power);
 	retval = clk_prepare(usbpll_clk);
@@ -348,8 +366,11 @@ void mt_usb_clock_prepare(void)
 		DBG(0, KERN_WARNING "prepare fail\n");
 }
 
-void mt_usb_clock_unprepare(void)
+void mt_usb_clock_unprepare(struct musb *musb)
 {
+	--usb20_clk_prepared_cnt;
+	DBG(1, "prepared cnt:%d\n", usb20_clk_prepared_cnt);
+
 	DBG(1, "usb_power = %d\n", mtk_usb_power);
 
 	clk_unprepare(usbmcu_clk);
@@ -363,29 +384,22 @@ void mt_usb_clock_unprepare(void)
 static struct delayed_work connection_work;
 void do_connection_work(struct work_struct *data)
 {
-	static DEFINE_RATELIMIT_STATE(ratelimit, 1 * HZ, 3);
 	unsigned long flags = 0;
 	bool usb_in = false;
 
-	if (mtk_musb) {
-		if (__ratelimit(&ratelimit))
-			DBG(0, "is ready %d is_host %d power %d\n", mtk_musb->is_ready, mtk_musb->is_host,
-					mtk_musb->power);
-	} else {
-		/* re issue delay work */
-		if (__ratelimit(&ratelimit))
-			DBG(0, "issue work after %d ms\n", CONN_WORK_DELAY);
+	if (!mtk_musb->is_ready) {
+		/* re issue work */
+		DBG_LIMIT(3, "!is_ready, retrigger after %d ms, is_host<%d>, power<%d>",
+				CONN_WORK_DELAY,
+				mtk_musb->is_host,
+				mtk_musb->power);
 		queue_delayed_work(mtk_musb->st_wq, &connection_work, msecs_to_jiffies(CONN_WORK_DELAY));
 		return;
 	}
 
-	if (!mtk_musb->is_ready) {
-		/* re issue work */
-		if (__ratelimit(&ratelimit))
-			DBG(0, "issue work after %d ms\n", CONN_WORK_DELAY);
-		queue_delayed_work(mtk_musb->st_wq, &connection_work, msecs_to_jiffies(CONN_WORK_DELAY));
-		return;
-	}
+	DBG(0, "is_host<%d>, power<%d>\n",
+			mtk_musb->is_host,
+			mtk_musb->power);
 
 	/* be aware this could not be used in non-sleep context */
 	usb_in = usb_cable_connected();
@@ -420,8 +434,7 @@ void do_connection_work(struct work_struct *data)
 		/* note this already put SOFTCON */
 		musb_start(mtk_musb);
 
-	}
-	else if (mtk_musb->power && (usb_in == false)) {
+	} else if (mtk_musb->power && (usb_in == false)) {
 		/* disable usb */
 		#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
 		spin_unlock_irqrestore(&mtk_musb->lock, flags);
@@ -472,12 +485,6 @@ void mt_usb_disconnect(void)
 	queue_delayed_work(mtk_musb->st_wq, &connection_work, 0);
 	DBG(0, "[MUSB] USB disconnect\n");
 #endif
-}
-
-static void do_connect_rescue_work(struct work_struct *work)
-{
-	DBG(0, "do_connect_rescue_work, issue connection work\n");
-	queue_delayed_work(mtk_musb->st_wq, &connection_work, 0);
 }
 
 /* build time force on */
@@ -558,19 +565,16 @@ bool usb_cable_connected(void)
 {
 	CHARGER_TYPE chg_type = CHARGER_UNKNOWN;
 	bool connected = false, vbus_exist = false;
-	int delay_time;
 
 	mutex_lock(&cable_connected_lock);
 	/* FORCE USB ON case */
 	if (musb_force_on) {
-		delay_time = 0;    /* directly issue connection */
 		chg_type = STANDARD_HOST;
 		vbus_exist = true;
 		connected = true;
 		DBG(0, "%s type force to STANDARD_HOST\n", __func__);
 	} else {
 		/* TYPE CHECK*/
-		delay_time = 2000; /* issue connection one time in case, BAT THREAD didn't come*/
 		chg_type = musb_hal_get_charger_type();
 		if (musb_fake_CDP && chg_type == STANDARD_HOST) {
 			DBG(0, "%s, fake to type 2\n", __func__);
@@ -592,23 +596,17 @@ bool usb_cable_connected(void)
 	if (cable_mode == CABLE_MODE_CHRG_ONLY || (cable_mode == CABLE_MODE_HOST_ONLY && chg_type != CHARGING_HOST))
 		connected = false;
 
-	/* one time job, set_usb_rdy, issue connect_rescue_work */
-	if (is_usb_rdy() == KAL_FALSE && mtk_musb->is_ready) {
-		static struct delayed_work connect_rescue_work;
-
-		set_usb_rdy();
-
-		INIT_DELAYED_WORK(&connect_rescue_work, do_connect_rescue_work);
-		DBG(0, "issue connect_rescue_work on is_ready begin, delay_time:%d ms\n", delay_time);
-		schedule_delayed_work(&connect_rescue_work, msecs_to_jiffies(delay_time));
-		DBG(0, "issue connect_rescue_work on is_ready end, delay_time:%d ms\n", delay_time);
-	}
-
 	mutex_unlock(&cable_connected_lock);
 	DBG(0, "%s, connected:%d, cable_mode:%d\n", __func__, connected, cable_mode);
 	return connected;
 }
 
+static void usb_reconnect(void)
+{
+	DBG(0, "issue work\n");
+	queue_delayed_work(mtk_musb->st_wq, &connection_work, 0);
+	DBG(0, "%s end\n", __func__);
+}
 
 void musb_platform_reset(struct musb *musb)
 {
@@ -695,7 +693,7 @@ static irqreturn_t mt_usb_interrupt(int irq, void *dev_id)
 	u32 usb_l1_ints;
 
 #ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
-	if (usb_shutdown) {
+	if (musb_shutted) {
 		pr_err("%s, already shut down\n", __func__);
 		return IRQ_HANDLED;
 	}
@@ -733,6 +731,79 @@ static irqreturn_t mt_usb_interrupt(int irq, void *dev_id)
 	return status;
 }
 
+/*--FOR INSTANT POWER ON USAGE--------------------------------------------------*/
+static ssize_t mt_usb_show_cmode(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	if (!dev) {
+		DBG(0, "dev is null!!\n");
+		return 0;
+	}
+	return scnprintf(buf, PAGE_SIZE, "%d\n", cable_mode);
+}
+
+static ssize_t mt_usb_store_cmode(struct device *dev, struct device_attribute *attr,
+	const char *buf, size_t count)
+{
+	unsigned int cmode;
+
+	if (!dev) {
+		DBG(0, "dev is null!!\n");
+		return count;
+	/* } else if (1 == sscanf(buf, "%d", &cmode)) { */
+	} else if (kstrtol(buf, 10, (long *)&cmode) == 0) {
+		DBG(0, "cmode=%d, cable_mode=%d\n", cmode, cable_mode);
+		if (cmode >= CABLE_MODE_MAX)
+			cmode = CABLE_MODE_NORMAL;
+
+		if (cable_mode != cmode) {
+			if (mtk_musb) {
+				if (down_interruptible(&mtk_musb->musb_lock))
+					DBG(0, "USB20: %s: busy, Couldn't get power_clock_lock\n",
+					    __func__);
+			}
+			if (cmode == CABLE_MODE_CHRG_ONLY) { /* IPO shutdown, disable USB*/
+				if (mtk_musb)
+					mtk_musb->in_ipo_off = true;
+
+			} else {	/* IPO bootup, enable USB */
+				if (mtk_musb)
+					mtk_musb->in_ipo_off = false;
+			}
+
+			cable_mode = cmode;
+			usb_reconnect();
+			mdelay(10);
+
+#ifdef CONFIG_USB_MTK_OTG
+			if (cmode == CABLE_MODE_CHRG_ONLY) {
+				if (mtk_musb && mtk_musb->is_host) { /* shut down USB host for IPO*/
+					if (wake_lock_active(&mtk_musb->usb_lock))
+						wake_unlock(&mtk_musb->usb_lock);
+					musb_platform_set_vbus(mtk_musb, 0);
+					msleep(50); /*add sleep time to ensure vbus off and disconnect irq processed.*/
+					musb_stop(mtk_musb);
+					MUSB_DEV_MODE(mtk_musb);
+					/* Think about IPO shutdown with A-cable, then switch to B-cable and IPO bootup.
+					*	We need a point to clear session bit
+					*/
+					musb_writeb(mtk_musb->mregs, MUSB_DEVCTL,
+											(~MUSB_DEVCTL_SESSION) &
+					musb_readb(mtk_musb->mregs, MUSB_DEVCTL));
+				}
+				/* mask ID pin interrupt even if A-cable is not plugged in*/
+				switch_int_to_host_and_mask(mtk_musb);
+			} else {
+				switch_int_to_host(mtk_musb); /* resotre ID pin interrupt*/
+			}
+#endif
+			if (mtk_musb)
+				up(&mtk_musb->musb_lock);
+		}
+	}
+	return count;
+}
+
+DEVICE_ATTR(cmode,  0664, mt_usb_show_cmode, mt_usb_store_cmode);
 
 static bool saving_mode;
 
@@ -954,41 +1025,73 @@ static ssize_t mt_usb_show_uart_path(struct device *dev, struct device_attribute
 DEVICE_ATTR(uartpath,  0444, mt_usb_show_uart_path, NULL);
 #endif
 
-#ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE
-static bool device_mode;
-static bool host_mode;
+#ifndef FPGA_PLATFORM
+static struct device_attribute *mt_usb_attributes[] = {
+	&dev_attr_saving,
+#ifdef CONFIG_MTK_UART_USB_SWITCH
+	&dev_attr_portmode,
+	&dev_attr_uartpath,
+#endif
+	NULL
+};
 
+static int init_sysfs(struct device *dev)
+{
+	struct device_attribute **attr;
+	int rc;
+
+	for (attr = mt_usb_attributes; *attr; attr++) {
+		rc = device_create_file(dev, *attr);
+		if (rc)
+			goto out_unreg;
+	}
+	return 0;
+
+out_unreg:
+	for (; attr >= mt_usb_attributes; attr--)
+		device_remove_file(dev, *attr);
+	return rc;
+}
+#endif
+
+
+#ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE
 static ssize_t mt_usb_store_swmode(struct device *dev, struct device_attribute *attr,
 						   const char *buf, size_t count)
 {
 	if (count >= 6 && !strncmp(buf, "device", 6)) {
-		if (!device_mode && !host_mode) {
-			DBG(0, "switch to device mode\n");
+		DBG(0, "switch to device mode\n");
+		if (mtk_musb->is_host) {
+			DBG(0, "Now usb is host mode\n");
+			musb_id_pin_sw_work(false);
+			udelay(500);
 			mt_usb20_sw_connect();
-			device_mode = true;
+		} else {
+			DBG(0, "Switch to device mode directly\n");
+			mt_usb20_sw_connect();
 		}
 	}
 
 	if (count >= 4 && !strncmp(buf, "host", 4)) {
-		if (!device_mode && !host_mode) {
-			DBG(0, "switch to host mode\n");
+		DBG(0, "switch to host mode\n");
+		if (mtk_musb->is_active) {
+			if (mtk_musb->is_host) {
+				DBG(0, "already in host mode\n");
+				goto exit;
+			} else {
+				DBG(0, "Now usb is device mode\n");
+				mt_usb20_sw_disconnect();
+				udelay(500);
+				musb_id_pin_sw_work(true);
+			}
+		} else {
+			DBG(0, "switch to host mode directly\n");
 			musb_id_pin_sw_work(true);
-			host_mode = true;
 		}
 	}
 
-	if (count >= 4 && !strncmp(buf, "idle", 4)) {
-		if (device_mode) {
-			DBG(0, "switch to dev->idle mode\n");
-			mt_usb20_sw_disconnect();
-			device_mode = false;
-		} else if (host_mode) {
-			DBG(0, "switch to host->idle mode\n");
-			musb_id_pin_sw_work(false);
-			host_mode = false;
-		} else
-			DBG(0, "do nothing\n");
-	}
+exit:
+	DBG(0, "%s:%d finish\n", __func__, __LINE__);
 
 	return count;
 }
@@ -1020,13 +1123,11 @@ UINT8 USB_PHY_Read_Register8(UINT8 addr)
 
 static int usb_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-#ifdef CONFIG_OF
 	unsigned long base;
 	/* if i2c probe before musb prob, this would cause KE */
 	/* base = (unsigned long)((unsigned long)mtk_musb->xceiv->io_priv); */
 	base = usb_phy_base;
 	DBG(0, "[MUSB]usb_i2c_probe, start, base:%lx\n", base);
-#endif
 
 	usb_i2c_client = client;
 
@@ -1156,12 +1257,10 @@ static int usb_i2c_remove(struct i2c_client *client)
 	return 0;
 }
 
-#ifdef CONFIG_OF
 static const struct of_device_id usb_of_match[] = {
 	{.compatible = "mediatek,mtk-usb"},
 	{},
 };
-#endif
 
 struct i2c_driver usb_i2c_driver = {
 	.probe = usb_i2c_probe,
@@ -1169,9 +1268,7 @@ struct i2c_driver usb_i2c_driver = {
 	/*.detect = usb_i2c_detect,*/
 	.driver = {
 		.name = "mtk-usb",
-		#ifdef CONFIG_OF
 		.of_match_table = usb_of_match,
-		#endif
 	},
 	.id_table = usb_i2c_id,
 };
@@ -1190,7 +1287,7 @@ static int add_usb_i2c_driver(void)
 }
 #endif /*End of FPGA_PLATFORM*/
 
-static int mt_usb_init(struct musb *musb)
+static int __init mt_usb_init(struct musb *musb)
 {
 #if !defined(CONFIG_MTK_LEGACY) && !defined(FPGA_PLATFORM)
 	int ret;
@@ -1206,12 +1303,6 @@ static int mt_usb_init(struct musb *musb)
 		return -EPROBE_DEFER;
 	}
 
-
-#ifdef CONFIG_OF
-	/*musb->nIrq = usb_irq_number1;*/
-#else
-	musb->nIrq = USB_MCU_IRQ_BIT1_ID;
-#endif
 	musb->dma_irq = (int)SHARE_IRQ;
 	musb->fifo_cfg = fifo_cfg;
 	musb->fifo_cfg_size = ARRAY_SIZE(fifo_cfg);
@@ -1264,6 +1355,7 @@ static int mt_usb_init(struct musb *musb)
 							DMA_INT_STATUS);
 #endif
 
+	INIT_WORK(&musb_do_idle_work, musb_idle_work_func);
 	setup_timer(&musb_idle_timer, musb_do_idle, (unsigned long) musb);
 
 	DBG(0, "%s, init_otg before\n", __func__);
@@ -1282,6 +1374,16 @@ static int mt_usb_exit(struct musb *musb)
 	return 0;
 }
 
+static void mt_usb_enable_clk(struct musb *musb)
+{
+	usb_enable_clock(true);
+}
+
+static void mt_usb_disable_clk(struct musb *musb)
+{
+	usb_enable_clock(false);
+}
+
 static const struct musb_platform_ops mt_usb_ops = {
 	.init		= mt_usb_init,
 	.exit		= mt_usb_exit,
@@ -1290,7 +1392,11 @@ static const struct musb_platform_ops mt_usb_ops = {
 	.enable		= mt_usb_enable,
 	.disable	= mt_usb_disable,
 	.set_vbus	= mt_usb_set_vbus,
-	.vbus_status = mt_usb_get_vbus_status
+	.vbus_status = mt_usb_get_vbus_status,
+	.enable_clk =  mt_usb_enable_clk,
+	.disable_clk =  mt_usb_disable_clk,
+	.prepare_clk = mt_usb_clock_prepare,
+	.unprepare_clk = mt_usb_clock_unprepare,
 };
 
 static u64 mt_usb_dmamask = DMA_BIT_MASK(32);
@@ -1300,12 +1406,16 @@ static int mt_usb_probe(struct platform_device *pdev)
 	struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;
 	struct platform_device		*musb;
 	struct mt_usb_glue		*glue;
-#ifdef CONFIG_OF
+
 	struct musb_hdrc_config		*config;
 	struct device_node		*np = pdev->dev.of_node;
 	/*u32 temp_id = 0; */
 	/*unsigned long usb_mac;*/
+
+#ifdef CONFIG_MTK_UART_USB_SWITCH
+	struct device_node *np, *node_pctl;
 #endif
+
 	int ret = -ENOMEM;
 	/*int retval = 0;*/
 
@@ -1318,22 +1428,24 @@ static int mt_usb_probe(struct platform_device *pdev)
 		goto err0;
 	}
 
-	musb = platform_device_alloc("musb-hdrc", PLATFORM_DEVID_AUTO);
+	musb = platform_device_alloc("musb-hdrc", PLATFORM_DEVID_NONE);
 	if (!musb) {
 		dev_err(&pdev->dev, "failed to allocate musb device\n");
 		DBG(0, "[U2]failed to allocate musb device\n");
 		goto err1;
 	}
 
-#ifdef CONFIG_OF
-	dts_np = pdev->dev.of_node;
+	/*dts_np = pdev->dev.of_node;*/
+	musb->dev.of_node = pdev->dev.of_node;	/* it should be put in musb_core probe */
+	if (musb->dev.of_node == NULL)
+		pr_info("musb set of node failed\n");
 
 	/*usb_irq_number1 = irq_of_parse_and_map(pdev->dev.of_node, 0);*/
 	/*usb_mac = (unsigned long)of_iomap(pdev->dev.of_node, 0);*/
-	usb_phy_base = (unsigned long)of_iomap(pdev->dev.of_node, 1);
+	usb_phy_base = of_iomap(np, 1);
+
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
-		dev_err(&pdev->dev, "failed to allocate musb platform data\n");
 		DBG(0, "[U2]failed to allocate musb platform data\n");
 		goto err2;
 	}
@@ -1359,21 +1471,28 @@ static int mt_usb_probe(struct platform_device *pdev)
 	/*config->dma = of_property_read_bool(np, "dma");*/
 
 	pdata->config       = config;
-#endif
 
 	musb->dev.parent		= &pdev->dev;
 	musb->dev.dma_mask		= &mt_usb_dmamask;
 	musb->dev.coherent_dma_mask	= mt_usb_dmamask;
-#ifdef CONFIG_OF
+
 	pdev->dev.dma_mask = &mt_usb_dmamask;
 	pdev->dev.coherent_dma_mask = mt_usb_dmamask;
 	arch_setup_dma_ops(&musb->dev, 0, mt_usb_dmamask, NULL, 0);
-#endif
 
 	glue->dev			= &pdev->dev;
 	glue->musb			= musb;
 
 	pdata->platform_ops		= &mt_usb_ops;
+	/*
+	 * Don't use the name from dtsi, like "11200000.usb0".
+	 * So modify the device name. And rc can use the same path for
+	 * all platform, like "/sys/devices/platform/mt_usb/".
+	 */
+	ret = device_rename(&pdev->dev, "mt_usb");
+	if (ret)
+		dev_notice(&pdev->dev, "failed to rename\n");
+
 	platform_set_drvdata(pdev, glue);
 
 	ret = platform_device_add_resources(musb, pdev->resource, pdev->num_resources);
@@ -1395,12 +1514,10 @@ static int mt_usb_probe(struct platform_device *pdev)
 		goto err2;
 	}
 
-	ret = device_create_file(&pdev->dev, &dev_attr_saving);
+	ret = device_create_file(&pdev->dev, &dev_attr_cmode);
 #ifdef CONFIG_MTK_UART_USB_SWITCH
-	ret = device_create_file(&pdev->dev, &dev_attr_portmode);
 	ret = device_create_file(&pdev->dev, &dev_attr_tx);
 	ret = device_create_file(&pdev->dev, &dev_attr_rx);
-	ret = device_create_file(&pdev->dev, &dev_attr_uartpath);
 #endif
 #ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE
 	ret = device_create_file(&pdev->dev, &dev_attr_swmode);
@@ -1412,6 +1529,96 @@ static int mt_usb_probe(struct platform_device *pdev)
 		goto err2;
 	}
 
+	DBG(0, "init connection_work\n");
+	INIT_DELAYED_WORK(&connection_work, do_connection_work);
+	DBG(0, "keep musb->power & mtk_usb_power in the samae value\n");
+	mtk_usb_power = false;
+
+#ifndef FPGA_PLATFORM
+	usbpll_clk = devm_clk_get(&pdev->dev, "usbpll");
+	if (IS_ERR(usbpll_clk)) {
+		DBG(0, KERN_WARNING "cannot get usbpll clock\n");
+		return PTR_ERR(usbpll_clk);
+	}
+	#ifndef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	DBG(0, KERN_WARNING "get usbpll clock ok, prepare it\n");
+	retval = clk_prepare(usbpll_clk);
+	if (retval == 0) {
+		DBG(0, KERN_WARNING "prepare done\n");
+	} else {
+		DBG(0, KERN_WARNING "prepare fail\n");
+		return retval;
+	}
+	#endif
+
+	usb_clk = devm_clk_get(&pdev->dev, "usb");
+	if (IS_ERR(usb_clk)) {
+		DBG(0, KERN_WARNING "cannot get usb clock\n");
+		return PTR_ERR(usb_clk);
+	}
+	#ifndef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	DBG(0, KERN_WARNING "get usb clock ok, prepare it\n");
+	retval = clk_prepare(usb_clk);
+	if (retval == 0) {
+		DBG(0, KERN_WARNING "prepare done\n");
+	} else {
+		DBG(0, KERN_WARNING "prepare fail\n");
+		return retval;
+	}
+	#endif
+
+	usbmcu_clk = devm_clk_get(&pdev->dev, "usbmcu");
+	if (IS_ERR(usbmcu_clk)) {
+		DBG(0, KERN_WARNING "cannot get usbmcu clock\n");
+		return PTR_ERR(usbmcu_clk);
+	}
+	#ifndef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	DBG(0, KERN_WARNING "get usbmcu clock ok, prepare it\n");
+	retval = clk_prepare(usbmcu_clk);
+	if (retval == 0) {
+		DBG(0, KERN_WARNING "prepare done\n");
+	} else {
+		DBG(0, KERN_WARNING "prepare fail\n");
+		return retval;
+	}
+	#endif
+
+	icusb_clk = devm_clk_get(&pdev->dev, "icusb");
+	if (IS_ERR(icusb_clk)) {
+		DBG(0, KERN_WARNING "cannot get icusb clock\n");
+		return PTR_ERR(icusb_clk);
+	}
+	#ifndef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+	DBG(0, KERN_WARNING "get icusb clock ok, prepare it\n");
+	retval = clk_prepare(icusb_clk);
+	if (retval == 0) {
+		DBG(0, KERN_WARNING "prepare done\n");
+	} else {
+		DBG(0, KERN_WARNING "prepare fail\n");
+		return retval;
+	}
+	#endif
+#endif
+#ifdef CONFIG_MTK_UART_USB_SWITCH
+	np = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-pinctrl");
+	node_pctl = of_parse_phandle(np, "mediatek,pctl-regmap", 0);
+	if (node_pctl) {
+		mt_regmap = syscon_node_to_regmap(node_pctl);
+		if (IS_ERR(mt_regmap))
+			return PTR_ERR(mt_regmap);
+		DBG(0, KERN_WARNING "Get PINCTRL SUCCESS!!\n");
+	}
+#endif
+	DBG(0, "[U2]usb20 dts probe\n");
+
+	if (init_sysfs(&pdev->dev)) {
+		DBG(0, "failed to init_sysfs\n");
+		goto err2;
+	}
+
+	DBG(0, "[U2]usb20 dts probe ret:%d\n", ret);
+
+
 #ifdef CONFIG_OF
 	/*pr_info("usb probe irq: 0x%d usb phy address: 0x%lx usb mac : 0x%1x\n",
 		*				usb_irq_number1, usb_phy_base, usb_mac);
@@ -1422,6 +1629,13 @@ static int mt_usb_probe(struct platform_device *pdev)
 	/* run time force on */
 #if defined(FPGA_PLATFORM) || defined(FOR_BRING_UP)
 	musb_force_on = 1;
+#endif
+
+#ifndef FPGA_PLATFORM
+	if (get_boot_mode() == META_BOOT) {
+		DBG(0, "in special mode %d\n", get_boot_mode());
+		musb_force_on = 1;
+	}
 #endif
 
 	DBG(0, "[U2]success to register musb\n");
@@ -1437,7 +1651,7 @@ err0:
 	DBG(0, "[U2]failed to register musb\n");
 	return ret;
 }
-
+#if 0
 static int mt_usb_dts_probe(struct platform_device *pdev)
 {
 	/*struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;*/
@@ -1547,13 +1761,19 @@ static int mt_usb_dts_probe(struct platform_device *pdev)
 	DBG(0, "[U2]usb20 dts probe ret:%d\n", retval);
 	return retval;
 }
-
+#endif
 static int mt_usb_remove(struct platform_device *pdev)
 {
 	struct mt_usb_glue		*glue = platform_get_drvdata(pdev);
 
 	platform_device_unregister(glue->musb);
 	kfree(glue);
+#ifndef FPGA_PLATFORM
+		clk_unprepare(icusb_clk);
+		clk_unprepare(usbmcu_clk);
+		clk_unprepare(usb_clk);
+		clk_unprepare(usbpll_clk);
+#endif
 
 	return 0;
 }
@@ -1563,16 +1783,20 @@ static void mt_usb_shutdown(struct platform_device *pdev)
 {
 	pr_err("%s, start to shut down\n", __func__);
 	/* disable all level-1 interrupts in shutdown status */
+
+	/* need prepare clock because  musb_generic_disable may call prepare clock in atomic context */
+	mt_usb_clock_prepare(mtk_musb);
+
 	musb_writel(mtk_musb->mregs, USB_L1INTM, 0x0);
 	musb_writeb(mtk_musb->mregs, MUSB_HSDMA_INTR, 0xff);
 	pr_err("%s, 0xa4 = 0x%x, 0x200 = 0x%x\n", __func__,
 		musb_readl(mtk_musb->mregs, USB_L1INTM),
 		musb_readb(mtk_musb->mregs, MUSB_HSDMA_INTR));
-	usb_shutdown = true;
 
+	mt_usb_clock_unprepare(mtk_musb);
 }
 #endif
-
+#if 0
 static int mt_usb_dts_remove(struct platform_device *pdev)
 {
 	struct mt_usb_glue		*glue = platform_get_drvdata(pdev);
@@ -1589,19 +1813,21 @@ static int mt_usb_dts_remove(struct platform_device *pdev)
 
 	return 0;
 }
-
+#endif
 
 static struct platform_driver mt_usb_driver = {
 	.remove		= mt_usb_remove,
 	.probe		= mt_usb_probe,
 	.driver		= {
 		.name	= "mt_usb",
+		.of_match_table = apusb_of_ids,
 	},
 	#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
 	.shutdown = mt_usb_shutdown,
 	#endif
 };
 
+#if 0
 static struct platform_driver mt_usb_dts_driver = {
 	.remove		= mt_usb_dts_remove,
 	.probe		= mt_usb_dts_probe,
@@ -1612,7 +1838,7 @@ static struct platform_driver mt_usb_dts_driver = {
 #endif
 	},
 };
-
+#endif
 
 static int __init usb20_init(void)
 {
@@ -1620,8 +1846,7 @@ static int __init usb20_init(void)
 
 	DBG(0, "usb20 init\n");
 
-	platform_driver_register(&mt_usb_driver);
-	ret = platform_driver_register(&mt_usb_dts_driver);
+	ret =  platform_driver_register(&mt_usb_driver);
 
 #ifdef FPGA_PLATFORM
 	add_usb_i2c_driver();
@@ -1636,6 +1861,5 @@ late_initcall(usb20_init);
 static void __exit usb20_exit(void)
 {
 	platform_driver_unregister(&mt_usb_driver);
-	platform_driver_unregister(&mt_usb_dts_driver);
 }
 module_exit(usb20_exit)

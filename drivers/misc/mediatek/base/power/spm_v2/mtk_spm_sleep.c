@@ -56,6 +56,14 @@
 
 #include <mtk_power_gs.h>
 
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+#include <mtk_pmic_api_buck.h>
+#endif
+#endif
+
+#include <linux/wakeup_reason.h>
+
 /**************************************
  * only for internal debug
  **************************************/
@@ -66,7 +74,11 @@
 #else
 #define SPM_PWAKE_EN            1
 #define SPM_PCMWDT_EN           1
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+#define SPM_BYPASS_SYSPWREQ     1
+#else
 #define SPM_BYPASS_SYSPWREQ     0
+#endif
 #endif
 
 #ifdef CONFIG_OF
@@ -436,6 +448,8 @@ struct spm_lp_scen __spm_suspend = {
 	.wakestatus = &suspend_info[0],
 };
 
+static int mt_power_gs_dump_suspend_count = 2;
+
 static void spm_suspend_pre_process(struct pwr_ctrl *pwrctrl)
 {
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
@@ -444,12 +458,34 @@ static void spm_suspend_pre_process(struct pwr_ctrl *pwrctrl)
 
 	__spm_pmic_low_iq_mode(1);
 
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+	/* nothing, not need for MT6355 */
+#else
 	__spm_pmic_pg_force_on();
+#endif
 
 	spm_pmic_power_mode(PMIC_PWR_SUSPEND, 0, 0);
 
-#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+	pmic_read_interface_nolock(PMIC_RG_LDO_VSRAM_PROC_EN_ADDR, &temp, 0xFFFF, 0);
+	mt_spm_pmic_wrap_set_cmd(PMIC_WRAP_PHASE_SUSPEND,
+			IDX_SP_VSRAM_PWR_ON,
+			0x1);
+	mt_spm_pmic_wrap_set_cmd(PMIC_WRAP_PHASE_SUSPEND,
+			IDX_SP_VSRAM_SHUTDOWN,
+			0x3);
+
+	pmic_read_interface_nolock(PMIC_RG_BUCK_VPROC11_EN_ADDR, &temp, 0xFFFF, 0);
+	mt_spm_pmic_wrap_set_cmd_full(PMIC_WRAP_PHASE_SUSPEND,
+			IDX_SP_VPROC_PWR_ON,
+			PMIC_RG_BUCK_VPROC11_EN_ADDR,
+			0x1);
+	mt_spm_pmic_wrap_set_cmd_full(PMIC_WRAP_PHASE_SUSPEND,
+			IDX_SP_VPROC_SHUTDOWN,
+			PMIC_RG_BUCK_VPROC11_EN_ADDR,
+			0x3);
+#else
 	/* set PMIC WRAP table for suspend power control */
 	pmic_read_interface_nolock(MT6351_PMIC_RG_VSRAM_PROC_EN_ADDR, &temp, 0xFFFF, 0);
 	mt_spm_pmic_wrap_set_cmd(PMIC_WRAP_PHASE_SUSPEND,
@@ -476,10 +512,22 @@ static void spm_suspend_pre_process(struct pwr_ctrl *pwrctrl)
 
 		__spm_backup_pmic_ck_pdn();
 	}
+
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+	wk_auxadc_bgd_ctrl(0);
+#endif
+#endif
 }
 
 static void spm_suspend_post_process(struct pwr_ctrl *pwrctrl)
 {
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+	wk_auxadc_bgd_ctrl(1);
+#endif
+#endif
+
 	/* Do more low power setting when MD1/C2K/CONN off */
 	if (is_md_c2k_conn_power_off())
 		__spm_restore_pmic_ck_pdn();
@@ -491,7 +539,11 @@ static void spm_suspend_post_process(struct pwr_ctrl *pwrctrl)
 
 	__spm_pmic_low_iq_mode(0);
 
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+	/* nothing, not need for MT6355 */
+#else
 	__spm_pmic_pg_force_off();
+#endif
 }
 
 static void spm_set_sysclk_settle(void)
@@ -558,9 +610,9 @@ static void spm_clean_after_wakeup(void)
 	__spm_clean_after_wakeup();
 }
 
-static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct pcm_desc *pcmdesc, int vcore_status)
+static unsigned int spm_output_wake_reason(struct wake_status *wakesta, struct pcm_desc *pcmdesc, int vcore_status)
 {
-	wake_reason_t wr;
+	unsigned int wr;
 	u32 md32_flag = 0;
 	u32 md32_flag2 = 0;
 
@@ -625,6 +677,9 @@ static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct 
 		exec_ccci_kern_func_by_md_id(2, ID_GET_MD_WAKEUP_SRC, NULL, 0);
 #endif
 #endif
+
+	log_wakeup_reason(SPM_IRQ0_ID);
+
 	return wr;
 }
 
@@ -673,7 +728,7 @@ void spm_suspend_aee_init(void)
 #endif
 
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
-#ifdef CONFIG_MTK_PMIC
+#if defined(CONFIG_MTK_PMIC) || defined(CONFIG_MTK_PMIC_NEW_ARCH)
 /* #include <cust_pmic.h> */
 #ifndef DISABLE_DLPT_FEATURE
 /* extern int get_dlpt_imix_spm(void); */
@@ -685,7 +740,7 @@ int __attribute__((weak)) get_dlpt_imix_spm(void)
 #endif
 #endif
 
-wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
+unsigned int spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 {
 	u32 sec = 2;
 	/* struct wake_status wakesta; */
@@ -695,7 +750,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	struct wd_api *wd_api;
 	int wd_ret;
 #endif
-	static wake_reason_t last_wr = WR_NONE;
+	static unsigned int last_wr = WR_NONE;
 	struct pcm_desc *pcmdesc = NULL;
 	struct pwr_ctrl *pwrctrl;
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
@@ -711,7 +766,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 #endif
 
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
-#ifdef CONFIG_MTK_PMIC
+#if defined(CONFIG_MTK_PMIC) || defined(CONFIG_MTK_PMIC_NEW_ARCH)
 #ifndef DISABLE_DLPT_FEATURE
 	get_dlpt_imix_spm();
 #endif
@@ -776,7 +831,8 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
 	snapshot_golden_setting(__func__, 0);
 #endif
-	mt_power_gs_dump_suspend();
+	if (slp_dump_golden_setting || --mt_power_gs_dump_suspend_count >= 0)
+		mt_power_gs_dump_suspend();
 
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
@@ -872,7 +928,7 @@ RESTORE_IRQ:
 
 #ifdef CONFIG_MTK_USB2JTAG_SUPPORT
 	if (usb2jtag_mode())
-		mt_usb2jtag_resume();
+		mtk_usb2jtag_resume();
 #endif
 
 	return last_wr;

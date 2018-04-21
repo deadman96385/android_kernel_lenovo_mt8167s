@@ -162,7 +162,7 @@ struct mtk_bucks_t mtk_bucks_class[] = {
 
 static unsigned int mtk_bucks_size = ARRAY_SIZE(mtk_bucks_class);
 
-int buck_is_enabled(BUCK_TYPE type)
+int buck_is_enabled(enum BUCK_TYPE type)
 {
 	if (type >= mtk_bucks_size) {
 		pr_err("[PMIC]Wrong buck type\n");
@@ -173,7 +173,7 @@ int buck_is_enabled(BUCK_TYPE type)
 }
 /*en = 1 enable*/
 /*en = 0 disable*/
-int buck_enable(BUCK_TYPE type, unsigned char en)
+int buck_enable(enum BUCK_TYPE type, unsigned char en)
 {
 	unsigned int retry = 0;
 
@@ -257,7 +257,7 @@ int buck_enable(BUCK_TYPE type, unsigned char en)
 
 /*pmode = 1 force PWM mode*/
 /*pmode = 0 auto mode*/
-int buck_set_mode(BUCK_TYPE type, unsigned char pmode)
+int buck_set_mode(enum BUCK_TYPE type, unsigned char pmode)
 {
 	if (type >= mtk_bucks_size) {
 		pr_err("[PMIC]Wrong buck type for setting mode\n");
@@ -276,6 +276,7 @@ int buck_set_mode(BUCK_TYPE type, unsigned char pmode)
 	}
 
 	/*---Make sure BUCK <NAME> ON before setting---*/
+	pr_err("[PMIC] Before set %s Mode to %d\n", mtk_bucks_class[type].name, pmode);
 	if (type == VCORE) {
 		if (pmode == 1) {
 			pmic_set_register_value(PMIC_RG_VCORE_CCSEL1, 0x2);
@@ -302,7 +303,7 @@ int buck_set_mode(BUCK_TYPE type, unsigned char pmode)
 		}
 	} else
 		pmic_set_register_value(mtk_bucks_class[type].mode, pmode);
-
+	pr_err("[PMIC] After set %s Mode to %d\n", mtk_bucks_class[type].name, pmode);
 	if (pmic_get_register_value(mtk_bucks_class[type].mode) == pmode)
 		pr_debug("[PMIC] Set %s Mode to %d pass\n", mtk_bucks_class[type].name, pmode);
 	else
@@ -312,7 +313,7 @@ int buck_set_mode(BUCK_TYPE type, unsigned char pmode)
 }
 
 
-int buck_set_voltage(BUCK_TYPE type, unsigned int voltage)
+int buck_set_voltage(enum BUCK_TYPE type, unsigned int voltage)
 {
 	unsigned short value = 0;
 
@@ -352,7 +353,7 @@ int buck_set_voltage(BUCK_TYPE type, unsigned int voltage)
 }
 
 
-unsigned int buck_get_voltage(BUCK_TYPE type)
+unsigned int buck_get_voltage(enum BUCK_TYPE type)
 {
 	unsigned short value = 0;
 	unsigned int voltage = 0;

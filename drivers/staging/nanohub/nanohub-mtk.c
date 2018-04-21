@@ -30,11 +30,24 @@ struct nanohub_ipi_rx_st {
 struct nanohub_ipi_rx_st nanohub_ipi_rx;
 
 struct iio_dev *nanohub_iio_dev;
+struct semaphore scp_nano_ipi_sem;
 
 struct nanohub_ipi_data {
 	struct nanohub_data data;
 	/* todo */
 };
+
+enum scp_ipi_status __attribute__((weak))
+scp_ipi_registration(enum ipi_id id, void (*ipi_handler)(int id, void *data, unsigned int len),	const char *name)
+{
+	return SCP_IPI_ERROR;
+}
+
+enum scp_ipi_status __attribute__((weak))
+scp_ipi_send(enum ipi_id id, void *buf, unsigned int  len, unsigned int wait, enum scp_core_id scp_id)
+{
+	return SCP_IPI_ERROR;
+}
 
 #define NANOHUB_IPI_SEND_RETRY 100
 void mtk_ipi_scp_isr_sim(int got_size)
@@ -45,7 +58,7 @@ void mtk_ipi_scp_isr_sim(int got_size)
 
 	while (retry--) { /* add retry to avoid SCP busy timeout */
 		ret = scp_ipi_send(IPI_CHREX, &token, sizeof(token), 0, SCP_A_ID);
-		if (ret != BUSY)
+		if (ret != SCP_IPI_BUSY)
 			break;
 		usleep_range(100, 200);
 	}
@@ -65,11 +78,15 @@ int nanohub_ipi_write(void *data, u8 *tx, int length, int timeout)
 #endif
 	while (retry--) { /* add retry to avoid SCP busy timeout */
 		ret = scp_ipi_send(IPI_CHRE, tx, length, 0, SCP_A_ID);
-		if (ret != BUSY)
+		if (ret != SCP_IPI_BUSY)
 			break;
 		usleep_range(100, 200);
 	}
-	if (ret == DONE)
+
+	if (ret == SCP_IPI_BUSY)
+		pr_debug("%s ipi busy, ret=%d\n", __func__, ret);
+
+	if (ret == SCP_IPI_DONE)
 		return length;
 	else
 		return ERROR_NACK;
@@ -100,13 +117,14 @@ int nanohub_ipi_read(void *data, u8 *rx, int max_length, int timeout)
 
 static int nanohub_ipi_open(void *data)
 {
+	down(&scp_nano_ipi_sem);
 	reinit_completion(&nanohub_ipi_rx.isr_comp);	/* reset when every retry start */
 	return 0;
 }
 
 static void nanohub_ipi_close(void *data)
 {
-	/* do nothing */
+	up(&scp_nano_ipi_sem);
 }
 
 void nanohub_ipi_comms_init(struct nanohub_ipi_data *ipi_data)
@@ -114,9 +132,9 @@ void nanohub_ipi_comms_init(struct nanohub_ipi_data *ipi_data)
 	struct nanohub_comms *comms = &ipi_data->data.comms;
 
 	comms->seq = 1;
-	comms->timeout_write = msecs_to_jiffies(1024);
-	comms->timeout_ack = msecs_to_jiffies(1024);
-	comms->timeout_reply = msecs_to_jiffies(1024);
+	comms->timeout_write = msecs_to_jiffies(512);
+	comms->timeout_ack = msecs_to_jiffies(3);
+	comms->timeout_reply = msecs_to_jiffies(3);
 	comms->open = nanohub_ipi_open;
 	comms->close = nanohub_ipi_close;
 	comms->write = nanohub_ipi_write;
@@ -124,6 +142,7 @@ void nanohub_ipi_comms_init(struct nanohub_ipi_data *ipi_data)
 /*	comms->tx_buffer = kmalloc(4096, GFP_KERNEL | GFP_DMA); */
 	comms->rx_buffer = kmalloc(4096, GFP_KERNEL | GFP_DMA);
 	nanohub_ipi_rx.buff = comms->rx_buffer;
+	sema_init(&scp_nano_ipi_sem, 1);
 }
 
 static int nanohub_ipi_remove(struct platform_device *pdev);
@@ -164,7 +183,7 @@ int nanohub_ipi_probe(struct platform_device *pdev)
 {
 	struct nanohub_ipi_data *ipi_data;
 	struct iio_dev *iio_dev;
-	ipi_status status;
+	enum scp_ipi_status status;
 
 	iio_dev = iio_device_alloc(sizeof(struct nanohub_ipi_data));
 	if (!iio_dev)

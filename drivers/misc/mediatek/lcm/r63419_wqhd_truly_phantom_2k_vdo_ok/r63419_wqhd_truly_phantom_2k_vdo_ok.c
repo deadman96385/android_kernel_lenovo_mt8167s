@@ -301,7 +301,7 @@ static struct LCM_setting_table lcm_initialization_setting[] = {
 	/* Power setting(Charge pump setting */
 	{0xD0, 4, {0x11, 0x17, 0x17, 0xFD} },
 	/* Power setting for internal Power */
-	{0xD2, 16, {0xCD, 0x2B, 0x2B, 0x33, 0x12, 0x33, 0x33, 0x33, 0x77, 0x77, 0x33, 0x33, 0x33,
+	{0xD2, 16, {0xCD, 0x2B, 0x2B, 0x33, 0x10, 0x33, 0x33, 0x33, 0x77, 0x77, 0x33, 0x33, 0x33,
 		    0x00, 0x00, 0x00} },
 	/* vplvl 2b 4v vnlvl  2b -4v  12  4.02V ENTER ABNORMAL SEQUENCE */
 	/* VCOM setting */
@@ -486,8 +486,8 @@ static void lcm_get_params(LCM_PARAMS *params)
 
 	params->dsi.vertical_sync_active				= 4;
 	params->dsi.vertical_backporch					= 6;
-	params->dsi.vertical_frontporch					= 20;
-	params->dsi.vertical_frontporch_for_low_power			= 600;
+	params->dsi.vertical_frontporch					= 30;
+	params->dsi.vertical_frontporch_for_low_power			= 900;
 	params->dsi.vertical_active_line				= FRAME_HEIGHT;
 
 	params->dsi.horizontal_sync_active				= 8;
@@ -495,10 +495,10 @@ static void lcm_get_params(LCM_PARAMS *params)
 	params->dsi.horizontal_frontporch				= 150;/* >150 */
 	params->dsi.horizontal_active_pixel				= FRAME_WIDTH;
 #if (LCM_DSI_CMD_MODE)
-	params->dsi.PLL_CLOCK = 423; /*this value must be in MTK suggested table */
+	params->dsi.PLL_CLOCK = 425; /*this value must be in MTK suggested table */
 #else
 	/* params->dsi.PLL_CLOCK = 480; */
-	params->dsi.PLL_CLOCK = 423;
+	params->dsi.PLL_CLOCK = 425;
 #endif
 	params->dsi.ufoe_enable  = 1;
 	params->dsi.ufoe_params.lr_mode_en = 1;
@@ -526,7 +526,7 @@ static void lcm_get_params(LCM_PARAMS *params)
 	params->dsi.lane_swap[MIPITX_PHY_PORT_0][MIPITX_PHY_LANE_RX]	= MIPITX_PHY_LANE_3;
 	/* for ARR 2.0 */
 	params->max_refresh_rate = 60;
-	params->min_refresh_rate = 30;
+	params->min_refresh_rate = 45;
 }
 
 #ifdef BUILD_LK

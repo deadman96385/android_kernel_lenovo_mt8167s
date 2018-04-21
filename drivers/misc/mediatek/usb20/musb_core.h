@@ -43,37 +43,29 @@
 #include "musb.h"
 #include <linux/wakelock.h>
 #include <linux/version.h>
+#if CONFIG_MTK_GAUGE_VERSION == 30
+#include <mt-plat/charger_type.h>
+#else
 #include <mt-plat/charging.h>
-#include <linux/clk.h>
+#endif
 #if defined(CONFIG_MTK_SMART_BATTERY)
 extern CHARGER_TYPE mt_get_charger_type(void);
 #endif
+#include <linux/clk.h>
 
 extern struct clk *usbpll_clk;
 extern struct clk *usbmcu_clk;
 extern struct clk *usb_clk;
 extern struct clk *icusb_clk;
 
-typedef unsigned int kal_uint32;
-typedef uint8_t kal_uint8;
+#ifdef CONFIG_MTK_MUSB_PORT0_LOWPOWER_MODE
+extern bool musb_shutted;
+#endif
 
-/* data type and MACRO used from mt_typdefs.h for UART USB SWITCH */
-typedef unsigned char UINT8;
-typedef unsigned int UINT32;
-
-#define WRITE_REGISTER_UINT32(reg, val)	((*(volatile UINT32 * const)(reg)) = (val))
-#define READ_REGISTER_UINT8(reg)	((*(volatile UINT8 * const)(reg)))
-#define WRITE_REGISTER_UINT8(reg, val)	((*(volatile UINT8 * const)(reg)) = (val))
-
-#define INREG8(x)           READ_REGISTER_UINT8((UINT8 *)((void *)(x)))
-#define OUTREG8(x, y)       WRITE_REGISTER_UINT8((UINT8 *)((void *)(x)), (UINT8)(y))
-#define OUTREG32(x, y)      WRITE_REGISTER_UINT32((UINT32 *)((void *)(x)), (UINT32)(y))
-
-#define DRV_Reg8(addr)              INREG8(addr)
-#define DRV_WriteReg8(addr, data)   OUTREG8(addr, data)
-#define DRV_WriteReg32(addr, data)  OUTREG32(addr, data)
-
-
+/* to prevent 32 bit project misuse */
+#if defined(CONFIG_MTK_MUSB_DRV_36BIT) && !defined(CONFIG_64BIT)
+#error
+#endif
 
 #ifdef CONFIG_MTK_MUSB_QMU_SUPPORT
 #include "mtk_qmu.h"
@@ -84,15 +76,14 @@ typedef unsigned int UINT32;
 struct musb;
 struct musb_hw_ep;
 struct musb_ep;
-extern volatile bool usb_is_host;
 extern int musb_fake_CDP;
 extern int kernel_init_done;
 extern int musb_force_on;
 extern int musb_host_dynamic_fifo;
 extern int musb_host_dynamic_fifo_usage_msk;
-extern unsigned musb_uart_debug;
 extern struct musb *mtk_musb;
 extern bool mtk_usb_power;
+extern ktime_t ktime_ready;
 extern int ep_config_from_table_for_host(struct musb *musb);
 extern int polling_vbus_value(void *data);
 
@@ -136,27 +127,6 @@ extern void musb_bug(void);
 #include "musb_gadget.h"
 #include <linux/usb/hcd.h>
 #include "musb_host.h"
-#ifdef CONFIG_OF
-
-enum {
-	usb0 = 0,
-	usb_sif,
-	usb_acm_temp_device,
-};
-extern struct device_node *dts_np;
-#endif
-
-
-#ifdef ENABLE_STORAGE_LOGGER
-#define USB_LOGGER(msg_id, func_name, ...) \
-	do { \
-		if (unlikely(is_dump_musb())) { \
-			ADD_USB_TRACE(msg_id, func_name, __VA_ARGS__); \
-		} \
-	} while (0)
-#else
-#define USB_LOGGER(msg_id, func_name, args...) do {} while (0)
-#endif
 
 /* NOTE:  otg and peripheral-only state machines start at B_IDLE.
  * OTG or host-only go to A_IDLE when ID is sensed.
@@ -260,14 +230,14 @@ enum musb_g_ep0_state {
 
 #define MUSB_MODE(musb) ((musb)->is_host ? "Host" : "Peripheral")
 
-typedef enum {
+enum writeFunc_enum {
 	funcWriteb = 0,
 	funcWritew,
 	funcWritel,
 	funcInterrupt
-} writeFunc_enum;
+};
 
-void dumpTime(writeFunc_enum func, int epnum);
+void dumpTime(enum writeFunc_enum func, int epnum);
 
 /******************************** TYPES *************************************/
 
@@ -296,6 +266,11 @@ struct musb_platform_ops {
 
 	int (*adjust_channel_params)(struct dma_channel *channel,
 				      u16 packet_sz, u8 *mode, dma_addr_t *dma_addr, u32 *len);
+
+	void (*enable_clk)(struct musb *musb);
+	void (*disable_clk)(struct musb *musb);
+	void (*prepare_clk)(struct musb *musb);
+	void (*unprepare_clk)(struct musb *musb);
 };
 
 /*
@@ -377,7 +352,6 @@ struct musb {
 	struct semaphore musb_lock;
 	/* device lock */
 	spinlock_t lock;
-	enum usb_otg_state	state;
 	const struct musb_platform_ops *ops;
 	struct musb_context_registers context;
 
@@ -386,6 +360,7 @@ struct musb {
 	struct work_struct otg_notifier_work;
 	u16 hwvers;
 	struct delayed_work id_pin_work;
+	struct delayed_work host_work;
 #ifdef CONFIG_MTK_MUSB_CARPLAY_SUPPORT
 	struct delayed_work carplay_work;
 #endif
@@ -455,10 +430,12 @@ struct musb {
 	u8 nr_endpoints;
 
 	int (*board_set_power)(int state);
+	void (*usb_rev6_setting)(int value);
 
 	u8 min_power;		/* vbus for periph, in mA/2 */
 
 	bool is_host;
+	bool in_ipo_off;
 
 	int a_wait_bcon;	/* VBUS timeout in msecs */
 	unsigned long idle_timeout;	/* Next timeout in jiffies */
@@ -655,6 +632,30 @@ static inline int musb_platform_exit(struct musb *musb)
 	return musb->ops->exit(musb);
 }
 
+static inline void musb_platform_enable_clk(struct musb *musb)
+{
+	if (musb->ops->enable_clk)
+		musb->ops->enable_clk(musb);
+}
+
+static inline void musb_platform_disable_clk(struct musb *musb)
+{
+	if (musb->ops->disable_clk)
+		musb->ops->disable_clk(musb);
+}
+
+static inline void musb_platform_prepare_clk(struct musb *musb)
+{
+	if (musb->ops->prepare_clk)
+		musb->ops->prepare_clk(musb);
+}
+
+static inline void musb_platform_unprepare_clk(struct musb *musb)
+{
+	if (musb->ops->unprepare_clk)
+		musb->ops->unprepare_clk(musb);
+}
+
 /* #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) */
 #if 1
 static inline const char *otg_state_string(enum usb_otg_state state)
@@ -662,5 +663,14 @@ static inline const char *otg_state_string(enum usb_otg_state state)
 	return usb_otg_state_string(state);
 }
 #endif
-
+enum {
+	USB_DPIDLE_ALLOWED = 0,
+	USB_DPIDLE_FORBIDDEN,
+	USB_DPIDLE_SRAM,
+	USB_DPIDLE_TIMER
+};
+extern void usb_hal_dpidle_request(int mode);
+extern void register_usb_hal_dpidle_request(void (*function)(int));
+extern void register_usb_hal_disconnect_check(void (*function)(void));
+extern void wake_up_bat(void);
 #endif				/* __MUSB_CORE_H__ */

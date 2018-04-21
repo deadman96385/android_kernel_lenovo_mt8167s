@@ -83,7 +83,7 @@ static LCM_UTIL_FUNCS lcm_util = {0};
 			break;				\
 		pr_debug("DDP ASSERT FAILED %s, %d\n",	\
 		       __FILE__, __LINE__);		\
-		BUG();					\
+		WARN_ON();					\
 	} while (0)
 #endif
 
@@ -127,11 +127,11 @@ static void init_lcm_registers(void)
 	data_array[0] = 0x000C3902;
 	data_array[1] = 0x106400B2;
 	data_array[2] = 0x081C2207;
-    data_array[3] = 0x004D1C08;
+	data_array[3] = 0x004D1C08;
 	dsi_set_cmdq(data_array, 4, 1);
 	MDELAY(10);
 
-    /* SET CYC */
+	/* SET CYC */
 	data_array[0] = 0x000D3902;
 	data_array[1] = 0x03FF00B4;
 	data_array[2] = 0x035A035A;
@@ -141,7 +141,7 @@ static void init_lcm_registers(void)
 	MDELAY(10);
 
 	data_array[0] = 0x00023902;
-    data_array[1] = 0x000007BC;
+	data_array[1] = 0x000007BC;
 	dsi_set_cmdq(data_array, 2, 1);
 	MDELAY(10);
 
@@ -152,7 +152,7 @@ static void init_lcm_registers(void)
 
 	/* Set VCOM */
 	data_array[0] = 0x00033902;
-    data_array[1] = 0x005c5cB6;
+	data_array[1] = 0x005c5cB6;
 	dsi_set_cmdq(data_array, 2, 1);
 	MDELAY(10);
 
@@ -226,7 +226,7 @@ static void init_lcm_registers(void)
 	MDELAY(10);
 
 	data_array[0] = 0x00033902;
-    data_array[1] = 0x001430C0;
+	data_array[1] = 0x001430C0;
 	dsi_set_cmdq(data_array, 2, 1);
 	MDELAY(10);
 
@@ -237,12 +237,12 @@ static void init_lcm_registers(void)
 	MDELAY(10);
 
 	data_array[0] = 0x00023902;
-    data_array[1] = 0x00008edf;
+	data_array[1] = 0x00008edf;
 	dsi_set_cmdq(data_array, 2, 1);
 	MDELAY(10);
 
 	data_array[0] = 0x00023902;
-    data_array[1] = 0x000066d2;
+	data_array[1] = 0x000066d2;
 	dsi_set_cmdq(data_array, 2, 1);
 	MDELAY(10);
 
@@ -312,20 +312,20 @@ static int lcm_get_vgp_supply(struct device *dev)
 	int ret;
 	struct regulator *lcm_vgp_ldo;
 
-	printk("LCM: lcm_get_vgp_supply is going\n");
+	pr_notice("LCM: lcm_get_vgp_supply is going\n");
 
 	lcm_vgp_ldo = devm_regulator_get(dev, "reg-lcm");
 	if (IS_ERR(lcm_vgp_ldo)) {
 		ret = PTR_ERR(lcm_vgp_ldo);
-		dev_err(dev, "failed to get reg-lcm LDO, %d\n", ret);
+		dev_notice(dev, "failed to get reg-lcm LDO, %d\n", ret);
 		return ret;
 	}
 
-	printk("LCM: lcm get supply ok.\n");
+	pr_notice("LCM: lcm get supply ok.\n");
 
 	/* get current voltage settings */
 	ret = regulator_get_voltage(lcm_vgp_ldo);
-	printk("lcm LDO voltage = %d in LK stage\n", ret);
+	pr_notice("lcm LDO voltage = %d in LK stage\n", ret);
 
 	lcm_vgp = lcm_vgp_ldo;
 
@@ -337,29 +337,29 @@ int lcm_vgp_supply_enable(void)
 	int ret;
 	unsigned int volt;
 
-	printk("LCM: lcm_vgp_supply_enable\n");
+	pr_notice("LCM: lcm_vgp_supply_enable\n");
 
 	if (lcm_vgp == NULL)
 		return 0;
 
-	printk("LCM: set regulator voltage lcm_vgp voltage to 3.3V\n");
+	pr_notice("LCM: set regulator voltage lcm_vgp voltage to 3.3V\n");
 	/* set voltage to 1.8V */
 	ret = regulator_set_voltage(lcm_vgp, 3300000, 3300000);
 	if (ret != 0) {
-		pr_err("LCM: lcm failed to set lcm_vgp voltage: %d\n", ret);
+		pr_notice("LCM: lcm failed to set lcm_vgp voltage: %d\n", ret);
 		return ret;
 	}
 
 	/* get voltage settings again */
 	volt = regulator_get_voltage(lcm_vgp);
 	if (volt == 3300000)
-		printk("LCM: check regulator voltage=3300000 pass!\n");
+		pr_notice("LCM: check regulator voltage=3300000 pass!\n");
 	else
 		pr_debug("LCM: check regulator voltage=3300000 fail! (voltage: %d)\n", volt);
 
 	ret = regulator_enable(lcm_vgp);
 	if (ret != 0) {
-		pr_err("LCM: Failed to enable lcm_vgp: %d\n", ret);
+		pr_notice("LCM: Failed to enable lcm_vgp: %d\n", ret);
 		return ret;
 	}
 
@@ -377,18 +377,18 @@ int lcm_vgp_supply_disable(void)
 	/* disable regulator */
 	isenable = regulator_is_enabled(lcm_vgp);
 
-	printk("LCM: lcm query regulator enable status[%d]\n", isenable);
+	pr_notice("LCM: lcm query regulator enable status[%d]\n", isenable);
 
 	if (isenable) {
 		ret = regulator_disable(lcm_vgp);
 		if (ret != 0) {
-			pr_err("LCM: lcm failed to disable lcm_vgp: %d\n", ret);
+			pr_notice("LCM: lcm failed to disable lcm_vgp: %d\n", ret);
 			return ret;
 		}
 		/* verify */
 		isenable = regulator_is_enabled(lcm_vgp);
 		if (!isenable)
-			pr_err("LCM: lcm regulator disable pass\n");
+			pr_notice("LCM: lcm regulator disable pass\n");
 	}
 
 	return ret;
@@ -396,7 +396,7 @@ int lcm_vgp_supply_disable(void)
 
 static int lcm_driver_probe(struct device *dev, void const *data)
 {
-    printk("LCM: lcm_driver_probe\n");
+	pr_notice("LCM: lcm_driver_probe\n");
 	lcm_get_vgp_supply(dev);
 	lcm_vgp_supply_enable();
 
@@ -437,7 +437,7 @@ static struct platform_driver lcm_driver = {
 static int __init lcm_init(void)
 {
 	if (platform_driver_register(&lcm_driver)) {
-		pr_err("LCM: failed to register this driver!\n");
+		pr_notice("LCM: failed to register this driver!\n");
 		return -ENODEV;
 	}
 
@@ -475,17 +475,18 @@ static void lcm_set_util_funcs(const LCM_UTIL_FUNCS *util)
 
 static void lcm_get_params(LCM_PARAMS *params)
 {
-     memset(params, 0, sizeof(LCM_PARAMS));
+	memset(params, 0, sizeof(LCM_PARAMS));
 
 	params->type   = LCM_TYPE_DSI;
 
 	params->width  = FRAME_WIDTH;
 	params->height = FRAME_HEIGHT;
+	params->density = 160;
 
 #if (LCM_DSI_CMD_MODE)
 	params->dsi.mode   = CMD_MODE;
 #else
-    params->dsi.mode   = BURST_VDO_MODE;
+	params->dsi.mode   = BURST_VDO_MODE;
 #endif
 
 
@@ -505,7 +506,7 @@ static void lcm_get_params(LCM_PARAMS *params)
 	/* video mode timing */
 	params->dsi.PS = LCM_PACKED_PS_24BIT_RGB888;
 
-    params->dsi.word_count = FRAME_WIDTH*3;
+	params->dsi.word_count = FRAME_WIDTH*3;
 
 
 	params->dsi.vertical_sync_active				= 4;/* 2; */
@@ -518,7 +519,7 @@ static void lcm_get_params(LCM_PARAMS *params)
 	params->dsi.horizontal_frontporch				= 30;/* 69; */
 	params->dsi.horizontal_active_pixel				= FRAME_WIDTH;
 
-    params->dsi.ssc_disable	= 1;
+	params->dsi.ssc_disable	= 1;
 	params->dsi.cont_clock	= 0;
 	params->dsi.PLL_CLOCK   = 205;
 
@@ -550,7 +551,7 @@ static void lcm_suspend(void)
 	push_table(lcm_deep_sleep_mode_in_setting,
 		   sizeof(lcm_deep_sleep_mode_in_setting) / sizeof(struct LCM_setting_table), 1);
 
-    lcm_vgp_supply_disable();
+	lcm_vgp_supply_disable();
 	MDELAY(20);
 
 }

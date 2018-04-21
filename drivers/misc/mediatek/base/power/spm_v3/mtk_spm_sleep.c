@@ -29,17 +29,22 @@
 #endif
 /* #include <mach/mtk_clkmgr.h> */
 #include <mtk_cpuidle.h>
-#if defined(CONFIG_MTK_WATCHDOG) && defined(CONFIG_MTK_WD_KICKER)
+#if defined(CONFIG_WATCHDOG) && defined(CONFIG_MTK_WATCHDOG) && \
+	defined(CONFIG_MTK_WD_KICKER)
 #include <mach/wd_api.h>
 #endif
 #include <mt-plat/upmu_common.h>
 #include <mtk_spm_misc.h>
+#ifdef CONFIG_MTK_DRAMC
 #include <mtk_dramc.h>
+#endif
 
 #include <mtk_spm_internal.h>
 #include <mtk_spm_pmic_wrap.h>
 #include <mtk_pmic_api_buck.h>
 #include <mt6337_api.h>
+
+#include <mtk_spm_vcore_dvfs.h>
 
 #include <mt-plat/mtk_ccci_common.h>
 
@@ -53,6 +58,14 @@
 #endif
 
 #include <mtk_power_gs_api.h>
+
+#ifdef CONFIG_MTK_ICCS_SUPPORT
+#include <mtk_hps_internal.h>
+#endif
+
+#ifdef CONFIG_MTK_ACAO_SUPPORT
+#include <mtk_mcdi_api.h>
+#endif
 
 /**************************************
  * only for internal debug
@@ -78,6 +91,11 @@ u8 spm_snapshot_golden_setting;
 struct wake_status spm_wakesta; /* record last wakesta */
 static unsigned int spm_sleep_count;
 
+#if defined(CONFIG_MACH_MT6758)
+int sleep_ddr;
+u32 sleep_vcorefs_debug;
+#endif
+
 /**************************************
  * SW code for suspend
  **************************************/
@@ -85,73 +103,68 @@ static unsigned int spm_sleep_count;
 
 #define WAIT_UART_ACK_TIMES     10	/* 10 * 10us */
 
+#define WAKE_SRC_FOR_COMMON_SUSPEND (\
+	(WAKE_SRC_R12_PCMTIMER) | \
+	(WAKE_SRC_R12_SSPM_WDT_EVENT_B) | \
+	(WAKE_SRC_R12_KP_IRQ_B) | \
+	(WAKE_SRC_R12_SYS_TIMER_EVENT_B) | \
+	(WAKE_SRC_R12_EINT_EVENT_B) | \
+	(WAKE_SRC_R12_C2K_WDT_IRQ_B) | \
+	(WAKE_SRC_R12_CCIF0_EVENT_B) | \
+	(WAKE_SRC_R12_SSPM_SPM_IRQ_B) | \
+	(WAKE_SRC_R12_SCP_IPC_MD2SPM_B) | \
+	(WAKE_SRC_R12_SCP_WDT_EVENT_B) | \
+	(WAKE_SRC_R12_USBX_CDSC_B) | \
+	(WAKE_SRC_R12_USBX_POWERDWN_B) | \
+	(WAKE_SRC_R12_EINT_EVENT_SECURE_B) | \
+	(WAKE_SRC_R12_CCIF1_EVENT_B) | \
+	(WAKE_SRC_R12_MD1_WDT_B) | \
+	(WAKE_SRC_R12_MD2AP_PEER_WAKEUP_EVENT))
+
 #if defined(CONFIG_MICROTRUST_TEE_SUPPORT)
-#define WAKE_SRC_FOR_SUSPEND \
-	(WAKE_SRC_R12_PCMTIMER | \
-	WAKE_SRC_R12_SSPM_WDT_EVENT_B | \
-	WAKE_SRC_R12_KP_IRQ_B | \
-	WAKE_SRC_R12_SYS_TIMER_EVENT_B | \
-	WAKE_SRC_R12_EINT_EVENT_B | \
-	WAKE_SRC_R12_C2K_WDT_IRQ_B | \
-	WAKE_SRC_R12_CCIF0_EVENT_B | \
-	WAKE_SRC_R12_SSPM_SPM_IRQ_B | \
-	WAKE_SRC_R12_SCP_IPC_MD2SPM_B | \
-	WAKE_SRC_R12_SCP_WDT_EVENT_B | \
-	WAKE_SRC_R12_USBX_CDSC_B | \
-	WAKE_SRC_R12_USBX_POWERDWN_B | \
-	WAKE_SRC_R12_EINT_EVENT_SECURE_B | \
-	WAKE_SRC_R12_CCIF1_EVENT_B | \
-	WAKE_SRC_R12_CSYSPWRUPREQ_B | \
-	WAKE_SRC_R12_MD1_WDT_B | \
-	WAKE_SRC_R12_MD2AP_PEER_WAKEUP_EVENT)
+#define WAKE_SRC_FOR_SUSPEND (WAKE_SRC_FOR_COMMON_SUSPEND)
 #else
 #define WAKE_SRC_FOR_SUSPEND \
-	(WAKE_SRC_R12_PCMTIMER | \
-	WAKE_SRC_R12_SSPM_WDT_EVENT_B | \
-	WAKE_SRC_R12_KP_IRQ_B | \
-	WAKE_SRC_R12_SYS_TIMER_EVENT_B | \
-	WAKE_SRC_R12_EINT_EVENT_B | \
-	WAKE_SRC_R12_C2K_WDT_IRQ_B | \
-	WAKE_SRC_R12_CCIF0_EVENT_B | \
-	WAKE_SRC_R12_SSPM_SPM_IRQ_B | \
-	WAKE_SRC_R12_SCP_IPC_MD2SPM_B | \
-	WAKE_SRC_R12_SCP_WDT_EVENT_B | \
-	WAKE_SRC_R12_USBX_CDSC_B | \
-	WAKE_SRC_R12_USBX_POWERDWN_B | \
-	WAKE_SRC_R12_EINT_EVENT_SECURE_B | \
-	WAKE_SRC_R12_CCIF1_EVENT_B | \
-	WAKE_SRC_R12_CSYSPWRUPREQ_B | \
-	WAKE_SRC_R12_MD1_WDT_B | \
-	WAKE_SRC_R12_MD2AP_PEER_WAKEUP_EVENT | \
-	WAKE_SRC_R12_SEJ_EVENT_B)
+	(WAKE_SRC_FOR_COMMON_SUSPEND | WAKE_SRC_R12_SEJ_EVENT_B)
 #endif /* #if defined(CONFIG_MICROTRUST_TEE_SUPPORT) */
 
 #define spm_is_wakesrc_invalid(wakesrc)     (!!((u32)(wakesrc) & 0xc0003803))
 
 int __attribute__ ((weak)) mtk_enter_idle_state(int idx)
 {
-	pr_err("NO %s !!!\n", __func__);
+	spm_crit2("NO %s !!!\n", __func__);
 	return -1;
 }
 
 void __attribute__((weak)) mt_cirq_clone_gic(void)
 {
-	pr_err("NO %s !!!\n", __func__);
+	spm_crit2("NO %s !!!\n", __func__);
 }
 
 void __attribute__((weak)) mt_cirq_enable(void)
 {
-	pr_err("NO %s !!!\n", __func__);
+	spm_crit2("NO %s !!!\n", __func__);
 }
 
 void __attribute__((weak)) mt_cirq_flush(void)
 {
-	pr_err("NO %s !!!\n", __func__);
+	spm_crit2("NO %s !!!\n", __func__);
 }
 
 void __attribute__((weak)) mt_cirq_disable(void)
 {
-	pr_err("NO %s !!!\n", __func__);
+	spm_crit2("NO %s !!!\n", __func__);
+}
+
+int __attribute__((weak)) vcorefs_get_curr_vcore(void)
+{
+	spm_crit2("NO %s !!!\n", __func__);
+	return 0;
+}
+
+void __attribute__((weak)) mt_eint_print_status(void)
+{
+	spm_crit2("NO %s !!!\n", __func__);
 }
 
 enum spm_suspend_step {
@@ -210,13 +223,13 @@ static struct pwr_ctrl suspend_ctrl = {
 	.reg_spm_cksel3_req = 0,
 
 	/* SPM_SRC_MASK */
-	.reg_csyspwreq_mask = 0,
+	.reg_csyspwreq_mask = 1,
 	.reg_md_srcclkena_0_infra_mask_b = 1,
 	.reg_md_srcclkena_1_infra_mask_b = 0,
 	.reg_md_apsrc_req_0_infra_mask_b = 0,
 	.reg_md_apsrc_req_1_infra_mask_b = 0,
-	.reg_conn_srcclkena_infra_mask_b = 0,
-	.reg_conn_infra_req_mask_b = 1,
+	.reg_conn_srcclkena_infra_mask_b = 1,
+	.reg_conn_infra_req_mask_b = 0,
 	.reg_sspm_srcclkena_infra_mask_b = 0,
 	.reg_sspm_infra_req_mask_b = 1,
 	.reg_scp_srcclkena_infra_mask_b = 0,
@@ -241,16 +254,26 @@ static struct pwr_ctrl suspend_ctrl = {
 	.reg_disp2_req_mask_b = 0,
 	.reg_md_ddr_en_0_mask_b = 1,
 	.reg_md_ddr_en_1_mask_b = 0,
-	.reg_conn_ddr_en_mask_b = 0,
+	.reg_conn_ddr_en_mask_b = 1,
 
 	/* SPM_SRC2_MASK */
+#if defined(CONFIG_MACH_MT6775)
+	.reg_disp0_apsrc_req_mask_b = 1,
+	.reg_disp1_apsrc_req_mask_b = 1,
+#else
 	.reg_disp0_req_mask_b = 0,
 	.reg_disp1_req_mask_b = 0,
+#endif
 	.reg_disp_od_req_mask_b = 0,
 	.reg_mfg_req_mask_b = 0,
 	.reg_vdec0_req_mask_b = 0,
+#if defined(CONFIG_MACH_MT6775)
+	.reg_gce_apsrc_req_mask_b = 1,
+	.reg_gce_ddr_en_req_mask_b = 1,
+#else
 	.reg_gce_req_mask_b = 0,
 	.reg_gce_vrf18_req_mask_b = 0,
+#endif
 	.reg_lpdma_req_mask_b = 0,
 	.reg_conn_srcclkena_cksel2_mask_b = 0,
 	.reg_sspm_apsrc_req_ddren_mask_b = 1,
@@ -271,9 +294,18 @@ static struct pwr_ctrl suspend_ctrl = {
 	.reg_sspm2spm_int2_mask_b = 1,
 	.reg_sspm2spm_int3_mask_b = 1,
 	.reg_dqssoc_req_mask_b = 0,
+#if defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758)
+	.reg_gce_vrf18_req2_mask_b = 0,
+#elif defined(CONFIG_MACH_MT6775)
+	.reg_gce_busclk_req_mask_b = 1,
+#endif
+#if defined(CONFIG_MACH_MT6758) || defined(CONFIG_MACH_MT6775)
+	.reg_ufs_srcclkena_mask_b = 1,
+	.reg_ufs_vrf18_req_mask_b = 0,
+#endif
 
 	/* SPM_SRC3_MASK */
-	.reg_mpwfi_op = 0,
+	.reg_mpwfi_op = 1,
 	.reg_spm_resource_req_rsv1_4_mask_b = 0,
 	.reg_spm_resource_req_rsv1_3_mask_b = 0,
 	.reg_spm_resource_req_rsv1_2_mask_b = 0,
@@ -292,22 +324,34 @@ static struct pwr_ctrl suspend_ctrl = {
 	.reg_srcclkeni0_cksel2_mask_b = 0,
 	.reg_md_ddr_en_0_dbc_en = 1,
 	.reg_md_ddr_en_1_dbc_en = 0,
-	.reg_conn_ddr_en_dbc_en = 0,
+	.reg_conn_ddr_en_dbc_en = 1,
 	.reg_sspm_mask_b = 1,
 	.reg_md_0_mask_b = 1,
 	.reg_md_1_mask_b = 0,
 	.reg_scp_mask_b = 1,
 	.reg_srcclkeni0_mask_b = 1,
-	.reg_srcclkeni1_mask_b = 0,
+	.reg_srcclkeni1_mask_b = 1,
 	.reg_srcclkeni2_mask_b = 0,
 	.reg_md_apsrc_1_sel = 0,
 	.reg_md_apsrc_0_sel = 0,
-	.reg_conn_mask_b = 0,
+	.reg_conn_mask_b = 1,
 	.reg_conn_apsrc_sel = 0,
 	.reg_md_srcclkena_0_vrf18_mask_b = 1,
-
+#if defined(CONFIG_MACH_MT6759) \
+	|| defined(CONFIG_MACH_MT6758) \
+	|| defined(CONFIG_MACH_MT6775)
+	/* SPM_SRC4_MASK */
+	.reg_ccif4_ap_event_mask_b = 1,
+	.reg_ccif4_md_event_mask_b = 1,
+	.reg_ccif5_ap_event_mask_b = 1,
+	.reg_ccif5_md_event_mask_b = 1,
+#endif
+#if defined(CONFIG_MACH_MT6775)
+	.reg_disp0_ddren_req_mask_b = 1,
+	.reg_disp1_ddren_req_mask_b = 1,
+#endif
 	/* SPM_WAKEUP_EVENT_MASK */
-	.reg_wakeup_event_mask = 0xF0F92218,
+	.reg_wakeup_event_mask = 0xF1782218,
 
 	/* SPM_EXT_WAKEUP_EVENT_MASK */
 	.reg_ext_wakeup_event_mask = 0xFFFFFFFF,
@@ -347,7 +391,16 @@ static struct pwr_ctrl suspend_ctrl = {
 
 	/* SLEEP_MCU11_WFI_EN */
 	.mcu11_wfi_en = 1,
+#if defined(CONFIG_MACH_MT6775)
+	/* SLEEP_MCU12_WFI_EN */
+	.mcu12_wfi_en = 0,
 
+	/* SLEEP_MCU13_WFI_EN */
+	.mcu13_wfi_en = 0,
+
+	/* SLEEP_MCU14_WFI_EN */
+	.mcu14_wfi_en = 0,
+#else
 	/* SLEEP_MCU12_WFI_EN */
 	.mcu12_wfi_en = 1,
 
@@ -356,7 +409,7 @@ static struct pwr_ctrl suspend_ctrl = {
 
 	/* SLEEP_MCU14_WFI_EN */
 	.mcu14_wfi_en = 1,
-
+#endif
 	/* SLEEP_MCU15_WFI_EN */
 	.mcu15_wfi_en = 0,
 
@@ -365,11 +418,17 @@ static struct pwr_ctrl suspend_ctrl = {
 
 	/* SLEEP_MCU17_WFI_EN */
 	.mcu17_wfi_en = 0,
+#if defined(CONFIG_MACH_MT6759)	|| defined(CONFIG_MACH_MT6758)
+	/* SPM_RSV_CON2 */
+	.spm_rsv_con2 = 0,
+#elif defined(CONFIG_MACH_MT6775)
+	/* SPM_RSV_CON2 */
+	.spm_rsv_con2 =
+		(SPM_RSV_CON2_DIS_MCDSR),
+#endif
 
 	/* Auto-gen End */
 };
-
-/* please put firmware to vendor/mediatek/proprietary/hardware/spm/mtxxxx/ */
 struct spm_lp_scen __spm_suspend = {
 	.pwrctrl = &suspend_ctrl,
 	.wakestatus = &suspend_info[0],
@@ -382,13 +441,12 @@ static void spm_trigger_wfi_for_sleep(struct pwr_ctrl *pwrctrl)
 	else
 		spm_dormant_sta = mtk_enter_idle_state(MTK_LEGACY_SUSPEND_MODE);
 
-	if (spm_dormant_sta < 0) {
+	if (spm_dormant_sta < 0)
 		spm_crit2("spm_dormant_sta %d", spm_dormant_sta);
-		/* BUG(); */
-	}
-
+#if defined(CONFIG_MTK_SERIAL)
 	if (is_infra_pdn(pwrctrl->pcm_flags))
 		mtk_uart_restore();
+#endif
 }
 
 static void spm_set_sysclk_settle(void)
@@ -401,10 +459,15 @@ static void spm_set_sysclk_settle(void)
 	/* md_settle is keyword for suspend status */
 	spm_crit2("md_settle = %u, settle = %u\n", SPM_SYSCLK_SETTLE, settle);
 }
-
+#if !defined(CONFIG_MACH_MT6759) && !defined(CONFIG_MACH_MT6758) && \
+	!defined(CONFIG_MACH_MT6775)
 static int mt_power_gs_dump_suspend_count = 2;
+#endif
 static void spm_suspend_pre_process(struct pwr_ctrl *pwrctrl)
 {
+#if !defined(CONFIG_MACH_MT6759) \
+	&& !defined(CONFIG_MACH_MT6758) \
+	&& !defined(CONFIG_MACH_MT6775)
 #if !defined(CONFIG_MTK_TINYSYS_SSPM_SUPPORT)
 
 	mt_spm_pmic_wrap_set_cmd(PMIC_WRAP_PHASE_ALLINONE,
@@ -414,37 +477,59 @@ static void spm_suspend_pre_process(struct pwr_ctrl *pwrctrl)
 	mt_spm_pmic_wrap_set_phase(PMIC_WRAP_PHASE_ALLINONE);
 	spm_pmic_power_mode(PMIC_PWR_SUSPEND, 0, 0);
 
-	pmic_config_interface_nolock(
-		PMIC_RG_BUCK_VCORE_HW0_OP_EN_ADDR,
-		1,
-		PMIC_RG_BUCK_VCORE_HW0_OP_EN_MASK,
-		PMIC_RG_BUCK_VCORE_HW0_OP_EN_SHIFT);
-
-	pmic_config_interface_nolock(
-		PMIC_RG_VSRAM_VCORE_HW0_OP_EN_ADDR,
-		1,
-		PMIC_RG_VSRAM_VCORE_HW0_OP_EN_MASK,
-		PMIC_RG_VSRAM_VCORE_HW0_OP_EN_SHIFT);
-
+	spm_pmic_vcore_setting(1);
 	wk_auxadc_bgd_ctrl(0);
+#ifdef CONFIG_MACH_MT6799
 	wk_mt6337_set_lp_setting();
+#endif
 #endif /* !defined(CONFIG_MTK_TINYSYS_SSPM_SUPPORT) */
 
-	if (--mt_power_gs_dump_suspend_count >= 0)
+#if defined(CONFIG_MACH_MT6799)
+	dvfsrc_md_scenario_update(1);
+#endif
+
+#if defined(CONFIG_MACH_MT6758)
+	spm_vcorefs_md_scenario_update(1);
+#endif
+
+	if (slp_dump_golden_setting || --mt_power_gs_dump_suspend_count >= 0)
 		mt_power_gs_dump_suspend(GS_PMIC);
+#endif
+
+#if defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758)
+	if (slp_dump_golden_setting)
+		mt_power_gs_dump_suspend();
+#endif
 }
 
 static void spm_suspend_post_process(struct pwr_ctrl *pwrctrl)
 {
+
+#if defined(CONFIG_MACH_MT6799)
+	dvfsrc_md_scenario_update(0);
+#endif
+
+#if defined(CONFIG_MACH_MT6758)
+	sleep_ddr = vcorefs_get_curr_ddr();
+	sleep_vcorefs_debug = spm_read(SPM_DVFS_DEBUG);
+	spm_vcorefs_md_scenario_update(0);
+#endif
+
+#if !defined(CONFIG_MACH_MT6759) \
+	&& !defined(CONFIG_MACH_MT6758) \
+	&& !defined(CONFIG_MACH_MT6775)
 #if !defined(CONFIG_MTK_TINYSYS_SSPM_SUPPORT)
 	mt_spm_pmic_wrap_set_phase(PMIC_WRAP_PHASE_ALLINONE);
 
 	wk_auxadc_bgd_ctrl(1);
+#ifdef CONFIG_MACH_MT6799
 	wk_mt6337_restore_lp_setting();
+#endif
 #endif /* !defined(CONFIG_MTK_TINYSYS_SSPM_SUPPORT) */
+#endif
 }
 
-static void spm_suspend_pcm_setup_before_wfi(u32 cpu, struct pcm_desc *pcmdesc,
+static void spm_suspend_pcm_setup_before_wfi(u32 cpu,
 		struct pwr_ctrl *pwrctrl)
 {
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
@@ -464,10 +549,8 @@ static void spm_suspend_pcm_setup_before_wfi(u32 cpu, struct pcm_desc *pcmdesc,
 	spm_d.u.suspend.vcore_volt_pmic_val = pwrctrl->vcore_volt_pmic_val;
 
 	ret = spm_to_sspm_command(SPM_SUSPEND, &spm_d);
-	if (ret < 0) {
+	if (ret < 0)
 		spm_crit2("ret %d", ret);
-		/* BUG(); */
-	}
 #endif /* CONFIG_MTK_TINYSYS_SSPM_SUPPORT */
 
 	spm_suspend_pre_process(pwrctrl);
@@ -494,18 +577,16 @@ static void spm_suspend_pcm_setup_after_wfi(u32 cpu, struct pwr_ctrl *pwrctrl)
 #endif
 
 	ret = spm_to_sspm_command(SPM_RESUME, &spm_d);
-	if (ret < 0) {
+	if (ret < 0)
 		spm_crit2("ret %d", ret);
-		/* BUG(); */
-	}
 #endif /* CONFIG_MTK_TINYSYS_SSPM_SUPPORT */
 
 	spm_suspend_post_process(pwrctrl);
 }
 
-static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct pcm_desc *pcmdesc)
+static unsigned int spm_output_wake_reason(struct wake_status *wakesta)
 {
-	wake_reason_t wr;
+	unsigned int wr;
 	int ddr_status = 0;
 	int vcore_status = 0;
 
@@ -514,7 +595,13 @@ static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct 
 	else
 		spm_sleep_count++;
 
-	wr = __spm_output_wake_reason(wakesta, pcmdesc, true, "suspend");
+#if defined(CONFIG_MACH_MT6799)
+	/* Note: Print EMI Idle Fail */
+	if (spm_read(SPM_SW_RSV_3) & 0x1)
+		pr_info("SUSPNED: SPM CHECK EMI IDLE FAIL\n");
+#endif
+
+	wr = __spm_output_wake_reason(wakesta, NULL, true, "suspend");
 
 #if 1
 	memcpy(&suspend_info[log_wakesta_cnt], wakesta, sizeof(struct wake_status));
@@ -535,8 +622,14 @@ static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct 
 	ddr_status = vcorefs_get_curr_ddr();
 	vcore_status = vcorefs_get_curr_vcore();
 
+#if defined(CONFIG_MACH_MT6758)
+	spm_crit2(
+	"suspend dormant state = %d, ddr = %d, vcore = %d, spm_sleep_count = %d, sleep ddr = %d, debug = 0x%x\n",
+	spm_dormant_sta, ddr_status, vcore_status, spm_sleep_count, sleep_ddr, sleep_vcorefs_debug);
+#else
 	spm_crit2("suspend dormant state = %d, ddr = %d, vcore = %d, spm_sleep_count = %d\n",
 		  spm_dormant_sta, ddr_status, vcore_status, spm_sleep_count);
+#endif
 	if (spm_ap_mdsrc_req_cnt != 0)
 		spm_crit2("warning: spm_ap_mdsrc_req_cnt = %d, r7[ap_mdsrc_req] = 0x%x\n",
 			  spm_ap_mdsrc_req_cnt, spm_read(SPM_POWER_ON_VAL1) & (1 << 17));
@@ -546,7 +639,7 @@ static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct 
 
 #ifdef CONFIG_MTK_CCCI_DEVICES
 	/* if (wakesta->r13 & 0x18) { */
-		spm_crit2("dump ID_DUMP_MD_SLEEP_MODE");
+		/* spm_crit2("dump ID_DUMP_MD_SLEEP_MODE"); */
 		exec_ccci_kern_func_by_md_id(0, ID_DUMP_MD_SLEEP_MODE, NULL, 0);
 	/* } */
 #endif
@@ -600,7 +693,7 @@ u32 spm_get_sleep_wakesrc(void)
 }
 
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
-#ifdef CONFIG_MTK_PMIC
+#if defined(CONFIG_MTK_PMIC) || defined(CONFIG_MTK_PMIC_NEW_ARCH)
 /* #include <cust_pmic.h> */
 #if !defined(DISABLE_DLPT_FEATURE)
 /* extern int get_dlpt_imix_spm(void); */
@@ -613,27 +706,31 @@ int __attribute__((weak)) get_dlpt_imix_spm(void)
 #endif
 #endif
 
-wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
+unsigned int spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 {
 	u32 sec = 2;
 	unsigned long flags;
 #if defined(CONFIG_MTK_GIC_V3_EXT)
 	struct mtk_irq_mask mask;
 #endif
-#if defined(CONFIG_MTK_WATCHDOG) && defined(CONFIG_MTK_WD_KICKER)
+#if defined(CONFIG_WATCHDOG) && defined(CONFIG_MTK_WATCHDOG) && \
+	defined(CONFIG_MTK_WD_KICKER)
 	struct wd_api *wd_api;
 	int wd_ret;
 #endif
-	static wake_reason_t last_wr = WR_NONE;
-	struct pcm_desc *pcmdesc = NULL;
+	static unsigned int last_wr = WR_NONE;
 	struct pwr_ctrl *pwrctrl;
 	u32 cpu = 0;
 	int ch;
 
+#ifdef CONFIG_MTK_ACAO_SUPPORT
+	mcdi_task_pause(true);
+#endif
+
 	spm_suspend_footprint(SPM_SUSPEND_ENTER);
 
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
-#ifdef CONFIG_MTK_PMIC
+#if defined(CONFIG_MTK_PMIC) || defined(CONFIG_MTK_PMIC_NEW_ARCH)
 #if !defined(DISABLE_DLPT_FEATURE)
 	get_dlpt_imix_spm();
 #endif
@@ -643,7 +740,14 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	pwrctrl = __spm_suspend.pwrctrl;
 
 	set_pwrctrl_pcm_flags(pwrctrl, spm_flags);
-	/* set_pwrctrl_pcm_flags1(pwrctrl, spm_data); */
+#if defined(CONFIG_MACH_MT6775)
+	if (is_big_buck_pdn_by_spm()) {
+		spm_data |= (SPM_RSV_CON2_BIG_BUCK_ON_EN |
+			     SPM_RSV_CON2_BIG_BUCK_OFF_EN);
+	}
+
+	set_pwrctrl_pcm_flags1(pwrctrl, spm_data);
+#endif
 	/* need be called after set_pwrctrl_pcm_flags1() */
 	/* spm_set_dummy_read_addr(false); */
 
@@ -658,7 +762,10 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 #endif
 	pwrctrl->timer_val = sec * 32768;
 
-#if defined(CONFIG_MTK_WATCHDOG) && defined(CONFIG_MTK_WD_KICKER)
+	mt_secure_call(MTK_SIP_KERNEL_SPM_ARGS, SPM_ARGS_PCM_WDT, 1, 30);
+
+#if defined(CONFIG_WATCHDOG) && defined(CONFIG_MTK_WATCHDOG) && \
+	defined(CONFIG_MTK_WD_KICKER)
 	wd_ret = get_wd_api(&wd_api);
 	if (!wd_ret) {
 		wd_api->wd_spmwdt_mode_config(WD_REQ_EN, WD_REQ_RST_MODE);
@@ -671,6 +778,9 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	pwrctrl->opp_level = __spm_check_opp_level(ch);
 	pwrctrl->vcore_volt_pmic_val = __spm_get_vcore_volt_pmic_val(true, ch);
 	spm_wakesta.dcs_ch = (u32)ch;
+
+	/* update pcm_flags with dcs flag */
+	__spm_update_pcm_flags_dcs_workaround(pwrctrl, ch);
 
 	spin_lock_irqsave(&__spm_lock, flags);
 
@@ -689,15 +799,20 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 		  sec, pwrctrl->wake_src, is_cpu_pdn(pwrctrl->pcm_flags),
 		  is_infra_pdn(pwrctrl->pcm_flags));
 
-	spm_suspend_pcm_setup_before_wfi(cpu, pcmdesc, pwrctrl);
+#ifdef CONFIG_MTK_ICCS_SUPPORT
+	iccs_enter_low_power_state();
+#endif
+	spm_suspend_pcm_setup_before_wfi(cpu, pwrctrl);
 
 	spm_suspend_footprint(SPM_SUSPEND_ENTER_UART_SLEEP);
 
+#if defined(CONFIG_MTK_SERIAL)
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
 	if (request_uart_to_sleep()) {
 		last_wr = WR_UART_BUSY;
 		goto RESTORE_IRQ;
 	}
+#endif
 #endif
 
 	spm_suspend_footprint(SPM_SUSPEND_ENTER_WFI);
@@ -706,22 +821,22 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 
 	spm_suspend_footprint(SPM_SUSPEND_LEAVE_WFI);
 
+#if defined(CONFIG_MTK_SERIAL)
+#if !defined(CONFIG_FPGA_EARLY_PORTING)
+	request_uart_to_wakeup();
+RESTORE_IRQ:
+#endif
+#endif
+
 	/* record last wakesta */
 	__spm_get_wakeup_status(&spm_wakesta);
 
 	spm_suspend_footprint(SPM_SUSPEND_ENTER_UART_AWAKE);
 
-#if !defined(CONFIG_FPGA_EARLY_PORTING)
-	request_uart_to_wakeup();
-#endif
-
 	spm_suspend_pcm_setup_after_wfi(0, pwrctrl);
 
 	/* record last wakesta */
-	last_wr = spm_output_wake_reason(&spm_wakesta, pcmdesc);
-#if !defined(CONFIG_FPGA_EARLY_PORTING)
-RESTORE_IRQ:
-#endif
+	last_wr = spm_output_wake_reason(&spm_wakesta);
 #if defined(CONFIG_MTK_SYS_CIRQ)
 	mt_cirq_flush();
 	mt_cirq_disable();
@@ -736,7 +851,8 @@ RESTORE_IRQ:
 	/* need be called after spin_unlock_irqrestore() */
 	get_channel_unlock();
 
-#if defined(CONFIG_MTK_WATCHDOG) && defined(CONFIG_MTK_WD_KICKER)
+#if defined(CONFIG_WATCHDOG) && defined(CONFIG_MTK_WATCHDOG) && \
+	defined(CONFIG_MTK_WD_KICKER)
 	if (!wd_ret) {
 		if (!pwrctrl->wdt_disable)
 			wd_api->wd_resume_notify();
@@ -746,11 +862,17 @@ RESTORE_IRQ:
 	}
 #endif
 
+	mt_secure_call(MTK_SIP_KERNEL_SPM_ARGS, SPM_ARGS_PCM_WDT, 0, 0);
+
 #ifdef CONFIG_MTK_USB2JTAG_SUPPORT
 	if (usb2jtag_mode())
-		mt_usb2jtag_resume();
+		mtk_usb2jtag_resume();
 #endif
 	spm_suspend_footprint(0);
+
+#ifdef CONFIG_MTK_ACAO_SUPPORT
+	mcdi_task_pause(false);
+#endif
 
 	if (last_wr == WR_PCM_ASSERT)
 		rekick_vcorefs_scenario();
@@ -779,9 +901,6 @@ bool spm_is_conn_sleep(void)
 	return !(spm_read(PCM_REG13_DATA) & R13_CONN_SRCCLKENA);
 }
 
-#define hw_spin_lock_for_ddrdfs()
-#define hw_spin_unlock_for_ddrdfs()
-
 void spm_ap_mdsrc_req(u8 set)
 {
 	unsigned long flags;
@@ -798,9 +917,7 @@ void spm_ap_mdsrc_req(u8 set)
 		} else {
 			spm_ap_mdsrc_req_cnt++;
 
-			hw_spin_lock_for_ddrdfs();
 			mt_secure_call(MTK_SIP_KERNEL_SPM_AP_MDSRC_REQ, 1, 0, 0);
-			hw_spin_unlock_for_ddrdfs();
 
 			spin_unlock_irqrestore(&__spm_lock, flags);
 
@@ -831,11 +948,8 @@ void spm_ap_mdsrc_req(u8 set)
 			spm_crit2("warning: set = %d, spm_ap_mdsrc_req_cnt = %d\n", set,
 				  spm_ap_mdsrc_req_cnt);
 		} else {
-			if (spm_ap_mdsrc_req_cnt == 0) {
-				hw_spin_lock_for_ddrdfs();
+			if (spm_ap_mdsrc_req_cnt == 0)
 				mt_secure_call(MTK_SIP_KERNEL_SPM_AP_MDSRC_REQ, 0, 0, 0);
-				hw_spin_unlock_for_ddrdfs();
-			}
 		}
 
 		spin_unlock_irqrestore(&__spm_lock, flags);
@@ -845,6 +959,12 @@ void spm_ap_mdsrc_req(u8 set)
 int get_spm_sleep_count(struct seq_file *s, void *unused)
 {
 	seq_printf(s, "%d\n", spm_sleep_count);
+	return 0;
+}
+
+int get_spm_last_wakeup_src(struct seq_file *s, void *unused)
+{
+	seq_printf(s, "0x%x\n", spm_wakesta.r12);
 	return 0;
 }
 

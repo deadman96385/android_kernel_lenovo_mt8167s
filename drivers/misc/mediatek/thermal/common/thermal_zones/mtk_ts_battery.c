@@ -29,14 +29,20 @@
 #include "mt-plat/mtk_thermal_monitor.h"
 #include "mach/mtk_thermal.h"
 #include "mtk_thermal_timer.h"
-#include <tmp_battery.h>
 #include <linux/uidgid.h>
 #include <linux/slab.h>
+#include "tzbatt_initcfg.h"
+#if (CONFIG_MTK_GAUGE_VERSION == 30)
+#include <mtk_battery.h>
+#else
+#include <tmp_battery.h>
+#endif
 
 /* ************************************ */
 /* Function prototype*/
 /* ************************************ */
-static void __exit mtktsbattery_exit(void);
+static void tsbattery_exit(void);
+
 /* ************************************ */
 /* Weak functions */
 /* ************************************ */
@@ -55,15 +61,31 @@ battery_get_bat_temperature(void)
 	for (i = 0; i < 5; i++)
 		pr_err("[Thermal] E_WF: %s doesn't exist\n", __func__);
 
-	mtktsbattery_exit();
+	tsbattery_exit();
 	return -127000;
 }
 /* ************************************ */
 static kuid_t uid = KUIDT_INIT(0);
 static kgid_t gid = KGIDT_INIT(1000);
+static DEFINE_SEMAPHORE(sem_mutex);
 
+#if TZBATT_SET_INIT_CFG == 1
+static unsigned int interval = TZBATT_INITCFG_INTERVAL;
+static int trip_temp[10] = {
+	TZBATT_INITCFG_TRIP_0_TEMP,
+	TZBATT_INITCFG_TRIP_1_TEMP,
+	TZBATT_INITCFG_TRIP_2_TEMP,
+	TZBATT_INITCFG_TRIP_3_TEMP,
+	TZBATT_INITCFG_TRIP_4_TEMP,
+	TZBATT_INITCFG_TRIP_5_TEMP,
+	TZBATT_INITCFG_TRIP_6_TEMP,
+	TZBATT_INITCFG_TRIP_7_TEMP,
+	TZBATT_INITCFG_TRIP_8_TEMP,
+	TZBATT_INITCFG_TRIP_9_TEMP };
+#else
 static unsigned int interval;	/* seconds, 0 : no auto polling */
 static int trip_temp[10] = { 120000, 110000, 100000, 90000, 80000, 70000, 65000, 60000, 55000, 50000 };
+#endif
 /* static unsigned int cl_dev_dis_charge_state = 0; */
 static unsigned int cl_dev_sysrst_state;
 static struct thermal_zone_device *thz_dev;
@@ -73,6 +95,19 @@ static int mtktsbattery_debug_log;
 static int kernelmode;
 static int g_THERMAL_TRIP[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
+#if TZBATT_SET_INIT_CFG == 1
+static int num_trip = TZBATT_INITCFG_NUM_TRIPS;
+static char g_bind0[20] = TZBATT_INITCFG_TRIP_0_COOLER;
+static char g_bind1[20] = TZBATT_INITCFG_TRIP_1_COOLER;
+static char g_bind2[20] = TZBATT_INITCFG_TRIP_2_COOLER;
+static char g_bind3[20] = TZBATT_INITCFG_TRIP_3_COOLER;
+static char g_bind4[20] = TZBATT_INITCFG_TRIP_4_COOLER;
+static char g_bind5[20] = TZBATT_INITCFG_TRIP_5_COOLER;
+static char g_bind6[20] = TZBATT_INITCFG_TRIP_6_COOLER;
+static char g_bind7[20] = TZBATT_INITCFG_TRIP_7_COOLER;
+static char g_bind8[20] = TZBATT_INITCFG_TRIP_8_COOLER;
+static char g_bind9[20] = TZBATT_INITCFG_TRIP_9_COOLER;
+#else
 static int num_trip;
 static char g_bind0[20] = { 0 };
 static char g_bind1[20] = { 0 };
@@ -84,6 +119,7 @@ static char g_bind6[20] = { 0 };
 static char g_bind7[20] = { 0 };
 static char g_bind8[20] = { 0 };
 static char g_bind9[20] = { 0 };
+#endif
 
 /**
  * If curr_temp >= polling_trip_temp1, use interval
@@ -94,6 +130,7 @@ static int polling_trip_temp1 = 40000;
 static int polling_trip_temp2 = 20000;
 static int polling_factor1 = 5000;
 static int polling_factor2 = 10000;
+static int bat_temp = 21234;
 
 /* static int battery_write_flag=0; */
 
@@ -106,6 +143,8 @@ do {                                    \
 	}                                   \
 } while (0)
 
+#define mtktsbattery_printk(fmt, args...)   \
+pr_debug("[Thermal/TZ/BATTERY]" fmt, ##args)
 /*
  * kernel fopen/fclose
  */
@@ -164,10 +203,10 @@ static int get_hw_battery_temp(void)
 #else
 	/* Phone */
 
-/* TO-DO: Use CONFIG MT6799 or GM3.0 */
-#if defined(CONFIG_MACH_MT6799)
+#if (CONFIG_MTK_GAUGE_VERSION == 30)
 	ret = battery_get_bat_temperature();
 #else
+	/* MTK_GAUGE_VERSION = 10 or 20 */
 	ret = read_tbat_value();
 #endif
 	ret = ret * 10;
@@ -200,6 +239,8 @@ static int mtktsbattery_get_hw_temp(void)
 	/* cat /sys/class/power_supply/battery/batt_temp */
 	t_ret = get_hw_battery_temp();
 	t_ret = t_ret * 100;
+	if (t_ret > 50000)
+		pr_debug("[Thermal/TZ/BATTERY] %s bat_temp:%d\n", __func__, t_ret);
 
 	mutex_unlock(&Battery_lock);
 
@@ -215,6 +256,7 @@ static int mtktsbattery_get_temp(struct thermal_zone_device *thermal, int *t)
 {
 
 	*t = mtktsbattery_get_hw_temp();
+	bat_temp = *t;
 
 	if ((int)*t >= polling_trip_temp1)
 		thermal->polling_delay = interval * 1000;
@@ -405,9 +447,11 @@ static int tsbat_sysrst_get_cur_state(struct thermal_cooling_device *cdev, unsig
 
 static int tsbat_sysrst_set_cur_state(struct thermal_cooling_device *cdev, unsigned long state)
 {
+
 	cl_dev_sysrst_state = state;
 	if (cl_dev_sysrst_state == 1) {
-		pr_debug("Power/battery_Thermal: reset, reset, reset!!!");
+
+		pr_debug("Power/battery_Thermal: reset, reset, reset!!! bat_temp=%d", bat_temp);
 		pr_debug("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 		pr_debug("*****************************************");
 		pr_debug("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
@@ -497,6 +541,7 @@ static ssize_t mtktsbattery_write(struct file *file, const char __user *buffer, 
 		&ptr_mtktsbattery_data->trip[8], &ptr_mtktsbattery_data->t_type[8], ptr_mtktsbattery_data->bind8,
 		&ptr_mtktsbattery_data->trip[9], &ptr_mtktsbattery_data->t_type[9], ptr_mtktsbattery_data->bind9,
 		&ptr_mtktsbattery_data->time_msec) == 32) {
+		down(&sem_mutex);
 		mtktsbattery_dprintk("[mtktsbattery_write] mtktsbattery_unregister_thermal\n");
 		mtktsbattery_unregister_thermal();
 
@@ -507,6 +552,7 @@ static ssize_t mtktsbattery_write(struct file *file, const char __user *buffer, 
 			#endif
 			mtktsbattery_dprintk("[mtktsbattery_write] bad argument\n");
 			kfree(ptr_mtktsbattery_data);
+			up(&sem_mutex);
 			return -EINVAL;
 		}
 
@@ -557,6 +603,7 @@ static ssize_t mtktsbattery_write(struct file *file, const char __user *buffer, 
 
 		mtktsbattery_dprintk("[mtktsbattery_write] mtktsbattery_register_thermal\n");
 		mtktsbattery_register_thermal();
+		up(&sem_mutex);
 
 		kfree(ptr_mtktsbattery_data);
 		/* battery_write_flag=1; */
@@ -595,7 +642,7 @@ static void mtkts_battery_start_thermal_timer(void)
 	/* For charging current throttling during deep idle,
 	*   this delayed work cannot be canceled.
 	*if (thz_dev != NULL && interval != 0)
-	*	mod_delayed_work(system_freezable_wq, &(thz_dev->poll_queue),
+	*	mod_delayed_work(system_freezable_power_efficient_wq, &(thz_dev->poll_queue),
 	*   round_jiffies(msecs_to_jiffies(3000)));
 	*
 	*return;
@@ -638,6 +685,13 @@ static void mtktsbattery_unregister_thermal(void)
 		mtk_thermal_zone_device_unregister(thz_dev);
 		thz_dev = NULL;
 	}
+}
+
+static void tsbattery_exit(void)
+{
+	mtktsbattery_dprintk("[tsbattery_exit]\n");
+	mtktsbattery_unregister_thermal();
+	mtktsbattery_unregister_cooler();
 }
 
 static int mtkts_battery_open(struct inode *inode, struct file *file)

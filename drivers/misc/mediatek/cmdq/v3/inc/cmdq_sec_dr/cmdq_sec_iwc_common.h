@@ -38,6 +38,29 @@ enum CMDQ_IWC_ADDR_METADATA_TYPE {
 	CMDQ_IWC_NMVA_2_MVA = 2, /* map normal MVA to secure world */
 };
 
+enum CMDQ_SEC_ENG_ENUM {
+	/* MDP */
+	CMDQ_SEC_MDP_RDMA0 = 0,
+	CMDQ_SEC_MDP_RDMA1,	/* 1 */
+	CMDQ_SEC_MDP_WDMA,	/* 2 */
+	CMDQ_SEC_MDP_WROT0,	/* 3 */
+	CMDQ_SEC_MDP_WROT1,	/* 4 */
+
+	/* DISP */
+	CMDQ_SEC_DISP_RDMA0,	/* 5 */
+	CMDQ_SEC_DISP_RDMA1,	/* 6 */
+	CMDQ_SEC_DISP_WDMA0,	/* 7 */
+	CMDQ_SEC_DISP_WDMA1,	/* 8 */
+	CMDQ_SEC_DISP_OVL0,	/* 9 */
+	CMDQ_SEC_DISP_OVL1,	/* 10 */
+	CMDQ_SEC_DISP_OVL2,	/* 11 */
+	CMDQ_SEC_DISP_2L_OVL0,	/* 12 */
+	CMDQ_SEC_DISP_2L_OVL1,	/* 13 */
+	CMDQ_SEC_DISP_2L_OVL2,	/* 14 */
+
+	CMDQ_SEC_MAX_ENG_COUNT	/* 15 */
+};
+
 /*  */
 /* IWC message */
 /*  */
@@ -60,12 +83,12 @@ struct iwcCmdqAddrMetadata_t {
 	 *	A~B or B~D: size
 	 */
 
-	uint32_t type;			/* [IN] addr handle type*/
+	uint32_t type;		/* [IN] addr handle type*/
 	uint64_t baseHandle;	/* [IN]_h, secure address handle */
 	uint32_t blockOffset;	/* [IN]_b, block offset from handle(PA) to current block(plane) */
-	uint32_t offset;		/* [IN]_b, buffser offset to secure handle */
-	uint32_t size;			/* buffer size */
-	uint32_t port;			/* hw port id (i.e. M4U port id)*/
+	uint32_t offset;	/* [IN]_b, buffser offset to secure handle */
+	uint32_t size;		/* buffer size */
+	uint32_t port;		/* hw port id (i.e. M4U port id)*/
 };
 
 struct iwcCmdqDebugConfig_t {
@@ -197,6 +220,8 @@ struct iwcCmdqMessage_t {
 #define CMDQ_ERR_INVALID_SECURITY_THREAD (1505)
 #define CMDQ_ERR_PATH_RESOURCE_NOT_READY (1506)
 #define CMDQ_ERR_NULL_TASK (1507)
+/* msee error */
+#define CMDQ_ERR_OPEN_IOCTL_FAILED (1600)
 /* secure access error */
 #define CMDQ_ERR_MAP_ADDRESS_FAILED (2001)
 #define CMDQ_ERR_UNMAP_ADDRESS_FAILED (2002)

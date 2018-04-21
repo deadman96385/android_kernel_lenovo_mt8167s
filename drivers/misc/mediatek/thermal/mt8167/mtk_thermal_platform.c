@@ -90,43 +90,6 @@ force_get_tbat(void)
 /* ********************************************* */
 static mm_segment_t oldfs;
 
-/*
- *  Read Battery Information.
- *
- *  "cat /sys/devices/platform/mt6575-battery/FG_Battery_CurrentConsumption"
- *  "cat /sys/class/power_supply/battery/batt_vol"
- *  "cat /sys/class/power_supply/battery/batt_temp"
- */
-static int get_sys_battery_info(char *dev)
-{
-	int fd;
-	long nRet;
-	int eCheck;
-	int nReadSize;
-	char buf[64];
-
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-	fd = sys_open(dev, O_RDONLY, 0);
-	if (fd < 0) {
-		THRML_LOG("[get_sys_battery_info] open fail dev:%s fd:%d\n", dev, fd);
-		set_fs(oldfs);
-		return fd;
-	}
-
-	nReadSize = sys_read(fd, buf, sizeof(buf) - 1);
-	THRML_LOG("[get_sys_battery_info] nReadSize:%d\n", nReadSize);
-	eCheck = kstrtol(buf, 10, &nRet);
-
-	set_fs(oldfs);
-	sys_close(fd);
-
-	if (eCheck == 0)
-		return (int)nRet;
-	else
-		return 0;
-}
-
 /* ********************************************* */
 /* Get Wifi Tx throughput */
 /* ********************************************* */
@@ -544,40 +507,6 @@ int mtk_thermal_get_gpu_info(int *nocores, int **gpufreq, int **gpuloading)
 	return 0;
 }
 EXPORT_SYMBOL(mtk_thermal_get_gpu_info);
-
-int mtk_thermal_get_batt_info(int *batt_voltage, int *batt_current, int *batt_temp)
-{
-	/* ****************** */
-	/* Battery */
-	/* ****************** */
-
-	/* Read Battery Information */
-	if (batt_current) {
-		*batt_current =
-		    get_sys_battery_info
-		    ("/sys/devices/platform/battery/FG_Battery_CurrentConsumption");
-		/* the return value is 0.1mA */
-		if (*batt_current % 10 < 5)
-			*batt_current /= 10;
-		else
-			*batt_current = 1 + (*batt_current / 10);
-
-
-#if defined(CONFIG_MTK_SMART_BATTERY)
-		if (gFG_Is_Charging == KAL_TRUE)
-			*batt_current *= -1;
-#endif
-	}
-
-	if (batt_voltage)
-		*batt_voltage = get_sys_battery_info("/sys/class/power_supply/battery/batt_vol");
-
-	if (batt_temp)
-		*batt_temp = get_sys_battery_info("/sys/class/power_supply/battery/batt_temp");
-
-	return 0;
-}
-EXPORT_SYMBOL(mtk_thermal_get_batt_info);
 
 #define NO_EXTRA_THERMAL_ATTR (7)
 static char *extra_attr_names[NO_EXTRA_THERMAL_ATTR] = { 0 };

@@ -20,11 +20,11 @@
 /* For Hybrid HW */
 VAL_VCODEC_OAL_HW_CONTEXT_T oal_hw_context[VCODEC_MULTIPLE_INSTANCE_NUM];
 /* mutex : NonCacheMemoryListLock */
-VAL_NON_CACHE_MEMORY_LIST_T grNonCacheMemoryList[VCODEC_MULTIPLE_INSTANCE_NUM_x_10];
+struct VAL_NON_CACHE_MEMORY_LIST_T grNonCacheMemoryList[VCODEC_MULTIPLE_INSTANCE_NUM_x_10];
 
 /* For both hybrid and pure HW */
-VAL_VCODEC_HW_LOCK_T grVcodecDecHWLock;	/* mutex : VdecHWLock */
-VAL_VCODEC_HW_LOCK_T grVcodecEncHWLock;	/* mutex : VencHWLock */
+struct VAL_VCODEC_HW_LOCK_T grVcodecDecHWLock;	/* mutex : VdecHWLock */
+struct VAL_VCODEC_HW_LOCK_T grVcodecEncHWLock;	/* mutex : VencHWLock */
 
 VAL_UINT32_T gu4LockDecHWCount;	/* spinlock : LockDecHWCountLock */
 VAL_UINT32_T gu4LockEncHWCount;	/* spinlock : LockEncHWCountLock */
@@ -41,7 +41,7 @@ VAL_INT32_T search_HWLockSlot_ByTID(VAL_ULONG_T ulpa, VAL_UINT32_T curr_tid)
 		if (oal_hw_context[i].u4VCodecThreadNum != VCODEC_THREAD_MAX_NUM) {
 			for (j = 0; j < oal_hw_context[i].u4VCodecThreadNum; j++) {
 				if (oal_hw_context[i].u4VCodecThreadID[j] == curr_tid) {
-					MODULE_MFV_LOGD
+					MODULE_MFV_PR_DEBUG
 					    ("[search_HWLockSlot_ByTID] Lookup curr HW Locker is ObjId %d in index%d\n",
 					     curr_tid, i);
 					return i;
@@ -58,7 +58,7 @@ VAL_INT32_T search_HWLockSlot_ByHandle(VAL_ULONG_T ulpa, VAL_HANDLE_T handle)
 	VAL_INT32_T i;
 
 	if (handle == (VAL_HANDLE_T)NULL) {
-		MODULE_MFV_LOGE("[VCODEC] Get NULL Handle\n");
+		MODULE_MFV_PR_ERR("[VCODEC] Get NULL Handle\n");
 		return -1;
 	}
 	for (i = 0; i < VCODEC_MULTIPLE_INSTANCE_NUM; i++) {
@@ -76,12 +76,12 @@ VAL_VCODEC_OAL_HW_CONTEXT_T *setCurr_HWLockSlot(VAL_ULONG_T ulpa, VAL_UINT32_T t
 
 	/* Dump current ObjId */
 	for (i = 0; i < VCODEC_MULTIPLE_INSTANCE_NUM; i++)
-		MODULE_MFV_LOGD("Dump curr slot %d ObjId %lu\n", i, oal_hw_context[i].ObjId);
+		MODULE_MFV_PR_DEBUG("Dump curr slot %d ObjId %lu\n", i, oal_hw_context[i].ObjId);
 
 	/* check if current ObjId exist in oal_hw_context[i].ObjId */
 	for (i = 0; i < VCODEC_MULTIPLE_INSTANCE_NUM; i++) {
 		if (oal_hw_context[i].ObjId == ulpa) {
-			MODULE_MFV_LOGD("[VCODEC] Curr Already exist in %d Slot\n", i);
+			MODULE_MFV_PR_DEBUG("[VCODEC] Curr Already exist in %d Slot\n", i);
 			return &oal_hw_context[i];
 		}
 	}
@@ -92,7 +92,7 @@ VAL_VCODEC_OAL_HW_CONTEXT_T *setCurr_HWLockSlot(VAL_ULONG_T ulpa, VAL_UINT32_T t
 			for (j = 0; j < oal_hw_context[i].u4VCodecThreadNum; j++) {
 				if (oal_hw_context[i].u4VCodecThreadID[j] == current->pid) {
 					oal_hw_context[i].ObjId = ulpa;
-					MODULE_MFV_LOGD("[VCODEC][setCurr_HWLockSlot] setCurr %d Slot\n",
+					MODULE_MFV_PR_DEBUG("[VCODEC][setCurr_HWLockSlot] setCurr %d Slot\n",
 						 i);
 					return &oal_hw_context[i];
 				}
@@ -100,7 +100,7 @@ VAL_VCODEC_OAL_HW_CONTEXT_T *setCurr_HWLockSlot(VAL_ULONG_T ulpa, VAL_UINT32_T t
 		}
 	}
 
-	MODULE_MFV_LOGE("[VCODEC][ERROR] setCurr_HWLockSlot All %d Slots unavaliable\n",
+	MODULE_MFV_PR_ERR("[VCODEC][ERROR] setCurr_HWLockSlot All %d Slots unavaliable\n",
 		 VCODEC_MULTIPLE_INSTANCE_NUM);
 	oal_hw_context[0].u4VCodecThreadNum = VCODEC_THREAD_MAX_NUM - 1;
 	for (i = 0; i < oal_hw_context[0].u4VCodecThreadNum; i++)
@@ -121,7 +121,7 @@ VAL_VCODEC_OAL_HW_CONTEXT_T *setCurr_HWLockSlot_Thread_ID(VAL_VCODEC_THREAD_ID_T
 	for (i = 0; i < VCODEC_MULTIPLE_INSTANCE_NUM; i++) {
 		if (oal_hw_context[i].u4VCodecThreadNum != VCODEC_THREAD_MAX_NUM) {
 			for (j = 0; j < oal_hw_context[i].u4VCodecThreadNum; j++) {
-				MODULE_MFV_LOGD
+				MODULE_MFV_PR_DEBUG
 				    ("[setCurr_HWLockSlot_Thread_ID] Dump curr slot %d, ThreadID[%d] = %d\n",
 				     i, j, oal_hw_context[i].u4VCodecThreadID[j]);
 			}
@@ -129,7 +129,7 @@ VAL_VCODEC_OAL_HW_CONTEXT_T *setCurr_HWLockSlot_Thread_ID(VAL_VCODEC_THREAD_ID_T
 	}
 
 	for (i = 0; i < a_prVcodecThreadID.u4VCodecThreadNum; i++) {
-		MODULE_MFV_LOGD
+		MODULE_MFV_PR_DEBUG
 		    ("[setCurr_HWLockSlot_Thread_ID] VCodecThreadNum = %d, VCodecThreadID = %d\n",
 		     a_prVcodecThreadID.u4VCodecThreadNum, a_prVcodecThreadID.u4VCodecThreadID[i]
 		    );
@@ -142,7 +142,7 @@ VAL_VCODEC_OAL_HW_CONTEXT_T *setCurr_HWLockSlot_Thread_ID(VAL_VCODEC_THREAD_ID_T
 				for (k = 0; k < a_prVcodecThreadID.u4VCodecThreadNum; k++) {
 					if (oal_hw_context[i].u4VCodecThreadID[j] ==
 					    a_prVcodecThreadID.u4VCodecThreadID[k]) {
-						MODULE_MFV_LOGE
+						MODULE_MFV_PR_DEBUG
 						    ("[setCurr_HWLockSlot_Thread_ID] Curr Already exist in %d Slot\n",
 						     i);
 						*a_prIndex = i;
@@ -160,7 +160,7 @@ VAL_VCODEC_OAL_HW_CONTEXT_T *setCurr_HWLockSlot_Thread_ID(VAL_VCODEC_THREAD_ID_T
 			for (j = 0; j < a_prVcodecThreadID.u4VCodecThreadNum; j++) {
 				oal_hw_context[i].u4VCodecThreadID[j] =
 				    a_prVcodecThreadID.u4VCodecThreadID[j];
-				MODULE_MFV_LOGD("[setCurr_HWLockSlot_Thread_ID] setCurr %d Slot, %d\n", i,
+				MODULE_MFV_PR_DEBUG("[setCurr_HWLockSlot_Thread_ID] setCurr %d Slot, %d\n", i,
 					 oal_hw_context[i].u4VCodecThreadID[j]);
 			}
 			*a_prIndex = i;
@@ -169,7 +169,7 @@ VAL_VCODEC_OAL_HW_CONTEXT_T *setCurr_HWLockSlot_Thread_ID(VAL_VCODEC_THREAD_ID_T
 	}
 
 	{
-		MODULE_MFV_LOGE
+		MODULE_MFV_PR_ERR
 		    ("[VCodec Error][ERROR] setCurr_HWLockSlot_Thread_ID All %d Slots unavaliable\n",
 		     VCODEC_MULTIPLE_INSTANCE_NUM);
 		oal_hw_context[0].u4VCodecThreadNum = a_prVcodecThreadID.u4VCodecThreadNum;
@@ -198,12 +198,12 @@ VAL_VCODEC_OAL_HW_CONTEXT_T *freeCurr_HWLockSlot(VAL_ULONG_T ulpa)
 
 			oal_hw_context[i].u4VCodecThreadNum = VCODEC_THREAD_MAX_NUM;
 			oal_hw_context[i].Oal_HW_reg = (VAL_VCODEC_OAL_HW_REGISTER_T *) 0;
-			MODULE_MFV_LOGD("freeCurr_HWLockSlot %d Slot\n", i);
+			MODULE_MFV_PR_DEBUG("freeCurr_HWLockSlot %d Slot\n", i);
 			return &oal_hw_context[i];
 		}
 	}
 
-	MODULE_MFV_LOGE("[VCodec Error][ERROR] freeCurr_HWLockSlot can't find pid in HWLockSlot\n");
+	MODULE_MFV_PR_ERR("[VCodec Error][ERROR] freeCurr_HWLockSlot can't find pid in HWLockSlot\n");
 	return 0;
 }
 
@@ -214,13 +214,13 @@ void Add_NonCacheMemoryList(VAL_ULONG_T a_ulKVA, VAL_ULONG_T a_ulKPA, VAL_ULONG_
 	VAL_UINT32_T u4I = 0;
 	VAL_UINT32_T u4J = 0;
 
-	MODULE_MFV_LOGD("Add_NonCacheMemoryList +, KVA = 0x%lx, KPA = 0x%lx, Size = 0x%lx\n", a_ulKVA,
+	MODULE_MFV_PR_DEBUG("Add_NonCacheMemoryList +, KVA = 0x%lx, KPA = 0x%lx, Size = 0x%lx\n", a_ulKVA,
 		 a_ulKPA, a_ulSize);
 
 	for (u4I = 0; u4I < VCODEC_MULTIPLE_INSTANCE_NUM_x_10; u4I++) {
 		if ((grNonCacheMemoryList[u4I].ulKVA == 0xffffffff)
 		    && (grNonCacheMemoryList[u4I].ulKPA == 0xffffffff)) {
-			MODULE_MFV_LOGD
+			MODULE_MFV_PR_DEBUG
 			    ("ADD Add_NonCacheMemoryList index = %d, VCodecThreadNum = %d, curr_tid = %d\n",
 			     u4I, a_u4VCodecThreadNum, current->pid);
 
@@ -228,7 +228,7 @@ void Add_NonCacheMemoryList(VAL_ULONG_T a_ulKVA, VAL_ULONG_T a_ulKPA, VAL_ULONG_
 			for (u4J = 0; u4J < grNonCacheMemoryList[u4I].u4VCodecThreadNum; u4J++) {
 				grNonCacheMemoryList[u4I].u4VCodecThreadID[u4J] =
 				    *(a_pu4VCodecThreadID + u4J);
-				MODULE_MFV_LOGD
+				MODULE_MFV_PR_DEBUG
 				    ("[Add_NonCacheMemoryList] VCodecThreadNum = %d, VCodecThreadID = %d\n",
 				     grNonCacheMemoryList[u4I].u4VCodecThreadNum,
 				     grNonCacheMemoryList[u4I].u4VCodecThreadID[u4J]);
@@ -242,9 +242,9 @@ void Add_NonCacheMemoryList(VAL_ULONG_T a_ulKVA, VAL_ULONG_T a_ulKPA, VAL_ULONG_
 	}
 
 	if (u4I == VCODEC_MULTIPLE_INSTANCE_NUM_x_10)
-		MODULE_MFV_LOGE("[VCODEC][ERROR] CAN'T ADD Add_NonCacheMemoryList, List is FULL!!\n");
+		MODULE_MFV_PR_ERR("[VCODEC][ERROR] CAN'T ADD Add_NonCacheMemoryList, List is FULL!!\n");
 
-	MODULE_MFV_LOGD("[VCODEC] Add_NonCacheMemoryList -\n");
+	MODULE_MFV_PR_DEBUG("[VCODEC] Add_NonCacheMemoryList -\n");
 }
 
 void Free_NonCacheMemoryList(VAL_ULONG_T a_ulKVA, VAL_ULONG_T a_ulKPA)
@@ -252,13 +252,13 @@ void Free_NonCacheMemoryList(VAL_ULONG_T a_ulKVA, VAL_ULONG_T a_ulKPA)
 	VAL_UINT32_T u4I = 0;
 	VAL_UINT32_T u4J = 0;
 
-	MODULE_MFV_LOGD("[VCODEC] Free_NonCacheMemoryList +, KVA = 0x%lx, KPA = 0x%lx\n", a_ulKVA,
+	MODULE_MFV_PR_DEBUG("[VCODEC] Free_NonCacheMemoryList +, KVA = 0x%lx, KPA = 0x%lx\n", a_ulKVA,
 		 a_ulKPA);
 
 	for (u4I = 0; u4I < VCODEC_MULTIPLE_INSTANCE_NUM_x_10; u4I++) {
 		if ((grNonCacheMemoryList[u4I].ulKVA == a_ulKVA)
 		    && (grNonCacheMemoryList[u4I].ulKPA == a_ulKPA)) {
-			MODULE_MFV_LOGD("[VCODEC] Free Free_NonCacheMemoryList index = %d\n", u4I);
+			MODULE_MFV_PR_DEBUG("[VCODEC] Free Free_NonCacheMemoryList index = %d\n", u4I);
 			grNonCacheMemoryList[u4I].u4VCodecThreadNum = VCODEC_THREAD_MAX_NUM;
 			for (u4J = 0; u4J < VCODEC_THREAD_MAX_NUM; u4J++)
 				grNonCacheMemoryList[u4I].u4VCodecThreadID[u4J] = 0xffffffff;
@@ -271,10 +271,10 @@ void Free_NonCacheMemoryList(VAL_ULONG_T a_ulKVA, VAL_ULONG_T a_ulKPA)
 	}
 
 	if (u4I == VCODEC_MULTIPLE_INSTANCE_NUM_x_10)
-		MODULE_MFV_LOGE("[VCODEC][ERROR] CAN'T Free Free_NonCacheMemoryList, Address is not find!!\n");
+		MODULE_MFV_PR_ERR("[VCODEC][ERROR] CAN'T Free Free_NonCacheMemoryList, Address is not find!!\n");
 
 
-	MODULE_MFV_LOGD("[VCODEC]Free_NonCacheMemoryList -\n");
+	MODULE_MFV_PR_DEBUG("[VCODEC]Free_NonCacheMemoryList -\n");
 }
 
 
@@ -284,13 +284,13 @@ void Force_Free_NonCacheMemoryList(VAL_UINT32_T a_u4Tid)
 	VAL_UINT32_T u4J = 0;
 	VAL_UINT32_T u4K = 0;
 
-	MODULE_MFV_LOGD("[VCODEC] Force_Free_NonCacheMemoryList +, curr_id = %d", a_u4Tid);
+	MODULE_MFV_PR_DEBUG("[VCODEC] Force_Free_NonCacheMemoryList +, curr_id = %d", a_u4Tid);
 
 	for (u4I = 0; u4I < VCODEC_MULTIPLE_INSTANCE_NUM_x_10; u4I++) {
 		if (grNonCacheMemoryList[u4I].u4VCodecThreadNum != VCODEC_THREAD_MAX_NUM) {
 			for (u4J = 0; u4J < grNonCacheMemoryList[u4I].u4VCodecThreadNum; u4J++) {
 				if (grNonCacheMemoryList[u4I].u4VCodecThreadID[u4J] == a_u4Tid) {
-					MODULE_MFV_LOGE("[VCODEC][WARNING] Force_Free_NonCacheMemoryList index = %d, tid = %d, KVA = 0x%lx, KPA = 0x%lx, Size = %lu\n",
+					MODULE_MFV_PR_DEBUG("[VCODEC][WARNING] Force_Free_NonCacheMemoryList index = %d, tid = %d, KVA = 0x%lx, KPA = 0x%lx, Size = %lu\n",
 					     u4I, a_u4Tid, grNonCacheMemoryList[u4I].ulKVA,
 					     grNonCacheMemoryList[u4I].ulKPA,
 					     grNonCacheMemoryList[u4I].ulSize);
@@ -315,7 +315,7 @@ void Force_Free_NonCacheMemoryList(VAL_UINT32_T a_u4Tid)
 		}
 	}
 
-	MODULE_MFV_LOGD("Force_Free_NonCacheMemoryList -, curr_id = %d", a_u4Tid);
+	MODULE_MFV_PR_DEBUG("Force_Free_NonCacheMemoryList -, curr_id = %d", a_u4Tid);
 }
 
 VAL_UINT32_T Search_NonCacheMemoryList_By_KPA(VAL_ULONG_T a_ulKPA)
@@ -325,23 +325,23 @@ VAL_UINT32_T Search_NonCacheMemoryList_By_KPA(VAL_ULONG_T a_ulKPA)
 
 	ulVA_Offset = a_ulKPA & 0x00000fff;
 
-	MODULE_MFV_LOGD("Search_NonCacheMemoryList_By_KPA +, KPA = 0x%lx, ulVA_Offset = 0x%lx\n", a_ulKPA,
+	MODULE_MFV_PR_DEBUG("Search_NonCacheMemoryList_By_KPA +, KPA = 0x%lx, ulVA_Offset = 0x%lx\n", a_ulKPA,
 		 ulVA_Offset);
 
 	for (u4I = 0; u4I < VCODEC_MULTIPLE_INSTANCE_NUM_x_10; u4I++) {
 		if (grNonCacheMemoryList[u4I].ulKPA == (a_ulKPA - ulVA_Offset)) {
-			MODULE_MFV_LOGD("Find Search_NonCacheMemoryList_By_KPA index = %d\n", u4I);
+			MODULE_MFV_PR_DEBUG("Find Search_NonCacheMemoryList_By_KPA index = %d\n", u4I);
 			break;
 		}
 	}
 
 	if (u4I == VCODEC_MULTIPLE_INSTANCE_NUM_x_10) {
-		MODULE_MFV_LOGE
+		MODULE_MFV_PR_ERR
 		    ("[ERROR] CAN'T Find Search_NonCacheMemoryList_By_KPA, Address is not find!!\n");
 		return (grNonCacheMemoryList[0].ulKVA + ulVA_Offset);
 	}
 
-	MODULE_MFV_LOGD("Search_NonCacheMemoryList_By_KPA, ulVA = 0x%lx -\n",
+	MODULE_MFV_PR_DEBUG("Search_NonCacheMemoryList_By_KPA, ulVA = 0x%lx -\n",
 		 (grNonCacheMemoryList[u4I].ulKVA + ulVA_Offset));
 
 	return (grNonCacheMemoryList[u4I].ulKVA + ulVA_Offset);

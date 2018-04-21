@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 MediaTek Inc.
+ * Copyright (C) 2017 MediaTek Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -23,6 +23,11 @@
 #include <mtk_spm.h>
 #include <mtk_lpae.h>
 #include <mtk_gpio.h>
+
+#if defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758) || \
+	defined(CONFIG_MACH_MT6775)
+#define SUP_MCSODI_FS
+#endif
 
 /**************************************
  * Config and Parameter
@@ -219,13 +224,23 @@ struct pwr_ctrl {
 	u8 reg_conn_ddr_en_mask_b;
 
 	/* SPM_SRC2_MASK */
+#if defined(CONFIG_MACH_MT6775)
+	u8 reg_disp0_apsrc_req_mask_b;
+	u8 reg_disp1_apsrc_req_mask_b;
+#else
 	u8 reg_disp0_req_mask_b;
 	u8 reg_disp1_req_mask_b;
+#endif
 	u8 reg_disp_od_req_mask_b;
 	u8 reg_mfg_req_mask_b;
 	u8 reg_vdec0_req_mask_b;
+#if defined(CONFIG_MACH_MT6775)
+	u8 reg_gce_apsrc_req_mask_b;
+	u8 reg_gce_ddr_en_req_mask_b;
+#else
 	u8 reg_gce_req_mask_b;
 	u8 reg_gce_vrf18_req_mask_b;
+#endif
 	u8 reg_lpdma_req_mask_b;
 	u8 reg_conn_srcclkena_cksel2_mask_b;
 	u8 reg_sspm_apsrc_req_ddren_mask_b;
@@ -246,7 +261,15 @@ struct pwr_ctrl {
 	u8 reg_sspm2spm_int2_mask_b;
 	u8 reg_sspm2spm_int3_mask_b;
 	u8 reg_dqssoc_req_mask_b;
-
+#if defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758)
+	u8 reg_gce_vrf18_req2_mask_b;
+#elif defined(CONFIG_MACH_MT6775)
+	u8 reg_gce_busclk_req_mask_b;
+#endif
+#if defined(CONFIG_MACH_MT6758) || defined(CONFIG_MACH_MT6775)
+	u8 reg_ufs_srcclkena_mask_b;
+	u8 reg_ufs_vrf18_req_mask_b;
+#endif
 	/* SPM_SRC3_MASK */
 	u8 reg_mpwfi_op;
 	u8 reg_spm_resource_req_rsv1_4_mask_b;
@@ -280,6 +303,20 @@ struct pwr_ctrl {
 	u8 reg_conn_mask_b;
 	u8 reg_conn_apsrc_sel;
 	u8 reg_md_srcclkena_0_vrf18_mask_b;
+
+#if defined(CONFIG_MACH_MT6759) \
+	|| defined(CONFIG_MACH_MT6758) \
+	|| defined(CONFIG_MACH_MT6775)
+	/* SPM_SRC4_MASK */
+	u8 reg_ccif4_md_event_mask_b;
+	u8 reg_ccif4_ap_event_mask_b;
+	u8 reg_ccif5_md_event_mask_b;
+	u8 reg_ccif5_ap_event_mask_b;
+#endif
+#if defined(CONFIG_MACH_MT6775)
+	u8 reg_disp0_ddren_req_mask_b;
+	u8 reg_disp1_ddren_req_mask_b;
+#endif
 
 	/* SPM_WAKEUP_EVENT_MASK */
 	u32 reg_wakeup_event_mask;
@@ -341,6 +378,11 @@ struct pwr_ctrl {
 	/* MCU17_WFI_EN */
 	u8 mcu17_wfi_en;
 
+#if defined(CONFIG_MACH_MT6759) \
+	|| defined(CONFIG_MACH_MT6758) \
+	|| defined(CONFIG_MACH_MT6775)
+	u32 spm_rsv_con2;
+#endif
 	/* Auto-gen End */
 };
 
@@ -421,13 +463,23 @@ enum pwr_ctrl_enum {
 	PWR_REG_MD_DDR_EN_0_MASK_B,
 	PWR_REG_MD_DDR_EN_1_MASK_B,
 	PWR_REG_CONN_DDR_EN_MASK_B,
+#if defined(CONFIG_MACH_MT6775)
+	PWR_REG_DISP0_APSRC_REQ_MASK_B,
+	PWR_REG_DISP1_APSRC_REQ_MASK_B,
+#else
 	PWR_REG_DISP0_REQ_MASK_B,
 	PWR_REG_DISP1_REQ_MASK_B,
+#endif
 	PWR_REG_DISP_OD_REQ_MASK_B,
 	PWR_REG_MFG_REQ_MASK_B,
 	PWR_REG_VDEC0_REQ_MASK_B,
+#if defined(CONFIG_MACH_MT6775)
+	PWR_REG_GCE_APSRC_REQ_MASK_B,
+	PWR_REG_GCE_DDR_EN_REQ_MASK_B,
+#else
 	PWR_REG_GCE_REQ_MASK_B,
 	PWR_REG_GCE_VRF18_REQ_MASK_B,
+#endif
 	PWR_REG_LPDMA_REQ_MASK_B,
 	PWR_REG_CONN_SRCCLKENA_CKSEL2_MASK_B,
 	PWR_REG_SSPM_APSRC_REQ_DDREN_MASK_B,
@@ -448,6 +500,15 @@ enum pwr_ctrl_enum {
 	PWR_REG_SSPM2SPM_INT2_MASK_B,
 	PWR_REG_SSPM2SPM_INT3_MASK_B,
 	PWR_REG_DQSSOC_REQ_MASK_B,
+#if defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758)
+	PWR_REG_GCE_VRF18_REQ2_MASK_B,
+#elif defined(CONFIG_MACH_MT6775)
+	PWR_REG_GCE_BUSCLK_REQ_MASK_B,
+#endif
+#if defined(CONFIG_MACH_MT6758) || defined(CONFIG_MACH_MT6775)
+	PWR_REG_UFS_SRCCLKENA_MASK_B,
+	PWR_REG_UFS_VRF18_REQ_MASK_B,
+#endif
 	PWR_REG_MPWFI_OP,
 	PWR_REG_SPM_RESOURCE_REQ_RSV1_4_MASK_B,
 	PWR_REG_SPM_RESOURCE_REQ_RSV1_3_MASK_B,
@@ -480,6 +541,18 @@ enum pwr_ctrl_enum {
 	PWR_REG_CONN_MASK_B,
 	PWR_REG_CONN_APSRC_SEL,
 	PWR_REG_MD_SRCCLKENA_0_VRF18_MASK_B,
+#if defined(CONFIG_MACH_MT6759) \
+	|| defined(CONFIG_MACH_MT6758) \
+	|| defined(CONFIG_MACH_MT6775)
+	PWR_REG_CCIF4_MD_EVENT_MASK_B,
+	PWR_REG_CCIF4_AP_EVENT_MASK_B,
+	PWR_REG_CCIF5_MD_EVENT_MASK_B,
+	PWR_REG_CCIF5_AP_EVENT_MASK_B,
+#endif
+#if defined(CONFIG_MACH_MT6775)
+	PWR_REG_DISP0_DDREN_REQ_MASK_B,
+	PWR_REG_DISP1_DDREN_REQ_MASK_B,
+#endif
 	PWR_REG_WAKEUP_EVENT_MASK,
 	PWR_REG_EXT_WAKEUP_EVENT_MASK,
 	PWR_MCU0_WFI_EN,
@@ -500,6 +573,11 @@ enum pwr_ctrl_enum {
 	PWR_MCU15_WFI_EN,
 	PWR_MCU16_WFI_EN,
 	PWR_MCU17_WFI_EN,
+#if defined(CONFIG_MACH_MT6759) \
+	|| defined(CONFIG_MACH_MT6758) \
+	|| defined(CONFIG_MACH_MT6775)
+	PWR_SPM_RSV_CON2,
+#endif
 	PWR_MAX_COUNT,
 };
 
@@ -512,6 +590,10 @@ enum {
 	SPM_LEAVE_SODI,
 	SPM_ENTER_SODI3,
 	SPM_LEAVE_SODI3,
+#ifdef SUP_MCSODI_FS
+	SPM_ENTER_MCSODI,
+	SPM_LEAVE_MCSODI,
+#endif
 	SPM_SUSPEND_PREPARE,
 	SPM_POST_SUSPEND,
 	SPM_DPIDLE_PREPARE,
@@ -520,12 +602,20 @@ enum {
 	SPM_POST_SODI,
 	SPM_SODI3_PREPARE,
 	SPM_POST_SODI3,
+#ifdef SUP_MCSODI_FS
+	SPM_MCSODI_PREPARE,
+	SPM_POST_MCSODI,
+#endif
 	SPM_VCORE_PWARP_CMD,
 	SPM_PWR_CTRL_SUSPEND,
 	SPM_PWR_CTRL_DPIDLE,
 	SPM_PWR_CTRL_SODI,
 	SPM_PWR_CTRL_SODI3,
+#ifdef SUP_MCSODI_FS
+	SPM_PWR_CTRL_MCSODI,
+#endif
 	SPM_PWR_CTRL_VCOREFS,
+	SPM_EXT_BUCK_STATUS,
 };
 
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
@@ -536,6 +626,7 @@ enum {
 	SPM_OPT_GPS_STAT      = (1 << 2),
 	SPM_OPT_VCORE_LP_MODE = (1 << 3),
 	SPM_OPT_XO_UFS_OFF    = (1 << 4),
+	SPM_OPT_CLKBUF_ENTER_BBLPM = (1 << 5),
 	NF_SPM_OPT
 };
 
@@ -549,36 +640,33 @@ struct spm_data {
 			unsigned int sys_src_clk_h;
 			unsigned int spm_opt;
 			unsigned int vcore_volt_pmic_val;
+			unsigned int reserved;
 		} suspend;
 		struct {
 			unsigned int root_id;
 		} notify;
+#if defined(CONFIG_MACH_MT6758)
+		struct {
+			unsigned int vcore_level0;
+			unsigned int vcore_level1;
+		} vcorefs;
+
+#elif defined(CONFIG_MACH_MT6775)
+		struct {
+			unsigned int vcore_level0;
+			unsigned int vcore_level1;
+			unsigned int vcore_level2;
+		} vcorefs;
+
+#else
 		struct {
 			unsigned int pcm_flags;
 		} vcorefs;
+#endif
 	} u;
 };
 
 #endif /* CONFIG_MTK_TINYSYS_SSPM_SUPPORT */
-
-#define DYNA_LOAD_PCM_PATH_SIZE 128
-#define PCM_FIRMWARE_VERSION_SIZE 128
-
-enum dyna_load_pcm_index {
-	DYNA_LOAD_PCM_SUSPEND = 0,
-	DYNA_LOAD_PCM_MAX,
-};
-
-struct dyna_load_pcm_t {
-	char path[DYNA_LOAD_PCM_PATH_SIZE];
-	char version[PCM_FIRMWARE_VERSION_SIZE];
-	char *buf;
-	dma_addr_t buf_dma;
-	struct pcm_desc desc;
-	int ready;
-};
-
-extern struct dyna_load_pcm_t dyna_load_pcm[DYNA_LOAD_PCM_MAX];
 
 struct wake_status {
 	u32 assert_pc;		/* PCM_REG_DATA_INI */
@@ -610,16 +698,20 @@ extern struct spm_lp_scen __spm_dpidle;
 extern struct spm_lp_scen __spm_sodi3;
 extern struct spm_lp_scen __spm_sodi;
 extern struct spm_lp_scen __spm_mcdi;
+#ifdef SUP_MCSODI_FS
+extern struct spm_lp_scen __spm_mcsodi;
+#endif
 extern struct spm_lp_scen __spm_vcorefs;
 
 extern int __spm_check_opp_level(int ch);
 extern unsigned int __spm_get_vcore_volt_pmic_val(bool is_vcore_volt_lower, int ch);
+extern void __spm_update_pcm_flags_dcs_workaround(struct pwr_ctrl *pwrctrl, int ch);
 
 extern int __spm_get_pcm_timer_val(const struct pwr_ctrl *pwrctrl);
 extern void __spm_sync_pcm_flags(struct pwr_ctrl *pwrctrl);
 
 extern void __spm_get_wakeup_status(struct wake_status *wakesta);
-extern wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
+extern unsigned int __spm_output_wake_reason(const struct wake_status *wakesta,
 		const struct pcm_desc *pcmdesc, bool suspend, const char *scenario);
 
 extern void __spm_sync_vcore_dvfs_power_control(struct pwr_ctrl *dest_pwr_ctrl, const struct pwr_ctrl *src_pwr_ctrl);
@@ -631,8 +723,7 @@ void spm_set_dummy_read_addr(int debug);
 extern int spm_fs_init(void);
 
 extern int spm_golden_setting_cmp(bool en);
-extern void __spm_set_pcm_wdt(int en);
-extern u32 _spm_get_wake_period(int pwake_time, wake_reason_t last_wr);
+extern u32 _spm_get_wake_period(int pwake_time, unsigned int last_wr);
 
 extern int get_channel_lock(bool blocking);
 extern void get_channel_unlock(void);
@@ -646,14 +737,14 @@ extern void get_channel_unlock(void);
 	 (!!(resume) << 6) |			\
 	 ((event) & 0x3f))
 
-#define spm_emerg(fmt, args...)		pr_emerg("[SPM] " fmt, ##args)
-#define spm_alert(fmt, args...)		pr_alert("[SPM] " fmt, ##args)
-#define spm_crit(fmt, args...)		pr_crit("[SPM] " fmt, ##args)
-#define spm_err(fmt, args...)		pr_err("[SPM] " fmt, ##args)
-#define spm_warn(fmt, args...)		pr_warn("[SPM] " fmt, ##args)
-#define spm_notice(fmt, args...)	pr_notice("[SPM] " fmt, ##args)
+#define spm_emerg(fmt, args...)		pr_info("[SPM] " fmt, ##args)
+#define spm_alert(fmt, args...)		pr_info("[SPM] " fmt, ##args)
+#define spm_crit(fmt, args...)		pr_info("[SPM] " fmt, ##args)
+#define spm_err(fmt, args...)		pr_info("[SPM] " fmt, ##args)
+#define spm_warn(fmt, args...)		pr_info("[SPM] " fmt, ##args)
+#define spm_notice(fmt, args...)	pr_info("[SPM] " fmt, ##args)
 #define spm_info(fmt, args...)		pr_info("[SPM] " fmt, ##args)
-#define spm_debug(fmt, args...)		pr_info("[SPM] " fmt, ##args)	/* pr_debug show nothing */
+#define spm_debug(fmt, args...)		pr_debug("[SPM] " fmt, ##args)	/* pr_debug show nothing */
 
 /* just use in suspend flow for important log due to console suspend */
 #define spm_crit2(fmt, args...)		\
@@ -665,6 +756,7 @@ do {					\
 #define wfi_with_sync()					\
 do {							\
 	isb();						\
+	/* add mb() before wfi */			\
 	mb();						\
 	__asm__ __volatile__("wfi" : : : "memory");	\
 } while (0)

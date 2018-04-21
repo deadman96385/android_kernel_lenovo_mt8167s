@@ -41,17 +41,20 @@
 #include "ged_notify_sw_vsync.h"
 #include "ged_dvfs.h"
 #include "ged_kpi.h"
-#include "ged_ge.h"
 #include "ged_frr.h"
+#include "ged_fdvfs.h"
+
+#include "ged_ge.h"
 
 #define GED_DRIVER_DEVICE_NAME "ged"
-
+#ifndef GED_BUFFER_LOG_DISABLE
 #ifdef GED_DEBUG
 #define GED_LOG_BUF_COMMON_GLES "GLES"
-static GED_LOG_BUF_HANDLE ghLogBuf_GLES = 0;
-GED_LOG_BUF_HANDLE ghLogBuf_GED = 0;
+static GED_LOG_BUF_HANDLE ghLogBuf_GLES;
+GED_LOG_BUF_HANDLE ghLogBuf_GED;
 #endif
 
+static GED_LOG_BUF_HANDLE ghLogBuf_GPU;
 #define GED_LOG_BUF_COMMON_HWC "HWC"
 static GED_LOG_BUF_HANDLE ghLogBuf_HWC;
 #define GED_LOG_BUF_COMMON_HWC_ERR "HWC_err"
@@ -60,10 +63,10 @@ static GED_LOG_BUF_HANDLE ghLogBuf_HWC_ERR;
 static GED_LOG_BUF_HANDLE ghLogBuf_FENCE;
 static GED_LOG_BUF_HANDLE ghLogBuf_FWTrace;
 static GED_LOG_BUF_HANDLE ghLogBuf_ftrace;
+#endif
 
-
-GED_LOG_BUF_HANDLE ghLogBuf_DVFS = 0;
-GED_LOG_BUF_HANDLE ghLogBuf_ged_srv = 0;
+GED_LOG_BUF_HANDLE ghLogBuf_DVFS;
+GED_LOG_BUF_HANDLE ghLogBuf_ged_srv;
 
 /******************************************************************************
  * GED File operations
@@ -127,7 +130,7 @@ static long ged_dispatch(struct file *pFile, GED_BRIDGE_PACKAGE *psBridgePackage
 		}
 
 		if (psBridgePackageKM->i32OutBufferSize > 0) {
-			pvOut = kmalloc(psBridgePackageKM->i32OutBufferSize, GFP_KERNEL);
+			pvOut = kzalloc(psBridgePackageKM->i32OutBufferSize, GFP_KERNEL);
 
 			if (pvOut == NULL)
 				goto dispatch_exit;
@@ -181,29 +184,17 @@ static long ged_dispatch(struct file *pFile, GED_BRIDGE_PACKAGE *psBridgePackage
 		case GED_BRIDGE_COMMAND_GE_ALLOC:
 			SET_FUNC_AND_CHECK(ged_bridge_ge_alloc, GE_ALLOC);
 			break;
-		case GED_BRIDGE_COMMAND_GE_RETAIN:
-			SET_FUNC_AND_CHECK(ged_bridge_ge_retain, GE_RETAIN);
-			break;
-		case GED_BRIDGE_COMMAND_GE_RELEASE:
-			SET_FUNC_AND_CHECK(ged_bridge_ge_release, GE_RELEASE);
-			break;
 		case GED_BRIDGE_COMMAND_GE_GET:
 			SET_FUNC_AND_CHECK(ged_bridge_ge_get, GE_GET);
 			break;
 		case GED_BRIDGE_COMMAND_GE_SET:
 			SET_FUNC_AND_CHECK(ged_bridge_ge_set, GE_SET);
 			break;
-		case GED_BRIDGE_COMMAND_WAIT_HW_VSYNC:
-			SET_FUNC_AND_CHECK(ged_bridge_wait_hw_vsync, WAIT_HW_VSYNC);
+		case GED_BRIDGE_COMMAND_GE_INFO:
+			SET_FUNC_AND_CHECK(ged_bridge_ge_info, GE_INFO);
 			break;
 		case GED_BRIDGE_COMMAND_GPU_TIMESTAMP:
 			SET_FUNC_AND_CHECK(ged_bridge_gpu_timestamp, GPU_TIMESTAMP);
-			break;
-		case GED_BRIDGE_COMMAND_TARGET_FPS:
-			SET_FUNC_AND_CHECK(ged_bridge_target_fps, TARGET_FPS);
-			break;
-		case GED_BRIDGE_COMMAND_QUERY_TARGET_FPS:
-			SET_FUNC_AND_CHECK(ged_bridge_query_target_fps, QUERY_TARGET_FPS);
 			break;
 		default:
 			GED_LOGE("Unknown Bridge ID: %u\n", GED_GET_BRIDGE_ID(psBridgePackageKM->ui32FunctionID));
@@ -212,40 +203,6 @@ static long ged_dispatch(struct file *pFile, GED_BRIDGE_PACKAGE *psBridgePackage
 
 		if (pFunc)
 			ret = pFunc(pvIn, pvOut);
-
-		switch (GED_GET_BRIDGE_ID(psBridgePackageKM->ui32FunctionID)) {
-		case GED_BRIDGE_COMMAND_GE_ALLOC:
-			{
-				GED_BRIDGE_OUT_GE_ALLOC *out = (GED_BRIDGE_OUT_GE_ALLOC *)pvOut;
-
-				if (out->eError == GED_OK) {
-					ged_ge_init_context(&pFile->private_data);
-					ged_ge_context_ref(pFile->private_data, out->ge_hnd);
-				}
-			}
-			break;
-		case GED_BRIDGE_COMMAND_GE_RETAIN:
-			{
-				GED_BRIDGE_IN_GE_RETAIN *in = (GED_BRIDGE_IN_GE_RETAIN *)pvIn;
-				GED_BRIDGE_OUT_GE_RETAIN *out = (GED_BRIDGE_OUT_GE_RETAIN *)pvOut;
-
-				if (out->eError == GED_OK) {
-					ged_ge_init_context(&pFile->private_data);
-					ged_ge_context_ref(pFile->private_data, in->ge_hnd);
-				}
-			}
-			break;
-		case GED_BRIDGE_COMMAND_GE_RELEASE:
-			{
-				GED_BRIDGE_IN_GE_RELEASE *in = (GED_BRIDGE_IN_GE_RELEASE *)pvIn;
-				GED_BRIDGE_OUT_GE_RELEASE *out = (GED_BRIDGE_OUT_GE_RELEASE *)pvOut;
-
-				if (out->eError == GED_OK)
-					ged_ge_context_deref(pFile->private_data, in->ge_hnd);
-
-			}
-			break;
-		}
 
 		if (psBridgePackageKM->i32OutBufferSize > 0)
 		{
@@ -350,6 +307,7 @@ static struct miscdevice ged_dev = {
 
 static void ged_exit(void)
 {
+#ifndef GED_BUFFER_LOG_DISABLE
 #ifdef GED_DVFS_DEBUG_BUF
 	ged_log_buf_free(ghLogBuf_DVFS);
 	ged_log_buf_free(ghLogBuf_ged_srv);
@@ -362,12 +320,19 @@ static void ged_exit(void)
 	ged_log_buf_free(ghLogBuf_GLES);
 	ghLogBuf_GLES = 0;
 #endif
+	ged_log_buf_free(ghLogBuf_GPU);
+	ghLogBuf_GPU = 0;
 	ged_log_buf_free(ghLogBuf_FENCE);
 	ghLogBuf_FENCE = 0;
 	ged_log_buf_free(ghLogBuf_HWC);
 	ghLogBuf_HWC = 0;
+#endif
 
+	ged_fdvfs_exit();
+
+#ifdef MTK_FRR20
 	ged_frr_system_exit();
+#endif
 
 	ged_kpi_system_exit();
 
@@ -456,14 +421,26 @@ static int ged_init(void)
 		goto ERROR;
 	}
 
+#ifdef MTK_FRR20
 	err = ged_frr_system_init();
 	if (unlikely(err != GED_OK)) {
 		GED_LOGE("ged: failed to init FRR Table!\n");
 		goto ERROR;
 	}
+#endif
 
+#ifdef GED_FDVFS_ENABLE
+	err = ged_fdvfs_system_init();
+	if (unlikely(err != GED_OK)) {
+		GED_LOGE("ged: failed to init FDVFS!\n");
+		goto ERROR;
+	}
+#endif
+#ifndef GED_BUFFER_LOG_DISABLE
 	/* common gpu info buffer */
-	ged_log_buf_alloc(32, 128 * 32, GED_LOG_BUF_TYPE_QUEUEBUFFER, "gpuinfo", "gpuinfo");
+	ged_log_buf_alloc(1024, 64 * 1024, GED_LOG_BUF_TYPE_RINGBUFFER, "gpuinfo", "gpuinfo");
+
+	ghLogBuf_GPU = ged_log_buf_alloc(512, 128 * 512, GED_LOG_BUF_TYPE_RINGBUFFER, "GPU_FENCE", NULL);
 
 #ifdef GED_DEBUG
 	ghLogBuf_GLES = ged_log_buf_alloc(160, 128 * 160, GED_LOG_BUF_TYPE_RINGBUFFER, GED_LOG_BUF_COMMON_GLES, NULL);
@@ -479,12 +456,10 @@ static int ged_init(void)
 	ghLogBuf_FWTrace = ged_log_buf_alloc(1024*32, 1024*1024, GED_LOG_BUF_TYPE_QUEUEBUFFER, "fw_trace", "fw_trace");
 
 #ifdef GED_DVFS_DEBUG_BUF
-#ifdef GED_LOG_SIZE_LIMITED
-	ghLogBuf_DVFS =  ged_log_buf_alloc(20*60, 20*60*80, GED_LOG_BUF_TYPE_RINGBUFFER, "DVFS_Log", "ged_dvfs_debug_limited");
-#else
-	ghLogBuf_DVFS =  ged_log_buf_alloc(20*60*10, 20*60*10*80, GED_LOG_BUF_TYPE_RINGBUFFER, "DVFS_Log", "ged_dvfs_debug");
-#endif
+	ghLogBuf_DVFS =  ged_log_buf_alloc(20*60*10, 20*60*10*100
+				, GED_LOG_BUF_TYPE_RINGBUFFER, "DVFS_Log", "ged_dvfs_debug");
 	ghLogBuf_ged_srv =  ged_log_buf_alloc(32, 32*80, GED_LOG_BUF_TYPE_RINGBUFFER, "ged_srv_Log", "ged_srv_debug");
+#endif
 #endif
 
 	return 0;

@@ -56,7 +56,6 @@
 #include <linux/sched.h>
 #include <linux/random.h>
 #include <linux/of.h>
-#include <linux/clk.h>
 
 #include "ssi_config.h"
 #include "ssi_driver.h"
@@ -74,7 +73,13 @@
 #define DX_CACHE_PARAMS_SET_MASK 0x80000000
 #define DX_CACHE_PARAMS_SET_TIMEOUT_MS 100
 
-static struct clk *dxcc_pub_clock;
+struct clk *dxcc_pub_clock;
+static bool fips_clock_control = 1;
+
+#ifdef TRUSTONIC_FIPS_SUPPORT
+module_param(fips_clock_control, bool, 0644);
+MODULE_PARM_DESC(fips_clock_control, "FIPS clock control bit: 1 (enabled)");
+#endif
 
 #ifdef DX_DUMP_BYTES
 void dump_byte_array(const char *name, const uint8_t *the_array, unsigned long size)
@@ -300,7 +305,7 @@ static int init_cc_resources(struct platform_device *plat_dev)
 	}
 	SSI_LOG_DEBUG("CC registers mapped from %pa to 0x%p\n", &new_drvdata->res_mem->start, cc_base);
 	new_drvdata->cc_base = cc_base;
-	
+
 
 	/* Then IRQ */
 	new_drvdata->res_irq = platform_get_resource(plat_dev, IORESOURCE_IRQ, 0);
@@ -310,7 +315,7 @@ static int init_cc_resources(struct platform_device *plat_dev)
 		goto init_cc_res_err;
 	}
 	rc = request_irq(new_drvdata->res_irq->start, cc_isr,
-			 IRQF_SHARED , "cc63_perf_test", new_drvdata);
+			 IRQF_SHARED, "cc63_perf_test", new_drvdata);
 	if (unlikely(rc != 0)) {
 		SSI_LOG_ERR("Could not register to interrupt %llu\n",
 			(unsigned long long)new_drvdata->res_irq->start);
@@ -473,6 +478,7 @@ init_cc_res_err:
 		ssi_sysfs_fini();
 #endif
 		ssi_power_mgr_free(new_drvdata);
+
 		if (req_mem_cc_regs != NULL) {
 			if (irq_registered) {
 				free_irq(new_drvdata->res_irq->start, new_drvdata);
@@ -518,6 +524,7 @@ static void cleanup_cc_resources(struct platform_device *plat_dev)
 
 	/* Mask all interrupts */
 	fini_cc_regs(drvdata);
+
 	free_irq(drvdata->res_irq->start, drvdata);
 	drvdata->res_irq = NULL;
 
@@ -536,7 +543,6 @@ static void cleanup_cc_resources(struct platform_device *plat_dev)
 static int cc64_probe(struct platform_device *plat_dev)
 {
 	int rc;
-
 #if defined(CONFIG_ARM) && defined(DX_DEBUG)
 	uint32_t ctr, cacheline_size;
 
@@ -557,10 +563,12 @@ static int cc64_probe(struct platform_device *plat_dev)
 		return PTR_ERR(dxcc_pub_clock);
 	}
 
-	rc = clk_prepare_enable(dxcc_pub_clock);
-	if (rc != 0) {
-		SSI_LOG_ERR("Cannot prepare dxcc public core clock from common clock framework.\n");
-		return rc;
+	if (fips_clock_control) {
+		rc = clk_prepare_enable(dxcc_pub_clock);
+		if (rc != 0) {
+			SSI_LOG_ERR("Cannot prepare dxcc public core clock from common clock framework.\n");
+			return rc;
+		}
 	}
 
 	/* Map registers space */
@@ -583,7 +591,8 @@ static int cc64_remove(struct platform_device *plat_dev)
 #ifdef ENABLE_CYCLE_COUNT
 	display_all_stat_db();
 #endif
-	clk_disable_unprepare(dxcc_pub_clock);
+	if (fips_clock_control)
+		clk_disable_unprepare(dxcc_pub_clock);
 	return 0;
 }
 #if defined (CONFIG_PM_RUNTIME) || defined (CONFIG_PM_SLEEP)

@@ -897,6 +897,18 @@ int dpmgr_path_get_mutex(disp_path_handle dp_handle)
 	return handle->hwmutexid;
 }
 
+void dpmgr_path_update_mutexid_by_scenario(disp_path_handle dp_handle)
+{
+	struct ddp_path_handle *handle = NULL;
+
+	ASSERT(dp_handle != NULL);
+	handle = (struct ddp_path_handle *)dp_handle;
+	handle->hwmutexid = acquire_mutex(handle->scenario);
+	DISP_LOG_V("%s : scenario %s, hwmutexid = %d\n",
+			__func__, ddp_get_scenario_name(handle->scenario),
+			handle->hwmutexid);
+}
+
 enum DISP_MODULE_ENUM dpmgr_path_get_dst_module(disp_path_handle dp_handle)
 {
 	struct ddp_path_handle *handle;

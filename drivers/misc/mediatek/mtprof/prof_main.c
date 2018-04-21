@@ -110,6 +110,51 @@ static ssize_t mt_log_write(struct file *filp, const char *ubuf, size_t cnt, lof
 }
 #endif
 
+/* 6. reboot pid*/
+MT_DEBUG_ENTRY(pid);
+
+int reboot_pid;
+static int mt_pid_show(struct seq_file *m, void *v)
+{
+	SEQ_printf(m, "reboot pid %d.\n", reboot_pid);
+	return 0;
+}
+
+static ssize_t mt_pid_write(struct file *filp, const char *ubuf,
+	   size_t cnt, loff_t *data)
+{
+	char buf[10];
+	unsigned long val;
+	int ret;
+	struct task_struct *tsk;
+
+	if (cnt >= sizeof(buf)) {
+		pr_debug("mt_pid input stream size to large.\n");
+		return -EINVAL;
+	}
+
+	if (copy_from_user(&buf, ubuf, cnt))
+		return -EFAULT;
+	buf[cnt] = 0;
+	ret = kstrtoul(buf, 10, &val);
+
+	reboot_pid = val;
+	if (reboot_pid > PID_MAX_DEFAULT) {
+		pr_debug("get reboot pid error %d.\n", reboot_pid);
+		reboot_pid = 0;
+		return -EFAULT;
+	}
+	pr_debug("get reboot pid: %d.\n", reboot_pid);
+
+	if (reboot_pid > 1) {
+		tsk = find_task_by_vpid(reboot_pid);
+		if (tsk != NULL)
+			pr_crit("Reboot Process(%s:%d).\n", tsk->comm, tsk->pid);
+	}
+
+	return cnt;
+
+}
 
 #define STORE_SIGINFO(_errno, _code, info)			\
 	do {							\
@@ -154,14 +199,12 @@ static void probe_signal_generate(void *ignore, int sig, struct siginfo *info,
 	/*
 	 * only log delivered signals
 	 */
-	if (result == TRACE_SIGNAL_DELIVERED) {
-		STORE_SIGINFO(errno, code, info);
-		pr_debug("[signal][%d:%s]generate sig %d to [%d:%s:%c] errno=%d code=%d grp=%d res=%s\n",
-				current->pid, current->comm, sig,
-				task->pid, task->comm,
-				state < sizeof(stat_nam) - 1 ? stat_nam[state] : '?',
-				errno, code, group, signal_deliver_results[result]);
-	}
+	STORE_SIGINFO(errno, code, info);
+	pr_debug("[signal][%d:%s]generate sig %d to [%d:%s:%c] errno=%d code=%d grp=%d res=%s\n",
+		 current->pid, current->comm, sig,
+		task->pid, task->comm,
+		state < sizeof(stat_nam) - 1 ? stat_nam[state] : '?',
+		errno, code, group, signal_deliver_results[result]);
 }
 
 static void probe_signal_deliver(void *ignore, int sig, struct siginfo *info,
@@ -182,14 +225,11 @@ static void probe_death_signal(void *ignore, int sig, struct siginfo *info,
 	unsigned int state;
 	int group;
 
-	/* kernel log reduction: only print delivered signals */
-	if (result != TRACE_SIGNAL_DELIVERED)
-		return;
-
 	/*
 	 * all action will cause process coredump or terminate
+	 * kernel log reduction: only print delivered signals
 	 */
-	if (sig_fatal(task, sig)) {
+	if (sig_fatal(task, sig) && result == TRACE_SIGNAL_DELIVERED) {
 		signal = task->signal;
 		group = _group ||
 			(signal->flags & (SIGNAL_GROUP_EXIT | SIGNAL_GROUP_COREDUMP));
@@ -227,7 +267,8 @@ static void probe_death_signal(void *ignore, int sig, struct siginfo *info,
 			 current->pid, current->comm,
 			 sig, task->pid, task->comm,
 			 state < sizeof(stat_nam) - 1 ? stat_nam[state] : '?');
-	} else if (sig_kernel_stop(sig) || sig == SIGCONT) {
+	} else if ((sig_kernel_stop(sig) && result == TRACE_SIGNAL_DELIVERED) ||
+		   sig == SIGCONT) {
 
 		/*
 		 * kernel log reduction
@@ -389,6 +430,9 @@ static int __init init_mtsched_prof(void)
 
 	if (!proc_mkdir("mtprof", NULL))
 		return -1;
+	pe = proc_create("mtprof/reboot_pid", 0660, NULL, &mt_pid_fops);
+	if (!pe)
+		return -ENOMEM;
 	init_signal_log();
 	pe = proc_create("mtprof/signal_log", 0664, NULL, &mt_signal_log_fops);
 	if (!pe)

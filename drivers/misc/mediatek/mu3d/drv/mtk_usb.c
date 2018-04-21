@@ -17,19 +17,19 @@
 #include <linux/usb/gadget.h>
 /*#include "mach/emi_mpu.h"*/
 
+#ifdef CONFIG_TCPC_CLASS
+#include "tcpm.h"
+#endif /* CONFIG_TCPC_CLASS */
 #include "mu3d_hal_osal.h"
 #include "musb_core.h"
 #if defined(CONFIG_MTK_UART_USB_SWITCH) || defined(CONFIG_MTK_SIB_USB_SWITCH)
 #include "mtk-phy-asic.h"
 /*#include <mach/mt_typedefs.h>*/
 #endif
+#include <linux/phy/mediatek/mtk_usb_phy.h>
 
-#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT) || defined(CONFIG_MTK_MD_DIRECT_LOGGING_SUPPORT)
-#include "port_ipc.h"
-#include "ccci_ipc_task_ID.h"
-#include "ccci_ipc_msg_id.h"
-#include "mtk_gadget.h"
-#include "pkt_track.h"
+#ifdef CONFIG_PHY_MTK_SSUSB
+#include "mtk-ssusb-hal.h"
 #endif
 
 unsigned int cable_mode = CABLE_MODE_NORMAL;
@@ -48,7 +48,7 @@ bool mt_usb_is_device(void)
 #if !defined(CONFIG_FPGA_EARLY_PORTING) && defined(CONFIG_USB_XHCI_MTK)
 	bool tmp = mtk_is_host_mode();
 
-	os_printk(K_INFO, "%s mode\n", tmp ? "HOST" : "DEV");
+	os_printk(K_DEBUG, "%s mode\n", tmp ? "HOST" : "DEV");
 	return !tmp;
 #else
 	return true;
@@ -99,22 +99,26 @@ void connection_work(struct work_struct *data)
 	/* delay 100ms if user space is not ready to set usb function */
 	if (!is_usb_rdy()) {
 		static DEFINE_RATELIMIT_STATE(ratelimit, 1 * HZ, 5);
-		int delay = 50, to_off_state = 1;
+		int delay = 50;
 
 		if (__ratelimit(&ratelimit))
 			os_printk(K_INFO, "%s, !is_usb_rdy, delay %d ms\n", __func__, delay);
 
 		/* to DISCONNECT stage to avoid stage transition while usb is ready */
 #ifdef CONFIG_MTK_UART_USB_SWITCH
-		if (usb_phy_check_in_uart_mode())
-			to_off_state = 0;
+		if (in_uart_mode) {
+			os_printk(K_INFO, "%s, Uart mode. directly return\n", __func__);
+			return;
+		}
 #endif
 #ifndef CONFIG_FPGA_EARLY_PORTING
-		if (!mt_usb_is_device())
-			to_off_state = 0;
+		if (!mt_usb_is_device()) {
+			os_printk(K_INFO, "%s, Host mode. directly return\n", __func__);
+			return;
+		}
 #endif
 
-		if (to_off_state && connection_work_dev_status != OFF) {
+		if (connection_work_dev_status != OFF) {
 			connection_work_dev_status = OFF;
 #ifndef CONFIG_USBIF_COMPLIANCE
 			clr_connect_timestamp();
@@ -128,10 +132,13 @@ void connection_work(struct work_struct *data)
 			if (wake_lock_active(&musb->usb_wakelock))
 				wake_unlock(&musb->usb_wakelock);
 
+#ifdef VCORE_OPS_DEV
+			vcore_op(0);
+#endif
 			os_printk(K_INFO, "%s ----Disconnect----\n", __func__);
 		}
 
-		schedule_delayed_work(&musb->connection_work,
+		queue_delayed_work(musb->st_wq, &musb->connection_work,
 				msecs_to_jiffies(delay));
 		return;
 	}
@@ -143,7 +150,12 @@ void connection_work(struct work_struct *data)
 #ifndef CONFIG_FPGA_EARLY_PORTING
 		if (!mt_usb_is_device()) {
 			connection_work_dev_status = OFF;
+#ifdef CONFIG_PHY_MTK_SSUSB
+			if (musb->is_clk_on)
+				phy_power_off(musb->mtk_phy);
+#else
 			usb_fake_powerdown(musb->is_clk_on);
+#endif
 			musb->is_clk_on = 0;
 			os_printk(K_INFO, "%s, Host mode. directly return\n", __func__);
 			return;
@@ -170,6 +182,9 @@ void connection_work(struct work_struct *data)
 			/* FIXME: Should use usb_udc_start() & usb_gadget_connect(), like usb_udc_softconn_store().
 			 * But have no time to think how to handle. However i think it is the correct way.
 			 */
+#ifdef VCORE_OPS_DEV
+			vcore_op(1);
+#endif
 			musb_start(musb);
 
 			os_printk(K_INFO, "%s ----Connect----\n", __func__);
@@ -188,6 +203,9 @@ void connection_work(struct work_struct *data)
 			if (wake_lock_active(&musb->usb_wakelock))
 				wake_unlock(&musb->usb_wakelock);
 
+#ifdef VCORE_OPS_DEV
+			vcore_op(0);
+#endif
 			os_printk(K_INFO, "%s ----Disconnect----\n", __func__);
 		} else {
 			/* This if-elseif is to set wakelock when booting with USB cable.
@@ -235,7 +253,7 @@ void mt_usb_connect(void)
 
 		work = &_mu3d_musb->connection_work;
 
-		schedule_delayed_work(work, 0);
+		queue_delayed_work(_mu3d_musb->st_wq, work, 0);
 	} else {
 		os_printk(K_INFO, "%s musb_musb not ready\n", __func__);
 	}
@@ -252,7 +270,7 @@ void mt_usb_disconnect(void)
 
 		work = &_mu3d_musb->connection_work;
 
-		schedule_delayed_work(work, 0);
+		queue_delayed_work(_mu3d_musb->st_wq, work, 0);
 	} else {
 		os_printk(K_INFO, "%s musb_musb not ready\n", __func__);
 	}
@@ -261,7 +279,7 @@ void mt_usb_disconnect(void)
 EXPORT_SYMBOL_GPL(mt_usb_disconnect);
 
 /* build time force on */
-#if defined(CONFIG_FPGA_EARLY_PORTING) || defined(U3_COMPLIANCE) || defined(FOR_BRING_UP)
+#if defined(CONFIG_FPGA_EARLY_PORTING)
 #define BYPASS_PMIC_LINKAGE
 #endif
 
@@ -330,12 +348,23 @@ static void do_mu3d_test_connect_work(struct work_struct *work)
 }
 void mt_usb_connect_test(int start)
 {
+	static struct wake_lock device_test_wakelock;
+	static int wake_lock_inited;
+
+	if (!wake_lock_inited) {
+		os_printk(K_WARNIN, "%s wake_lock_init\n", __func__);
+		wake_lock_init(&device_test_wakelock, WAKE_LOCK_SUSPEND, "device.test.lock");
+		wake_lock_inited = 1;
+	}
+
 	if (start) {
+		wake_lock(&device_test_wakelock);
 		mu3d_test_connect = 1;
 		INIT_DELAYED_WORK(&mu3d_test_connect_work, do_mu3d_test_connect_work);
 		schedule_delayed_work(&mu3d_test_connect_work, 0);
 	} else {
 		mu3d_test_connect = 0;
+		wake_unlock(&device_test_wakelock);
 	}
 }
 
@@ -344,14 +373,6 @@ bool usb_cable_connected(void)
 {
 	CHARGER_TYPE chg_type = CHARGER_UNKNOWN;
 	bool connected = false, vbus_exist = false;
-
-#ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
-	if (get_boot_mode() == KERNEL_POWER_OFF_CHARGING_BOOT
-			|| get_boot_mode() == LOW_POWER_OFF_CHARGING_BOOT) {
-		os_printk(K_INFO, "%s, in KPOC, force USB on\n", __func__);
-		return true;
-	}
-#endif
 
 	if (mu3d_test_connect) {
 		os_printk(K_INFO, "%s, return test_connected<%d>\n", __func__, test_connected);
@@ -403,7 +424,7 @@ int typec_switch_usb_connect(void *data)
 
 		work = &musb->connection_work;
 
-		schedule_delayed_work(work, 0);
+		queue_delayed_work(_mu3d_musb->st_wq, work, 0);
 	} else {
 		os_printk(K_INFO, "%s musb_musb not ready\n", __func__);
 	}
@@ -423,7 +444,7 @@ int typec_switch_usb_disconnect(void *data)
 
 		work = &musb->connection_work;
 
-		schedule_delayed_work(work, 0);
+		queue_delayed_work(_mu3d_musb->st_wq, work, 0);
 	} else {
 		os_printk(K_INFO, "%s musb_musb not ready\n", __func__);
 	}
@@ -496,12 +517,22 @@ ssize_t musb_cmode_store(struct device *dev, struct device_attribute *attr,
 {
 	unsigned int cmode;
 	struct musb *musb;
+#ifdef CONFIG_TCPC_CLASS
+	struct tcpc_device *tcpc;
+#endif /* CONFIG_TCPC_CLASS */
 
 	if (!dev) {
 		os_printk(K_ERR, "dev is null!!\n");
 		return count;
 	}
 
+#ifdef CONFIG_TCPC_CLASS
+	tcpc = tcpc_dev_get_by_name("type_c_port0");
+	if (!tcpc) {
+		pr_err("%s get tcpc device type_c_port0 fail\n", __func__);
+		return -ENODEV;
+	}
+#endif /* CONFIG_TCPC_CLASS */
 	musb = dev_to_musb(dev);
 
 	if (sscanf(buf, "%ud", &cmode) == 1) {
@@ -547,13 +578,17 @@ ssize_t musb_cmode_store(struct device *dev, struct device_attribute *attr,
 			}
 #ifdef CONFIG_USB_MTK_DUALMODE
 			if (cmode == CABLE_MODE_CHRG_ONLY) {
-#ifdef CONFIG_USB_MTK_IDDIG
+				#ifdef CONFIG_TCPC_CLASS
+				tcpm_typec_change_role(tcpc, TYPEC_ROLE_SNK);
+				#elif defined(CONFIG_USB_MTK_IDDIG)
 				mtk_disable_host();
-#endif
+				#endif /* CONFIG_TCPC_CLASS */
 			} else {
-#ifdef CONFIG_USB_MTK_IDDIG
+				#ifdef CONFIG_TCPC_CLASS
+				tcpm_typec_change_role(tcpc, TYPEC_ROLE_DRP);
+				#elif defined(CONFIG_USB_MTK_IDDIG)
 				mtk_enable_host();
-#endif
+				#endif /* CONFIG_TCPC_CLASS */
 			}
 #endif
 			if (_mu3d_musb)
@@ -562,6 +597,43 @@ ssize_t musb_cmode_store(struct device *dev, struct device_attribute *attr,
 	}
 	return count;
 }
+
+static bool saving_mode;
+
+ssize_t musb_saving_mode_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	if (!dev) {
+		pr_info("dev is null!!\n");
+		return 0;
+	}
+	return scnprintf(buf, PAGE_SIZE, "%d\n", saving_mode);
+}
+
+ssize_t musb_saving_mode_store(struct device *dev, struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	int saving;
+	long tmp_val;
+
+	if (!dev) {
+		pr_info("dev is null!!\n");
+		return count;
+	/* } else if (1 == sscanf(buf, "%d", &saving)) { */
+	} else if (kstrtol(buf, 10, (long *)&tmp_val) == 0) {
+		saving = tmp_val;
+		pr_info("old=%d new=%d\n", saving, saving_mode);
+		if (saving_mode == (!saving))
+			saving_mode = !saving_mode;
+	}
+	return count;
+}
+
+bool is_saving_mode(void)
+{
+	pr_info("saving_mode : %d\n", saving_mode);
+	return saving_mode;
+}
+
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH
 ssize_t musb_portmode_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -617,6 +689,10 @@ ssize_t musb_portmode_store(struct device *dev, struct device_attribute *attr,
 
 ssize_t musb_tx_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
+#ifdef CONFIG_PHY_MTK_SSUSB
+	struct musb *musb;
+	u32 value;
+#endif
 	u8 var;
 	u8 var2;
 
@@ -625,7 +701,13 @@ ssize_t musb_tx_show(struct device *dev, struct device_attribute *attr, char *bu
 		return 0;
 	}
 
+#ifdef CONFIG_PHY_MTK_SSUSB
+	musb = dev_to_musb(dev);
+	value = usb_mtkphy_io_read(musb->mtk_phy, 1, 0x6C);
+	var = value >> 16;
+#else
 	var = U3PhyReadReg8((u3phy_addr_t) (U3D_U2PHYDTM1 + 0x2));
+#endif
 	var2 = (var >> 3) & ~0xFE;
 	pr_debug("[MUSB]addr: 0x6E (TX), value: %x - %x\n", var, var2);
 
@@ -638,6 +720,10 @@ ssize_t musb_tx_store(struct device *dev, struct device_attribute *attr,
 		      const char *buf, size_t count)
 {
 	unsigned int val;
+#ifdef CONFIG_PHY_MTK_SSUSB
+	struct musb *musb;
+	u32 value;
+#endif
 	u8 var;
 	u8 var2;
 
@@ -650,7 +736,13 @@ ssize_t musb_tx_store(struct device *dev, struct device_attribute *attr,
 #ifdef CONFIG_FPGA_EARLY_PORTING
 		var = USB_PHY_Read_Register8(U3D_U2PHYDTM1 + 0x2);
 #else
+#ifdef CONFIG_PHY_MTK_SSUSB
+		musb = dev_to_musb(dev);
+		value = usb_mtkphy_io_read(musb->mtk_phy, 1, 0x6C);
+		var = value >> 16;
+#else
 		var = U3PhyReadReg8((u3phy_addr_t) (U3D_U2PHYDTM1 + 0x2));
+#endif
 #endif
 
 		if (val == 0)
@@ -666,9 +758,14 @@ ssize_t musb_tx_store(struct device *dev, struct device_attribute *attr,
 		 * E60802_RG_USB20_BC11_SW_EN_OFST, E60802_RG_USB20_BC11_SW_EN, 0);
 		 */
 		/* Jeremy TODO 0320 */
+#ifdef CONFIG_PHY_MTK_SSUSB
+		musb = dev_to_musb(dev);
+		value = usb_mtkphy_io_read(musb->mtk_phy, 1, 0x6C);
+		var = value >> 16;
+#else
 		var = U3PhyReadReg8((u3phy_addr_t) (U3D_U2PHYDTM1 + 0x2));
 #endif
-
+#endif
 		var2 = (var >> 3) & ~0xFE;
 
 		pr_debug
@@ -681,6 +778,10 @@ ssize_t musb_tx_store(struct device *dev, struct device_attribute *attr,
 
 ssize_t musb_rx_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
+#ifdef CONFIG_PHY_MTK_SSUSB
+	struct musb *musb;
+	u32 value;
+#endif
 	u8 var;
 	u8 var2;
 
@@ -691,7 +792,13 @@ ssize_t musb_rx_show(struct device *dev, struct device_attribute *attr, char *bu
 #ifdef CONFIG_FPGA_EARLY_PORTING
 	var = USB_PHY_Read_Register8(U3D_U2PHYDMON1 + 0x3);
 #else
+#ifdef CONFIG_PHY_MTK_SSUSB
+	musb = dev_to_musb(dev);
+	value = usb_mtkphy_io_read(musb->mtk_phy, 1, 0x74);
+	var = value >> 24;
+#else
 	var = U3PhyReadReg8((u3phy_addr_t) (U3D_U2PHYDMON1 + 0x3));
+#endif
 #endif
 	var2 = (var >> 7) & ~0xFE;
 	pr_debug("[MUSB]addr: U3D_U2PHYDMON1 (0x77) (RX), value: %x - %x\n", var, var2);
@@ -701,15 +808,19 @@ ssize_t musb_rx_show(struct device *dev, struct device_attribute *attr, char *bu
 }
 ssize_t musb_uart_path_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	u8 var = 0;
+	u32 var = 0;
 
 	if (!dev) {
 		pr_debug("dev is null!!\n");
 		return 0;
 	}
 
+#ifdef CONFIG_PHY_MTK_SSUSB
+	var = usb_phy_get_uart_path();
+#else
 	var = DRV_Reg32(ap_uart0_base + 0x600);
-	pr_debug("[MUSB]addr: (GPIO Misc) 0x600, value: %x\n\n", DRV_Reg32(ap_uart0_base + 0x600));
+#endif
+	pr_debug("[MUSB]addr: (GPIO Misc) 0x600, value: %x\n\n", var);
 	sw_uart_path = var;
 
 	return scnprintf(buf, PAGE_SIZE, "%x\n", var);
@@ -743,275 +854,6 @@ ssize_t musb_sib_enable_store(struct device *dev, struct device_attribute *attr,
 	}
 	return count;
 }
-#endif
-
-#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT) || defined(CONFIG_MTK_MD_DIRECT_LOGGING_SUPPORT)
-u8 musb_get_usb_addr(void)
-{
-	if (_mu3d_musb != NULL && _mu3d_musb->set_address == true)
-		return _mu3d_musb->address;
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(musb_get_usb_addr);
-
-int musb_md_msg_hdlr(ipc_ilm_t *ilm)
-{
-	if (ilm != NULL && _mu3d_musb != NULL &&
-		_mu3d_musb->gadget_driver != NULL &&
-		_mu3d_musb->gadget_driver->md_msg_hdlr != NULL) {
-		_mu3d_musb->gadget_driver->md_msg_hdlr(&_mu3d_musb->g,
-				ilm->msg_id, (void *)ilm->local_para_ptr);
-	}
-	return 0;
-}
-EXPORT_SYMBOL_GPL(musb_md_msg_hdlr);
-
-int musb_notify_md_bus_event(struct musb *musb, u32 bus_event)
-{
-	int ret = 0;
-	/* skip notify md bus event */
-	#if 0
-	os_printk(K_NOTICE, "%s\n", __func__);
-	if (musb->gadget_driver->md_status_qry(&musb->g)) {
-		ipc_ilm_t ilm;
-		local_para_struct *p_local_para = NULL;
-
-		p_local_para = kzalloc(sizeof(local_para_struct) + sizeof(u32), GFP_KERNEL);
-		if (p_local_para != NULL) {
-			memset(&ilm, 0, sizeof(ilm));
-			memset(p_local_para, 0, sizeof(local_para_struct) + sizeof(u32));
-			p_local_para->msg_len = sizeof(local_para_struct) + sizeof(u32);
-			memcpy(p_local_para->data, &bus_event, sizeof(u32));
-
-			os_printk(K_NOTICE, "%s, bus_event(%u)\n", __func__, bus_event);
-
-			ilm.src_mod_id = AP_MOD_USB;
-			ilm.dest_mod_id = MD_MOD_UFPM;
-			ilm.msg_id = IPC_MSG_ID_UFPM_NOTIFY_MD_BUS_EVENT_REQ;
-			ilm.local_para_ptr = p_local_para;
-
-			ret = ccci_ipc_send_ilm(0, &ilm);
-			kfree(p_local_para);
-		} else {
-			os_printk(K_ERR, "%s alloc fail!!\n", __func__);
-			ret = -ENOMEM;
-		}
-	}
-
-	os_printk(K_NOTICE, "%s ret=%d\n", __func__, ret);
-	#endif
-	return ret;
-}
-EXPORT_SYMBOL_GPL(musb_notify_md_bus_event);
-
-int musb_enable_md_fast_path(u32 mode)
-{
-	ufpm_enable_md_func_req_t req;
-	struct ccci_emi_info emi_info;
-	int ret = 0;
-
-	os_printk(K_NOTICE, "%s\n", __func__);
-
-	ret = ccci_get_emi_info(0, &emi_info);
-	if (ret >= 0) {
-		req.mpuInfo.apUsbDomainId = emi_info.ap_domain_id;
-		req.mpuInfo.mdCldmaDomainId = emi_info.md_domain_id;
-		req.mpuInfo.memBank0BaseAddr = emi_info.ap_view_bank0_base;
-		req.mpuInfo.memBank0Size = emi_info.bank0_size;
-		req.mpuInfo.memBank4BaseAddr = emi_info.ap_view_bank4_base;
-		req.mpuInfo.memBank4Size = emi_info.bank4_size;
-		req.mode = mode;
-
-		os_printk(K_NOTICE, "%s memBank0BaseAddr=0x%llx\n", __func__, req.mpuInfo.memBank0BaseAddr);
-		os_printk(K_NOTICE, "%s memBank0Size=0x%llx\n", __func__, req.mpuInfo.memBank0Size);
-		os_printk(K_NOTICE, "%s memBank4BaseAddr=0x%llx\n", __func__, req.mpuInfo.memBank4BaseAddr);
-		os_printk(K_NOTICE, "%s memBank4Size=0x%llx\n", __func__, req.mpuInfo.memBank4Size);
-
-		if (mode == UFPM_FUNC_MODE_TETHER) {
-			/* Call AP Packet Tracking module's API */
-			return pkt_track_enable_md_fast_path(&req);
-		} else if (mode == UFPM_FUNC_MODE_LOG) {
-			ipc_ilm_t ilm;
-			local_para_struct *p_local_para = NULL;
-
-			memset(&ilm, 0, sizeof(ilm));
-			p_local_para = kzalloc(sizeof(local_para_struct)
-							+ sizeof(ufpm_enable_md_func_req_t), GFP_KERNEL);
-			if (p_local_para != NULL) {
-				p_local_para->msg_len = sizeof(local_para_struct) + sizeof(ufpm_enable_md_func_req_t);
-				memcpy(p_local_para->data, &req, sizeof(ufpm_enable_md_func_req_t));
-
-				ilm.src_mod_id = AP_MOD_USB;
-				ilm.dest_mod_id = MD_MOD_UFPM;
-				ilm.msg_id = IPC_MSG_ID_UFPM_ENABLE_MD_FAST_PATH_REQ;
-				ilm.local_para_ptr = p_local_para;
-
-				ret = ccci_ipc_send_ilm(0, &ilm);
-				kfree(p_local_para);
-			} else {
-				os_printk(K_ERR, "%s alloc fail!!\n", __func__);
-				ret = -ENOMEM;
-			}
-		}
-	}
-
-	os_printk(K_NOTICE, "%s ret=%d\n", __func__, ret);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(musb_enable_md_fast_path);
-
-int musb_disable_md_fast_path(ufpm_md_fast_path_common_req_t *req)
-{
-	int ret = 0;
-
-	os_printk(K_NOTICE, "%s\n", __func__);
-
-	if (req->mode == UFPM_FUNC_MODE_TETHER) {
-		/* Call AP Packet Tracking module's API */
-		return pkt_track_disable_md_fast_path(req);
-	} else if (req->mode == UFPM_FUNC_MODE_LOG) {
-		ipc_ilm_t ilm;
-		local_para_struct *p_local_para = NULL;
-
-		memset(&ilm, 0, sizeof(ilm));
-		p_local_para = kzalloc(sizeof(local_para_struct) + sizeof(ufpm_md_fast_path_common_req_t), GFP_KERNEL);
-		if (p_local_para != NULL) {
-			p_local_para->msg_len = sizeof(local_para_struct) + sizeof(ufpm_md_fast_path_common_req_t);
-			memcpy(p_local_para->data, req, sizeof(ufpm_md_fast_path_common_req_t));
-
-			ilm.src_mod_id = AP_MOD_USB;
-			ilm.dest_mod_id = MD_MOD_UFPM;
-			ilm.msg_id = IPC_MSG_ID_UFPM_DISABLE_MD_FAST_PATH_REQ;
-			ilm.local_para_ptr = p_local_para;
-
-			ret = ccci_ipc_send_ilm(0, &ilm);
-			kfree(p_local_para);
-		} else {
-			os_printk(K_ERR, "%s alloc fail!!\n", __func__);
-			ret = -ENOMEM;
-		}
-	}
-
-	os_printk(K_NOTICE, "%s ret=%d\n", __func__, ret);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(musb_disable_md_fast_path);
-
-int musb_activate_md_fast_path(ufpm_activate_md_func_req_t *req)
-{
-	int ret = 0;
-
-	os_printk(K_NOTICE, "%s\n", __func__);
-
-	if (req->mode == UFPM_FUNC_MODE_TETHER) {
-		/* Call AP Packet Tracking module's API */
-		ret = pkt_track_activate_md_fast_path(req);
-	} else if (req->mode == UFPM_FUNC_MODE_LOG) {
-		ipc_ilm_t ilm;
-		local_para_struct *p_local_para = NULL;
-
-		memset(&ilm, 0, sizeof(ilm));
-		p_local_para = kzalloc(sizeof(local_para_struct) + sizeof(ufpm_activate_md_func_req_t), GFP_KERNEL);
-		if (p_local_para != NULL) {
-			p_local_para->msg_len = sizeof(local_para_struct) + sizeof(ufpm_activate_md_func_req_t);
-			memcpy(p_local_para->data, req, sizeof(ufpm_activate_md_func_req_t));
-
-			ilm.src_mod_id = AP_MOD_USB;
-			ilm.dest_mod_id = MD_MOD_UFPM;
-			ilm.msg_id = IPC_MSG_ID_UFPM_ACTIVATE_MD_FAST_PATH_REQ;
-			ilm.local_para_ptr = p_local_para;
-
-			ret = ccci_ipc_send_ilm(0, &ilm);
-			kfree(p_local_para);
-		} else {
-			os_printk(K_ERR, "%s alloc fail!!\n", __func__);
-			ret = -ENOMEM;
-		}
-	}
-
-	os_printk(K_NOTICE, "%s ret=%d\n", __func__, ret);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(musb_activate_md_fast_path);
-
-int musb_deactivate_md_fast_path(ufpm_md_fast_path_common_req_t *req)
-{
-	int ret = 0;
-
-	os_printk(K_DEBUG, "%s\n", __func__);
-
-	if (req->mode == UFPM_FUNC_MODE_TETHER) {
-		/* Call AP Packet Tracking module's API */
-		ret = pkt_track_deactivate_md_fast_path(req);
-	} else if (req->mode == UFPM_FUNC_MODE_LOG) {
-		ipc_ilm_t ilm;
-		local_para_struct *p_local_para = NULL;
-
-		memset(&ilm, 0, sizeof(ilm));
-		p_local_para = kzalloc(sizeof(local_para_struct) + sizeof(ufpm_md_fast_path_common_req_t), GFP_KERNEL);
-		if (p_local_para != NULL) {
-			p_local_para->msg_len = sizeof(local_para_struct) + sizeof(ufpm_md_fast_path_common_req_t);
-			memcpy(p_local_para->data, req, sizeof(ufpm_md_fast_path_common_req_t));
-
-			ilm.src_mod_id = AP_MOD_USB;
-			ilm.dest_mod_id = MD_MOD_UFPM;
-			ilm.msg_id = IPC_MSG_ID_UFPM_DEACTIVATE_MD_FAST_PATH_REQ;
-			ilm.local_para_ptr = p_local_para;
-
-			ret = ccci_ipc_send_ilm(0, &ilm);
-			kfree(p_local_para);
-		} else {
-			os_printk(K_ERR, "%s alloc fail!!\n", __func__);
-			ret = -ENOMEM;
-		}
-	}
-
-	os_printk(K_DEBUG, "%s ret=%d\n", __func__, ret);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(musb_deactivate_md_fast_path);
-
-int musb_send_md_ep0_msg(ufpm_send_md_ep0_msg_t *req, u32 msg_id)
-{
-	ipc_ilm_t ilm;
-	local_para_struct *p_local_para = NULL;
-
-	os_printk(K_DEBUG, "%s\n", __func__);
-
-	memset(&ilm, 0, sizeof(ilm));
-	p_local_para = kzalloc(sizeof(local_para_struct) + sizeof(ufpm_send_md_ep0_msg_t), GFP_KERNEL);
-
-	if (p_local_para == NULL)
-		return -ENOMEM;
-
-	p_local_para->msg_len = sizeof(local_para_struct) + sizeof(ufpm_send_md_ep0_msg_t);
-	memcpy(p_local_para->data, req, sizeof(ufpm_send_md_ep0_msg_t));
-
-	ilm.src_mod_id = AP_MOD_USB;
-	ilm.dest_mod_id = MD_MOD_UFPM;
-	ilm.msg_id = msg_id;
-	ilm.local_para_ptr = p_local_para;
-
-	#if 0
-	if (p_local_para->msg_len) {
-		int i;
-
-		pr_debug("msg_len=%d, data=0x", p_local_para->msg_len);
-
-		for (i = 0; i < p_local_para->msg_len; i++)
-			pr_debug("%02x ", *((u8 *)p_local_para->data + i));
-
-		pr_debug("\n");
-	}
-	#endif
-
-	ccci_ipc_send_ilm(0, &ilm);
-	kfree(p_local_para);
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(musb_send_md_ep0_msg);
 #endif
 
 #ifdef NEVER

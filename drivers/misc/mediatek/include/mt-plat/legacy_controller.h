@@ -13,9 +13,9 @@
 
 #include <mach/mtk_ppm_api.h>
 
-#define KIR_PERF 0
-#define KIR_FBC 1
-#define MAX_KIR 2
+#define PPM_KIR_PERF 0
+#define PPM_KIR_FBC 1
+#define PPM_MAX_KIR 2
 
 extern char *ppm_copy_from_user_for_proc(const char __user *buffer, size_t count);
 int update_userlimit_cpu_freq(int kicker, int num_cluster, struct ppm_limit_data *freq_limit);

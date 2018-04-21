@@ -12,6 +12,7 @@
  */
 
 #include <stdarg.h>
+#include <linux/crc32.h>
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -36,6 +37,10 @@
 #include <mrdump.h>
 #include <linux/kdebug.h>
 #include "mrdump_private.h"
+#ifdef CONFIG_MTK_WATCHDOG
+#include <mach/wd_api.h>
+#include <ext_wd_drv.h>
+#endif
 
 #define KEXEC_NOTE_HEAD_BYTES ALIGN(sizeof(struct elf_note), 4)
 #define KEXEC_CORE_NOTE_NAME "CORE"
@@ -50,7 +55,6 @@ static int crashing_cpu;
 
 static note_buf_t __percpu *crash_notes;
 
-static bool mrdump_enable = 1;
 static unsigned long mrdump_output_lbaooo;
 
 static const struct mrdump_platform *mrdump_plat;
@@ -110,14 +114,12 @@ static void save_current_task(void)
 	int i;
 	struct stack_trace trace;
 	unsigned long stack_entries[16];
-	struct task_struct *tsk;
-	struct mrdump_crash_record *crash_record = &mrdump_cblock.crash_record;
-
-	tsk = current_thread_info()->task;
+	struct task_struct *tsk = current;
+	struct mrdump_crash_record *crash_record = &mrdump_cblock->crash_record;
 
 	/* Grab kernel task stack trace */
 	trace.nr_entries = 0;
-	trace.max_entries = ARRAY_SIZE(stack_entries) / sizeof(stack_entries[0]);
+	trace.max_entries = ARRAY_SIZE(stack_entries);
 	trace.entries = stack_entries;
 	trace.skip = 1;
 	save_stack_trace_tsk(tsk, &trace);
@@ -125,6 +127,7 @@ static void save_current_task(void)
 	for (i = 0; i < trace.nr_entries; i++) {
 		int off = strlen(crash_record->backtrace);
 		int plen = sizeof(crash_record->backtrace) - off;
+
 		if (plen > 16) {
 			snprintf(crash_record->backtrace + off, plen, "[<%p>] %pS\n",
 				 (void *)stack_entries[i], (void *)stack_entries[i]);
@@ -136,8 +139,9 @@ static void save_current_task(void)
 
 static void aee_kdump_cpu_stop(void *arg, void *regs, void *svc_sp)
 {
-	struct mrdump_crash_record *crash_record = &mrdump_cblock.crash_record;
+	struct mrdump_crash_record *crash_record = &mrdump_cblock->crash_record;
 	int cpu = 0;
+
 	register int sp asm("sp");
 	struct pt_regs *ptregs = (struct pt_regs *)regs;
 
@@ -176,7 +180,7 @@ static atomic_t waiting_for_crash_ipi;
 
 static void mrdump_stop_noncore_cpu(void *unused)
 {
-	struct mrdump_crash_record *crash_record = &mrdump_cblock.crash_record;
+	struct mrdump_crash_record *crash_record = &mrdump_cblock->crash_record;
 	struct pt_regs regs;
 	int cpu = get_HW_cpuid();
 
@@ -196,6 +200,7 @@ static void mrdump_stop_noncore_cpu(void *unused)
 static void __mrdump_reboot_stop_all(struct mrdump_crash_record *crash_record)
 {
 	unsigned long msecs;
+
 	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
 	smp_call_function(mrdump_stop_noncore_cpu, NULL, false);
 
@@ -211,46 +216,48 @@ static void __mrdump_reboot_stop_all(struct mrdump_crash_record *crash_record)
 #endif
 
 
-static void __mrdump_reboot_va(AEE_REBOOT_MODE reboot_mode, struct pt_regs *regs, const char *msg, va_list ap)
+static void __mrdump_reboot_va(enum AEE_REBOOT_MODE reboot_mode, struct pt_regs *regs, const char *msg, va_list ap)
 {
 	struct mrdump_crash_record *crash_record;
 	int cpu;
 
-	if (mrdump_enable != 1)
-		pr_info("MT-RAMDUMP no enable");
+	if (mrdump_cblock) {
+		if (mrdump_cblock->enabled != MRDUMP_ENABLE_COOKIE)
+			pr_info("MT-RAMDUMP no enable");
 
-	crash_record = &mrdump_cblock.crash_record;
+		crash_record = &mrdump_cblock->crash_record;
 
-	local_irq_disable();
-	local_fiq_disable();
+		local_irq_disable();
+		local_fiq_disable();
 
 #if defined(CONFIG_SMP)
-	__mrdump_reboot_stop_all(crash_record);
+		__mrdump_reboot_stop_all(crash_record);
 #endif
 
-	cpu = get_HW_cpuid();
-	crashing_cpu = cpu;
-	crash_save_cpu(regs, cpu);
+		cpu = get_HW_cpuid();
+		crashing_cpu = cpu;
+		crash_save_cpu(regs, cpu);
 
-	elf_core_copy_kernel_regs((elf_gregset_t *)&crash_record->cpu_regs[cpu], regs);
+		elf_core_copy_kernel_regs((elf_gregset_t *)&crash_record->cpu_regs[cpu], regs);
 
-	vsnprintf(crash_record->msg, sizeof(crash_record->msg), msg, ap);
-	crash_record->fault_cpu = cpu;
-	save_current_task();
+		vsnprintf(crash_record->msg, sizeof(crash_record->msg), msg, ap);
+		crash_record->fault_cpu = cpu;
+		save_current_task();
 
-	/* FIXME: Check reboot_mode is valid */
-	crash_record->reboot_mode = reboot_mode;
-	__disable_dcache__inner_flush_dcache_L1__inner_flush_dcache_L2();
+		/* FIXME: Check reboot_mode is valid */
+		crash_record->reboot_mode = reboot_mode;
+		__disable_dcache__inner_flush_dcache_L1__inner_flush_dcache_L2();
 
-	if (reboot_mode == AEE_REBOOT_MODE_NESTED_EXCEPTION) {
-		while (1)
-			cpu_relax();
+		if (reboot_mode == AEE_REBOOT_MODE_NESTED_EXCEPTION) {
+			while (1)
+				cpu_relax();
+		}
 	}
 
 	mrdump_plat->reboot();
 }
 
-void aee_kdump_reboot(AEE_REBOOT_MODE reboot_mode, const char *msg, ...)
+void aee_kdump_reboot(enum AEE_REBOOT_MODE reboot_mode, const char *msg, ...)
 {
 	va_list ap;
 	struct pt_regs regs;
@@ -263,41 +270,51 @@ void aee_kdump_reboot(AEE_REBOOT_MODE reboot_mode, const char *msg, ...)
 	va_end(ap);
 }
 
-void __mrdump_create_oops_dump(AEE_REBOOT_MODE reboot_mode, struct pt_regs *regs, const char *msg, ...)
+void __mrdump_create_oops_dump(enum AEE_REBOOT_MODE reboot_mode, struct pt_regs *regs, const char *msg, ...)
 {
 	va_list ap;
 	struct mrdump_crash_record *crash_record;
 	int cpu;
 
-	crash_record = &mrdump_cblock.crash_record;
+	if (mrdump_cblock) {
+		crash_record = &mrdump_cblock->crash_record;
 
-	local_irq_disable();
-	local_fiq_disable();
+		local_irq_disable();
+		local_fiq_disable();
 
 #if defined(CONFIG_SMP)
-	__mrdump_reboot_stop_all(crash_record);
+		__mrdump_reboot_stop_all(crash_record);
 #endif
 
-	cpu = get_HW_cpuid();
-	crashing_cpu = cpu;
-	crash_save_cpu(regs, cpu);
+		cpu = get_HW_cpuid();
+		crashing_cpu = cpu;
+		/* null regs, no register dump */
+		if (regs) {
+			crash_save_cpu(regs, cpu);
+			elf_core_copy_kernel_regs((elf_gregset_t *)&crash_record->cpu_regs[cpu], regs);
+		}
 
-	elf_core_copy_kernel_regs((elf_gregset_t *)&crash_record->cpu_regs[cpu], regs);
+		va_start(ap, msg);
+		vsnprintf(crash_record->msg, sizeof(crash_record->msg), msg, ap);
+		va_end(ap);
 
-	va_start(ap, msg);
-	vsnprintf(crash_record->msg, sizeof(crash_record->msg), msg, ap);
-	va_end(ap);
+		crash_record->fault_cpu = cpu;
+		save_current_task();
 
-	crash_record->fault_cpu = cpu;
-	save_current_task();
-
-	/* FIXME: Check reboot_mode is valid */
-	crash_record->reboot_mode = reboot_mode;
+		/* FIXME: Check reboot_mode is valid */
+			crash_record->reboot_mode = reboot_mode;
+	}
 }
 
 int __init mrdump_platform_init(const struct mrdump_platform *plat)
 {
-	mrdump_plat = plat;
+	int mrdump_enable = 1;
+
+	if (mrdump_cblock == NULL) {
+		memset(mrdump_lk, 0, sizeof(mrdump_lk));
+		pr_err("%s: MT-RAMDUMP no control block\n", __func__);
+		return -EINVAL;
+	}
 
 	/* Allocate memory for saving cpu registers. */
 	crash_notes = alloc_percpu(note_buf_t);
@@ -306,6 +323,7 @@ int __init mrdump_platform_init(const struct mrdump_platform *plat)
 		return -ENOMEM;
 	}
 
+	mrdump_plat = plat;
 	if (mrdump_plat == NULL) {
 		mrdump_enable = 0;
 		pr_err("%s: MT-RAMDUMP platform no init\n", __func__);
@@ -319,11 +337,10 @@ int __init mrdump_platform_init(const struct mrdump_platform *plat)
 	}
 
 	/* move default enable MT-RAMDUMP to late_init (this function) */
-	if (mrdump_enable) {
+	if (mrdump_enable)
 		mrdump_plat->hw_enable(mrdump_enable);
-		mrdump_cblock.enabled = MRDUMP_ENABLE_COOKIE;
-		__inner_flush_dcache_all();
-	}
+
+	pr_info("%s: done.\n", __func__);
 
 	return 0;
 }
@@ -363,7 +380,7 @@ static int __init mrdump_sysfs_init(void)
 		return -EINVAL;
 	}
 
-	pr_info("%s: init_done.\n", __func__);
+	pr_info("%s: done.\n", __func__);
 	return 0;
 }
 
@@ -371,36 +388,19 @@ module_init(mrdump_sysfs_init);
 
 #endif
 
-static int param_set_mrdump_enable(const char *val, const struct kernel_param *kp)
+static int param_set_mrdump_lbaooo(const char *val, const struct kernel_param *kp)
 {
-	int res, retval = 0;
-	struct wd_api *wd_api = NULL;
+	int retval = 0;
 
-	res = get_wd_api(&wd_api);
-	if (res < 0) {
-		pr_alert("wd_ddr_reserved_mode, get wd api error %d\n", res);
-		return res;
-	}
+	if (mrdump_cblock) {
+		retval = param_set_ulong(val, kp);
 
-	/* Always disable if version not matched...cannot enable manually. */
-	if ((mrdump_plat != NULL) && (memcmp(mrdump_cblock.sig, MRDUMP_GO_DUMP, 8) == 0) && !mrdump_rsv_conflict) {
-		retval = param_set_bool(val, kp);
 		if (retval == 0) {
-			mrdump_plat->hw_enable(mrdump_enable);
-			mrdump_cblock.enabled = mrdump_enable ? MRDUMP_ENABLE_COOKIE : 0;
+			mrdump_cblock->output_fs_lbaooo = mrdump_output_lbaooo;
 			__inner_flush_dcache_all();
 		}
 	}
-	return retval;
-}
 
-static int param_set_mrdump_lbaooo(const char *val, const struct kernel_param *kp)
-{
-	int retval = param_set_ulong(val, kp);
-	if (retval == 0) {
-		mrdump_cblock.output_fs_lbaooo = mrdump_output_lbaooo;
-		__inner_flush_dcache_all();
-	}
 	return retval;
 }
 
@@ -416,15 +416,6 @@ struct kernel_param_ops param_ops_mrdump_lbaooo = {
 param_check_ulong(lbaooo, &mrdump_output_lbaooo);
 module_param_cb(lbaooo, &param_ops_mrdump_lbaooo, &mrdump_output_lbaooo, S_IRUGO | S_IWUSR);
 __MODULE_PARM_TYPE(lbaooo, unsigned long);
-
-/* sys/modules/mrdump/parameter/enable */
-struct kernel_param_ops param_ops_mrdump_enable = {
-	.set = param_set_mrdump_enable,
-	.get = param_get_bool,
-};
-param_check_bool(enable, &mrdump_enable);
-module_param_cb(enable, &param_ops_mrdump_enable, &mrdump_enable, S_IRUGO | S_IWUSR);
-__MODULE_PARM_TYPE(enable, bool);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MediaTek MRDUMP module");

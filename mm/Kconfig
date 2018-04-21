@@ -312,6 +312,7 @@ config MMU_NOTIFIER
 config KSM
 	bool "Enable KSM for page merging"
 	depends on MMU
+	depends on !MTK_ENABLE_AGO
 	help
 	  Enable Kernel Samepage Merging: KSM periodically scans those areas
 	  of an application's address space that an app has advised may be
@@ -530,6 +531,16 @@ config CMA_AREAS
 	  number of CMA area in the system.
 
 	  If unsure, leave the default value "7".
+
+config CMA_REFUSE_PAGE_CACHE
+	bool "refue page cache to alloc from CMA"
+	depends on CMA
+	default n
+	help
+	  Page cache might cause cma allocation flow fail for small size
+	  CMA pool, set to "y" if that kind of issue happened.
+
+	  If unsure, say "n".
 
 config MEM_SOFT_DIRTY
 	bool "Track memory changes"

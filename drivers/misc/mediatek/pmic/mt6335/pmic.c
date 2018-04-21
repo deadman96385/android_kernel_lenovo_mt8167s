@@ -95,10 +95,10 @@ void vmd1_pmic_setting_on(void)
 	pmic_config_interface(0x0F9C, 0x1, 0x1, 12);	/* 0x0F9C[12] = 1 */
 	pmic_config_interface(0x0F88, 0x1, 0x1, 12);	/* 0x0F88[12] = 1 */
 
-	/*---VMD1, VMODEM, VSRAM_VMD ENABLE---*/
+	/*---VMD1, VMODEM, VSRAM_VMD ENABLE, VSRAM_VMD need to be enabled first---*/
+	pmic_set_register_value(PMIC_RG_VSRAM_VMD_SW_EN, 1);
 	pmic_set_register_value(PMIC_RG_BUCK_VMD1_EN, 1);
 	pmic_set_register_value(PMIC_RG_BUCK_VMODEM_EN, 1);
-	pmic_set_register_value(PMIC_RG_VSRAM_VMD_SW_EN, 1);
 	udelay(220);
 
 	/* Disable FPFM after enable BUCK, SW workaround to avoid VMD1/VMODEM overshoot */
@@ -125,9 +125,10 @@ void vmd1_pmic_setting_off(void)
 	unsigned int vmodem_en = 0;
 	unsigned int vsram_vmd_en = 0;
 
-	/*---VMD1, VMODEM, VSRAM_VMD DISABLE---*/
+	/*---VMD1, VMODEM, VSRAM_VMD DISABLE, need to delay 25ms before disable VSRAM_VMD---*/
 	pmic_set_register_value(PMIC_RG_BUCK_VMD1_EN, 0);
 	pmic_set_register_value(PMIC_RG_BUCK_VMODEM_EN, 0);
+	mdelay(25);
 	pmic_set_register_value(PMIC_RG_VSRAM_VMD_SW_EN, 0);
 	udelay(220);
 
@@ -409,8 +410,13 @@ unsigned int enable_vimvo_lp_mode(unsigned lp)
 {
 	if (lp != 1 && lp != 0)
 		return lp;
-
-	pmic_set_register_value(PMIC_RG_BUCK_VIMVO_LP, lp);
+	if (lp == 1) {
+		pmic_set_register_value(PMIC_RG_BUCK_VMD1_DVS_TRANS_CTRL, 0);
+		pmic_set_register_value(PMIC_RG_BUCK_VIMVO_LP, lp);
+	} else {
+		pmic_set_register_value(PMIC_RG_BUCK_VIMVO_LP, lp);
+		pmic_set_register_value(PMIC_RG_BUCK_VMD1_DVS_TRANS_CTRL, 1);
+	}
 	if (pmic_get_register_value(PMIC_RG_BUCK_VIMVO_LP) == lp) {
 		pr_err("[PMIC][%s] VIMVO enter %s mode success\n", __func__, (lp == 1)?"sleep":"normal");
 		return 0;
@@ -506,13 +512,15 @@ void pmic_dump_register(struct seq_file *m)
 int pmic_pre_wdt_reset(void)
 {
 	int ret = 0;
-
+/* remove dump exception status before wdt, since we will recore it at next boot preloader */
+#if 0
 	preempt_disable();
 	local_irq_disable();
 	pr_err(PMICTAG "[%s][pmic_boot_status]\n", __func__);
 	pmic_dump_exception_reg();
 #if DUMP_ALL_REG
 	pmic_dump_register();
+#endif
 #endif
 	return ret;
 
@@ -1046,6 +1054,8 @@ static int pmic_mt_probe(struct platform_device *dev)
 	enable_vsram_vcore_hw_tracking(1);
 	PMICLOG("Enable VSRAM_VCORE hw tracking\n");
 
+	/* To prevent from writing MT6337 when accessing Main PMIC, need this setting */
+	pmic_set_register_value(PMIC_RG_REG_CK_PDN_HWEN, 0x0);
 	return 0;
 }
 

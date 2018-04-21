@@ -124,9 +124,11 @@
 /* #define FPGA_VERSION */
 #include "jpeg_drv_reg.h"
 
-#ifdef JPEG_DRV_MT6799
+#ifdef SMI_CG_SUPPORT
 #include "smi_public.h"
 #endif
+
+#include "smi_debug.h"
 
 /* -------------------------------------------------------------------------- */
 /*  */
@@ -173,6 +175,8 @@ static struct JpegClk gJpegClk;
 static wait_queue_head_t dec_wait_queue;
 static spinlock_t jpeg_dec_lock;
 static int dec_status;
+static int dec_ready;
+
 #endif
 
 #ifdef JPEG_PM_DOMAIN_ENABLE
@@ -184,6 +188,7 @@ struct platform_device *pjenc_dev;
 static wait_queue_head_t enc_wait_queue;
 static spinlock_t jpeg_enc_lock;
 static int enc_status;
+static int enc_ready;
 
 /* ========================================== */
 /* CMDQ */
@@ -264,7 +269,7 @@ void jpeg_drv_dec_power_on(void)
 		if (clk_prepare_enable(gJpegClk.clk_venc_jpgDec))
 			JPEG_ERR("enable clk_venc_jpgDec fail!");
 	#else
-		#ifdef JPEG_DRV_MT6799
+		#ifdef SMI_CG_SUPPORT
 			smi_bus_enable(SMI_LARB_VENCSYS, "JPEG");
 			if (clk_prepare_enable(gJpegClk.clk_venc_jpgDec))
 				JPEG_ERR("enable clk_venc_jpgDec fail!");
@@ -299,7 +304,7 @@ void jpeg_drv_dec_power_off(void)
 		clk_disable_unprepare(gJpegClk.clk_venc_jpgDec);
 		mtk_smi_larb_clock_off(3, true);
 	#else
-		#ifdef JPEG_DRV_MT6799
+		#ifdef SMI_CG_SUPPORT
 			clk_disable_unprepare(gJpegClk.clk_venc_jpgDec);
 			smi_bus_disable(SMI_LARB_VENCSYS, "JPEG");
 		#else
@@ -331,7 +336,7 @@ void jpeg_drv_enc_power_on(void)
 		if (clk_prepare_enable(gJpegClk.clk_venc_jpgEnc))
 			JPEG_ERR("enable clk_venc_jpgEnc fail!");
 	#else
-		#ifdef JPEG_DRV_MT6799
+		#ifdef SMI_CG_SUPPORT
 			smi_bus_enable(SMI_LARB_VENCSYS, "JPEG");
 			if (clk_prepare_enable(gJpegClk.clk_venc_jpgEnc))
 				JPEG_ERR("enable clk_venc_jpgDec fail!");
@@ -372,7 +377,7 @@ void jpeg_drv_enc_power_off(void)
 		clk_disable_unprepare(gJpegClk.clk_venc_jpgEnc);
 		mtk_smi_larb_clock_off(3, true);
 	#else
-		#ifdef JPEG_DRV_MT6799
+		#ifdef SMI_CG_SUPPORT
 			clk_disable_unprepare(gJpegClk.clk_venc_jpgEnc);
 			smi_bus_disable(SMI_LARB_VENCSYS, "JPEG");
 		#else
@@ -401,6 +406,7 @@ static int jpeg_drv_dec_init(void)
 		retValue = -EBUSY;
 	} else {
 		dec_status = 1;
+		dec_ready = 0;
 		retValue = 0;
 	}
 	spin_unlock(&jpeg_dec_lock);
@@ -419,6 +425,7 @@ static void jpeg_drv_dec_deinit(void)
 
 		spin_lock(&jpeg_dec_lock);
 		dec_status = 0;
+		dec_ready = 0;
 		spin_unlock(&jpeg_dec_lock);
 
 		jpeg_drv_dec_reset();
@@ -438,6 +445,7 @@ static int jpeg_drv_enc_init(void)
 		retValue = -EBUSY;
 	} else {
 		enc_status = 1;
+		enc_ready = 0;
 		retValue = 0;
 	}
 	spin_unlock(&jpeg_enc_lock);
@@ -455,6 +463,7 @@ static void jpeg_drv_enc_deinit(void)
 	if (enc_status != 0) {
 		spin_lock(&jpeg_enc_lock);
 		enc_status = 0;
+		enc_ready = 0;
 		spin_unlock(&jpeg_enc_lock);
 
 		jpeg_drv_enc_reset();
@@ -540,8 +549,12 @@ static int jpeg_dec_ioctl(unsigned int cmd, unsigned long arg, struct file *file
 		else
 			_jpeg_dec_mode = 0;
 
-		if (jpeg_drv_dec_set_config_data(&dec_params) < 0)
+		if (jpeg_drv_dec_set_config_data(&dec_params) == 0)
 			return -EFAULT;
+
+		spin_lock(&jpeg_dec_lock);
+		dec_ready = 1;
+		spin_unlock(&jpeg_dec_lock);
 
 		break;
 
@@ -611,7 +624,7 @@ static int jpeg_dec_ioctl(unsigned int cmd, unsigned long arg, struct file *file
 			    ("[JPEGDRV]Permission Denied! This process can not access decoder\n");
 			return -EFAULT;
 		}
-		if (dec_status == 0) {
+		if (dec_status == 0 || dec_ready == 0) {
 			JPEG_MSG("[JPEGDRV]JPEG Decoder is unlocked!!");
 			*pStatus = 0;
 			return -EFAULT;
@@ -625,10 +638,14 @@ static int jpeg_dec_ioctl(unsigned int cmd, unsigned long arg, struct file *file
 			 dec_row_params.pauseMCU - 1, dec_row_params.decRowBuf[0],
 			 dec_row_params.decRowBuf[1], dec_row_params.decRowBuf[2]);
 
-		jpeg_drv_dec_set_dst_bank0(dec_row_params.decRowBuf[0], dec_row_params.decRowBuf[1],
-					   dec_row_params.decRowBuf[2]);
+		if (!jpeg_drv_dec_set_dst_bank0(dec_row_params.decRowBuf[0], dec_row_params.decRowBuf[1],
+					   dec_row_params.decRowBuf[2])) {
+			return -EFAULT;
+		}
 
-		jpeg_drv_dec_set_pause_mcu_idx(dec_row_params.pauseMCU - 1);
+		if (!jpeg_drv_dec_set_pause_mcu_idx(dec_row_params.pauseMCU - 1))
+			return -EFAULT;
+
 
 		/* lock CPU to ensure irq is enabled after trigger HW */
 		spin_lock(&jpeg_dec_lock);
@@ -637,6 +654,15 @@ static int jpeg_dec_ioctl(unsigned int cmd, unsigned long arg, struct file *file
 		break;
 
 	case JPEG_DEC_IOCTL_START:	/* OT:OK */
+		if (*pStatus != JPEG_DEC_PROCESS) {
+			JPEG_WRN("Permission Denied! This process can not access decoder");
+			return -EFAULT;
+		}
+		if (dec_status == 0 || dec_ready == 0) {
+			JPEG_WRN("Decoder status is available, HOW COULD THIS HAPPEN ??");
+			*pStatus = 0;
+			return -EFAULT;
+		}
 		/*JPEG_MSG("[JPEGDRV][IOCTL] JPEG Decoder Start!!\n");*/
 
 		jpeg_drv_dec_start();
@@ -647,7 +673,7 @@ static int jpeg_dec_ioctl(unsigned int cmd, unsigned long arg, struct file *file
 			JPEG_WRN("Permission Denied! This process can not access decoder");
 			return -EFAULT;
 		}
-		if (dec_status == 0) {
+		if (dec_status == 0 || dec_ready == 0) {
 			JPEG_WRN("Decoder status is available, HOW COULD THIS HAPPEN ??");
 			*pStatus = 0;
 			return -EFAULT;
@@ -691,7 +717,7 @@ static int jpeg_dec_ioctl(unsigned int cmd, unsigned long arg, struct file *file
 
 			/* need to dump smi for the case that no irq coming from HW */
 			if (decResult == 5)
-				smi_debug_bus_hanging_detect_ext(0x1FF, 1, 0);
+				smi_debug_bus_hanging_detect_ext2(0x1FF, 1, 0, 1);
 
 			jpeg_drv_dec_warm_reset();
 		}
@@ -876,6 +902,10 @@ static int jpeg_enc_ioctl(unsigned int cmd, unsigned long arg, struct file *file
 			 cfgEnc.encQuality, cfgEnc.restartInterval);
 
 		jpeg_drv_enc_ctrl_cfg(cfgEnc.enableEXIF, cfgEnc.encQuality, cfgEnc.restartInterval);
+
+		spin_lock(&jpeg_enc_lock);
+		enc_ready = 1;
+		spin_unlock(&jpeg_enc_lock);
 		break;
 
 	case JPEG_ENC_IOCTL_START:
@@ -884,8 +914,9 @@ static int jpeg_enc_ioctl(unsigned int cmd, unsigned long arg, struct file *file
 			JPEG_WRN("Permission Denied! This process can not access encoder");
 			return -EFAULT;
 		}
-		if (enc_status == 0) {
-			JPEG_WRN("Encoder status is available, HOW COULD THIS HAPPEN ??");
+
+		if (enc_status == 0 || enc_ready == 0) {
+			JPEG_WRN("Encoder status is unavailable, HOW COULD THIS HAPPEN ??");
 			*pStatus = 0;
 			return -EFAULT;
 		}
@@ -898,8 +929,9 @@ static int jpeg_enc_ioctl(unsigned int cmd, unsigned long arg, struct file *file
 			JPEG_WRN("Permission Denied! This process can not access encoder");
 			return -EFAULT;
 		}
-		if (enc_status == 0) {
-			JPEG_WRN("Encoder status is available, HOW COULD THIS HAPPEN ??");
+
+		if (enc_status == 0 || enc_ready == 0) {
+			JPEG_WRN("Encoder status is unavailable, HOW COULD THIS HAPPEN ??");
 			*pStatus = 0;
 			return -EFAULT;
 		}
@@ -952,7 +984,7 @@ static int jpeg_enc_ioctl(unsigned int cmd, unsigned long arg, struct file *file
 
 			/* need to dump smi for the case that no irq coming from HW */
 			if (ret == 3)
-				smi_debug_bus_hanging_detect_ext(0x1FF, 1, 0);
+				smi_debug_bus_hanging_detect_ext2(0x1FF, 1, 0, 1);
 
 			jpeg_drv_enc_warm_reset();
 
@@ -1233,6 +1265,18 @@ static ssize_t jpeg_read(struct file *file, char __user *data, size_t len, loff_
 
 static int jpeg_release(struct inode *inode, struct file *file)
 {
+	if (enc_status != 0) {
+		JPEG_WRN("Error! Enable error handling for jpeg encoder");
+		jpeg_drv_enc_deinit();
+	}
+
+#ifdef JPEG_DEC_DRIVER
+	if (dec_status != 0) {
+		JPEG_WRN("Error! Enable error handling for jpeg decoder");
+		jpeg_drv_dec_deinit();
+	}
+#endif
+
 	if (file->private_data != NULL) {
 		kfree(file->private_data);
 		file->private_data = NULL;
@@ -1324,7 +1368,7 @@ static int jpeg_probe(struct platform_device *pdev)
 		#ifdef JPEG_PM_DOMAIN_ENABLE
 			pjenc_dev = pdev;
 		#else
-			#ifndef JPEG_DRV_MT6799
+			#ifndef SMI_CG_SUPPORT
 				/* venc-mtcmos lead to disp power scpsys SCP_SYS_DISP */
 				gJpegClk.clk_scp_sys_mm0 = of_clk_get_by_name(node, "MT_CG_SCP_SYS_MM0");
 				if (IS_ERR(gJpegClk.clk_scp_sys_mm0))
@@ -1392,6 +1436,7 @@ static int jpeg_probe(struct platform_device *pdev)
 	proc_create("mtk_jpeg", 0, NULL, &jpeg_fops);
 #endif
 }
+
 	spin_lock_init(&jpeg_enc_lock);
 
 	/* initial codec, register codec ISR */
@@ -1455,9 +1500,12 @@ static void jpeg_shutdown(struct platform_device *pdev)
 static int jpeg_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
 #ifdef JPEG_DEC_DRIVER
-	jpeg_drv_dec_deinit();
+	if (dec_status != 0)
+		jpeg_drv_dec_deinit();
 #endif
-	jpeg_drv_enc_deinit();
+
+	if (enc_status != 0)
+		jpeg_drv_enc_deinit();
 	return 0;
 }
 

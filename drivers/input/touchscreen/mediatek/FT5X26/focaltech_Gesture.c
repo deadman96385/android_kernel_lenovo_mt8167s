@@ -72,7 +72,7 @@
 #define FTS_GESTRUE_POINTS					255
 #define FTS_GESTRUE_POINTS_ONETIME		62
 #define FTS_GESTRUE_POINTS_HEADER			8
-#define FTS_GESTURE_OUTPUT_ADRESS			0xD3
+#define FTS_GESTURE_OUTPUT_ADDRESS			0xD3
 #define FTS_GESTURE_OUTPUT_UNIT_LENGTH	4
 
 /*******************************************************************************
@@ -151,104 +151,132 @@ static void fts_check_gesture(struct input_dev *input_dev, int gesture_id)
 {
 	char *envp[2];
 
-	printk("fts gesture_id==0x%x\n ", gesture_id);
+	FTS_DBG("fts gesture_id==0x%x\n ", gesture_id);
 
 	switch (gesture_id) {
 	case GESTURE_LEFT:
-		/*input_report_key(input_dev, KEY_GESTURE_LEFT, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_LEFT, 0);
-		input_sync(input_dev);*/
+		/*
+		*input_report_key(input_dev, KEY_GESTURE_LEFT, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_LEFT, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=LEFT";
 		break;
 	case GESTURE_RIGHT:
-		/*input_report_key(input_dev, KEY_GESTURE_RIGHT, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_RIGHT, 0);
-		input_sync(input_dev);*/
+		/*
+		*input_report_key(input_dev, KEY_GESTURE_RIGHT, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_RIGHT, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=RIGHT";
 		break;
 	case GESTURE_UP:
-		/*input_report_key(input_dev, KEY_GESTURE_UP, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_UP, 0);
-		input_sync(input_dev);  */
+		/*
+		*input_report_key(input_dev, KEY_GESTURE_UP, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_UP, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=UP";
 		break;
 	case GESTURE_DOWN:
-		/*input_report_key(input_dev, KEY_GESTURE_DOWN, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_DOWN, 0);
-		input_sync(input_dev);*/
+		/*
+		*input_report_key(input_dev, KEY_GESTURE_DOWN, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_DOWN, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=DOWN";
 		break;
 	case GESTURE_DOUBLECLICK:
-		/*input_report_key(input_dev, KEY_POWER, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_POWER, 0);
-		input_sync(input_dev);*/
+		/*
+		*input_report_key(input_dev, KEY_POWER, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_POWER, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=DOUBLE_CLICK";
 		break;
 	case GESTURE_O:
-		/*input_report_key(input_dev, KEY_GESTURE_O, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_O, 0);
-		input_sync(input_dev);*/
+		/*
+		*input_report_key(input_dev, KEY_GESTURE_O, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_O, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=O";
 		break;
 	case GESTURE_W:
-		/*input_report_key(input_dev, KEY_GESTURE_W, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_W, 0);
-		input_sync(input_dev);*/
+		/*
+		*input_report_key(input_dev, KEY_GESTURE_W, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_W, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=W";
 		break;
 	case GESTURE_M:
-		/*input_report_key(input_dev, KEY_GESTURE_M, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_M, 0);
-		input_sync(input_dev);*/
+		/*
+		*input_report_key(input_dev, KEY_GESTURE_M, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_M, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=M";
 		break;
 	case GESTURE_E:
-		/*input_report_key(input_dev, KEY_GESTURE_E, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_E, 0);
-		input_sync(input_dev);*/
+		/*
+		*input_report_key(input_dev, KEY_GESTURE_E, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_E, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=E";
 		break;
 	case GESTURE_L:
-		/*input_report_key(input_dev, KEY_GESTURE_L, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_L, 0);
-		input_sync(input_dev);*/
+		/*
+		*input_report_key(input_dev, KEY_GESTURE_L, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_L, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=L";
 		break;
 	case GESTURE_S:
-		/*input_report_key(input_dev, KEY_GESTURE_S, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_S, 0);
-		input_sync(input_dev);*/
+		/*
+		*input_report_key(input_dev, KEY_GESTURE_S, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_S, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=S";
 		break;
 	case GESTURE_V:
-		/*input_report_key(input_dev, KEY_GESTURE_V, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_V, 0);
-		input_sync(input_dev);*/
+		/*
+		*input_report_key(input_dev, KEY_GESTURE_V, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_V, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=V";
 		break;
-	/*case GESTURE_Z:
-		input_report_key(input_dev, KEY_GESTURE_Z, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_Z, 0);
-		input_sync(input_dev);
-		break;*/
+	/*
+	*case GESTURE_Z:
+		*input_report_key(input_dev, KEY_GESTURE_Z, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_Z, 0);
+		*input_sync(input_dev);
+		*break;
+	*/
 	case  GESTURE_C:
-		/*input_report_key(input_dev, KEY_GESTURE_C, 1);
-		input_sync(input_dev);
-		input_report_key(input_dev, KEY_GESTURE_C, 0);
-		input_sync(input_dev);*/
+		/*
+		*input_report_key(input_dev, KEY_GESTURE_C, 1);
+		*input_sync(input_dev);
+		*input_report_key(input_dev, KEY_GESTURE_C, 0);
+		*input_sync(input_dev);
+		*/
 		envp[0] = "GESTURE=C";
 		break;
 	default:
@@ -256,7 +284,7 @@ static void fts_check_gesture(struct input_dev *input_dev, int gesture_id)
 
 	}
 	envp[1] = NULL;
-	printk("going to kobject_uevent_env\n");
+	FTS_DBG("going to kobject_uevent_env\n");
 	kobject_uevent_env(&tpd->tpd_dev->kobj, KOBJ_CHANGE, envp);
 	sysfs_notify(&tpd->tpd_dev->kobj, NULL, "GESTURE_ID");
 
@@ -280,15 +308,17 @@ int fts_read_Gestruedata(void)
 	pointnum = 0;
 
 	ret = fts_i2c_read(fts_i2c_client, buf, 1, buf, FTS_GESTRUE_POINTS_HEADER);
-	/* printk( "tpd read FTS_GESTRUE_POINTS_HEADER.\n"); */
+	/* FTS_DBG( "tpd read FTS_GESTRUE_POINTS_HEADER.\n"); */
 
 	if (ret < 0) {
-		printk("%s read touchdata failed.\n", __func__);
+		FTS_ERR("%s read touchdata failed.\n", __func__);
 		return ret;
 	}
 
 	/* FW */
-	if (fts_updateinfo_curr.CHIP_ID == 0x54 || fts_updateinfo_curr.CHIP_ID == 0x58 || fts_updateinfo_curr.CHIP_ID == 0x86 || fts_updateinfo_curr.CHIP_ID == 0x87  || fts_updateinfo_curr.CHIP_ID == 0x64) {
+	if (fts_updateinfo_curr.CHIP_ID == 0x54 || fts_updateinfo_curr.CHIP_ID == 0x58
+		|| fts_updateinfo_curr.CHIP_ID == 0x86 || fts_updateinfo_curr.CHIP_ID == 0x87
+		|| fts_updateinfo_curr.CHIP_ID == 0x64) {
 		gestrue_id = buf[0];
 		pointnum = (short)(buf[1]) & 0xff;
 		buf[0] = 0xd3;
@@ -300,7 +330,7 @@ int fts_read_Gestruedata(void)
 			ret = fts_i2c_read(fts_i2c_client, buf, 0, buf + 255, (pointnum * 4 + 2) - 255);
 		}
 		if (ret < 0) {
-			printk("%s read touchdata failed.\n", __func__);
+			FTS_ERR("%s read touchdata failed.\n", __func__);
 			return ret;
 		}
 
@@ -317,7 +347,7 @@ int fts_read_Gestruedata(void)
 	if (buf[0] == 0x24) {
 		gestrue_id = 0x24;
 		fts_check_gesture(fts_input_dev, gestrue_id);
-		printk("%d check_gesture gestrue_id.\n", gestrue_id);
+		FTS_ERR("%d check_gesture gestrue_id.\n", gestrue_id);
 		return -1;
 	}
 
@@ -330,14 +360,14 @@ int fts_read_Gestruedata(void)
 		ret = fts_i2c_read(fts_i2c_client, buf, 0, buf + 255, (pointnum * 4 + 8) - 255);
 	}
 	if (ret < 0) {
-		printk("%s read touchdata failed.\n", __func__);
+		FTS_ERR("%s read touchdata failed.\n", __func__);
 		return ret;
 	}
 
 	/* gestrue_id = fetch_object_sample(buf, pointnum);//need gesture lib.a */
 	gestrue_id = 0x24;
 	fts_check_gesture(fts_input_dev, gestrue_id);
-	printk("%d read gestrue_id.\n", gestrue_id);
+	FTS_DBG("%d read gestrue_id.\n", gestrue_id);
 
 	for (i = 0; i < pointnum; i++) {
 		coordinate_x[i] =  (((s16) buf[0 + (4 * i + 8)]) & 0x0F) <<

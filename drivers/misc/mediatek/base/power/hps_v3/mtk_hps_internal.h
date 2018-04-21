@@ -26,7 +26,11 @@
 /*
  * CONFIG - compile time
  */
+#ifdef CONFIG_MACH_MT6799
 #define CPU_BUCK_CTRL   (1)
+#else
+#define CPU_BUCK_CTRL   (0)
+#endif
 
 #define HPS_TASK_RT_PRIORITY		(MAX_RT_PRIO - 3)
 #define HPS_TASK_NORMAL_PRIORITY	(MIN_NICE)
@@ -47,13 +51,18 @@
  * CONFIG - runtime
  */
 #define DEF_CPU_UP_THRESHOLD		(95)
-#define DEF_CPU_UP_TIMES		(1)
+#define DEF_CPU_UP_TIMES		(4)
+#define DEF_ROOT_CPU_DOWN_TIMES		(8)
 #define DEF_CPU_DOWN_THRESHOLD		(85)
 #define DEF_CPU_DOWN_TIMES		(1)
 #define DEF_TLP_TIMES			(1)
 
 #define DEF_EAS_UP_THRESHOLD_0            (40)
+#ifdef CONFIG_MACH_MT6763
+#define DEF_EAS_DOWN_THRESHOLD_0          (10)
+#else
 #define DEF_EAS_DOWN_THRESHOLD_0          (20)
+#endif
 #define DEF_EAS_UP_THRESHOLD_1            (70)
 #define DEF_EAS_DOWN_THRESHOLD_1          (60)
 #define DEF_EAS_UP_THRESHOLD_2            (80)
@@ -80,8 +89,8 @@
 #define hps_emerg(fmt, args...)             pr_emerg("[HPS] " fmt, ##args)
 #define hps_alert(fmt, args...)             pr_alert("[HPS] " fmt, ##args)
 #define hps_crit(fmt, args...)              pr_crit("[HPS] " fmt, ##args)
-#define hps_error(fmt, args...)             pr_err("[HPS] " fmt, ##args)
-#define hps_warn(fmt, args...)              pr_warn("[HPS] " fmt, ##args)
+#define hps_error(fmt, args...)             pr_info("[HPS] " fmt, ##args)
+#define hps_warn(fmt, args...)              pr_info("[HPS] " fmt, ##args)
 #define hps_notice(fmt, args...)            pr_notice("[HPS] " fmt, ##args)
 #define hps_info(fmt, args...)              pr_info("[HPS] " fmt, ##args)
 #define hps_debug(fmt, args...)             pr_debug("[HPS] " fmt, ##args)
@@ -112,20 +121,20 @@
  *	hps_debug("@@@### file:%s, func:%s, line:%d ###@@@\n", __FILE__, __func__, __LINE__)
  */
 
-typedef enum {
+enum hps_init_state {
 	INIT_STATE_NOT_READY = 0,
 	INIT_STATE_DONE
-} hps_init_state_e;
+};
 
-typedef enum {
+enum hps_ctxt_state {
 	STATE_LATE_RESUME = 0,
 	STATE_EARLY_SUSPEND,
 	STATE_SUSPEND,
 	STATE_COUNT
-} hps_ctxt_state_e;
+};
 
 /* TODO: verify do you need action? no use now */
-typedef enum {
+enum hps_ctxt_action {
 	ACTION_NONE = 0,
 	ACTION_BASE_LITTLE,	/* bit  1, 0x0002 */
 	ACTION_BASE_BIG,	/* bit  2, 0x0004 */
@@ -142,9 +151,9 @@ typedef enum {
 	ACTION_ROOT_2_LITTLE,	/*bit 13, 0x2000 */
 	ACTION_ROOT_2_BIG,	/*bit 14, 0x4000 */
 	ACTION_COUNT
-} hps_ctxt_action_e;
+};
 
-typedef enum {
+enum hps_ctxt_func_ctrl {
 	HPS_FUNC_CTRL_HPS,	/* bit  0, 0x0001 */
 	HPS_FUNC_CTRL_RUSH,	/* bit  1, 0x0002 */
 	HPS_FUNC_CTRL_HVY_TSK,	/* bit  2, 0x0004 */
@@ -154,7 +163,7 @@ typedef enum {
 	HPS_FUNC_CTRL_EAS,	/* big  6, 0x0040 */
 	HPS_FUNC_CTRL_IDLE_DET,	/* big  7 0x0080 */
 	HPS_FUNC_CTRL_COUNT
-} hps_ctxt_func_ctrl_e;
+};
 
 #define HPS_SYS_CHANGE_ROOT	(0x001)
 struct hps_sys_ops {
@@ -179,15 +188,23 @@ struct hps_cluster_info {
 	unsigned int target_core_num;
 	unsigned int utilization;
 	unsigned int loading;
+	unsigned int abs_load;
+	unsigned int rel_load;
+	unsigned int sched_load;
 	unsigned int up_threshold;
 	unsigned int down_threshold;
 	unsigned int eas_up_threshold;
 	unsigned int eas_down_threshold;
 	unsigned int pwr_seq;
 	unsigned int bigTsk_value;
+#ifdef CONFIG_MTK_ICCS_SUPPORT
+	unsigned int iccs_state;
+#endif
+	int down_times[8];
+	int down_time_val[8];
 };
 
-typedef struct hps_sys_struct {
+struct hps_sys_struct {
 	unsigned int cluster_num;
 	struct hps_cluster_info *cluster_info;
 	unsigned int func_num;
@@ -201,12 +218,14 @@ typedef struct hps_sys_struct {
 	unsigned int up_load_avg;
 	unsigned int down_load_avg;
 	unsigned int action_id;
-} hps_sys_t;
+};
 
-typedef struct hps_ctxt_struct {
+struct hps_ctxt_struct {
 	/* state */
 	unsigned int init_state;
 	unsigned int state;
+	cpumask_var_t online_core;
+	cpumask_var_t online_core_req;
 	unsigned int is_interrupt;
 	/*unsigned int pwrseq;*/
 	ktime_t hps_regular_ktime;
@@ -316,20 +335,19 @@ typedef struct hps_ctxt_struct {
 	/* misc */
 	unsigned int test0;
 	unsigned int test1;
-} hps_ctxt_t;
+};
 
-typedef struct hps_cpu_ctxt_struct {
+struct hps_cpu_ctxt_struct {
 	unsigned int load;
-} hps_cpu_ctxt_t;
+};
 
-typedef struct mtk_idle_recent_ratio hps_idle_ratio_t;
 
 /*=============================================================*/
 /* Global variable declaration */
 /*=============================================================*/
-extern hps_ctxt_t hps_ctxt;
-extern hps_sys_t hps_sys;
-DECLARE_PER_CPU(hps_cpu_ctxt_t, hps_percpu_ctxt);
+extern struct hps_ctxt_struct hps_ctxt;
+extern struct hps_sys_struct hps_sys;
+DECLARE_PER_CPU(struct hps_cpu_ctxt_struct, hps_percpu_ctxt);
 /* forward references */
 extern struct cpumask cpu_domain_big_mask;	/* definition in kernel-3.10/arch/arm/kernel/topology.c */
 extern struct cpumask cpu_domain_little_mask;	/* definition in kernel-3.10/arch/arm/kernel/topology.c */
@@ -341,9 +359,6 @@ extern int sched_get_nr_running_avg(int *avg, int *iowait_avg);
 extern int sched_get_cluster_util(int id, unsigned long *util, unsigned long *cap);
 extern void sched_max_util_task(int *cpu, int *pid, int *util, int *boost);
 #endif
-
-/* defined in kernel/sched/fair.c */
-extern int STUNE_TASK_THRESHOLD;
 
 /* define in drivers/misc/mediatek/sched/sched_power.c */
 extern int sodi_limit;
@@ -400,7 +415,7 @@ extern unsigned int num_online_little_cpus(void);
 extern unsigned int num_online_big_cpus(void);
 extern int hps_cpu_is_cpu_big(int cpu);
 extern int hps_cpu_is_cpu_little(int cpu);
-extern unsigned int hps_cpu_get_percpu_load(int cpu);
+extern unsigned int hps_cpu_get_percpu_load(int cpu, int get_abs);
 extern unsigned int hps_cpu_get_nr_heavy_task(void);
 extern int hps_cpu_get_tlp(unsigned int *avg, unsigned int *iowait_avg);
 #ifdef CONFIG_MTK_SCHED_RQAVG_US
@@ -414,6 +429,7 @@ extern int get_avg_heavy_task_threshold(void);
 extern int get_heavy_task_threshold(void);
 extern unsigned int sched_get_nr_heavy_task_by_threshold(int cluster_id, unsigned int threshold);
 extern int sched_get_nr_heavy_running_avg(int cid, int *avg);
+extern void sched_get_percpu_load2(int cpu, bool reset, unsigned int *rel_load, unsigned int *abs_load);
 extern struct cpumask cpu_domain_big_mask;
 extern struct cpumask cpu_domain_little_mask;
 extern int sched_get_nr_running_avg(int *avg, int *iowait_avg);
@@ -422,6 +438,15 @@ extern unsigned int sched_get_nr_heavy_task(void);
 extern void armpll_control(int id, int on);
 extern void mp_enter_suspend(int id, int suspend);
 extern void sched_big_task_nr(int *L_nr, int *B_nr);
-extern void __attribute__((weak))
-mt_smart_update_sysinfo(unsigned int cur_loads, unsigned int cur_tlp, unsigned int btask);
+extern void __attribute__((weak))mt_smart_update_sysinfo(unsigned int cur_loads,
+	unsigned int cur_tlp, unsigned int btask, unsigned int total_heavy_task);
+#ifdef CONFIG_MTK_ICCS_SUPPORT
+extern int hps_get_iccs_pwr_status(int cluster);
+extern void iccs_cluster_on_off(int cluster, int state);
+extern unsigned char iccs_get_target_power_state_bitmask(void);
+extern void iccs_set_target_power_state_bitmask(unsigned char value);
+extern void iccs_enter_low_power_state(void);
+#endif
+void __weak armpll_control(int id, int on) { }
+void __weak mp_enter_suspend(int id, int suspend) { }
 #endif

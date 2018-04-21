@@ -122,16 +122,13 @@ static int _hps_task_main(void *data)
  */
 int hps_task_start(void)
 {
-	struct sched_param param = { .sched_priority = HPS_TASK_PRIORITY };
-
 	if (hps_ctxt.tsk_struct_ptr == NULL) {
 		hps_ctxt.tsk_struct_ptr =
 			kthread_create(_hps_task_main, NULL, "hps_main");
 		if (IS_ERR(hps_ctxt.tsk_struct_ptr))
 			return PTR_ERR(hps_ctxt.tsk_struct_ptr);
 
-		sched_setscheduler_nocheck(
-			hps_ctxt.tsk_struct_ptr, SCHED_FIFO, &param);
+		set_user_nice(hps_ctxt.tsk_struct_ptr, HPS_TASK_NICE);
 		get_task_struct(hps_ctxt.tsk_struct_ptr);
 		wake_up_process(hps_ctxt.tsk_struct_ptr);
 		log_info("hps_task_start success, ptr: %p, pid: %d\n",

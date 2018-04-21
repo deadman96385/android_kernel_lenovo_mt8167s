@@ -223,8 +223,17 @@
 #define MUSB_DEVCTL		0x60	/* 8 bit */
 
 #define MUSB_OPSTATE    0x620
+#define MUSB_SUSPEND    0x631
 #define OTG_IDLE 0
 
+/*
+  * MD Direct Tethering related Registers
+  */
+
+#define MUSB_USB_MDL1INTM	0x744
+#define MUSB_QIMCR			0xc08
+#define MUSB_QIMSR			0xc0c
+#define MUSB_USBGCSR		0xb00
 
 /* These are always controlled through the INDEX register */
 #define MUSB_TXFIFOSZ		0x62	/* 8-bit (see masks) */
@@ -235,6 +244,7 @@
 /* REVISIT: vctrl/vstatus: optional vendor utmi+phy register at 0x68 */
 #define MUSB_HWVERS		0x6C	/* 8 bit */
 #define MUSB_ULPI_BUSCONTROL	0x70	/* 8 bit */
+#define MUSB_ULPI_BUSCONTROL1	0x71	/* 8 bit */
 #define MUSB_ULPI_INT_MASK	0x72	/* 8 bit */
 #define MUSB_ULPI_INT_SRC	0x73	/* 8 bit */
 #define MUSB_ULPI_REG_DATA	0x74	/* 8 bit */
@@ -365,6 +375,7 @@
 #define MUSB_QMUBASE	(0x800)
 #define MUSB_QISAR	(0xc00)
 #define MUSB_QIMR	(0xc04)
+#define MUSB_GPZCR (0xc34)
 #endif
 
 static inline void musb_write_txfifosz(void __iomem *mbase, u8 c_size)

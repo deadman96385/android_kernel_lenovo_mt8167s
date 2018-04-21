@@ -43,10 +43,12 @@ void tpd_debug_no_response(struct i2c_client *i2c_client)
 	int wakeup_count = 200;
 
 	for (i = 0; i < trial[trial_index]; i++) {
-		i2c_master_send(i2c_client, sleep, 2);
+		if (i2c_master_send(i2c_client, sleep, 2) != 2)
+			pr_debug("i2c_master_send sleep fail\n");
 		msleep(delay[delay_index]);
 		for (j = 0; j < wakeup_count; j++) {
-			i2c_master_send(i2c_client, wakeup, 2);
+			if (i2c_master_send(i2c_client, wakeup, 2) != 2)
+				pr_debug("i2c_master_send wakeup fail\n");
 			if (i2c_master_send(i2c_client, wakeup, 2) == 2)
 				break;
 			msleep(20);
@@ -254,8 +256,14 @@ struct tpd_debug_log_buf tpd_buf;
 
 static int tpd_debug_log_open(struct inode *inode, struct file *file)
 {
+	unsigned char *temp_buffer;
+
+	temp_buffer = tpd_buf.buffer;
 	memset(&tpd_buf, 0, sizeof(struct tpd_debug_log_buf));
-	tpd_buf.buffer = vmalloc(tpd_log_line_cnt * tpd_log_line_buffer);
+	if (temp_buffer == NULL)
+		tpd_buf.buffer = vmalloc(tpd_log_line_cnt * tpd_log_line_buffer);
+	else
+		tpd_buf.buffer = temp_buffer;
 	if (tpd_buf.buffer == NULL) {
 		pr_err("tpd_log: nomem for tpd_buf->buffer\n");
 		return -ENOMEM;
@@ -276,6 +284,7 @@ static int tpd_debug_log_release(struct inode *inode, struct file *file)
 	/* struct tpd_debug_log_buf *tpd_buf = (tpd_debug_log_buf *)file->private_data; */
 	pr_debug("[tpd_em_log]: close log file\n");
 	vfree(tpd_buf.buffer);
+	tpd_buf.buffer = NULL;
 	/* free(tpd_buf); */
 	return 0;
 }
@@ -292,6 +301,10 @@ static ssize_t tpd_debug_log_read(struct file *file, char __user *buffer,
 	struct tpd_debug_log_buf *tpd_buf = (struct tpd_debug_log_buf *)file->private_data;
 	unsigned int retval = 0, unit = tpd_log_line_buffer;
 	unsigned char *tmp_buf = NULL;
+
+	if (tpd_buf == NULL)
+		return -ENOMEM;
+
 
 	if (tpd_buf->head == tpd_buf->tail && (file->f_flags & O_NONBLOCK))
 		return -EAGAIN;

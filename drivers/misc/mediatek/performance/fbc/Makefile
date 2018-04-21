@@ -11,15 +11,19 @@
 # GNU General Public License for more details.
 #
 
-obj-y += fbc.o
-
-ifeq ($(CONFIG_MTK_FBC),y)
-ccflags-y += -DMTK_FBC_SUPPORT
+ifeq ($(CONFIG_MACH_MT6739), y)
+        ccflags-y += -DTOUCH_VCORE_OPP=0
 endif
 
+ifeq ($(CONFIG_MTK_FPSGO_FBT_UX),y)
+        obj-y += fbc.o
+else
+        ifneq ($(wildcard $(srctree)/drivers/misc/mediatek/performance/perfmgr/$(MTK_PLATFORM)/),)
+            obj-y += touch_boost.o
+        endif
+endif
 
 ccflags-y += \
-	-I$(srctree)/drivers/misc/mediatek/base/power/upower_v1/inc \
-	-I$(srctree)/drivers/misc/mediatek/base/power/include/leakage_table_v1  \
+	-I$(srctree)/drivers/misc/mediatek/base/power/include \
 	-I$(srctree)/kernel/trace/ \
 

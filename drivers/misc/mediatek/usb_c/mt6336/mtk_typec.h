@@ -28,6 +28,7 @@
 #include <linux/jiffies.h>
 #include <linux/kthread.h>
 #include <linux/wakelock.h>
+#include <mtk_ppm_api.h>
 
 #ifdef CONFIG_DUAL_ROLE_USB_INTF
 #include <linux/usb/class-dual-role.h>
@@ -140,6 +141,18 @@ enum sink_power_states {
 #define SNK_VRP15_AUXADC_MAX_VAL (1456)
 #define SNK_VRP30_AUXADC_MIN_VAL SNK_VRP15_AUXADC_MAX_VAL
 #define SNK_VRP30_AUXADC_MAX_VAL (AUXADC_VOLTAGE_SCALE - 1)
+
+#ifdef MT6336_E1
+	/*INT_STATUS5 4th*/
+#define TYPE_C_L_MIN (5*8+3)
+	/*INT_STATUS5 7th*/
+#define TYPE_C_H_MAX (5*8+6)
+#else
+	/*INT_STATUS5 1th*/
+#define TYPE_C_L_MIN (5*8+0)
+	/*INT_STATUS5 4th*/
+#define TYPE_C_H_MAX (5*8+3)
+#endif
 #endif
 
 /*timing*/
@@ -315,8 +328,10 @@ struct typec_hba {
 	unsigned int cc_irq;
 	unsigned int pd_irq;
 	int id;
+	int hwid;
 	bool is_kpoc;
-	unsigned int kpoc_retry;
+	bool is_boost;
+	bool is_shutdown;
 
 #if !COMPLIANCE
 	atomic_t lowq_cnt;
@@ -335,6 +350,7 @@ struct typec_hba {
 	struct work_struct wait_vbus_off_attached_snk;
 	struct work_struct wait_vbus_off_then_drive_attached_src;
 	struct work_struct wait_vsafe0v;
+	struct work_struct init_vbus_off;
 	unsigned int wq_running;
 	unsigned int wq_cnt;
 #if USE_AUXADC
@@ -448,6 +464,7 @@ struct typec_hba {
 #endif
 
 	int vsafe_5v;
+	void (*drive_vbus)(struct typec_hba *hba, uint8_t on);
 	int (*charger_det_notify)(int);
 };
 
@@ -554,6 +571,7 @@ extern void typec_vbus_det_enable(struct typec_hba *hba, uint8_t enable);
 extern unsigned int vbus_val(struct typec_hba *hba);
 extern unsigned int vbus_val_self(struct typec_hba *hba);
 extern void typec_drive_vbus(struct typec_hba *hba, uint8_t on);
+extern void typec_drive_vbus_e3(struct typec_hba *hba, uint8_t on);
 extern void typec_drive_vconn(struct typec_hba *hba, uint8_t enable);
 extern void typec_int_enable(struct typec_hba *hba, uint16_t msk0, uint16_t msk2);
 extern void typec_int_disable(struct typec_hba *hba, uint16_t msk0, uint16_t msk2);
@@ -567,14 +585,21 @@ extern void typec_disable_lowq(struct typec_hba *hba, char *str);
 extern struct typec_hba *get_hba(void);
 
 extern int pd_task(void *data);
+extern int pd_kpoc_task(void *data);
 extern void pd_set_data_role(struct typec_hba *hba, int role);
 extern void pd_get_message(struct typec_hba *hba, uint16_t *header, uint32_t *payload);
 extern int pd_is_power_swapping(struct typec_hba *hba);
+extern void pd_int_enable(struct typec_hba *hba, uint8_t enable);
+
+extern void pmic_enable_chrdet(unsigned char en);
 
 #ifdef CONFIG_DUAL_ROLE_USB_INTF
 extern int mt_dual_role_phy_init(struct typec_hba *hba);
 #endif
 
+extern void typec_auxadc_low_register(struct typec_hba *hba);
+extern void typec_auxadc_set_thresholds(struct typec_hba *hba, uint16_t min, uint16_t max);
+extern void typec_disable_auxadc_irq(struct typec_hba *hba);
 #endif
 
 #endif /* End of Header */

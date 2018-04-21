@@ -144,7 +144,9 @@ int xhci_mtk_add_ep_quirk(struct usb_hcd *hcd, struct usb_device *udev,
 		struct usb_host_endpoint *ep);
 void xhci_mtk_drop_ep_quirk(struct usb_hcd *hcd, struct usb_device *udev,
 		struct usb_host_endpoint *ep);
-
+extern void mtk_xhci_wakelock_lock(void);
+extern void mtk_xhci_wakelock_unlock(void);
+extern void enable_ipsleep_wakeup(void);
 #else
 static inline int xhci_mtk_add_ep_quirk(struct usb_hcd *hcd,
 	struct usb_device *udev, struct usb_host_endpoint *ep)
@@ -176,8 +178,9 @@ enum xhci_mtk_sram_id {
 };
 enum xhci_mtk_sram_state {
 	STATE_UNINIT = 0,
-	STATE_ALLOCATE_FAIL,
-	STATE_ALLOCATE_SUCCESS,
+	STATE_INIT,
+	STATE_USE,
+	STATE_NOMEM,
 };
 
 struct xhci_mtk_sram_block {

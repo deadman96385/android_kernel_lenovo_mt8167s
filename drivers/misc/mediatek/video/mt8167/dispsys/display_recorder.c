@@ -1044,29 +1044,29 @@ static struct logger_buffer dprec_logger_buffer[DPREC_LOGGER_PR_NUM] = {
 
 void get_disp_err_buffer(unsigned long *addr, unsigned long *size, unsigned long *start)
 {
-	*addr = (unsigned long)err_buffer;
-	*size = ERROR_BUFFER_COUNT * LOGGER_BUFFER_SIZE;
+	*addr = 0;
+	*size = 0;
 	*start = 0;
 }
 
 void get_disp_fence_buffer(unsigned long *addr, unsigned long *size, unsigned long *start)
 {
-	*addr = (unsigned long)fence_buffer;
-	*size = FENCE_BUFFER_COUNT * LOGGER_BUFFER_SIZE;
+	*addr = 0;
+	*size = 0;
 	*start = 0;
 }
 
 void get_disp_dbg_buffer(unsigned long *addr, unsigned long *size, unsigned long *start)
 {
-	*addr = (unsigned long)dbg_buffer;
-	*size = DEBUG_BUFFER_COUNT * LOGGER_BUFFER_SIZE;
+	*addr = 0;
+	*size = 0;
 	*start = 0;
 }
 
 void get_disp_dump_buffer(unsigned long *addr, unsigned long *size, unsigned long *start)
 {
-	*addr = (unsigned long)dump_buffer;
-	*size = DUMP_BUFFER_COUNT * LOGGER_BUFFER_SIZE;
+	*addr = 0;
+	*size = 0;
 	*start = 0;
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016 MICROTRUST Incorporated
+ * Copyright (c) 2015-2017 MICROTRUST Incorporated
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -21,27 +21,42 @@
 #include<linux/mm.h>
 #include<linux/sched.h>
 #include<linux/init.h>
-#include<linux/cdev.h>
-#include<asm/io.h>
-#include<asm/uaccess.h>
-#include<linux/semaphore.h>
-#include<linux/slab.h>
-#include"TEEI.h"
-#include "../tz_driver/include/teei_id.h"
+#include <linux/cdev.h>
+#include <linux/io.h>
+#include <linux/uaccess.h>
+#include <linux/semaphore.h>
+#include <linux/slab.h>
+#include "TEEI.h"
+#include "teei_id.h"
+#include "fp_vendor.h"
+#include "VFS.h"
+#include <linux/uaccess.h>
+#include "../tz_driver/include/backward_driver.h"
+#include "../tz_driver/include/teei_client_main.h"
+#include <imsg_log.h>
 
-#define VFS_SIZE        0x80000
-#define MEM_CLEAR       0x1
-#define VFS_MAJOR       253
+#define SEMA_INIT_ZERO	0
+#define VFS_SIZE	0x80000
+#define MEM_CLEAR	0x1
+#define VFS_MAJOR	253
+#define TEEI_IOC_MAGIC 'T'
+#define TEEI_CONFIG_IOC_MAGIC TEEI_IOC_MAGIC
 
-#define TEEI_CONFIG_IOC_MAGIC 0x775B777E
+#define TEEI_CONFIG_IOCTL_INIT_TEEI		_IOWR(TEEI_CONFIG_IOC_MAGIC, 3, int)
+#ifdef CONFIG_MICROTRUST_TUI_DRIVER
+#define SOTER_TUI_ENTER				    _IOWR(TEEI_CONFIG_IOC_MAGIC, 0x70, int)
+#define SOTER_TUI_LEAVE				    _IOWR(TEEI_CONFIG_IOC_MAGIC, 0x71, int)
+int enter_tui_flag;
+#else
+int enter_tui_flag;
+#endif
 
-#define TEEI_CONFIG_IOCTL_INIT_TEEI             _IOWR(TEEI_CONFIG_IOC_MAGIC, 3, int)
-#define SOTER_TUI_ENTER                         _IOWR(TEEI_CONFIG_IOC_MAGIC, 0x70, int)
-#define SOTER_TUI_LEAVE                         _IOWR(TEEI_CONFIG_IOC_MAGIC, 0x71, int)
+#define GET_FP_VENDOR_CMD				  _IOWR(TEEI_CONFIG_IOC_MAGIC, 0x80, int)
 
 static int vfs_major = VFS_MAJOR;
 static struct class *driver_class;
 static dev_t devno;
+
 
 struct vfs_dev {
 	struct cdev cdev;
@@ -49,45 +64,33 @@ struct vfs_dev {
 	struct semaphore sem;
 };
 
-extern struct completion global_down_lock;
-
-#ifdef MICROTRUST_TUI_DRIVER
-extern int display_enter_tui(void);
-extern int display_exit_tui(void);
-extern int primary_display_trigger(int blocking, void *callback, int need_merge);
-extern void mt_deint_leave(void);
-extern void mt_deint_restore(void);
-extern int tui_i2c_enable_clock(void);
-extern int tui_i2c_disable_clock(void);
-#endif
 
 #ifdef VFS_RDWR_SEM
 struct semaphore VFS_rd_sem;
-EXPORT_SYMBOL_GPL(VFS_rd_sem);
 
 struct semaphore VFS_wr_sem;
-EXPORT_SYMBOL_GPL(VFS_wr_sem);
 #else
 
 DECLARE_COMPLETION(VFS_rd_comp);
-EXPORT_SYMBOL_GPL(VFS_rd_comp);
 
 DECLARE_COMPLETION(VFS_wr_comp);
-EXPORT_SYMBOL_GPL(VFS_wr_comp);
 #endif
 
-struct vfs_dev *vfs_devp = NULL;
+struct vfs_dev *vfs_devp;
 
 int tz_vfs_open(struct inode *inode, struct file *filp)
 {
 	if (vfs_devp == NULL)
 		return -EINVAL;
 
+
 	if (filp == NULL)
 		return -EINVAL;
 
+
 	if (strcmp("teei_daemon", current->comm) != 0)
 		return -EINVAL;
+
 
 	filp->private_data = vfs_devp;
 	return 0;
@@ -100,51 +103,66 @@ int tz_vfs_release(struct inode *inode, struct file *filp)
 }
 
 static long tz_vfs_ioctl(struct file *filp,
-                         unsigned int cmd, unsigned long arg)
+			unsigned int cmd, unsigned long arg)
 {
 	int ret = 0;
+	int fp_vendor;
 
 	switch (cmd) {
-#ifdef MICROTRUST_TUI_DRIVER
-		case SOTER_TUI_ENTER:
-			pr_debug("***************SOTER_TUI_ENTER\n");
-			ret = tui_i2c_enable_clock();
-			if (ret)
-				pr_err("tui_i2c_enable_clock failed!!\n");
+#ifdef CONFIG_MICROTRUST_TUI_DRIVER
 
-			mt_deint_leave();
+	case SOTER_TUI_ENTER:
+		IMSG_DEBUG("***************SOTER_TUI_ENTER\n");
+		enter_tui_flag = 1;
+		ret = tui_i2c_enable_clock();
 
-			ret = display_enter_tui();
-			if (ret)
-				pr_err("display_enter_tui failed!!\n");
+		if (ret)
+			IMSG_ERROR("tui_i2c_enable_clock failed!!\n");
 
-			break;
 
-		case SOTER_TUI_LEAVE:
-			pr_debug("***************SOTER_TUI_LEAVE\n");
-			/*
-			ret = tui_i2c_disable_clock();
-			if(ret)
-			        pr_err("tui_i2c_disable_clock failed!!\n");
-			*/
-			mt_deint_restore();
+		mt_deint_leave();
 
-			ret = display_exit_tui();
-			if (ret)
-				pr_err("display_exit_tui failed!!\n");
-			/* primary_display_trigger(0, NULL, 0); */
+		ret = display_enter_tui();
 
-			break;
+		if (ret)
+			IMSG_ERROR("display_enter_tui failed!!\n");
+
+
+		break;
+
+	case SOTER_TUI_LEAVE:
+		IMSG_DEBUG("***************SOTER_TUI_LEAVE\n");
+		ret = tui_i2c_disable_clock();
+
+		if (ret)
+			IMSG_ERROR("tui_i2c_disable_clock failed!!\n");
+
+		mt_deint_restore();
+
+		ret = display_exit_tui();
+
+		if (ret)
+			IMSG_ERROR("display_exit_tui failed!!\n");
+
+		/* primary_display_trigger(0, NULL, 0); */
+		enter_tui_flag = 0;
+		break;
 #endif
-		default:
-			return -EINVAL;
+
+	case GET_FP_VENDOR_CMD:
+		fp_vendor = get_fp_vendor();
+		ret = copy_to_user((void *)arg, &fp_vendor, sizeof(int));
+		break;
+
+	default:
+		return -EINVAL;
 	}
 
 	return ret;
 }
 
 static ssize_t tz_vfs_read(struct file *filp, char __user *buf,
-                           size_t size, loff_t *ppos)
+		size_t size, loff_t *ppos)
 {
 	struct TEEI_vfs_command *vfs_p = NULL;
 	int length = 0;
@@ -153,35 +171,37 @@ static ssize_t tz_vfs_read(struct file *filp, char __user *buf,
 	if (buf == NULL)
 		return -EINVAL;
 
+
 	if (daulOS_VFS_share_mem == NULL)
 		return -EINVAL;
 
-	if ((0 > size) || (size > VFS_SIZE))
+
+	if (size > VFS_SIZE)
 		return -EINVAL;
 
-	/*pr_debug("read begin cpu[%d]\n",cpu_id);*/
+
+	/*IMSG_DEBUG("read begin cpu[%d]\n",cpu_id);*/
 #ifdef VFS_RDWR_SEM
 	down_interruptible(&VFS_rd_sem);
 #else
 	ret = wait_for_completion_interruptible(&VFS_rd_comp);
 
 	if (ret == -ERESTARTSYS) {
-		pr_debug("[%s][%d] ----------------wait_for_completion_interruptible_timeout interrupt----------------------- \n", __func__, __LINE__);
+		IMSG_DEBUG("[%s][%d] wait timeout interrupt\n",
+				__func__, __LINE__);
 		complete(&global_down_lock);
 		return ret;
 	}
+
 #endif
 
 	vfs_p = (struct TEEI_vfs_command *)daulOS_VFS_share_mem;
-
-#if 1
 
 	if (vfs_p->cmd_size > size)
 		length = size;
 	else
 		length = vfs_p->cmd_size;
 
-#endif
 
 	length = size;
 
@@ -189,26 +209,32 @@ static ssize_t tz_vfs_read(struct file *filp, char __user *buf,
 		ret = -EFAULT;
 	else
 		ret = length;
+
+
 	return ret;
 }
 
 static ssize_t tz_vfs_write(struct file *filp, const char __user *buf,
-                            size_t size, loff_t *ppos)
+			size_t size, loff_t *ppos)
 {
 	if (buf == NULL)
 		return -EINVAL;
 
+
 	if (daulOS_VFS_share_mem == NULL)
 		return -EINVAL;
 
-	if ((0 > size) || (size > VFS_SIZE))
+
+	if (size > VFS_SIZE)
 		return -EINVAL;
 
-	/*pr_debug("write begin cpu_id[%d]\n",cpu_id);*/
+	/*IMSG_DEBUG("write begin cpu_id[%d]\n",cpu_id);*/
 	if (copy_from_user((void *)daulOS_VFS_share_mem, buf, size))
 		return -EFAULT;
 
-	Flush_Dcache_By_Area((unsigned long)daulOS_VFS_share_mem, (unsigned long)daulOS_VFS_share_mem + size);
+
+	Flush_Dcache_By_Area((unsigned long)daulOS_VFS_share_mem,
+			(unsigned long)daulOS_VFS_share_mem + size);
 
 #ifdef VFS_RDWR_SEM
 	up(&VFS_wr_sem);
@@ -223,55 +249,55 @@ static loff_t tz_vfs_llseek(struct file *filp, loff_t offset, int orig)
 	loff_t ret = 0;
 
 	switch (orig) {
-		case 0:
-			if (offset < 0) {
-				ret = -EINVAL;
-				break;
-			}
-
-			if ((unsigned int)offset > VFS_SIZE) {
-				ret = -EINVAL;
-				break;
-			}
-
-			filp->f_pos = (unsigned int)offset;
-			ret = filp->f_pos;
-			break;
-
-		case 1:
-			if ((filp->f_pos + offset) > VFS_SIZE) {
-				ret = -EINVAL;
-				break;
-			}
-
-			if ((filp->f_pos + offset) < 0) {
-				ret = -EINVAL;
-				break;
-			}
-
-			filp->f_pos += offset;
-			ret = filp->f_pos;
-			break;
-
-		default:
+	case 0:
+		if (offset < 0) {
 			ret = -EINVAL;
 			break;
+		}
+
+		if ((unsigned int)offset > VFS_SIZE) {
+			ret = -EINVAL;
+			break;
+		}
+
+		filp->f_pos = (unsigned int)offset;
+		ret = filp->f_pos;
+		break;
+
+	case 1:
+		if ((filp->f_pos + offset) > VFS_SIZE) {
+			ret = -EINVAL;
+			break;
+		}
+
+		if ((filp->f_pos + offset) < 0) {
+			ret = -EINVAL;
+			break;
+		}
+
+		filp->f_pos += offset;
+		ret = filp->f_pos;
+		break;
+
+	default:
+		ret = -EINVAL;
+		break;
 	}
 
 	return ret;
 }
 
 static const struct file_operations vfs_fops = {
-	.owner =                THIS_MODULE,
-	.llseek =               tz_vfs_llseek,
-	.read =                 tz_vfs_read,
-	.write =                tz_vfs_write,
+	.owner =		THIS_MODULE,
+	.llseek =		tz_vfs_llseek,
+	.read =			tz_vfs_read,
+	.write =		tz_vfs_write,
 	.unlocked_ioctl = tz_vfs_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl   = tz_vfs_ioctl,
 #endif
-	.open =                 tz_vfs_open,
-	.release =              tz_vfs_release,
+	.open =			tz_vfs_open,
+	.release =		tz_vfs_release,
 };
 
 static void vfs_setup_cdev(struct vfs_dev *dev, int index)
@@ -284,16 +310,18 @@ static void vfs_setup_cdev(struct vfs_dev *dev, int index)
 	err = cdev_add(&dev->cdev, devno, 1);
 
 	if (err)
-		pr_err("Error %d adding socket %d.\n", err, index);
+		IMSG_ERROR("Error %d adding socket %d.\n", err, index);
+
 }
 
 
 
 
-int vfs_init(void)
+static int vfs_init(void)
 {
 	int result = 0;
 	struct device *class_dev = NULL;
+
 	devno = MKDEV(vfs_major, 0);
 
 	result = alloc_chrdev_region(&devno, 0, 1, "tz_vfs");
@@ -306,15 +334,16 @@ int vfs_init(void)
 
 	if (IS_ERR(driver_class)) {
 		result = -ENOMEM;
-		pr_err("class_create failed %d.\n", result);
+		IMSG_ERROR("class_create failed %d.\n", result);
 		goto unregister_chrdev_region;
 	}
 
-	class_dev = device_create(driver_class, NULL, devno, NULL, "tz_vfs");
+	class_dev = device_create(driver_class,
+						NULL, devno, NULL, "tz_vfs");
 
 	if (!class_dev) {
 		result = -ENOMEM;
-		pr_err("class_device_create failed %d.\n", result);
+		IMSG_ERROR("class_device_create failed %d.\n", result);
 		goto class_destroy;
 	}
 
@@ -330,8 +359,8 @@ int vfs_init(void)
 	sema_init(&vfs_devp->sem, 1);
 
 #ifdef VFS_RDWR_SEM
-	sema_init(&VFS_rd_sem, 0);
-	sema_init(&VFS_wr_sem, 0);
+	sema_init(&VFS_rd_sem, SEMA_INIT_ZERO);
+	sema_init(&VFS_wr_sem, SEMA_INIT_ZERO);
 #endif
 	goto return_fn;
 

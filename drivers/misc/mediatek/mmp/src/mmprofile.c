@@ -46,7 +46,7 @@
 #define MMPROFILE_INTERNAL
 #include <mmprofile_internal.h>
 
-#ifdef CONFIG_MTK_EXTMEM
+#ifdef CONFIG_MTK_USE_RESERVED_EXT_MEM
 #include <linux/exm_driver.h>
 #endif
 
@@ -307,7 +307,7 @@ static void mmprofile_init_buffer(void)
 		}
 		if (b_reset_ring_buffer) {
 			p_mmprofile_ring_buffer =
-#ifdef CONFIG_MTK_EXTMEM
+#ifdef CONFIG_MTK_USE_RESERVED_EXT_MEM
 			    (mmprofile_event_t *)
 			    extmem_malloc_page_align(mmprofile_globals.buffer_size_bytes);
 #else
@@ -329,7 +329,7 @@ static void mmprofile_init_buffer(void)
 		}
 		if (b_reset_meta_buffer) {
 			p_mmprofile_meta_buffer =
-#ifdef CONFIG_MTK_EXTMEM
+#ifdef CONFIG_MTK_USE_RESERVED_EXT_MEM
 			    (unsigned char *)
 			    extmem_malloc_page_align(mmprofile_globals.meta_buffer_size);
 #else
@@ -1149,6 +1149,76 @@ long mmprofile_log_meta_bitmap(mmp_event event, mmp_log_type type, mmp_metadata_
 }
 EXPORT_SYMBOL(mmprofile_log_meta_bitmap);
 
+long mmprofile_log_meta_yuv_bitmap(mmp_event event, mmp_log_type type, mmp_metadata_bitmap_t *p_meta_data)
+{
+	int ret = 0;
+
+	if (!mmprofile_globals.enable)
+		return 0;
+	if (event >= MMPROFILE_MAX_EVENT_COUNT)
+		return -3;
+	if (in_interrupt())
+		return 0;
+	if (event == MMP_INVALID_EVENT)
+		return 0;
+
+	if (bmmprofile_init_buffer && mmprofile_globals.start
+	    && (mmprofile_globals.event_state[event] & MMP_EVENT_STATE_ENABLED)) {
+		mmp_metadata_t meta_data;
+		char *p_src, *p_dst;
+		long pitch;
+
+		meta_data.data1 = p_meta_data->data1;
+		meta_data.data2 = p_meta_data->data2;
+		meta_data.data_type = MMPROFILE_META_RAW;
+		meta_data.size = p_meta_data->data_size;
+		meta_data.p_data = vmalloc(meta_data.size);
+		if (!meta_data.p_data)
+			return -1;
+		p_src = (char *)p_meta_data->p_data + p_meta_data->start_pos;
+		p_dst = (char *)((unsigned long)(meta_data.p_data));
+		pitch = p_meta_data->pitch;
+
+		if (pitch < 0)
+			((mmp_metadata_bitmap_t *) (meta_data.p_data))->pitch = -pitch;
+		if ((pitch > 0) && (p_meta_data->down_sample_x == 1)
+		    && (p_meta_data->down_sample_y == 1))
+			memcpy(p_dst, p_src, p_meta_data->data_size);
+		else {
+			unsigned int x, y, x0, y0;
+			unsigned int new_width, new_height, new_pitch;
+			unsigned int bpp = p_meta_data->bpp / 8;
+			unsigned int x_offset = p_meta_data->down_sample_x * 2;
+
+			new_width = (p_meta_data->width - 1) / p_meta_data->down_sample_x + 1;
+			new_height = (p_meta_data->height - 1) / p_meta_data->down_sample_y + 1;
+			new_pitch = new_width * bpp;
+			MMP_LOG(ANDROID_LOG_DEBUG, "n(%u,%u,%u),o(%u, %u,%d,%u) ", new_width,
+				new_height, new_pitch, p_meta_data->width, p_meta_data->height,
+				p_meta_data->pitch, p_meta_data->bpp);
+			for (y = 0, y0 = 0; y < p_meta_data->height;
+			     y0++, y += p_meta_data->down_sample_y) {
+				if (x_offset == 2)
+					memcpy(p_dst + new_pitch * y0,
+					       p_src + p_meta_data->pitch * y, p_meta_data->pitch);
+				else {
+					for (x = 0, x0 = 0; x < p_meta_data->width;
+					     x0 += 2, x += x_offset) {
+						memcpy(p_dst + new_pitch * y0 + x0 * bpp,
+						       p_src + p_meta_data->pitch * y + x * bpp,
+						       bpp * 2);
+					}
+				}
+			}
+			meta_data.size = new_pitch * new_height;
+		}
+		ret = mmprofile_log_meta(event, type, &meta_data);
+		vfree(meta_data.p_data);
+	}
+	return ret;
+}
+EXPORT_SYMBOL(mmprofile_log_meta_yuv_bitmap);
+
 /* Exposed APIs end */
 
 /* Debug FS begin */
@@ -1181,7 +1251,7 @@ static ssize_t mmprofile_dbgfs_start_read(struct file *file, char __user *buf, s
 static ssize_t mmprofile_dbgfs_start_write(struct file *file, const char __user *buf, size_t size,
 					   loff_t *ppos)
 {
-	unsigned int str;
+	unsigned int str = 0;
 	int start;
 	ssize_t ret;
 
@@ -1209,7 +1279,7 @@ static ssize_t mmprofile_dbgfs_enable_read(struct file *file, char __user *buf, 
 static ssize_t mmprofile_dbgfs_enable_write(struct file *file, const char __user *buf, size_t size,
 					    loff_t *ppos)
 {
-	unsigned int str;
+	unsigned int str = 0;
 	int enable;
 	ssize_t ret;
 
@@ -1507,8 +1577,26 @@ static long mmprofile_ioctl(struct file *file, unsigned int cmd, unsigned long a
 			mmp_metadata_t __user *p_meta_data_user;
 
 			retn = copy_from_user(&meta_log, p_meta_log_user, sizeof(mmprofile_metalog_t));
+			if (retn) {
+				pr_debug("[MMPROFILE]: copy_from_user failed! line:%d\n",
+				 __LINE__);
+				return -EFAULT;
+			}
 			p_meta_data_user = (mmp_metadata_t __user *)&(p_meta_log_user->meta_data);
 			retn = copy_from_user(&meta_data, p_meta_data_user, sizeof(mmp_metadata_t));
+
+			if (retn) {
+				pr_debug("[MMPROFILE]: copy_from_user failed! line:%d\n",
+				 __LINE__);
+				return -EFAULT;
+			}
+
+			if (meta_data.size == 0 || meta_data.size > 0x3000000) {
+				pr_debug("[MMPROFILE]: meta_data.size Invalid! line:%d\n",
+				 __LINE__);
+				return -EFAULT;
+			}
+
 			mmprofile_log_meta_int(meta_log.id, meta_log.type, &meta_data, 1);
 		}
 		break;
@@ -1752,16 +1840,24 @@ static long mmprofile_ioctl_compat(struct file *file, unsigned int cmd, unsigned
 
 			p_compat_meta_log_user = compat_ptr(arg);
 
-			retn = copy_from_user(&compat_meta_log, p_compat_meta_log_user,
-				sizeof(struct compat_mmprofile_metalog_t));
-			{
-				meta_log.id = compat_meta_log.id;
-				meta_log.type = compat_meta_log.type;
-				meta_log.meta_data.data1 = compat_meta_log.meta_data.data1;
-				meta_log.meta_data.data2 = compat_meta_log.meta_data.data2;
-				meta_log.meta_data.data_type = compat_meta_log.meta_data.data_type;
-				meta_log.meta_data.size = compat_meta_log.meta_data.size;
-				meta_log.meta_data.p_data = compat_ptr(compat_meta_log.meta_data.p_data);
+			if (copy_from_user(&compat_meta_log, p_compat_meta_log_user,
+				sizeof(struct compat_mmprofile_metalog_t))) {
+				pr_debug("[MMPROFILE]: copy_from_user failed! line:%d\n",
+				 __LINE__);
+				return -EFAULT;
+			}
+			meta_log.id = compat_meta_log.id;
+			meta_log.type = compat_meta_log.type;
+			meta_log.meta_data.data1 = compat_meta_log.meta_data.data1;
+			meta_log.meta_data.data2 = compat_meta_log.meta_data.data2;
+			meta_log.meta_data.data_type = compat_meta_log.meta_data.data_type;
+			meta_log.meta_data.size = compat_meta_log.meta_data.size;
+			meta_log.meta_data.p_data = compat_ptr(compat_meta_log.meta_data.p_data);
+
+			if (meta_log.meta_data.size == 0 || meta_log.meta_data.size > 0x3000000) {
+				pr_debug("[MMPROFILE]: meta_log.meta_data.size Invalid! line:%d\n",
+				 __LINE__);
+				return -EFAULT;
 			}
 			mmprofile_log_meta_int(meta_log.id, meta_log.type, &(meta_log.meta_data), 1);
 		}

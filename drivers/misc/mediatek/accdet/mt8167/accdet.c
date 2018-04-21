@@ -46,7 +46,12 @@ struct headset_mode_settings *cust_headset_settings;
 #define ACCDET_DEBUG(format, args...) pr_debug(format, ##args)
 #define ACCDET_INFO(format, args...) pr_notice(format, ##args)
 #define ACCDET_ERROR(format, args...) pr_err(format, ##args)
+#define JUST_INPUT_NO_SWITCH  0
+#if JUST_INPUT_NO_SWITCH
 static struct switch_dev accdet_data;
+#endif
+static void send_accdet_status_event(int cable_type, int status);
+
 static struct input_dev *kpd_accdet_dev;
 static struct cdev *accdet_cdev;
 static struct class *accdet_class;
@@ -157,6 +162,8 @@ static void accdet_write(unsigned int addr, unsigned int wdata)
 
 static inline void headset_plug_out(void)
 {
+	send_accdet_status_event(cable_type, 0);
+
 	accdet_status = PLUG_OUT;
 	cable_type = NO_DEVICE;
 	/*update the cable_type*/
@@ -165,7 +172,9 @@ static inline void headset_plug_out(void)
 		ACCDET_DEBUG(" [accdet] headset_plug_out send key = %d release\n", cur_key);
 		cur_key = 0;
 	}
+#if JUST_INPUT_NO_SWITCH
 	switch_set_state((struct switch_dev *)&accdet_data, cable_type);
+#endif
 	ACCDET_DEBUG(" [accdet] set state in cable_type = NO_DEVICE\n");
 
 }
@@ -281,33 +290,29 @@ static irqreturn_t accdet_eint_func(int irq, void *data)
 	ACCDET_INFO("[Accdet]cur_eint_state = %d\n", cur_eint_state);
 	ACCDET_INFO("[Accdet]current accdet_eint_type = %d\n", accdet_eint_type);
 
-	cur_eint_state = !cur_eint_state;
-
-	if (gpio_get_value(gpiopin)) {
-		ACCDET_INFO("%s: gpio_get_value %d = %d\n", __func__, gpiopin, gpio_get_value(gpiopin));
-		accdet_eint_type = IRQ_TYPE_LEVEL_LOW;
-	} else {
-		ACCDET_INFO("%s: gpio_get_value %d = %d\n", __func__, gpiopin, gpio_get_value(gpiopin));
-		accdet_eint_type = IRQ_TYPE_LEVEL_HIGH;
-	}
-
-	irq_set_irq_type(accdet_irq, accdet_eint_type);
-
 	if (cur_eint_state == EINT_PIN_PLUG_IN) {
-		gpio_set_debounce(gpiopin, accdet_dts_data.accdet_plugout_debounce * 1000);
-		ACCDET_INFO("[Accdet][After] cur_eint_state = %d\n", cur_eint_state);
-	} else{
+		if (accdet_eint_type == IRQ_TYPE_LEVEL_HIGH)
+			irq_set_irq_type(accdet_irq, IRQ_TYPE_LEVEL_HIGH);
+		else
+			irq_set_irq_type(accdet_irq, IRQ_TYPE_LEVEL_LOW);
 		gpio_set_debounce(gpiopin, headsetdebounce);
+		cur_eint_state = EINT_PIN_PLUG_OUT;
+	} else {
+		if (accdet_eint_type == IRQ_TYPE_LEVEL_HIGH)
+			irq_set_irq_type(accdet_irq, IRQ_TYPE_LEVEL_LOW);
+		else
+			irq_set_irq_type(accdet_irq, IRQ_TYPE_LEVEL_HIGH);
+
+		gpio_set_debounce(gpiopin, accdet_dts_data.accdet_plugout_debounce * 1000);
+		cur_eint_state = EINT_PIN_PLUG_IN;
+
 	}
-
-	ACCDET_INFO("[Accdet][After] cur_eint_state = %d\n", cur_eint_state);
-	ACCDET_INFO("[Accdet][After] accdet_eint_type = %d\n", accdet_eint_type);
-
 	disable_irq_nosync(accdet_irq);
+	ACCDET_DEBUG("[Accdet]accdet_eint_func after cur_eint_state=%d\n", cur_eint_state);
 
 	queue_work(accdet_eint_workqueue, &accdet_eint_work);
-
 	return IRQ_HANDLED;
+
 }
 
 
@@ -329,6 +334,7 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 {
 	struct device_node *node = NULL;
 	int ret;
+	int trigger_type = 0;
 
 	ACCDET_INFO("[Accdet]accdet_setup_eint\n");
 
@@ -345,11 +351,14 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 		accdet_irq = irq_of_parse_and_map(node, 1);
 		ACCDET_DEBUG("[accdet]accdet_irq=%d\n", accdet_irq);
 
+		trigger_type = irq_get_trigger_type(accdet_irq);
+		ACCDET_ERROR("[Accdet]triger type = %d\n", trigger_type);
+		accdet_eint_type = trigger_type;
+
 		gpiopin = of_get_named_gpio(node, "accdet-gpio", 0);
 		if (gpiopin < 0)
 			ACCDET_ERROR("[Accdet] not find accdet-gpio\n");
 		headsetdebounce = accdet_dts_data.eint_debounce;
-
 		ret = gpio_request(gpiopin, "accdet-gpio");
 		if (ret)
 			ACCDET_ERROR("gpio_request fail, ret(%d)\n", ret);
@@ -403,6 +412,29 @@ static int key_check(int b)
 	ACCDET_DEBUG("[accdet] leave key_check!!\n");
 	return NO_KEY;
 }
+
+
+static void send_accdet_status_event(int cable_type, int status)
+{
+	switch (cable_type) {
+	case HEADSET_NO_MIC:
+		input_report_switch(kpd_accdet_dev, SW_HEADPHONE_INSERT, status);
+		input_report_switch(kpd_accdet_dev, SW_JACK_PHYSICAL_INSERT, status);
+		input_sync(kpd_accdet_dev);
+		ACCDET_DEBUG("[Accdet]HEADSET_NO_MIC(3-pole) %s\n", status?"PlugIn":"PlugOut");
+		break;
+	case HEADSET_MIC:
+		input_report_switch(kpd_accdet_dev, SW_HEADPHONE_INSERT, status);
+		input_report_switch(kpd_accdet_dev, SW_MICROPHONE_INSERT, status);
+		input_report_switch(kpd_accdet_dev, SW_JACK_PHYSICAL_INSERT, status);
+		input_sync(kpd_accdet_dev);
+		ACCDET_DEBUG("[Accdet]HEADSET_MIC(4-pole) %s\n", status?"PlugIn":"PlugOut");
+		break;
+	default:
+		ACCDET_DEBUG("[Accdet]Invalid cableType\n");
+	}
+}
+
 
 static void send_key_event(int keycode, int flag)
 {
@@ -839,10 +871,16 @@ static void accdet_work_callback(struct work_struct *work)
 	check_cable_type();
 
 	mutex_lock(&accdet_eint_irq_sync_mutex);
-	if (eint_accdet_sync_flag == 1)
+	if (eint_accdet_sync_flag == 1) {
+		ACCDET_DEBUG("%s %d\n", __func__, __LINE__);
+		send_accdet_status_event(cable_type, 1);
+
+#if JUST_INPUT_NO_SWITCH
 		switch_set_state((struct switch_dev *)&accdet_data, cable_type);
-	else
+#endif
+	} else {
 		ACCDET_DEBUG("[Accdet] Headset has plugged out don't set accdet state\n");
+	}
 	mutex_unlock(&accdet_eint_irq_sync_mutex);
 
 	ACCDET_DEBUG(" [accdet] set state in cable_type  status\n");
@@ -895,7 +933,7 @@ void accdet_set_four_key_threshold(void)
 {
 	int GE, OE, Code7, Code6;
 	int mid_key_four_code, voice_key_four_code, up_key_four_code, down_key_four_code;
-	double R1, ratio_mid, ratio_voice, ratio_up, ratio_down;
+	int ratio_tmp, ratio_tmp2;
 
 	ACCDET_DEBUG("[ACCDET] 0x10009188 = 0x%x\n", get_devinfo_with_index(62));
 	GE = (get_devinfo_with_index(62) >> 11) & 0xFFF;
@@ -915,7 +953,8 @@ void accdet_set_four_key_threshold(void)
 	ACCDET_DEBUG("[ACCDET] Code7 0x%x = %d\n", Code7, Code7);
 	ACCDET_DEBUG("[ACCDET] Code6 0x%x = %d\n", Code6, Code6);
 
-	R1 = (double)((Code7 - (OE - 512)) / (Code6 - (OE - 512)));
+	ratio_tmp = Code7 - (OE - 512);
+	ratio_tmp2 = Code6 - (OE - 512);
 
 	/*
 	 *	Calculate four-key threshold for different MICBIAS1 voltage
@@ -928,38 +967,38 @@ void accdet_set_four_key_threshold(void)
 	switch (accdet_dts_data.mic_mode_vol) {
 	case 0:
 		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 2.5V!\n");
-		ratio_mid = 2.5 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
-		ratio_voice = 2.5 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
-		ratio_up = 2.5 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
-		ratio_down = 2.5 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
+		mid_key_four_code = 23 * (2048 + GE) * ratio_tmp / (152 * ratio_tmp2) + (OE - 512);
+		voice_key_four_code = 48 * (2048 + GE) * ratio_tmp / (152 * ratio_tmp2) + (OE - 512);
+		up_key_four_code = 55 * (2048 + GE) * ratio_tmp / (114 * ratio_tmp2) + (OE - 512);
+		down_key_four_code = 125 * (2048 + GE) * ratio_tmp / (114 * ratio_tmp2) + (OE - 512);
 		break;
 	case 1:
 		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 2.2V!\n");
-		ratio_mid = 2.2 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
-		ratio_voice = 2.2 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
-		ratio_up = 2.2 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
-		ratio_down = 2.2 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
+		mid_key_four_code = 253 * (2048 + GE) * ratio_tmp / (1900 * ratio_tmp2) + (OE - 512);
+		voice_key_four_code = 132 * (2048 + GE) * ratio_tmp / (475 * ratio_tmp2) + (OE - 512);
+		up_key_four_code = 121 * (2048 + GE) * ratio_tmp / (285 * ratio_tmp2) + (OE - 512);
+		down_key_four_code = 55 * (2048 + GE) * ratio_tmp / (57 * ratio_tmp2) + (OE - 512);
 		break;
 	case 2:
 		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 2.1V!\n");
-		ratio_mid = 2.1 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
-		ratio_voice = 2.1 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
-		ratio_up = 2.1 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
-		ratio_down = 2.1 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
+		mid_key_four_code = 7*69 * (2048 + GE) * ratio_tmp / (3800 * ratio_tmp2) + (OE - 512);
+		voice_key_four_code = 126 * (2048 + GE) * ratio_tmp / (475 * ratio_tmp2) + (OE - 512);
+		up_key_four_code = 154 * (2048 + GE) * ratio_tmp / (380 * ratio_tmp2) + (OE - 512);
+		down_key_four_code = 105 * (2048 + GE) * ratio_tmp / (114 * ratio_tmp2) + (OE - 512);
 		break;
 	case 3:
 		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 2.0V!\n");
-		ratio_mid = 2.0 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
-		ratio_voice = 2.0 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
-		ratio_up = 2.0 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
-		ratio_down = 2.0 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
+		mid_key_four_code = 23 * (2048 + GE) * ratio_tmp / (190 * ratio_tmp2) + (OE - 512);
+		voice_key_four_code = 24 * (2048 + GE) * ratio_tmp / (95 * ratio_tmp2) + (OE - 512);
+		up_key_four_code = 22 * (2048 + GE) * ratio_tmp / (57 * ratio_tmp2) + (OE - 512);
+		down_key_four_code = 50 * (2048 + GE) * ratio_tmp / (57 * ratio_tmp2) + (OE - 512);
 		break;
 	case 4:
 		ACCDET_INFO("[ACCDET] MICBIAS1 Voltage is 1.9V!\n");
-		ratio_mid = 1.9 / 1.9 * 0.069 * R1 * 2.5 / 1.5;
-		ratio_voice = 1.9 / 1.9 * 0.144 * R1 * 2.5 / 1.5;
-		ratio_up = 1.9 / 1.9 * 0.22 * R1 * 2.5 / 1.5;
-		ratio_down = 1.9 / 1.9 * 0.5 * R1 * 2.5 / 1.5;
+		mid_key_four_code = 23 * (2048 + GE) * ratio_tmp / (200 * ratio_tmp2) + (OE - 512);
+		voice_key_four_code = 24 * (2048 + GE) * ratio_tmp / (100 * ratio_tmp2) + (OE - 512);
+		up_key_four_code = 11 * (2048 + GE) * ratio_tmp / (30 * ratio_tmp2) + (OE - 512);
+		down_key_four_code = 5 * (2048 + GE) * ratio_tmp / (6 * ratio_tmp2) + (OE - 512);
 		break;
 	default:
 		ACCDET_ERROR("[ACCDET] Unsupported MICBIAS1 voltage!!!\n");
@@ -972,22 +1011,18 @@ void accdet_set_four_key_threshold(void)
 		OE = 512;
 	}
 
-	mid_key_four_code = ratio_mid * (4096 + GE - 2048) + (OE - 512);
 	mid_key_four = mid_key_four_code * 1500 / 4096;
 	ACCDET_INFO("[ACCDET] mid_key_four_code = %d\n", mid_key_four_code);
 	ACCDET_INFO("[ACCDET] mid_key_four = %d mV\n", mid_key_four);
 
-	voice_key_four_code = (ratio_voice * (4096 + GE - 2048) + (OE - 512));
 	voice_key_four  = voice_key_four_code * 1500 / 4096;
 	ACCDET_INFO("[ACCDET] voice_key_four_code = %d\n", voice_key_four_code);
 	ACCDET_INFO("[ACCDET] voice_key_four = %d mV\n", voice_key_four);
 
-	up_key_four_code = (ratio_up * (4096 + GE - 2048) + (OE - 512));
 	up_key_four  = up_key_four_code * 1500 / 4096;
 	ACCDET_INFO("[ACCDET] up_key_four_code = %d\n", up_key_four_code);
 	ACCDET_INFO("[ACCDET] up_key_four = %d mV\n", up_key_four);
 
-	down_key_four_code = (ratio_down * (4096 + GE - 2048) + (OE - 512));
 	down_key_four  = down_key_four_code * 1500 / 4096;
 	ACCDET_INFO("[ACCDET] down_key_four_code = %d\n", down_key_four_code);
 	ACCDET_INFO("[ACCDET] down_key_four = %d mV\n", down_key_four);
@@ -1044,9 +1079,6 @@ static ssize_t accdet_store_call_state(struct device_driver *ddri, const char *b
 		break;
 	case CALL_ACTIVE:
 		ACCDET_DEBUG("[Accdet]accdet call: active or hold state!\n");
-		ACCDET_DEBUG("[Accdet]accdet_ioctl : Button_Status=%d (state:%d)\n",
-			button_status, accdet_data.state);
-		/*return button_status;*/
 		break;
 	default:
 		ACCDET_DEBUG("[Accdet]accdet call : Invalid values\n");
@@ -1138,6 +1170,20 @@ static ssize_t store_accdet_dump_register(struct device_driver *ddri, const char
 	return count;
 }
 
+static ssize_t show_accdet_state(struct device_driver *ddri, char *buf)
+{
+	char temp_type = (char)cable_type;
+
+	if (buf == NULL) {
+		ACCDET_ERROR("[%s] *buf is NULL Pointer\n",  __func__);
+		return -EINVAL;
+	}
+
+	snprintf(buf, 3, "%d\n", temp_type);
+
+	return strlen(buf);
+}
+
 /*----------------------------------------------------------------------------*/
 static DRIVER_ATTR(dump_register, S_IWUSR | S_IRUGO, NULL, store_accdet_dump_register);
 
@@ -1145,12 +1191,16 @@ static DRIVER_ATTR(set_headset_mode, S_IWUSR | S_IRUGO, NULL, store_accdet_set_h
 
 static DRIVER_ATTR(start_debug, S_IWUSR | S_IRUGO, NULL, store_accdet_start_debug_thread);
 
+static DRIVER_ATTR(state, S_IWUSR | S_IRUGO, show_accdet_state, NULL);
+
+
 /*----------------------------------------------------------------------------*/
 static struct driver_attribute *accdet_attr_list[] = {
 	&driver_attr_start_debug,
 	&driver_attr_set_headset_mode,
 	&driver_attr_dump_register,
 	&driver_attr_accdet_call_state,
+	&driver_attr_state,
 	/*#ifdef CONFIG_ACCDET_PIN_RECOGNIZATION*/
 	&driver_attr_accdet_pin_recognition,
 	/*#endif*/
@@ -1162,8 +1212,8 @@ static struct driver_attribute *accdet_attr_list[] = {
 static int accdet_create_attr(struct device_driver *driver)
 {
 	int idx, err = 0;
-	int num = (int)(ARRAY_SIZE(accdet_attr_list) / sizeof(accdet_attr_list[0]));
-
+	int num = (int)ARRAY_SIZE(accdet_attr_list);
+	/*int num = (int)(ARRAY_SIZE(accdet_attr_list) / sizeof(accdet_attr_list[0]));*/
 	if (driver == NULL)
 		return -EINVAL;
 	for (idx = 0; idx < num; idx++) {
@@ -1213,14 +1263,17 @@ int mt_accdet_probe(struct platform_device *dev)
 	/*
 	 * below register accdet as switch class
 	 */
+#if JUST_INPUT_NO_SWITCH
 	accdet_data.name = "h2w";
 	accdet_data.index = 0;
 	accdet_data.state = NO_DEVICE;
 	ret = switch_dev_register(&accdet_data);
+
 	if (ret) {
 		ACCDET_ERROR("[Accdet]switch_dev_register returned:%d!\n", ret);
 		return 1;
 	}
+#endif
 	/*
 	 * Create normal device for auido use
 	 */
@@ -1264,6 +1317,12 @@ int mt_accdet_probe(struct platform_device *dev)
 	__set_bit(KEY_STOPCD, kpd_accdet_dev->keybit);
 	__set_bit(KEY_VOLUMEDOWN, kpd_accdet_dev->keybit);
 	__set_bit(KEY_VOLUMEUP, kpd_accdet_dev->keybit);
+
+	__set_bit(EV_SW, kpd_accdet_dev->evbit);
+	__set_bit(SW_HEADPHONE_INSERT, kpd_accdet_dev->swbit);
+	__set_bit(SW_MICROPHONE_INSERT, kpd_accdet_dev->swbit);
+	__set_bit(SW_JACK_PHYSICAL_INSERT, kpd_accdet_dev->swbit);
+	__set_bit(SW_LINEOUT_INSERT, kpd_accdet_dev->swbit);
 
 	kpd_accdet_dev->id.bustype = BUS_HOST;
 	kpd_accdet_dev->name = "ACCDET";
@@ -1332,7 +1391,9 @@ void mt_accdet_remove(void)
 	destroy_workqueue(accdet_eint_workqueue);
 #endif
 	destroy_workqueue(accdet_workqueue);
+#if JUST_INPUT_NO_SWITCH
 	switch_dev_unregister(&accdet_data);
+#endif
 	device_del(accdet_nor_device);
 	class_destroy(accdet_class);
 	cdev_del(accdet_cdev);
@@ -1385,20 +1446,25 @@ void mt_accdet_pm_restore_noirq(void)
 	case 0:		/*AB=0*/
 		cable_type = HEADSET_NO_MIC;
 		accdet_status = HOOK_SWITCH;
+		send_accdet_status_event(cable_type, 1);
 		break;
 	case 1:		/*AB=1*/
 		cable_type = HEADSET_MIC;
 		accdet_status = MIC_BIAS;
+		send_accdet_status_event(cable_type, 1);
 		break;
 	case 3:		/*AB=3*/
 		cable_type = NO_DEVICE;
 		accdet_status = PLUG_OUT;
+		send_accdet_status_event(cable_type, 0);
 		break;
 	default:
 		ACCDET_DEBUG("[Accdet]accdet_pm_restore_noirq: accdet current status error!\n");
 		break;
 	}
+#if JUST_INPUT_NO_SWITCH
 	switch_set_state((struct switch_dev *)&accdet_data, cable_type);
+#endif
 	if (cable_type == NO_DEVICE) {
 		/*disable accdet*/
 		pre_state_swctrl = accdet_read(ACCDET_STATE_SWCTRL);
@@ -1420,7 +1486,6 @@ long mt_accdet_unlocked_ioctl(unsigned int cmd, unsigned long arg)
 		ACCDET_DEBUG("[Accdet]accdet_ioctl : CALL_STATE=%d\n", call_status);
 		break;
 	case GET_BUTTON_STATUS:
-		ACCDET_DEBUG("[Accdet]accdet_ioctl : Button_Status=%d (state:%d)\n", button_status, accdet_data.state);
 		return button_status;
 	default:
 		ACCDET_DEBUG("[Accdet]accdet_ioctl : default\n");

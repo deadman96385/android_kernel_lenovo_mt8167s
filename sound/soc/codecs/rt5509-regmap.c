@@ -5,10 +5,14 @@
  *  Copyright (C) 2015 Richtek Technology Corp.
  *  cy_huang <cy_huang@richtek.com>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License version 2 as
+ *  published by the Free Software Foundation.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *  See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
 #include <linux/module.h>
@@ -208,6 +212,7 @@ RT_REG_DECL(RT5509_REG_TDM_CTRL, 1, RT_VOLATILE, {0x3f});
 RT_REG_DECL(RT5509_REG_ECO_CTRL, 1, RT_VOLATILE, {0x01});
 RT_REG_DECL(RT5509_REG_BSTTM, 1, RT_VOLATILE, {});
 RT_REG_DECL(RT5509_REG_ALCMINGAIN, 1, RT_VOLATILE, {});
+RT_REG_DECL(RT5509_REG_RESVECO0, 1, RT_VOLATILE, {});
 RT_REG_DECL(RT5509_REG_OTPCONF, 1, RT_VOLATILE, {});
 RT_REG_DECL(RT5509_REG_OTPDIN, 3, RT_VOLATILE, {});
 RT_REG_DECL(RT5509_REG_VBG_TRIM, 1, RT_VOLATILE, {0x1f});
@@ -445,6 +450,7 @@ static const rt_register_map_t rt5509_regmap[] = {
 	RT_REG(RT5509_REG_ECO_CTRL),
 	RT_REG(RT5509_REG_BSTTM),
 	RT_REG(RT5509_REG_ALCMINGAIN),
+	RT_REG(RT5509_REG_RESVECO0),
 	RT_REG(RT5509_REG_OTPCONF),
 	RT_REG(RT5509_REG_OTPDIN),
 	RT_REG(RT5509_REG_VBG_TRIM),

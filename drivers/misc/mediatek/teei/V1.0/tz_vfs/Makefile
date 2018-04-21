@@ -1,4 +1,4 @@
-# Copyright (c) 2015-2016 MICROTRUST Incorporated
+# Copyright (c) 2015-2017 MICROTRUST Incorporated
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or
@@ -10,5 +10,6 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 
-obj-$(CONFIG_MICROTRUST_VFS_DRIVER) += vfsFun.o
-EXTRA_CFLAGS += -D DEBUG_DO -fno-pic
+obj-$(CONFIG_MICROTRUST_VFS_DRIVER) += vfsFun.o fp_vendor.o
+ccflags-y += -DDEBUG_DO -fno-pic -DIMSG_TAG='"[tz_vfs]"'
+ccflags-y += -Wall -Werror

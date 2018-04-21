@@ -222,6 +222,14 @@ enum {
 	BY_MON_ERROR	= BIT(2),
 };
 
+#ifdef CONFIG_MTK_RAM_CONSOLE
+enum ptp_state {
+	PTP_CPU_BIG_IS_SET_VOLT = 0,    /* B */
+	PTP_GPU_IS_SET_VOLT = 1,        /* G */
+	PTP_CPU_LITTLE_IS_SET_VOLT = 2, /* L */
+};
+#endif
+
 #ifdef CONFIG_OF
 
 void __iomem *ptpod_base;
@@ -275,6 +283,9 @@ int ptpod_phy_base;
 
 #define PERCENT(numerator, denominator)	\
 	(unsigned char)(((numerator) * 100 + (denominator) - 1) / (denominator))
+
+#define PERCENT_U64(numerator, denominator)	\
+	(unsigned char)(div_u64(((numerator) * 100 + (denominator) - 1), (denominator)))
 
 static int ptp_log_en;
 static int is_ptp_initializing;
@@ -509,7 +520,7 @@ struct ptp_det {
 	unsigned long ptp_dvfs_min_freq_khz;
 
 	unsigned char freq_table_percent[NR_FREQ]; /* percentage to maximum freq */
-	unsigned long freq_table[NR_FREQ];     /* in KHz */
+	u64 freq_table[NR_FREQ];     /* in KHz */
 	int volt_table[NR_FREQ]; /* signed-off volt table in uVolt */
 
 	unsigned int volt_tbl[NR_FREQ]; /* pmic value */
@@ -1158,11 +1169,11 @@ static void base_ops_set_phase(struct ptp_det *det, enum ptp_phase phase)
 	FUNC_EXIT(FUNC_LV_HELP);
 }
 
+#ifdef CONFIG_THERMAL
 static int base_ops_get_temp(struct ptp_det *det)
 {
 	int temperature = -1;
 
-#ifdef CONFIG_THERMAL
 	if (det_to_id(det) == PTP_DET_MCUSYS) {
 		/* TS1 temp */
 		temperature = get_immediate_ts1_wrap();
@@ -1172,12 +1183,16 @@ static int base_ops_get_temp(struct ptp_det *det)
 		temperature = get_immediate_ts3_wrap();
 #endif
 	}
-#else
-	temperature = 25000;
-#endif
 
 	return temperature;
 }
+#else
+static int base_ops_get_temp(struct ptp_det *det)
+{
+	return (int)25000;
+}
+#endif
+
 
 static int base_ops_get_volt(struct ptp_det *det)
 {
@@ -1284,10 +1299,10 @@ static void get_freq_volt_table_cpu(struct ptp_det *det)
 
 		det->freq_table[i] = rate;
 		det->volt_table[i] = dev_pm_opp_get_voltage(opp);
-		det->freq_table_percent[i] = PERCENT(det->freq_table[i], det->freq_base);
+		det->freq_table_percent[i] = PERCENT_U64(det->freq_table[i], det->freq_base);
 
 		if (ptp_log_en)
-			ptp_error("cpu: freq_table[%d] = %ld, volt_table[%d] = %d, freq_percent[%d] = %d\n",
+			ptp_error("cpu: freq_table[%d] = %llu, volt_table[%d] = %d, freq_percent[%d] = %d\n",
 					i, det->freq_table[i], i, det->volt_table[i], i, det->freq_table_percent[i]);
 	}
 	rcu_read_unlock();
@@ -1432,12 +1447,28 @@ static int ptp_volt_thread_handler(void *data)
 {
 	struct ptp_ctrl *ctrl = (struct ptp_ctrl *)data;
 	struct ptp_det *det = id_to_ptp_det(ctrl->det_id);
+#ifdef CONFIG_MTK_RAM_CONSOLE
+	int ptp_status_temp = -1;
+#endif
 
 	FUNC_ENTER(FUNC_LV_HELP);
 
 	do {
 		wait_event_interruptible(ctrl->wq, ctrl->volt_update);
-
+#ifdef CONFIG_MTK_RAM_CONSOLE
+		/* update set volt status for this bank */
+		switch (det->ctrl_id) {
+		case PTP_CTRL_MCUSYS:
+			aee_rr_rec_ptp_status(aee_rr_curr_ptp_status() |
+				(1 << PTP_CPU_LITTLE_IS_SET_VOLT));
+			ptp_status_temp = PTP_CPU_LITTLE_IS_SET_VOLT;
+			break;
+		default:
+			ptp_error("%s: %u, wrong ctrl_id = %d\n",
+				__func__, __LINE__, det->ctrl_id);
+			break;
+		}
+#endif
 		if ((ctrl->volt_update & PTP_VOLT_UPDATE) && det->ops->set_volt)
 			det->ops->set_volt(det);
 
@@ -1445,6 +1476,13 @@ static int ptp_volt_thread_handler(void *data)
 			det->ops->restore_default_volt(det);
 
 		ctrl->volt_update = PTP_VOLT_NONE;
+
+#ifdef CONFIG_MTK_RAM_CONSOLE
+		/* clear out set volt status for this bank */
+		if (ptp_status_temp >= 0)
+			aee_rr_rec_ptp_status(aee_rr_curr_ptp_status() &
+				~(1 << ptp_status_temp));
+#endif
 
 	} while (!kthread_should_stop());
 
@@ -1540,8 +1578,8 @@ static int limit_mcusys_env(struct ptp_det *det)
 			(!det->ptp_dvfs_max_freq_khz || !det->ptp_dvfs_min_freq_khz)) {
 
 			/* seem no need ? det->volt_tbl_pmic[opp_index] = det->VBOOT; */
-			det->ptp_dvfs_max_freq_khz = det->freq_table[opp_index] / 1000;
-			det->ptp_dvfs_min_freq_khz = det->freq_table[opp_index] / 1000;
+			det->ptp_dvfs_max_freq_khz = div_u64(det->freq_table[opp_index], 1000);
+			det->ptp_dvfs_min_freq_khz = div_u64(det->freq_table[opp_index], 1000);
 			ret = dev_pm_opp_adjust_voltage(det->dev, det->freq_table[opp_index], u_vboot);
 			if (ret) {
 				ptp_error("Fail dev_pm_opp_adjust_voltage(), ret = %d\n", ret);
@@ -1682,9 +1720,13 @@ static void ptp_init_det_done(struct ptp_det *det)
 static void ptp_set_ptp_volt(struct ptp_det *det)
 {
 #if SET_PMIC_VOLT
-	int i, cur_temp, low_temp_offset;
+	int cur_temp, low_temp_offset, dvfs_index;
 	unsigned int clamp_signed_off_vmax;
 	struct ptp_ctrl *ctrl = id_to_ptp_ctrl(det->ctrl_id);
+#ifdef CONFIG_MTK_RAM_CONSOLE
+	unsigned long long temp_long;
+	unsigned long long temp_cur = (unsigned long long)aee_rr_curr_ptp_temp();
+#endif
 
 	cur_temp = det->ops->get_temp(det);
 
@@ -1697,13 +1739,36 @@ static void ptp_set_ptp_volt(struct ptp_det *det)
 		low_temp_offset = 0;
 
 	/* all scale of volt_tbl_pmic,volt_tbl,volt_offset are pmic value */
-	for (i = 0; i < det->num_freq_tbl; i++) {
-		clamp_signed_off_vmax = PTP_VOLT_TO_PMIC_VAL(det->volt_table[i]);
-		det->volt_tbl_pmic[i] =
-			clamp(det->volt_tbl[i] + det->volt_offset + low_temp_offset,
+	for (dvfs_index = 0; dvfs_index < det->num_freq_tbl; dvfs_index++) {
+		clamp_signed_off_vmax = PTP_VOLT_TO_PMIC_VAL(det->volt_table[dvfs_index]);
+		det->volt_tbl_pmic[dvfs_index] =
+			clamp(det->volt_tbl[dvfs_index] + det->volt_offset + low_temp_offset,
 					(det->VMIN + PTPOD_PMIC_OFFSET), clamp_signed_off_vmax);
 	}
+#ifdef CONFIG_MTK_RAM_CONSOLE
+	switch (det->ctrl_id) {
+	case PTP_CTRL_MCUSYS:
+		/* update AEE temperature */
+		temp_long = (unsigned long long) (cur_temp / 1000);
+		if (temp_long != 0) {
+			aee_rr_rec_ptp_temp(temp_long << (8 * PTP_CPU_LITTLE_IS_SET_VOLT) |
+				(temp_cur & ~((unsigned long long)0xFF <<
+					(8 * PTP_CPU_LITTLE_IS_SET_VOLT))));
+		}
 
+		/* update AEE voltage */
+		for (dvfs_index = 0; dvfs_index < NR_FREQ; dvfs_index++) {
+			aee_rr_rec_ptp_cpu_little_volt(
+				((unsigned long long)(det->volt_tbl_pmic[dvfs_index])
+					<< (8 * dvfs_index)) | (aee_rr_curr_ptp_cpu_little_volt()
+						& ~((unsigned long long)(0xFF) << (8 * dvfs_index))));
+		}
+		break;
+	default:
+		ptp_error("%s: %u, wrong ctrl_id = %d\n", __func__, __LINE__, det->ctrl_id);
+		break;
+	}
+#endif
 	ctrl->volt_update |= PTP_VOLT_UPDATE;
 	wake_up_interruptible(&ctrl->wq);
 #endif
@@ -2269,6 +2334,12 @@ static int ptp_init01(struct ptp_det *det, struct ptp_ctrl *ctrl)
 	if (ptp_log_en)
 		ptp_info("@%s(), get_volt(%s) = 0x%08X, VBOOT = 0x%08X\n",
 			__func__, det->name, vboot, det->VBOOT);
+#ifdef CONFIG_MTK_RAM_CONSOLE
+	/* record vboot of this bank */
+	aee_rr_rec_ptp_vboot(((unsigned long long)(vboot) << (8 * det->ctrl_id)) |
+		(aee_rr_curr_ptp_vboot() & ~((unsigned long long)(0xFF) << (8 * det->ctrl_id))));
+#endif
+
 	if (vboot != det->VBOOT) {
 		ptp_error("@%s():%d, get_volt(%s) = 0x%08X, VBOOT = 0x%08X\n",
 			__func__, __LINE__, det->name, vboot, det->VBOOT);
@@ -2378,18 +2449,19 @@ unsigned int leakage_sram1;
 
 void get_devinfo(struct ptp_devinfo *p)
 {
-	int *PTPOD = (int *)p;
+	int *M_HW_RES = (int *)p;
+	int array_index;
 
 	FUNC_ENTER(FUNC_LV_HELP);
 
 #if 1
-	PTPOD[0] = get_devinfo_with_index(67);
-	PTPOD[1] = get_devinfo_with_index(68);
-	PTPOD[2] = get_devinfo_with_index(69);
-	PTPOD[3] = get_devinfo_with_index(70);
-	PTPOD[4] = get_devinfo_with_index(71);
-	PTPOD[5] = get_devinfo_with_index(72);
-	PTPOD[6] = get_devinfo_with_index(73);
+	M_HW_RES[0] = get_devinfo_with_index(67);
+	M_HW_RES[1] = get_devinfo_with_index(68);
+	M_HW_RES[2] = get_devinfo_with_index(69);
+	M_HW_RES[3] = get_devinfo_with_index(70);
+	M_HW_RES[4] = get_devinfo_with_index(71);
+	M_HW_RES[5] = get_devinfo_with_index(72);
+	M_HW_RES[6] = get_devinfo_with_index(73);
 #else
 	PTPOD[0] = 0x10BD3C1B;
 	PTPOD[1] = 0x005500FF;
@@ -2399,15 +2471,19 @@ void get_devinfo(struct ptp_devinfo *p)
 	PTPOD[5] = 0x00000000;
 	PTPOD[6] = 0x00000000;
 #endif
+#ifdef CONFIG_MTK_RAM_CONSOLE
+	aee_rr_rec_ptp_e0((unsigned int)M_HW_RES[0]);
+	aee_rr_rec_ptp_e1((unsigned int)M_HW_RES[1]);
+	aee_rr_rec_ptp_e2((unsigned int)M_HW_RES[2]);
+	aee_rr_rec_ptp_e3((unsigned int)M_HW_RES[3]);
+	aee_rr_rec_ptp_e4((unsigned int)M_HW_RES[4]);
+	aee_rr_rec_ptp_e5((unsigned int)M_HW_RES[5]);
+	aee_rr_rec_ptp_e6((unsigned int)M_HW_RES[6]);
+#endif
 
 	if (ptp_log_en) {
-		ptp_info("PTPOD[0]=0x%08X\n", PTPOD[0]);
-		ptp_info("PTPOD[1]=0x%08X\n", PTPOD[1]);
-		ptp_info("PTPOD[2]=0x%08X\n", PTPOD[2]);
-		ptp_info("PTPOD[3]=0x%08X\n", PTPOD[3]);
-		ptp_info("PTPOD[4]=0x%08X\n", PTPOD[4]);
-		ptp_info("PTPOD[5]=0x%08X\n", PTPOD[5]);
-		ptp_info("PTPOD[6]=0x%08X\n", PTPOD[6]);
+		for (array_index = 0; array_index <= 6; array_index++)
+			ptp_info("M_HW_RES%d=0x%08X\n", array_index, M_HW_RES[array_index]);
 
 		ptp_info("p->PTPINITEN=0x%x\n", p->PTPINITEN);
 		ptp_info("p->PTPMONEN=0x%x\n", p->PTPMONEN);
@@ -2501,6 +2577,18 @@ static int ptp_cpufreq_notifier_registration(int registration)
 	return ret;
 }
 
+#ifdef CONFIG_MTK_RAM_CONSOLE
+static void _mt_ptp_aee_init(void)
+{
+	aee_rr_rec_ptp_vboot(0x0);
+	aee_rr_rec_ptp_cpu_little_volt(0x0);
+	aee_rr_rec_ptp_temp(0x0);
+
+	/* 0xFF default value. 1 means writing new voltage, 0 means finish */
+	aee_rr_rec_ptp_status(0x0);
+}
+#endif
+
 static int ptp_probe(struct platform_device *pdev)
 {
 	struct ptp_det *det;
@@ -2522,6 +2610,10 @@ static int ptp_probe(struct platform_device *pdev)
 		if (ret)
 			return ret;
 	}
+
+#ifdef CONFIG_MTK_RAM_CONSOLE
+	_mt_ptp_aee_init();
+#endif
 
 	ret = create_procfs();
 	if (ret)
@@ -2762,7 +2854,7 @@ out:
 static int ptp_dump_proc_show(struct seq_file *m, void *v)
 {
 	struct ptp_det *det;
-	int *val = (int *)&ptp_devinfo;
+	int *M_HW_RES = (int *)&ptp_devinfo;
 	int i;
 
 	FUNC_ENTER(FUNC_LV_HELP);
@@ -2773,7 +2865,7 @@ static int ptp_dump_proc_show(struct seq_file *m, void *v)
 	/* mt_ptp_reg_dump(); */
 
 	for (i = 0; i < sizeof(struct ptp_devinfo)/sizeof(unsigned int); i++)
-		seq_printf(m, "PTPOD%d\t= 0x%08X\n", i, val[i]);
+		seq_printf(m, "M_HW_RES%d\t= 0x%08X\n", i, M_HW_RES[i]);
 
 	/* seq_printf(m, "det->PTPMONEN= 0x%08X,det->PTPINITEN= 0x%08X\n", det->PTPMONEN, det->PTPINITEN); */
 #if 0

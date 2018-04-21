@@ -28,12 +28,32 @@
 #include <linux/sched/rt.h>
 #include <linux/string.h>
 #include <linux/topology.h>
+#ifdef CONFIG_MACH_MT6799
+#include <mt-plat/mtk_chip.h>	/* to get chip version */
+#endif
 #include <trace/events/mtk_events.h>
 
 #include "mtk_ppm_internal.h"
 
 
-#define PPM_TIMER_INTERVAL_MS		(1000)
+/*==============================================================*/
+/* Local Macros							*/
+/*==============================================================*/
+#define LOG_BUF_SIZE		(128)
+#define LOG_CHECK_INTERVAL	(500)	/* ms */
+#define LOG_MAX_CNT		(15)	/* max log cnt within a check interval */
+#define LOG_MAX_DIFF_INTERVAL	(100)	/* ms */
+
+/*==============================================================*/
+/* Local variables						*/
+/*==============================================================*/
+/* log filter parameters to avoid log too much issue */
+static ktime_t prev_log_time;
+static ktime_t prev_check_time;
+static unsigned int log_cnt;
+static unsigned int filter_cnt;
+/* force update limit to HPS since it's not ready at previous round */
+static bool force_update_to_hps;
 
 /*==============================================================*/
 /* Local function declarition					*/
@@ -61,12 +81,15 @@ struct ppm_data ppm_main_info = {
 #ifdef PPM_1LL_MIN_FREQ
 	.min_freq_1LL = PPM_1LL_MIN_FREQ,
 #endif
+	.smart_detect_boost = 0,
 
 #ifdef PPM_VPROC_5A_LIMIT_CHECK
 	.is_5A_limit_enable = true,
 	.is_5A_limit_on = false,
 #endif
-
+#ifdef PPM_TURBO_CORE_SUPPORT
+	.is_turbo_core = false,
+#endif
 	.dvfs_tbl_type = DVFS_TABLE_TYPE_FY,
 
 	.ppm_pm_ops = {
@@ -447,6 +470,15 @@ static void ppm_main_calc_new_limit(void)
 	/* fill ptpod activate flag */
 	c_req->is_ptp_policy_activate = is_ptp_activate;
 
+	/* fill smart detect hint to hps */
+	if (ppm_main_info.cur_power_state == PPM_POWER_STATE_LL_ONLY
+		|| ppm_main_info.cur_power_state == PPM_POWER_STATE_L_ONLY) {
+		/* force disable smart detect since HICA state is overwritted by other policy */
+		c_req->smart_detect = 0;
+	} else {
+		c_req->smart_detect = ppm_main_info.smart_detect_boost;
+	}
+
 	/* Trigger exception if all cluster max core limit is 0 */
 	if (is_all_cluster_zero) {
 		struct ppm_policy_data *pos;
@@ -573,15 +605,39 @@ skip_pwr_check:
 	return final_state;
 }
 
-#define LOG_BUF_SIZE	128
 static void ppm_main_log_print(unsigned int policy_mask, unsigned int min_power_budget,
 	unsigned int root_cluster, char *msg)
 {
-#ifdef PPM_OUTPUT_TRANS_LOG_TO_UART
-	ppm_info("(0x%x)(%d)(%d)%s\n", policy_mask, min_power_budget, root_cluster, msg);
-#else
-	ppm_dbg(MAIN, "(0x%x)(%d)(%d)%s\n", policy_mask, min_power_budget, root_cluster, msg);
-#endif
+	bool filter_log;
+	ktime_t cur_time = ktime_get();
+	unsigned long long delta1, delta2;
+
+	delta1 = ktime_to_ms(ktime_sub(cur_time, prev_check_time));
+	delta2 = ktime_to_ms(ktime_sub(cur_time, prev_log_time));
+
+	if (delta1 >= LOG_CHECK_INTERVAL || delta2 >= LOG_MAX_DIFF_INTERVAL) {
+		prev_check_time = cur_time;
+		filter_log = false;
+		log_cnt = 1;
+		if (filter_cnt) {
+			ppm_info("Shrink %d PPM logs from last %lld ms!\n", filter_cnt, delta1);
+			filter_cnt = 0;
+		}
+	} else if (log_cnt < LOG_MAX_CNT) {
+		filter_log = false;
+		log_cnt++;
+	} else {
+		/* filter log */
+		filter_log = true;
+		filter_cnt++;
+	}
+
+	if (!filter_log)
+		ppm_info("(0x%x)(%d)(%d)%s\n", policy_mask, min_power_budget, root_cluster, msg);
+	else
+		ppm_ver("(0x%x)(%d)(%d)%s\n", policy_mask, min_power_budget, root_cluster, msg);
+
+	prev_log_time = cur_time;
 }
 
 int mt_ppm_main(void)
@@ -693,7 +749,7 @@ int mt_ppm_main(void)
 			int idx = ppm_main_freq_to_idx(PPM_CLUSTER_LL,
 				ppm_main_info.min_freq_1LL, CPUFREQ_RELATION_L);
 
-			if (idx != -1) {
+			if (idx != -1 && idx < c_req->cpu_limit[PPM_CLUSTER_LL].min_cpufreq_idx) {
 				c_req->cpu_limit[PPM_CLUSTER_LL].min_cpufreq_idx =
 					(idx > c_req->cpu_limit[PPM_CLUSTER_LL].max_cpufreq_idx)
 					? idx : c_req->cpu_limit[PPM_CLUSTER_LL].max_cpufreq_idx;
@@ -783,13 +839,16 @@ int mt_ppm_main(void)
 			for (i = 0; i < c_req->cluster_num; i++) {
 				if (c_req->cpu_limit[i].min_cpu_core != last_req->cpu_limit[i].min_cpu_core
 					|| c_req->cpu_limit[i].max_cpu_core != last_req->cpu_limit[i].max_cpu_core
-					|| c_req->cpu_limit[i].has_advise_core) {
+					|| c_req->cpu_limit[i].has_advise_core
+					|| force_update_to_hps) {
 					notify_hps = true;
 					log_print = true;
+					force_update_to_hps = 0;
 				}
 				if (c_req->cpu_limit[i].min_cpufreq_idx != last_req->cpu_limit[i].min_cpufreq_idx
 					|| c_req->cpu_limit[i].max_cpufreq_idx != last_req->cpu_limit[i].max_cpufreq_idx
 					|| c_req->cpu_limit[i].has_advise_freq) {
+#if 0
 					int min_freq_ori = last_req->cpu_limit[i].min_cpufreq_idx;
 					int max_freq_ori = last_req->cpu_limit[i].max_cpufreq_idx;
 					int min_freq = c_req->cpu_limit[i].min_cpufreq_idx;
@@ -799,9 +858,13 @@ int mt_ppm_main(void)
 
 					/* check for log reduction */
 					if (c_req->cpu_limit[i].max_cpu_core != 0
-						&& (abs(max_freq - max_freq_ori) >= 5
-						|| abs(min_freq - min_freq_ori) >= 5))
+						&& (abs(max_freq - max_freq_ori) >= (DVFS_OPP_NUM / 2)
+						|| abs(min_freq - min_freq_ori) >= (DVFS_OPP_NUM / 2)))
 						log_print = true;
+#else
+					notify_dvfs = true;
+					log_print = true;
+#endif
 				}
 
 				if (notify_hps && notify_dvfs)
@@ -827,6 +890,9 @@ int mt_ppm_main(void)
 				now = ktime_get();
 				if (ppm_main_info.client_info[PPM_CLIENT_HOTPLUG].limit_cb)
 					ppm_main_info.client_info[PPM_CLIENT_HOTPLUG].limit_cb(*c_req);
+				else
+					/* force update to HPS next time */
+					force_update_to_hps = 1;
 				delta = ktime_to_us(ktime_sub(ktime_get(), now));
 				ppm_profile_update_client_exec_time(PPM_CLIENT_HOTPLUG, delta);
 				ppm_dbg(TIME_PROFILE, "Done! notify hps only! time = %lld us\n", delta);
@@ -868,6 +934,8 @@ int mt_ppm_main(void)
 				now = ktime_get();
 				if (ppm_main_info.client_info[i].limit_cb)
 					ppm_main_info.client_info[i].limit_cb(*c_req);
+				else if (i == PPM_CLIENT_HOTPLUG)
+					force_update_to_hps = 1;
 				delta = ktime_to_us(ktime_sub(ktime_get(), now));
 				ppm_profile_update_client_exec_time(i, delta);
 				ppm_dbg(TIME_PROFILE, "%s callback done! time = %lld us\n",
@@ -878,6 +946,8 @@ int mt_ppm_main(void)
 				now = ktime_get();
 				if (ppm_main_info.client_info[i].limit_cb)
 					ppm_main_info.client_info[i].limit_cb(*c_req);
+				else if (i == PPM_CLIENT_HOTPLUG)
+					force_update_to_hps = 1;
 				delta = ktime_to_us(ktime_sub(ktime_get(), now));
 				ppm_profile_update_client_exec_time(i, delta);
 				ppm_dbg(TIME_PROFILE, "%s callback done! time = %lld us\n",
@@ -1049,6 +1119,19 @@ static int ppm_main_data_init(void)
 #ifdef PPM_IC_SEGMENT_CHECK
 	ppm_main_info.fix_state_by_segment = ppm_check_fix_state_by_segment();
 #endif
+#ifdef PPM_TURBO_CORE_SUPPORT
+	/* Check HW has L plus CPU or not */
+	{
+		unsigned int segment_inner = (get_devinfo_with_index(30) & 0xE0) >> 5;
+		unsigned int bining = get_devinfo_with_index(30) & 0x7;
+
+		if (segment_inner == 7 || bining == 3)
+			ppm_main_info.is_turbo_core = true;
+
+		ppm_info("is_turbo_core = %d, segment_inner = 0x%x, bining = 0x%x\n",
+			ppm_main_info.is_turbo_core, segment_inner, bining);
+	}
+#endif
 
 #ifdef CONFIG_MTK_RAM_CONSOLE
 	/* init SRAM debug info */
@@ -1059,6 +1142,17 @@ static int ppm_main_data_init(void)
 	aee_rr_rec_ppm_policy_mask(0);
 	aee_rr_rec_ppm_step(0);
 	aee_rr_rec_ppm_waiting_for_pbm(0);
+#endif
+
+#ifdef CONFIG_MACH_MT6799
+	{
+		unsigned int ver;
+
+		/* update single core floor freq for E2 or later */
+		ver = mt_get_chip_sw_ver();
+		if (ver >= (unsigned int)CHIP_SW_VER_02)
+			ppm_main_info.min_freq_1LL = PPM_1LL_MIN_FREQ_E2;
+	}
 #endif
 
 	ppm_info("@%s: done!\n", __func__);

@@ -322,6 +322,7 @@ static void lcm_get_params(LCM_PARAMS *params)
 
 	params->width = FRAME_WIDTH;
 	params->height = FRAME_HEIGHT;
+	params->density = 160;
 
 	params->dpi.format = LCM_DPI_FORMAT_RGB666;
 	params->dpi.rgb_order = LCM_COLOR_ORDER_RGB;
@@ -377,6 +378,11 @@ void lcm_resume(void)
 #endif
 }
 
+static unsigned int lcm_ata_check(unsigned char *buffer)
+{
+	return 0;
+}
+
 LCM_DRIVER kd070d5450nha6_rgb_dpi_lcm_drv = {
 	.name = "kd070d5450nha6_rgb_dpi",
 	.set_util_funcs = lcm_set_util_funcs,
@@ -387,4 +393,5 @@ LCM_DRIVER kd070d5450nha6_rgb_dpi_lcm_drv = {
 	.init_power = lcm_init_power,
 	.resume_power = lcm_resume_power,
 	.suspend_power = lcm_suspend_power,
+	.ata_check = lcm_ata_check,
 };

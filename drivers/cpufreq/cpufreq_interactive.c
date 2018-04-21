@@ -32,8 +32,12 @@
 #include <linux/slab.h>
 
 #ifdef CONFIG_MACH_MT6757
-#include "../misc/mediatek/base/power/mt6757/mtk_cpufreq.h"
+#include <mtk_cpufreq.h>
 #define CPUDVFS_POWER_MODE
+#endif
+
+#if defined(CONFIG_CPU_FREQ_SCHED_ASSIST) && defined(CONFIG_MTK_ACAO_SUPPORT)
+#include <mtk_cpufreq_api.h>
 #endif
 
 #ifdef CPUDVFS_POWER_MODE
@@ -43,6 +47,8 @@ static unsigned int min_sample_time_perf;
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/cpufreq_interactive.h>
+
+#include <mt-plat/met_drv.h>
 
 struct cpufreq_interactive_cpuinfo {
 	struct timer_list cpu_timer;
@@ -322,13 +328,13 @@ static u64 update_load(int cpu)
 		pcpu->policy->governor_data;
 	u64 now;
 	u64 now_idle;
-	unsigned int delta_idle;
-	unsigned int delta_time;
+	u64 delta_idle;
+	u64 delta_time;
 	u64 active_time;
 
 	now_idle = get_cpu_idle_time(cpu, &now, tunables->io_is_busy);
-	delta_idle = (unsigned int)(now_idle - pcpu->time_in_idle);
-	delta_time = (unsigned int)(now - pcpu->time_in_idle_timestamp);
+	delta_idle = (now_idle - pcpu->time_in_idle);
+	delta_time = (now - pcpu->time_in_idle_timestamp);
 
 	if (delta_time <= delta_idle)
 		active_time = 0;
@@ -357,8 +363,6 @@ static void cpufreq_interactive_timer(unsigned long data)
 	unsigned int index;
 	unsigned long flags;
 	u64 max_fvtime;
-	int j;
-	unsigned int max_t_freq = 0;
 
 #ifdef CPUDVFS_POWER_MODE
 	/* default(normal), low power, just make, performance(sports) */
@@ -473,24 +477,13 @@ static void cpufreq_interactive_timer(unsigned long data)
 
 	if (pcpu->target_freq == new_freq &&
 			pcpu->target_freq <= pcpu->policy->cur) {
-		max_t_freq = 0;
-		for_each_cpu(j, pcpu->policy->cpus) {
-			struct cpufreq_interactive_cpuinfo *pjcpu;
-
-			pjcpu = &per_cpu(cpuinfo, j);
-			max_t_freq = max(max_t_freq, pjcpu->target_freq);
-		}
-
-		if (max_t_freq != pcpu->policy->cur)
-			goto pass_t;
-
 		trace_cpufreq_interactive_already(
 			data, cpu_load, pcpu->target_freq,
 			pcpu->policy->cur, new_freq);
 		spin_unlock_irqrestore(&pcpu->target_freq_lock, flags);
 		goto rearm;
 	}
-pass_t:
+
 	trace_cpufreq_interactive_target(data, cpu_load, pcpu->target_freq,
 					 pcpu->policy->cur, new_freq);
 
@@ -499,7 +492,14 @@ pass_t:
 	spin_lock_irqsave(&speedchange_cpumask_lock, flags);
 	cpumask_set_cpu(data, &speedchange_cpumask);
 	spin_unlock_irqrestore(&speedchange_cpumask_lock, flags);
+
+#if 0
+	/* Not to wake up speedchange_task if schedule hint enable */
+	if (!mt_cpufreq_get_sched_enable())
+		wake_up_process(speedchange_task);
+#else
 	wake_up_process(speedchange_task);
+#endif
 
 rearm:
 	if (!timer_pending(&pcpu->cpu_timer))
@@ -575,6 +575,15 @@ static void cpufreq_interactive_adjust_cpu(unsigned int cpu,
 		pcpu->pol_floor_val_time = fvt;
 	}
 
+#if defined(CONFIG_CPU_FREQ_SCHED_ASSIST) && defined(CONFIG_MTK_ACAO_SUPPORT)
+	mt_cpufreq_set_by_wfi_load_cluster(arch_get_cluster_id(policy->cpu), max_freq);
+	if (max_freq != policy->cur) {
+		for_each_cpu(i, policy->cpus) {
+			pcpu = &per_cpu(cpuinfo, i);
+			pcpu->pol_hispeed_val_time = hvt;
+		}
+	}
+#else
 	if (max_freq != policy->cur) {
 		__cpufreq_driver_target(policy, max_freq, CPUFREQ_RELATION_H);
 		for_each_cpu(i, policy->cpus) {
@@ -582,6 +591,14 @@ static void cpufreq_interactive_adjust_cpu(unsigned int cpu,
 			pcpu->pol_hispeed_val_time = hvt;
 		}
 	}
+#endif
+
+	if (policy->cpu < 4)
+		met_tag_oneshot(0, "INT_LL", max_freq);
+	else if (policy->cpu >= 4)
+		met_tag_oneshot(0, "INT_L", max_freq);
+	else if (policy->cpu >= 8)
+		met_tag_oneshot(0, "INT_B", max_freq);
 
 	trace_cpufreq_interactive_setspeed(cpu, max_freq, policy->cur);
 }
@@ -1231,8 +1248,12 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		tunables->min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
 		tunables->timer_rate = DEFAULT_TIMER_RATE;
 		tunables->boostpulse_duration_val = DEFAULT_MIN_SAMPLE_TIME;
-		tunables->timer_slack_val = DEFAULT_TIMER_SLACK;
 
+#if (!defined(CONFIG_CPU_FREQ_SCHED_ASSIST) && !defined(CONFIG_CPU_FREQ_GOV_SCHEDPLUS))
+		tunables->timer_slack_val = DEFAULT_TIMER_SLACK;
+#else
+		tunables->timer_slack_val = -1;
+#endif
 		spin_lock_init(&tunables->target_loads_lock);
 		spin_lock_init(&tunables->above_hispeed_delay_lock);
 

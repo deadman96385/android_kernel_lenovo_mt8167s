@@ -29,6 +29,7 @@ extern "C" {
  * CONFIG - compile time
  */
 #define HPS_TASK_PRIORITY		(MAX_RT_PRIO - 3)
+#define HPS_TASK_NICE			(MIN_NICE)
 #define HPS_TIMER_INTERVAL_MS		100
 
 #define MAX_CPU_UP_TIMES		10
@@ -40,17 +41,17 @@ extern "C" {
 /*
  * CONFIG - runtime
  */
-#define DEF_CPU_UP_THRESHOLD		70
-#define DEF_CPU_UP_TIMES		1
-#define DEF_CPU_DOWN_THRESHOLD		50
-#define DEF_CPU_DOWN_TIMES		50
+#define DEF_CPU_UP_THRESHOLD		80
+#define DEF_CPU_UP_TIMES		2
+#define DEF_CPU_DOWN_THRESHOLD		70
+#define DEF_CPU_DOWN_TIMES		20
 #define DEF_TLP_TIMES			1
 
 #define EN_CPU_INPUT_BOOST		1
 #define DEF_CPU_INPUT_BOOST_CPU_NUM	2
 
 #define EN_CPU_RUSH_BOOST		1
-#define DEF_CPU_RUSH_BOOST_THRESHOLD	90
+#define DEF_CPU_RUSH_BOOST_THRESHOLD	98
 #define DEF_CPU_RUSH_BOOST_TIMES	1
 
 #define EN_HPS				1

@@ -271,6 +271,17 @@ void typec_auxadc_register(struct typec_hba *hba)
 	typec_enable_auxadc_irq(hba);
 }
 
+void typec_auxadc_low_register(struct typec_hba *hba)
+{
+	uint8_t val = 0;
+
+	typec_writew(hba, AUXADC_INTERVAL_MS, AUXADC_TYPEC_L_DET_PRD_15_0_L);
+	typec_write8(hba, AUXADC_INTERVAL_MS, AUXADC_TYPEC_L_DEBT_MIN);
+
+	val = typec_read8(hba, AUXADC_TYPEC_L4_H);
+	typec_write8(hba, val | AUXADC_TYPEC_L_IRQ_EN_MIN, AUXADC_TYPEC_L4_H);
+}
+
 void typec_auxadc_unregister(struct typec_hba *hba)
 {
 	typec_disable_auxadc_irq(hba);
@@ -477,8 +488,15 @@ void typec_disable_lowq(struct typec_hba *hba, char *str)
 int is_otg_en(void)
 {
 	struct typec_hba *hba = get_hba();
+	int ret = 0;
 
-	return (hba->vbus_en == 1);
+	if (!hba->dev) {
+		pr_info("%s mt6336 is NOT initialized, read from REG to check\n", __func__);
+		ret =  !!(typec_read8(hba, 0x400) & (1<<3));
+	} else {
+		ret = (hba->vbus_en == 1);
+	}
+	return ret;
 }
 EXPORT_SYMBOL_GPL(is_otg_en);
 
@@ -1377,6 +1395,129 @@ skip:
 
 	hba->vbus_en = (on ? 1 : 0);
 }
+
+void typec_drive_vbus_e3(struct typec_hba *hba, uint8_t on)
+{
+	if (hba->vbus_en == on)
+		goto skip;
+
+	/*
+	 *  From Script_20161215.xlsx provided by Lynch Lin
+	 */
+	if (on) {
+		uint8_t tmp;
+		/*
+		 * ==Enable OTG==
+		 * 1. Check 0x612[4] (DA_QI_FLASH_MODE) and 0x0613[1] (DA_QI_VBUS_PLUGIN)
+		 *
+		 * 2. If they are both low, apply below settings
+		 * 3. If any of them is high, do nothing (chip does not support OTG mode while under CHR or Flash mode)"
+		 *
+		 * WR	57	519	0A
+		 * WR	57	520	00
+		 * WR	57	55A	01
+		 * WR	56	455	00
+		 * WR	55	3C9	00
+		 *
+		 * WR	57	553	14
+		 * WR	57	55F	E6
+		 * WR	57	53D	47
+		 * WR	57	529	8F
+		 *
+		 * WR	57	560	0C
+		 * WR	56	40F	04
+		 *
+		 * WR	56	400	[3]=1'b1	Enable OTG
+		 *
+		 * WR  57	51F	83
+		 */
+		tmp = typec_read8(hba, 0x612);
+		if (tmp & (0x1<<4)) {
+			dev_err(hba->dev, "At Flash mode, Can not turn on OTG\n");
+			return;
+		}
+
+		tmp = typec_read8(hba, 0x613);
+		if (tmp & (0x1<<1)) {
+			dev_err(hba->dev, "VBUS present, Can not turn on OTG\n");
+			return;
+		}
+
+		typec_write8(hba, 0x0A, 0x519);
+		typec_write8(hba, 0x00, 0x520);
+		typec_write8(hba, 0x01, 0x55A);
+		typec_write8(hba, 0x00, 0x455);
+		typec_write8(hba, 0x00, 0x3C9);
+
+		typec_write8(hba, 0x14, 0x553);
+		typec_write8(hba, 0xE6, 0x55F);
+		typec_write8(hba, 0x47, 0x53D);
+		typec_write8(hba, 0x8F, 0x529);
+
+		typec_write8(hba, 0x0C, 0x560);
+		typec_write8(hba, 0x04, 0x40F);
+
+		tmp = typec_read8(hba, 0x400);
+		typec_write8(hba, (tmp | RG_EN_OTG), 0x400);
+
+		typec_write8(hba, 0x83, 0x51F);
+		typec_write8(hba, 0x20, 0x652);
+		typec_write8(hba, 0x04, 0x561);
+	} else {
+		uint8_t tmp;
+		/*
+		 * ==Disable OTG==
+		 *
+		 * WR	57	52A	88
+		 * WR	57	553	14
+		 * WR	57	519	3E
+		 * WR	57	51E	02
+		 *
+		 * WR	57	520	04
+		 * WR	57	55A	00
+		 * WR	56	455	01
+		 * WR	55	3C9	10
+		 *
+		 * WR	55	3CF	03
+		 * WR	56	402	03
+		 *
+		 * WR	57	529	88
+		 * WR  57	51F	84
+		 * WR  57	53D	47
+		 *
+		 * WR	56	400	[3]=1'b0	Disable OTG
+		*/
+		typec_write8(hba, 0x88, 0x52A);
+		typec_write8(hba, 0x14, 0x553);
+		typec_write8(hba, 0x3E, 0x519);
+		typec_write8(hba, 0x02, 0x51E);
+
+		typec_write8(hba, 0x04, 0x520);
+		typec_write8(hba, 0x00, 0x55A);
+		typec_write8(hba, 0x01, 0x455);
+		typec_write8(hba, 0x10, 0x3C9);
+
+		typec_write8(hba, 0x03, 0x3CF);
+		typec_write8(hba, 0x03, 0x402);
+
+		typec_write8(hba, 0x80, 0x529);
+		typec_write8(hba, 0x84, 0x51F);
+		typec_write8(hba, 0x47, 0x53D);
+
+		tmp = typec_read8(hba, 0x400);
+		typec_write8(hba, (tmp & (~RG_EN_OTG)), 0x400);
+
+		typec_write8(hba, 0x00, 0x561);
+		typec_write8(hba, 0x00, 0x652);
+	}
+
+skip:
+	if ((hba->dbg_lvl >= TYPEC_DBG_LVL_2) && (hba->vbus_en != on))
+		dev_err(hba->dev, "VBUS %s", (on ? "ON" : "OFF"));
+
+	hba->vbus_en = (on ? 1 : 0);
+}
+
 #endif
 #endif
 
@@ -1457,14 +1598,6 @@ static void typec_basic_settings(struct typec_hba *hba)
 	typec_write8(hba, (1<<ENABLE_AVDD33_TYPEC_OFST), CORE_ANA_CON109);
 	if (is_print)
 		dev_err(hba->dev, "CORE_ANA_CON109(0x566)=0x%x [0x8]\n", typec_read8(hba, CORE_ANA_CON109));
-
-	typec_write8(hba, 0x0A, 0x0025);
-	if (is_print)
-		dev_err(hba->dev, "0x0025=0x%x [0xA]\n", typec_read8(hba, 0x0025));
-
-	typec_write8(hba, 0x20, 0x0504);
-	if (is_print)
-		dev_err(hba->dev, "0x0504=0x%x [0x20]\n", typec_read8(hba, 0x0504));
 
 #ifdef MT6336_E2
 	/*
@@ -1559,8 +1692,10 @@ int typec_enable(struct typec_hba *hba, int enable)
 			typec_set(hba, W1_TYPE_C_SW_ENT_UNATCH_SNK_CMD, TYPE_C_CC_SW_CTRL);
 			break;
 		case TYPEC_ROLE_SOURCE:
-		case TYPEC_ROLE_DRP:
 			typec_set(hba, W1_TYPE_C_SW_ENT_UNATCH_SRC_CMD, TYPE_C_CC_SW_CTRL);
+			break;
+		case TYPEC_ROLE_DRP:
+			typec_set(hba, W1_TYPE_C_SW_ENT_UNATCH_SNK_CMD, TYPE_C_CC_SW_CTRL);
 			break;
 		default:
 			return 1;
@@ -1727,7 +1862,7 @@ static void typec_wait_vbus_on_attach_wait_snk(struct work_struct *work)
 		if (hba->vbus_det_en && (typec_vbus(hba) > PD_VSAFE5V_LOW)) {
 
 			if (hba->vbus_en == 1) {
-				typec_drive_vbus(hba, 0);
+				hba->drive_vbus(hba, 0);
 			} else {
 				typec_vbus_present(hba, 1);
 
@@ -1745,6 +1880,23 @@ static void typec_wait_vbus_on_attach_wait_snk(struct work_struct *work)
 	typec_enable_lowq(hba, "typec_wait_vbus_on_attach_wait_snk");
 }
 
+static int keep_low(struct typec_hba *hba, int vbus)
+{
+	static ktime_t last_t_vsafe5v;
+
+	if (vbus > PD_VSAFE0V_HIGH) {
+		last_t_vsafe5v = ktime_get();
+		return 0;
+	}
+
+	if (ktime_ms_delta(ktime_get(), last_t_vsafe5v) > 5000) {
+		dev_err(hba->dev, "%s VBUS Keep LOW lasting 5sec", __func__);
+		return 1;
+	}
+
+	return 0;
+}
+
 static void typec_wait_vbus_off_attached_snk(struct work_struct *work)
 {
 	struct typec_hba *hba = container_of(work, struct typec_hba, wait_vbus_off_attached_snk);
@@ -1754,6 +1906,9 @@ static void typec_wait_vbus_off_attached_snk(struct work_struct *work)
 
 	typec_disable_lowq(hba, "typec_wait_vbus_off_attached_snk");
 
+	/*To update the timestamp*/
+	keep_low(hba, PD_VSAFE0V_HIGH+1);
+
 	while ((typec_read8(hba, TYPE_C_CC_STATUS) & RO_TYPE_C_CC_ST) == TYPEC_STATE_ATTACHED_SNK) {
 		int val = typec_vbus(hba);
 
@@ -1762,7 +1917,7 @@ static void typec_wait_vbus_off_attached_snk(struct work_struct *work)
 		if (hba->dbg_lvl >= TYPEC_DBG_LVL_3)
 			dev_err(hba->dev, "%s VBUS = %d, DET_EN=%d", __func__, val, hba->vbus_det_en);
 
-		if (hba->vbus_det_en && (val < hba->vsafe_5v)) {
+		if ((hba->vbus_det_en && (val < hba->vsafe_5v)) || keep_low(hba, val)) {
 
 #if COMPLIANCE
 			if (val > PD_VSAFE0V_HIGH) {
@@ -1790,6 +1945,37 @@ static void typec_wait_vbus_off_attached_snk(struct work_struct *work)
 	hba->wq_running &= ~WQ_FLAGS_VBUSOFF_ATTACHED_SNK;
 
 	dev_err(hba->dev, "Exit %s st=%d", __func__, typec_read8(hba, TYPE_C_CC_STATUS));
+}
+
+#define INIT_VBUS_OFF_PERIOD 100
+#define INIT_VBUS_OFF_CNT 5
+
+static void typec_init_vbus_off(struct work_struct *work)
+{
+	struct typec_hba *hba = container_of(work, struct typec_hba, init_vbus_off);
+	int cnt = 0;
+
+	dev_err(hba->dev, "typec_init_vbus_off+\n");
+
+	typec_disable_lowq(hba, "typec_wait_vsafe0v");
+
+	while (cnt < INIT_VBUS_OFF_CNT) {
+		int val = typec_vbus(hba);
+
+		if (val < PD_VSAFE5V_LOW)
+			cnt++;
+		else
+			break;
+
+		msleep(INIT_VBUS_OFF_PERIOD);
+	}
+
+	if (cnt == INIT_VBUS_OFF_CNT && hba->charger_det_notify)
+		hba->charger_det_notify(0);
+
+	dev_err(hba->dev, "typec_init_vbus_off-\n");
+
+	typec_enable_lowq(hba, "typec_wait_vsafe0v");
 }
 
 #define WAIT_VSAFE0V_PERIOD 1000
@@ -1846,7 +2032,7 @@ static void typec_wait_vbus_off_then_drive_attached_src(struct work_struct *work
 				typec_drive_vconn(hba, 1);
 #endif
 
-			typec_drive_vbus(hba, 1);
+			hba->drive_vbus(hba, 1);
 
 			break;
 		}
@@ -2028,7 +2214,7 @@ static void typec_intr(struct typec_hba *hba, uint16_t cc_is0, uint16_t cc_is2)
 		typec_int_disable(hba, toggle, 0);
 
 		typec_vbus_present(hba, 0);
-		typec_drive_vbus(hba, 0);
+		hba->drive_vbus(hba, 0);
 
 		if (hba->mode == 1)
 			typec_enable_lowq(hba, "UNATTACH");
@@ -2077,9 +2263,11 @@ static void typec_intr(struct typec_hba *hba, uint16_t cc_is0, uint16_t cc_is2)
 		queue_work(hba->pd_wq, &hba->wait_vbus_off_attached_snk);
 
 		#if USE_AUXADC
-		if (hba->is_kpoc) {
-			typec_auxadc_register(hba);
-			typec_auxadc_set_state(hba, STATE_POWER_DEFAULT);
+		if (hba->is_kpoc && hba->charger_det_notify) {
+			typec_auxadc_low_register(hba);
+			typec_auxadc_set_thresholds(hba, SNK_VRPUSB_AUXADC_MIN_VAL, 0);
+			mt6336_enable_interrupt(TYPE_C_L_MIN, "TYPE_C_L_MIN");
+			pmic_enable_chrdet(0);
 		}
 		/*schedule_work(&hba->auxadc_voltage_mon_attached_snk);*/
 		#endif
@@ -2106,7 +2294,9 @@ static void typec_intr(struct typec_hba *hba, uint16_t cc_is0, uint16_t cc_is2)
 
 	/*transition from Attached.SRC to TryWait.SNK*/
 	if (cc_is0 & TYPE_C_CC_ENT_TRY_WAIT_SNK_INTR) {
-		typec_drive_vbus(hba, 0);
+		hba->drive_vbus(hba, 0);
+
+
 		/* At TryWait.SNK, continue checking vSafe5V is presented or not?
 		 * If Vbus detected, set TYPE_C_SW_VBUS_PRESENT@TYPE_C_CC_SW_CTRL(0xA) as 1
 		 * to notify MAC layer.
@@ -2226,18 +2416,28 @@ void auxadc_detect_cableout_hanlder(void)
 {
 	struct typec_hba *hba = get_hba();
 	uint16_t val;
-
-	typec_disable_auxadc_irq(hba);
+	unsigned int vbus = 0;
+	static unsigned int pre_vbus;
 
 	val = typec_auxadc_get_value(hba, FLAGS_AUXADC_MIN);
 
 	dev_err(hba->dev, "ADC VAL=%d\n", val);
 
-	typec_disable_auxadc(hba, 1, 1);
+	typec_disable_auxadc(hba, 1, 0);
 
-	if (val < SNK_VRPUSB_AUXADC_MIN_VAL) {
-		if (hba->charger_det_notify)
+	vbus = typec_vbus(hba);
+
+	if ((val < SNK_VRPUSB_AUXADC_MIN_VAL) && ((vbus < (PD_VSAFE5V_LOW)) || (vbus < pre_vbus))) {
+		if (hba->is_kpoc && hba->charger_det_notify)
 			hba->charger_det_notify(0);
+
+		if (hba->vbus_det_en)
+			typec_vbus_present(hba, 0);
+
+		pre_vbus = 0;
+	} else {
+		pre_vbus = vbus;
+		typec_enable_auxadc(hba, 1, 0);
 	}
 }
 
@@ -2383,6 +2583,8 @@ int typec_init(struct device *dev, struct typec_hba **hba_handle,
 	INIT_WORK(&hba->wait_vbus_off_attached_snk, typec_wait_vbus_off_attached_snk);
 	INIT_WORK(&hba->wait_vbus_off_then_drive_attached_src, typec_wait_vbus_off_then_drive_attached_src);
 	INIT_WORK(&hba->wait_vsafe0v, typec_wait_vsafe0v);
+	INIT_WORK(&hba->init_vbus_off, typec_init_vbus_off);
+
 	#if USE_AUXADC
 	INIT_WORK(&hba->auxadc_voltage_mon_attached_snk, typec_auxadc_voltage_mon_attached_snk);
 	#endif
@@ -2397,24 +2599,10 @@ int typec_init(struct device *dev, struct typec_hba **hba_handle,
 	INIT_DELAYED_WORK(&hba->usb_work, trigger_driver);
 
 #if USE_AUXADC
-#ifdef MT6336_E1
-	/*INT_STATUS5 4th*/
-#define TYPE_C_L_MIN (5*8+3)
-#else
-	/*INT_STATUS5 1th*/
-#define TYPE_C_L_MIN (5*8+0)
-#endif
 	/*mt6336_enable_interrupt(TYPE_C_L_MIN, "TYPE_C_L_MIN");*/
 	/*mt6336_register_interrupt_callback(TYPE_C_L_MIN, auxadc_min_hanlder);*/
 	mt6336_register_interrupt_callback(TYPE_C_L_MIN, auxadc_detect_cableout_hanlder);
 
-#ifdef MT6336_E1
-	/*INT_STATUS5 7th*/
-#define TYPE_C_H_MAX (5*8+6)
-#else
-	/*INT_STATUS5 4th*/
-#define TYPE_C_H_MAX (5*8+3)
-#endif
 	/*mt6336_enable_interrupt(TYPE_C_H_MAX, "TYPE_C_H_MAX");*/
 	mt6336_register_interrupt_callback(TYPE_C_H_MAX, auxadc_max_hanlder);
 #endif
@@ -2449,7 +2637,9 @@ int typec_init(struct device *dev, struct typec_hba **hba_handle,
 		typec_readw(hba, TYPE_C_CC_VOL_PERIODIC_MEAS_VAL));
 
 	typec_basic_settings(hba);
-	pd_basic_settings(hba);
+
+	if (hba->mode == 2)
+		pd_basic_settings(hba);
 
 	/*initialize TYPEC*/
 	typec_set_default_param(hba);
@@ -2463,21 +2653,28 @@ int typec_init(struct device *dev, struct typec_hba **hba_handle,
 	hba->pd_rp_val = TYPEC_RP_15A;
 	hba->dbg_lvl = TYPEC_DBG_LVL_2;
 	hba->hr_auto_sent = 0;
-	hba->vbus_en = 0;
+	hba->vbus_en = 1;
 	hba->vsafe_5v = PD_VSAFE5V_LOW;
 	hba->task_state = PD_STATE_DISABLED;
 	hba->is_kpoc = false;
+	hba->is_boost = false;
+	hba->is_shutdown = false;
 	hba->wq_running = 0;
 	hba->wq_cnt = 0;
+	hba->hwid = typec_read8(hba, 0x02);
+
+	if (hba->hwid == 0x20)
+		hba->drive_vbus = typec_drive_vbus;
+	else
+		hba->drive_vbus = typec_drive_vbus_e3;
+
+	hba->drive_vbus(hba, 0);
+
+	dev_err(hba->dev, "MT6336 HWID=0x%x\n", hba->hwid);
+
 
 #if USE_AUXADC
 	init_completion(&hba->auxadc_event);
-#endif
-
-#if SUPPORT_PD
-	/*initialize PD*/
-	if (hba->mode == 2)
-		pd_init(hba);
 #endif
 
 #ifdef CONFIG_MTK_KERNEL_POWER_OFF_CHARGING
@@ -2486,11 +2683,23 @@ int typec_init(struct device *dev, struct typec_hba **hba_handle,
 		dev_err(hba->dev, "%s, in KPOC\n", __func__);
 		hba->support_role = TYPEC_ROLE_SINK;
 		hba->is_kpoc = true;
-		hba->kpoc_retry = 3;
-		hba->vbus_off_polling = hba->vbus_off_polling/2;
-		typec_set(hba, REG_TYPE_C_ADC_EN, TYPE_C_CTRL);
+		queue_work(hba->pd_wq, &hba->init_vbus_off);
 	}
 #endif
+
+#if SUPPORT_PD
+	/*initialize PD*/
+	if (hba->mode == 2)
+		pd_init(hba);
+#endif
+
+	if (hba->is_kpoc) {
+		hba->vbus_off_polling = hba->vbus_off_polling/2;
+		typec_set(hba, REG_TYPE_C_ADC_EN, TYPE_C_CTRL);
+
+		mt_ppm_sysboost_set_core_limit(BOOST_BY_USB_PD, 1, 4, 4);
+		hba->is_boost = true;
+	}
 
 #ifdef CONFIG_DUAL_ROLE_USB_INTF
 	mt_dual_role_phy_init(hba);
@@ -2526,17 +2735,16 @@ int typec_init(struct device *dev, struct typec_hba **hba_handle,
 
 		mt6336_enable_interrupt(TYPE_C_CC_IRQ_NUM, "TYPE_C_CC_IRQ");
 
-		if (hba->mode == 2) {
+		if (hba->mode == 2)
 			mt6336_enable_interrupt(TYPE_C_PD_IRQ_NUM, "TYPE_C_PD_IRQ");
-
-			if (hba->is_kpoc)
-				mt6336_enable_interrupt(TYPE_C_L_MIN, "TYPE_C_L_MIN");
-		}
 
 		/*Prefer Role 0: SNK Only, 1: SRC Only, 2: DRP, 3: Try.SRC, 4: Try.SNK */
 		typec_set_mode(hba, hba->support_role, hba->rp_val, ((hba->prefer_role == 3)?1:0));
 
-		typec_enable(hba, 1);
+		if (hba->is_kpoc)
+			typec_enable(hba, 0);
+		else
+			typec_enable(hba, 1);
 	} else {
 		typec_enable(hba, 0);
 	}

@@ -74,12 +74,12 @@ do {									\
 } while (0)
 
 /* Cali */
-static kal_int32 g_o_vts;
-static kal_int32 g_degc_cali;
-static kal_int32 g_adc_cali_en;
-static kal_int32 g_o_slope;
-static kal_int32 g_o_slope_sign;
-static kal_int32 g_id;
+static s32 g_o_vts;
+static s32 g_degc_cali;
+static s32 g_adc_cali_en;
+static s32 g_o_slope;
+static s32 g_o_slope_sign;
+static s32 g_id;
 
 static struct regmap *regmap_pmic_thermal;
 
@@ -96,7 +96,7 @@ static u16 pmic_read(u16 addr)
 
 static void pmic_cali_prepare(void)
 {
-	kal_uint32 temp0, temp1;
+	u32 temp0, temp1;
 
 	temp0 = pmic_read(0x666); /* efuse val between 160 to 175. */
 	temp1 = pmic_read(0x668); /* efuse val between 176 to 191. */
@@ -122,23 +122,22 @@ static void pmic_cali_prepare(void)
 	}
 }
 
-static kal_int32 thermal_cal_exec(kal_uint32 ret)
+static s32 thermal_cal_exec(u32 ret)
 {
-	kal_int32 t_current = 0;
-	kal_int32 y_curr = ret;
-	kal_int32 slope_data = 0;
-	kal_int32 VBE_T = 0;
+	s32 t_current = 0;
+	s32 y_curr = ret;
+	s32 slope_data = 0;
+	s32 VBE_T = 0;
 
 	if (ret == 0)
 		return 0;
 
 	VBE_T = ((g_o_vts * 1800) / 4096);
 
-	if (g_o_slope_sign == 0) {
+	if (g_o_slope_sign == 0)
 		slope_data = (y_curr - VBE_T) * 100 / (170 + g_o_slope);
-	} else {
+	else
 		slope_data = (y_curr - VBE_T) * 100 / (170 - g_o_slope);
-	}
 
 	slope_data = slope_data - 2 * slope_data;
 

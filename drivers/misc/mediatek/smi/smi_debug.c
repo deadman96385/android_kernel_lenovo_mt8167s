@@ -45,7 +45,10 @@
 #include "smi_reg.h"
 #include "smi_debug.h"
 #include "smi_configuration.h"
+#include "smi_public.h"
+#ifdef CONFIG_MTK_M4U
 #include "m4u.h"
+#endif
 
 #define SMI_LOG_TAG "smi"
 
@@ -60,89 +63,94 @@
 
 /* Debug Function */
 static void smi_dump_format(unsigned long base, unsigned int from, unsigned int to);
-static void smi_dumpper(int output_gce_buffer, unsigned long *offset, unsigned long base, int reg_number)
+static void smi_dumpper(int output_gce_buffer, unsigned long *offset, unsigned long base,
+	int reg_number, bool zero_dump)
 {
-	int num_of_set = 3;
-	int remain_runtimes = 0;
-	int runtimes = 0;
+	int size = 0;
+	int length = 0;
+	int max_size = 128;
+	char buffer[max_size + 1];
 	int i = 0;
+	int j = 0;
 
-	remain_runtimes = reg_number % num_of_set;
-	runtimes = reg_number / num_of_set;
-	runtimes = runtimes * 3;
+	for (i = 0; i < reg_number; i += j) {
+		length = 0;
+		max_size = 128;
+		for (j = 0; i + j < reg_number; j++) {
+			if (zero_dump == false && M4U_ReadReg32(base, offset[i + j]) == 0)
+				continue;
+			else if (zero_dump == true && base == 0) /* offset */
+				size = snprintf(buffer + length, max_size + 1, " 0x%lx,", offset[i + j]);
+			else if (base != 0) /* offset + value */
+				size = snprintf(buffer + length, max_size + 1, " 0x%lx=0x%x,",
+					offset[i + j], M4U_ReadReg32(base, offset[i + j]));
 
-	do {
-		SMIMSG3(output_gce_buffer, "[0x%lx,0x%lx,0x%lx]=[0x%x,0x%x,0x%x]\n",
-			offset[i], offset[i + 1], offset[i + 2],
-			M4U_ReadReg32(base, offset[i]), M4U_ReadReg32(base, offset[i + 1]),
-			M4U_ReadReg32(base, offset[i + 2]));
-		i += 3;
-	} while (i < runtimes);
-
-	switch (remain_runtimes) {
-	case 2:
-		SMIMSG3(output_gce_buffer, "[0x%lx,0x%lx]=[0x%x,0x%x]\n",
-			offset[i], offset[i + 1],
-			M4U_ReadReg32(base, offset[i]), M4U_ReadReg32(base, offset[i + 1]));
-		break;
-	case 1:
-		SMIMSG3(output_gce_buffer, "[0x%lx]=[0x%x]\n",
-			offset[i], M4U_ReadReg32(base, offset[i]));
-		break;
-	default:
-		break;
+			if (size < 0 || max_size < size) {
+				snprintf(buffer + length, max_size + 1, " ");
+				break;
+			}
+			length = length + size;
+			max_size = max_size - size;
+		}
+		SMIMSG3(output_gce_buffer, "%s\n", buffer);
 	}
+}
+
+static void smi_dumpRegDebugMsg(int output_gce_buffer)
+{
+	SMIMSG3(output_gce_buffer, "========== SMI common register dump offset ==========\n");
+	smi_dumpper(output_gce_buffer, smi_common_debug_offset, 0,
+		    SMI_COMMON_DEBUG_OFFSET_NUM, true);
+
+	SMIMSG3(output_gce_buffer, "========== SMI larb register dump offset ==========\n");
+	smi_dumpper(output_gce_buffer, smi_larb_debug_offset[0], 0,
+	    smi_larb_debug_offset_num[0], true);
 }
 
 void smi_dumpCommonDebugMsg(int output_gce_buffer)
 {
-	unsigned long u4Base;
-
+	unsigned long u4Base = 0;
 	/* No verify API in CCF, assume clk is always on */
-	int smiCommonClkEnabled = 1;
+	unsigned int smiCommonClkEnabled = 1;
 
-#if !defined(SMI_INTERNAL_CCF_SUPPORT)
-	smiCommonClkEnabled = clock_is_on(MT_CG_DISP0_SMI_COMMON);
-#endif				/* !defined (SMI_INTERNAL_CCF_SUPPORT) */
-
+	u4Base = get_common_base_addr();
+	smiCommonClkEnabled = smi_clk_get_ref_count(SMI_COMMON_REG_INDX);
 	/* SMI COMMON dump */
-	if ((!smiCommonClkEnabled)) {
-		SMIMSG3(output_gce_buffer, "===SMI common clock is disabled===\n");
+	if (u4Base == SMI_ERROR_ADDR) {
+		SMIMSG3(output_gce_buffer, "Doesn't support reg dump for SMI common\n");
+		return;
+	} else if (smiCommonClkEnabled == 0) {
+		SMIMSG3(output_gce_buffer, "========== SMI common clock is disable ==========\n");
 		return;
 	}
 
-	SMIMSG3(output_gce_buffer, "===SMI common reg dump, CLK: %d===\n", smiCommonClkEnabled);
+	SMIMSG3(output_gce_buffer, "========== SMI common reg dump, CLK: %d ==========\n", smiCommonClkEnabled);
 
-	u4Base = get_common_base_addr();
 	smi_dumpper(output_gce_buffer, smi_common_debug_offset, u4Base,
-		    SMI_COMMON_DEBUG_OFFSET_NUM);
+		    SMI_COMMON_DEBUG_OFFSET_NUM, false);
 }
 
 void smi_dumpLarbDebugMsg(unsigned int u4Index, int output_gce_buffer)
 {
 	unsigned long u4Base = 0;
 	/* No verify API in CCF, assume clk is always on */
-	int larbClkEnabled = 1;
+	unsigned int larbClkEnabled = 1;
 
 	u4Base = get_larb_base_addr(u4Index);
-#if !defined(SMI_INTERNAL_CCF_SUPPORT)
-	larbClkEnabled = smi_larb_clock_is_on(u4Index);
-#endif
-
+	larbClkEnabled = smi_clk_get_ref_count(u4Index);
 	if (u4Base == SMI_ERROR_ADDR) {
 		SMIMSG3(output_gce_buffer, "Doesn't support reg dump for Larb%d\n", u4Index);
 		return;
-	} else if ((larbClkEnabled != 0)) {
-		SMIMSG3(output_gce_buffer, "===SMI LARB%d reg dump, CLK: %d===\n", u4Index,
-			larbClkEnabled);
-
-		smi_dumpper(output_gce_buffer, smi_larb_debug_offset[u4Index], u4Base,
-			    smi_larb_debug_offset_num[u4Index]);
-
-	} else {
-		SMIMSG3(output_gce_buffer, "===SMI LARB%d clock is disabled===\n", u4Index);
+	} else if (larbClkEnabled == 0) {
+		SMIMSG3(output_gce_buffer, "========== SMI LARB%d clock is disable ==========\n", u4Index);
+		return;
 	}
 
+	SMIMSG3(output_gce_buffer, "========== SMI LARB%d reg dump, CLK: %d ==========\n",
+		u4Index, larbClkEnabled);
+
+	smi_dumpper(output_gce_buffer, smi_larb_debug_offset[u4Index], u4Base,
+		    smi_larb_debug_offset_num[u4Index], false);
 }
 
 void smi_dumpLarb(unsigned int index)
@@ -216,27 +224,27 @@ int smi_debug_bus_hanging_detect(unsigned int larbs, int show_dump)
 }
 
 static int get_status_code(int smi_larb_clk_status, int smi_larb_busy_count,
-			   int smi_common_busy_count)
+			   int smi_common_busy_count, int max_count)
 {
 	int status_code = 0;
 
 	if (smi_larb_clk_status != 0) {
-		if (smi_larb_busy_count == 5) {	/* The larb is always busy */
-			if (smi_common_busy_count == 5)	/* smi common is always busy */
+		if (smi_larb_busy_count == max_count) {	/* The larb is always busy */
+			if (smi_common_busy_count == max_count)	/* smi common is always busy */
 				status_code = 1;
 			else if (smi_common_busy_count == 0)	/* smi common is always idle */
 				status_code = 2;
 			else
 				status_code = 5;	/* smi common is sometimes busy and idle */
 		} else if (smi_larb_busy_count == 0) {	/* The larb is always idle */
-			if (smi_common_busy_count == 5)	/* smi common is always busy */
+			if (smi_common_busy_count == max_count)	/* smi common is always busy */
 				status_code = 3;
 			else if (smi_common_busy_count == 0)	/* smi common is always idle */
 				status_code = 4;
 			else
 				status_code = 6;	/* smi common is sometimes busy and idle */
 		} else {	/* sometime the larb is busy */
-			if (smi_common_busy_count == 5)	/* smi common is always busy */
+			if (smi_common_busy_count == max_count)	/* smi common is always busy */
 				status_code = 7;
 			else if (smi_common_busy_count == 0)	/* smi common is always idle */
 				status_code = 8;
@@ -263,49 +271,39 @@ int smi_debug_bus_hanging_detect_ext2(unsigned short larbs, int show_dump,
 
 	int i = 0;
 	int dump_time = 0;
-	int is_smi_issue = 0;
 	int status_code = 0;
+	int max_count = 5;
 	/* Keep the dump result */
-	unsigned char smi_common_busy_count = 0;
 	unsigned int u4Index = 0;
 	unsigned long u4Base = 0;
-
-	volatile unsigned int reg_temp = 0;
+	unsigned char smi_common_busy_count = 0;
 	unsigned char smi_larb_busy_count[SMI_LARB_NUM] = { 0 };
-	unsigned char smi_larb_mmu_status[SMI_LARB_NUM] = { 0 };
-	int smi_larb_clk_status[SMI_LARB_NUM] = { 0 };
 
 	/* dump resister and save resgister status */
-	for (dump_time = 0; dump_time < 5; dump_time++) {
-		reg_temp = M4U_ReadReg32(get_common_base_addr(), 0x440);
-		if ((reg_temp & (1 << 0)) == 0) {
-			/* smi common is busy */
-			smi_common_busy_count++;
+	if (show_dump)
+		smi_dumpRegDebugMsg(output_gce_buffer);
+
+	for (dump_time = 0; dump_time < max_count; dump_time++) {
+		u4Base = get_common_base_addr();
+		/* check smi common busy register */
+		if (u4Base != SMI_ERROR_ADDR && smi_clk_get_ref_count(SMI_COMMON_REG_INDX) != 0) {
+			if ((M4U_ReadReg32(u4Base, 0x440) & (1 << 0)) == 0)
+				smi_common_busy_count++;
+			if (show_dump != 0)
+				smi_dumpCommonDebugMsg(output_gce_buffer);
 		}
-		/* Dump smi common regs */
-		if (show_dump != 0)
-			smi_dumpCommonDebugMsg(output_gce_buffer);
 
 		for (u4Index = 0; u4Index < SMI_LARB_NUM; u4Index++) {
 			u4Base = get_larb_base_addr(u4Index);
-
-			smi_larb_clk_status[u4Index] = smi_larb_clock_is_on(u4Index);
-			/* check larb clk is enable */
-			if (smi_larb_clk_status[u4Index] != 0) {
-				if (u4Base != SMI_ERROR_ADDR) {
-					reg_temp = M4U_ReadReg32(u4Base, 0x0);
-					if (reg_temp != 0) {
-						/* Larb is busy */
-						smi_larb_busy_count[u4Index]++;
-					}
-					smi_larb_mmu_status[u4Index] = M4U_ReadReg32(u4Base, 0xa0);
-					if (show_dump != 0) {
-						smi_dumpLarbDebugMsg(u4Index, output_gce_buffer);
-						smi_dump_larb_m4u_register(u4Index);
-					}
+			/* check smi larb busy register */
+			if (u4Base != SMI_ERROR_ADDR && smi_clk_get_ref_count(u4Index) != 0) {
+				if (M4U_ReadReg32(u4Base, 0x0) != 0)
+					smi_larb_busy_count[u4Index]++;
+				if (show_dump != 0) {
+					smi_dumpLarbDebugMsg(u4Index, output_gce_buffer);
+					smi_dump_larb_m4u_register(u4Index);
 				}
 			}
-
 		}
 	}
 	/* Show the checked result */
@@ -313,71 +311,28 @@ int smi_debug_bus_hanging_detect_ext2(unsigned short larbs, int show_dump,
 		if (SMI_DGB_LARB_SELECT(larbs, i)) {
 			/* larb i has been selected */
 			/* Get status code */
-			status_code = get_status_code(smi_larb_clk_status[i], smi_larb_busy_count[i],
-					smi_common_busy_count);
+			status_code = get_status_code(smi_clk_get_ref_count(i), smi_larb_busy_count[i],
+					smi_common_busy_count, max_count);
 
 			/* Send the debug message according to the final result */
-			switch (status_code) {
-			case 1:
-			case 3:
-			case 5:
-			case 7:
-			case 8:
-				SMIMSG3(output_gce_buffer,
-					"Larb%d Busy=%d/5, SMI Common Busy=%d/5, status=%d ==> Check engine's state first\n",
-					i, smi_larb_busy_count[i], smi_common_busy_count,
-					status_code);
-				SMIMSG3(output_gce_buffer,
-					"If the engine is waiting for Larb%ds' response, it needs SMI HW's check\n",
-					i);
-				break;
-			case 2:
-				if (smi_larb_mmu_status[i] == 0) {
-					SMIMSG3(output_gce_buffer,
-						"Larb%d Busy=%d/5, SMI Common Busy=%d/5, status=%d ==> Check engine state first\n",
-						i, smi_larb_busy_count[i],
-						smi_common_busy_count, status_code);
-					SMIMSG3(output_gce_buffer,
-						"If the engine is waiting for Larb%ds' response, it needs SMI HW's check\n",
-						i);
-				} else {
-					SMIMSG3(output_gce_buffer,
-						"Larb%d Busy=%d/5, SMI Common Busy=%d/5, status=%d ==> MMU port config error\n",
-						i, smi_larb_busy_count[i],
-						smi_common_busy_count, status_code);
-					is_smi_issue = 1;
-				}
-				break;
-			case 4:
-			case 6:
-			case 9:
-				SMIMSG3(output_gce_buffer,
-					"Larb%d Busy=%d/5, SMI Common Busy=%d/5, status=%d ==> not SMI issue\n",
-					i, smi_larb_busy_count[i], smi_common_busy_count,
-					status_code);
-				break;
-			case 10:
-				SMIMSG3(output_gce_buffer,
-					"Larb%d clk is disbable, status=%d ==> no need to check\n",
+			if (status_code == 10) { /* larb i clock is disable */
+				SMIMSG3(output_gce_buffer, "Larb%d clk is disbable, status=%d ==> no need to check\n",
 					i, status_code);
-				break;
-			default:
-				SMIMSG3(output_gce_buffer,
-					"Larb%d Busy=%d/5, SMI Common Busy=%d/5, status=%d ==> status unknown\n",
-					i, smi_larb_busy_count[i], smi_common_busy_count,
-					status_code);
-				break;
+				continue;
 			}
-
+			SMIMSG3(output_gce_buffer,
+				"Larb%d Busy=%d/%d, SMI Common Busy=%d/%d, status=%d ==> Check engine's state first\n",
+				i, smi_larb_busy_count[i], max_count, smi_common_busy_count, max_count, status_code);
 		}
-
 	}
 
+#ifdef CONFIG_MTK_M4U
 	if (enable_m4u_reg_dump) {
 		SMIMSG("call m4u API for m4u register dump\n");
 		m4u_dump_reg_for_smi_hang_issue();
 	}
-	return is_smi_issue;
+#endif
+	return 0;
 }
 void smi_dump_clk_status(void)
 {
@@ -391,21 +346,25 @@ void smi_dump_clk_status(void)
 void smi_dump_larb_m4u_register(int larb)
 {
 	unsigned long u4Base = 0;
+	unsigned int larbClkEnabled = 0;
 
 	u4Base = get_larb_base_addr(larb);
+	larbClkEnabled = smi_clk_get_ref_count(larb);
 
 	if (u4Base == SMI_ERROR_ADDR) {
 		SMIMSG("Doesn't support reg dump for Larb%d\n", larb);
 		return;
+	} else if (larbClkEnabled == 0) {
+		SMIMSG("========== SMI LARB%d clock is disable ==========\n", larb);
+		return;
 	}
 
 #if defined(SMI_MMU_V1)
-	SMIMSG("dump larb%d m4u register:0x%x\n", larb, M4U_ReadReg32(u4Base, 0xfc0));
+	SMIMSG("LARB%d m4u register:0x%x\n", larb, M4U_ReadReg32(u4Base, 0xfc0));
 #else
-	SMIMSG("dump larb%d m4u register:\n", larb);
-	SMIMSG("secure register:\n");
-	smi_dumpper(0, smi_m4u_secure_offset, u4Base, SMI_MAX_PORT_NUM);
-	SMIMSG("non-secure register:\n");
-	smi_dumpper(0, smi_m4u_non_secure_offset, u4Base, SMI_MAX_PORT_NUM);
+	SMIMSG("========== LARB%d m4u secure register ==========\n", larb);
+	smi_dumpper(0, smi_m4u_secure_offset, u4Base, SMI_MAX_PORT_NUM, false);
+	SMIMSG("========== LARB%d m4u non-secure register ==========\n", larb);
+	smi_dumpper(0, smi_m4u_non_secure_offset, u4Base, SMI_MAX_PORT_NUM, false);
 #endif
 }

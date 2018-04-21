@@ -13,6 +13,7 @@
 
 #include <linux/bitmap.h>
 #include <linux/cpumask.h>
+#include <linux/cpu_pm.h>
 #include <linux/export.h>
 #include <linux/kernel.h>
 #include <linux/of_device.h>
@@ -346,7 +347,8 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
 		ret = armpmu->handle_irq(irq, armpmu);
 	finish_clock = sched_clock();
 
-	perf_sample_event_took(finish_clock - start_clock);
+	/* FIXME */
+	/* perf_sample_event_took(finish_clock - start_clock); */
 	return ret;
 }
 
@@ -610,8 +612,10 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
 
 	irq = platform_get_irq(pmu_device, 0);
 	if (irq >= 0 && irq_is_percpu(irq)) {
+		get_online_cpus();
 		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
 		free_percpu_irq(irq, &hw_events->percpu_pmu);
+		put_online_cpus();
 	} else {
 		for (i = 0; i < irqs; ++i) {
 			int cpu = i;
@@ -645,14 +649,17 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
 
 	irq = platform_get_irq(pmu_device, 0);
 	if (irq >= 0 && irq_is_percpu(irq)) {
+		get_online_cpus();
 		err = request_percpu_irq(irq, handler, "arm-pmu",
 					 &hw_events->percpu_pmu);
 		if (err) {
 			pr_err("unable to request IRQ%d for ARM PMU counters\n",
 				irq);
+			put_online_cpus();
 			return err;
 		}
 		on_each_cpu(cpu_pmu_enable_percpu_irq, &irq, 1);
+		put_online_cpus();
 	} else {
 		for (i = 0; i < irqs; ++i) {
 			int cpu = i;
@@ -704,19 +711,128 @@ static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
 	int cpu = (unsigned long)hcpu;
 	struct arm_pmu *pmu = container_of(b, struct arm_pmu, hotplug_nb);
 
+	if ((action & ~CPU_TASKS_FROZEN) == CPU_DOWN_PREPARE) {
+		if (pmu->ppi_irq >= 0)
+			_disable_percpu_irq(pmu->ppi_irq, cpu);
+		return NOTIFY_DONE;
+	}
+
 	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
 		return NOTIFY_DONE;
 
 	if (!cpumask_test_cpu(cpu, &pmu->supported_cpus))
 		return NOTIFY_DONE;
 
-	if (pmu->reset)
+	if (pmu->reset) {
 		pmu->reset(pmu);
-	else
+		if (pmu->ppi_irq >= 0)
+			enable_percpu_irq(pmu->ppi_irq, IRQ_TYPE_NONE);
+	} else {
+		if (pmu->ppi_irq >= 0)
+			enable_percpu_irq(pmu->ppi_irq, IRQ_TYPE_NONE);
 		return NOTIFY_DONE;
+	}
 
 	return NOTIFY_OK;
 }
+
+#ifdef CONFIG_CPU_PM
+static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
+{
+	struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
+	struct perf_event *event;
+	int idx;
+
+	for (idx = 0; idx < armpmu->num_events; idx++) {
+		/*
+		 * If the counter is not used skip it, there is no
+		 * need of stopping/restarting it.
+		 */
+		if (!test_bit(idx, hw_events->used_mask))
+			continue;
+
+		event = hw_events->events[idx];
+
+		switch (cmd) {
+		case CPU_PM_ENTER:
+			/*
+			 * Stop and update the counter
+			 */
+			armpmu_stop(event, PERF_EF_UPDATE);
+			break;
+		case CPU_PM_EXIT:
+		case CPU_PM_ENTER_FAILED:
+			 /*
+			  * Restore and enable the counter.
+			  * armpmu_start() indirectly calls
+			  *
+			  * perf_event_update_userpage()
+			  *
+			  * that requires RCU read locking to be functional,
+			  * wrap the call within RCU_NONIDLE to make the
+			  * RCU subsystem aware this cpu is not idle from
+			  * an RCU perspective for the armpmu_start() call
+			  * duration.
+			  */
+			RCU_NONIDLE(armpmu_start(event, PERF_EF_RELOAD));
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
+			     void *v)
+{
+	struct arm_pmu *armpmu = container_of(b, struct arm_pmu, cpu_pm_nb);
+	struct pmu_hw_events *hw_events = this_cpu_ptr(armpmu->hw_events);
+	int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
+
+	if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
+		return NOTIFY_DONE;
+
+	/*
+	 * Always reset the PMU registers on power-up even if
+	 * there are no events running.
+	 */
+	if (cmd == CPU_PM_EXIT && armpmu->reset)
+		armpmu->reset(armpmu);
+
+	if (!enabled)
+		return NOTIFY_OK;
+
+	switch (cmd) {
+	case CPU_PM_ENTER:
+		armpmu->stop(armpmu);
+		cpu_pm_pmu_setup(armpmu, cmd);
+		break;
+	case CPU_PM_EXIT:
+		cpu_pm_pmu_setup(armpmu, cmd);
+	case CPU_PM_ENTER_FAILED:
+		armpmu->start(armpmu);
+		break;
+	default:
+		return NOTIFY_DONE;
+	}
+
+	return NOTIFY_OK;
+}
+
+static int cpu_pm_pmu_register(struct arm_pmu *cpu_pmu)
+{
+	cpu_pmu->cpu_pm_nb.notifier_call = cpu_pm_pmu_notify;
+	return cpu_pm_register_notifier(&cpu_pmu->cpu_pm_nb);
+}
+
+static void cpu_pm_pmu_unregister(struct arm_pmu *cpu_pmu)
+{
+	cpu_pm_unregister_notifier(&cpu_pmu->cpu_pm_nb);
+}
+#else
+static inline int cpu_pm_pmu_register(struct arm_pmu *cpu_pmu) { return 0; }
+static inline void cpu_pm_pmu_unregister(struct arm_pmu *cpu_pmu) { }
+#endif
 
 static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
 {
@@ -732,6 +848,10 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
 	err = register_cpu_notifier(&cpu_pmu->hotplug_nb);
 	if (err)
 		goto out_hw_events;
+
+	err = cpu_pm_pmu_register(cpu_pmu);
+	if (err)
+		goto out_unregister;
 
 	for_each_possible_cpu(cpu) {
 		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
@@ -754,6 +874,8 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
 
 	return 0;
 
+out_unregister:
+	unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
 out_hw_events:
 	free_percpu(cpu_hw_events);
 	return err;
@@ -761,6 +883,7 @@ out_hw_events:
 
 static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
 {
+	cpu_pm_pmu_unregister(cpu_pmu);
 	unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
 	free_percpu(cpu_pmu->hw_events);
 }
@@ -815,6 +938,7 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
 			if (i > 0 && spi != using_spi) {
 				pr_err("PPI/SPI IRQ type mismatch for %s!\n",
 					dn->name);
+				of_node_put(dn);
 				kfree(irqs);
 				return -EINVAL;
 			}
@@ -907,6 +1031,10 @@ int arm_pmu_device_probe(struct platform_device *pdev,
 		pr_info("failed to probe PMU!\n");
 		goto out_free;
 	}
+
+	pmu->ppi_irq = platform_get_irq(pmu->plat_device, 0);
+	if (!(pmu->ppi_irq >= 0 && irq_is_percpu(pmu->ppi_irq)))
+		pmu->ppi_irq = -1;
 
 	ret = cpu_pmu_init(pmu);
 	if (ret)

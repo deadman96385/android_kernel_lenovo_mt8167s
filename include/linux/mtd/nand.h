@@ -131,10 +131,11 @@ extern int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
 /* Status bits */
 #define NAND_STATUS_FAIL	0x01
 #define NAND_STATUS_FAIL_N1	0x02
+#define SLC_MODE_OP_FALI	0x04
+
 #define NAND_STATUS_TRUE_READY	0x20
 #define NAND_STATUS_READY	0x40
 #define NAND_STATUS_WP		0x80
-#define SLC_MODE_OP_FALI    (0x04)
 
 /*
  * Constants for ECC_MODES
@@ -557,6 +558,7 @@ struct nand_ecc_ctrl {
  * @ecccalc:	buffer pointer for calculated ECC, size is oobsize.
  * @ecccode:	buffer pointer for ECC read from flash, size is oobsize.
  * @databuf:	buffer pointer for data, size is (page size + oobsize).
+ * @subpagebuf:	buffer pointer for sub page read, cache mechanism.
  *
  * Do not change the order of buffers. databuf and oobrbuf must be in
  * consecutive order.
@@ -684,7 +686,11 @@ struct nand_chip {
 	void (*read_buf)(struct mtd_info *mtd, uint8_t *buf, int len);
 	void (*select_chip)(struct mtd_info *mtd, int chip);
 	int (*block_bad)(struct mtd_info *mtd, loff_t ofs, int getchip);
+#if defined(CONFIG_MTK_TLC_NAND_SUPPORT)
+	int (*block_markbad)(struct mtd_info *mtd, loff_t ofs, const uint8_t *buf);
+#else
 	int (*block_markbad)(struct mtd_info *mtd, loff_t ofs);
+#endif
 	void (*cmd_ctrl)(struct mtd_info *mtd, int dat, unsigned int ctrl);
 	int (*dev_ready)(struct mtd_info *mtd);
 	void (*cmdfunc)(struct mtd_info *mtd, unsigned command, int column,
@@ -1110,14 +1116,14 @@ extern u64 part_get_startaddress(u64 byte_address, u32 *idx);
 
 #ifdef CONFIG_MTK_MTD_NAND
 extern int mtk_nand_write_tlc_block(struct mtd_info *mtd, struct nand_chip *chip,
-				uint8_t *buf, u32 page);
+				uint8_t *buf, u32 page, u32 size);
 extern int mtk_nand_read(struct mtd_info *mtd, struct nand_chip *chip, u8 *buf,
 				int page, u32 size);
 extern bool mtk_block_istlc(u64 addr);
 extern bool mtk_is_normal_tlc_nand(void);
+extern bool mtk_is_tlc_nand(void);
 extern u64 mtk_nand_device_size(void);
 extern int mtk_nand_init_size(struct mtd_info *mtd, struct nand_chip *this, u8 *id_data);
-extern int mtk_nand_interface_async(void);
 #endif
 
 #define PMT_POOL_SIZE (2)

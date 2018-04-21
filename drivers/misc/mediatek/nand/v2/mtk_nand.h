@@ -16,11 +16,15 @@
 
 #include <partition_define.h>
 #include <linux/mtd/partitions.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/nand.h>
 
 /*******************************************************************************
  * NFI Register Definition
  *******************************************************************************/
 #ifdef CONFIG_OF
+extern void __iomem *mtk_nfi_base;
+extern void __iomem *mtk_nfiecc_base;
 #define NFI_BASE	mtk_nfi_base
 #define NFIECC_BASE mtk_nfiecc_base
 #endif
@@ -527,6 +531,11 @@
 /* ECC_DECFSM */
 #define ECC_DECFSM_IDLE_V1         (0x01010101)
 #define ECC_DECFSM_IDLE_V2         (0x01011101)
+
+#define ERR_RTN_SUCCESS   1
+#define ERR_RTN_FAIL	  0
+#define ERR_RTN_BCH_FAIL -1
+
 /*******************************************************************************
  * Data Structure Definition
  *******************************************************************************/
@@ -583,6 +592,15 @@ struct read_sleep_para {
 	int t_threshold;
 };
 
+struct rd_err {
+	bool en_print;
+	u32 max_num;
+};
+
+struct mtk_nand_debug {
+	struct rd_err err;
+};
+
 struct mtk_nand_host {
 	struct nand_chip nand_chip;
 	struct mtd_info mtd;
@@ -597,6 +615,7 @@ struct mtk_nand_host {
 	struct mtk_nand_pl_test pl;
 #endif
 	struct mtd_erase_region_info erase_region[20];
+	struct mtk_nand_debug debug;
 };
 
 struct NAND_CMD {
@@ -633,6 +652,60 @@ struct nand_ecclayout {
 extern u32 get_devinfo_with_index(u32 index);
 #endif
 
+#ifndef FALSE
+#define FALSE (0)
+#endif
+
+#ifndef TRUE
+#define TRUE  (1)
+#endif
+
+#ifndef NULL
+#define NULL  (0)
+#endif
+
+#define READ_REGISTER_UINT8(reg) \
+	(*(volatile unsigned char * const)(reg))
+
+#define READ_REGISTER_UINT16(reg) \
+	(*(volatile unsigned short * const)(reg))
+
+#define READ_REGISTER_UINT32(reg) \
+	(*(volatile unsigned int * const)(reg))
+
+
+#define INREG8(x)			READ_REGISTER_UINT8((unsigned char *)((void *)(x)))
+#define INREG16(x)			READ_REGISTER_UINT16((unsigned short *)((void *)(x)))
+#define INREG32(x)			READ_REGISTER_UINT32((unsigned int *)((void *)(x)))
+#define DRV_Reg8(addr)				INREG8(addr)
+#define DRV_Reg16(addr)				INREG16(addr)
+#define DRV_Reg32(addr)				INREG32(addr)
+#define DRV_Reg(addr)				DRV_Reg16(addr)
+
+#define WRITE_REGISTER_UINT8(reg, val) \
+	((*(volatile unsigned char * const)(reg)) = (val))
+#define WRITE_REGISTER_UINT16(reg, val) \
+	((*(volatile unsigned short * const)(reg)) = (val))
+#define WRITE_REGISTER_UINT32(reg, val) \
+	((*(volatile unsigned int * const)(reg)) = (val))
+
+
+#define OUTREG8(x, y)		WRITE_REGISTER_UINT8((unsigned char *)((void *)(x)), (unsigned char)(y))
+#define OUTREG16(x, y)		WRITE_REGISTER_UINT16((unsigned short *)((void *)(x)), (unsigned short)(y))
+#define OUTREG32(x, y)		WRITE_REGISTER_UINT32((unsigned int *)((void *)(x)), (unsigned int)(y))
+#define DRV_WriteReg8(addr, data)	OUTREG8(addr, data)
+#define DRV_WriteReg16(addr, data)	OUTREG16(addr, data)
+#define DRV_WriteReg32(addr, data)	OUTREG32(addr, data)
+#define DRV_WriteReg(addr, data)	DRV_WriteReg16(addr, data)
+
+#define CFG_PERFLOG_DEBUG (0)	/* for performance log */
+extern void __iomem *mtk_gpio_base;
+#define GPIO_BASE	mtk_gpio_base
+
+extern int g_i4Interrupt;
+extern unsigned int nfi_irq;
+#define MT_NFI_IRQ_ID nfi_irq
+
 void show_stack(struct task_struct *tsk, unsigned long *sp);
 extern struct mtd_partition g_pasStatic_Partition[PART_MAX_COUNT];
 extern struct mtd_perf_log g_MtdPerfLog;
@@ -650,7 +723,7 @@ u32 micron_pairpage_mapping(u32 page, bool high_to_low);
 u32 sandisk_pairpage_mapping(u32 page, bool high_to_low);
 extern u64 part_get_startaddress(u64 byte_address, u32 *idx);
 extern bool raw_partition(u32 index);
-
+int mtk_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip, u8 *buf, int page);
 #define PMT							1
 
 #ifdef PMT

@@ -47,10 +47,6 @@ extern void aee_rr_rec_sodi3_val(u32 val);
 extern u32 aee_rr_curr_sodi3_val(void);
 #endif
 
-#ifdef SPM_SODI_PROFILE_TIME
-extern unsigned int soidle3_profile[4];
-#endif
-
 /* SODI */
 extern void soidle_before_wfi(int cpu);
 extern void soidle_after_wfi(int cpu);
@@ -59,16 +55,21 @@ extern void aee_rr_rec_sodi_val(u32 val);
 extern u32 aee_rr_curr_sodi_val(void);
 #endif
 
-#ifdef SPM_SODI_PROFILE_TIME
-extern unsigned int soidle_profile[4];
-#endif
-
 extern bool mtk_gpu_sodi_entry(void);
 extern bool mtk_gpu_sodi_exit(void);
 extern int hps_del_timer(void);
 extern int hps_restart_timer(void);
 extern int vcorefs_get_curr_ddr(void);
 extern int vcorefs_get_curr_vcore(void);
+
+/* MC-SODI */
+extern void mcsodi_before_wfi(int cpu);
+extern void mcsodi_after_wfi(int cpu);
+extern bool mtk_idle_cpu_wfi_criteria(void);
+#if SPM_AEE_RR_REC
+extern void aee_rr_rec_mcsodi_val(u32 val);
+extern u32 aee_rr_curr_mcsodi_val(void);
+#endif
 
 /* Deepidle */
 #if SPM_AEE_RR_REC
@@ -102,6 +103,10 @@ extern bool is_already_snap_shot;
 
 /* power golden setting */
 extern void mt_power_gs_dump_suspend(void);
+extern void mt_power_gs_dump_dpidle(void);
+extern void mt_power_gs_dump_sodi3(void);
+extern bool slp_dump_golden_setting;
+extern int slp_dump_golden_setting_type;
 
 /* gpio */
 extern void gpio_dump_regs(void);
@@ -120,20 +125,20 @@ extern void mt_eint_print_status(void);
 __attribute__ ((weak))
 unsigned int pmic_read_interface_nolock(unsigned int RegNum, unsigned int *val, unsigned int MASK, unsigned int SHIFT)
 {
-	pr_err("NO %s !!!\n", __func__);
+	pr_notice("NO %s !!!\n", __func__);
 	return 0;
 }
 
 __attribute__ ((weak))
 unsigned int pmic_config_interface(unsigned int RegNum, unsigned int val, unsigned int MASK, unsigned int SHIFT)
 {
-	pr_err("NO %s !!!\n", __func__);
+	pr_notice("NO %s !!!\n", __func__);
 	return 0;
 }
 __attribute__ ((weak))
 unsigned int pmic_config_interface_nolock(unsigned int RegNum, unsigned int val, unsigned int MASK, unsigned int SHIFT)
 {
-	pr_err("NO %s !!!\n", __func__);
+	pr_notice("NO %s !!!\n", __func__);
 	return 0;
 }
 #endif /* CONFIG_FPGA_EARLY_PORTING */
@@ -141,7 +146,7 @@ unsigned int pmic_config_interface_nolock(unsigned int RegNum, unsigned int val,
 __attribute__ ((weak))
 int vcorefs_get_curr_ddr(void)
 {
-	pr_err("NO %s !!!\n", __func__);
+	pr_notice("NO %s !!!\n", __func__);
 	return -1;
 }
 
@@ -152,7 +157,7 @@ extern int univpll_is_used(void);
 __attribute__ ((weak))
 int hps_get_root_id(void)
 {
-	pr_err("NO %s !!!\n", __func__);
+	pr_notice("NO %s !!!\n", __func__);
 	return 0;
 }
 

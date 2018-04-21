@@ -194,6 +194,8 @@ unsigned int mt6336_interrupts_size = ARRAY_SIZE(mt6336_interrupts);
 unsigned char cc_pd_i = MT6336_INT_TYPE_C_CC_IRQ / CHR_INT_WIDTH;
 unsigned char cc_j = MT6336_INT_TYPE_C_CC_IRQ % CHR_INT_WIDTH;
 unsigned char pd_j = MT6336_INT_TYPE_C_PD_IRQ % CHR_INT_WIDTH;
+unsigned char cl_j = MT6336_INT_TYPE_C_L_MIN % CHR_INT_WIDTH;
+
 
 /*****************************************************************************
  * MT6336 Interrupt service
@@ -228,7 +230,7 @@ irqreturn_t mt6336_eint_irq(int irq, void *desc)
 	return IRQ_HANDLED;
 }
 
-void mt6336_enable_interrupt(MT6336_IRQ_ENUM intNo, char *str)
+void mt6336_enable_interrupt(enum MT6336_IRQ_ENUM intNo, char *str)
 {
 	unsigned int shift, no;
 
@@ -250,7 +252,7 @@ void mt6336_enable_interrupt(MT6336_IRQ_ENUM intNo, char *str)
 		mt6336_interrupts[shift].en, mt6336_get_register_value(mt6336_interrupts[shift].en));
 }
 
-void mt6336_disable_interrupt(MT6336_IRQ_ENUM intNo, char *str)
+void mt6336_disable_interrupt(enum MT6336_IRQ_ENUM intNo, char *str)
 {
 	unsigned int shift, no;
 
@@ -272,7 +274,7 @@ void mt6336_disable_interrupt(MT6336_IRQ_ENUM intNo, char *str)
 		mt6336_interrupts[shift].en, mt6336_get_register_value(mt6336_interrupts[shift].en));
 }
 
-void mt6336_mask_interrupt(MT6336_IRQ_ENUM intNo, char *str)
+void mt6336_mask_interrupt(enum MT6336_IRQ_ENUM intNo, char *str)
 {
 	unsigned int shift, no;
 
@@ -294,7 +296,7 @@ void mt6336_mask_interrupt(MT6336_IRQ_ENUM intNo, char *str)
 		mt6336_interrupts[shift].mask, mt6336_get_register_value(mt6336_interrupts[shift].mask));
 }
 
-void mt6336_unmask_interrupt(MT6336_IRQ_ENUM intNo, char *str)
+void mt6336_unmask_interrupt(enum MT6336_IRQ_ENUM intNo, char *str)
 {
 	unsigned int shift, no;
 
@@ -316,7 +318,7 @@ void mt6336_unmask_interrupt(MT6336_IRQ_ENUM intNo, char *str)
 		mt6336_interrupts[shift].mask, mt6336_get_register_value(mt6336_interrupts[shift].mask));
 }
 
-void mt6336_register_interrupt_callback(MT6336_IRQ_ENUM intNo, void (EINT_FUNC_PTR) (void))
+void mt6336_register_interrupt_callback(enum MT6336_IRQ_ENUM intNo, void (EINT_FUNC_PTR) (void))
 {
 	unsigned int shift, no;
 
@@ -357,8 +359,6 @@ static void mt6336_int_handler(void)
 			/* handle CC & PD irq first, CC & PD are at the same status register */
 			cc_pd_status = mt6336_get_register_value(mt6336_interrupts[cc_pd_i].address);
 			if (cc_pd_status) {
-				pr_err(MT6336TAG "[CHR_INT] Type-C status[0x%x]=0x%x\n",
-					mt6336_interrupts[cc_pd_i].address, cc_pd_status);
 				if (cc_pd_status & (1 << cc_j)
 				    && mt6336_interrupts[cc_pd_i].interrupts[cc_j].callback != NULL) {
 					mt6336_interrupts[cc_pd_i].interrupts[cc_j].callback();
@@ -369,9 +369,16 @@ static void mt6336_int_handler(void)
 					mt6336_interrupts[cc_pd_i].interrupts[pd_j].callback();
 					mt6336_interrupts[cc_pd_i].interrupts[pd_j].times++;
 				}
+				if (cc_pd_status & (1 << cl_j)
+				    && mt6336_interrupts[cc_pd_i].interrupts[cl_j].callback != NULL) {
+					mt6336_interrupts[cc_pd_i].interrupts[cl_j].callback();
+					mt6336_interrupts[cc_pd_i].interrupts[cl_j].times++;
+				}
+				pr_err(MT6336TAG "[CHR_INT] Type-C status[0x%x]=0x%x\n",
+					mt6336_interrupts[cc_pd_i].address, cc_pd_status);
 				mt6336_set_register_value(mt6336_interrupts[cc_pd_i].address, cc_pd_status);
 			}
-			if (i == cc_pd_i && (j == cc_j || j == pd_j))
+			if (i == cc_pd_i && (j == cc_j || j == pd_j || j == cl_j))
 				continue;
 			/* handle other irqs */
 			if ((int_status_vals[i]) & (1 << j)) {
@@ -390,8 +397,10 @@ static void mt6336_int_handler(void)
 /* interrupt service */
 int mt6336_thread_kthread(void *x)
 {
+#if 0
 	unsigned int i;
 	unsigned int int_status_val = 0;
+#endif
 	struct sched_param param = {.sched_priority = 98 };
 
 	sched_setscheduler(current, SCHED_FIFO, &param);
@@ -406,11 +415,13 @@ int mt6336_thread_kthread(void *x)
 		mt6336_ctrl_enable(irq_ctrl);
 		mt6336_int_handler();
 		mt6336_ctrl_disable(irq_ctrl);
+#if 0
 		for (i = 0; i < ARRAY_SIZE(mt6336_interrupts); i++) {
 			int_status_val = mt6336_get_register_value(mt6336_interrupts[i].address);
 			MT6336LOG("[CHR_INT] %d after, status[0x%x]=0x%x\n", i,
 				mt6336_interrupts[i].address, int_status_val);
 		}
+#endif
 		mdelay(1);
 
 		mutex_unlock(&mt6336_mutex);

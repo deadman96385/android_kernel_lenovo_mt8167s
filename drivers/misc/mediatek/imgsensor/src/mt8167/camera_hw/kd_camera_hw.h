@@ -40,8 +40,8 @@
 
 /* Main sensor */
     /* Common phone's reset pin uses extension GPIO10 of mt6306 */
-#define CAMERA_CMRST_PIN            GPIO_CAMERA_CMRST_PIN
-#define CAMERA_CMRST_PIN_M_GPIO     GPIO_CAMERA_CMRST_PIN_M_GPIO
+    #define CAMERA_CMRST_PIN            GPIO_CAMERA_CMRST_PIN
+    #define CAMERA_CMRST_PIN_M_GPIO     GPIO_CAMERA_CMRST_PIN_M_GPIO
 
 
 #define CAMERA_CMPDN_PIN            GPIO_CAMERA_CMPDN_PIN
@@ -79,7 +79,7 @@
 int mtkcam_gpio_set(int PinIdx, int PwrType, int Val);
 int mtkcam_gpio_init(struct platform_device *pdev);
 
-#endif				/* End of #if defined CONFIG_MTK_LEGACY */
+#endif /* End of #if defined CONFIG_MTK_LEGACY */
 
 typedef enum KD_REGULATOR_TYPE_TAG {
 	VCAMA,

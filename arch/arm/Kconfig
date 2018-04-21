@@ -1270,6 +1270,14 @@ config ARM_ERRATA_824069
 	  in another cluster is executing a cache maintenance operation
 	  to the same address, then this erratum might cause
 	  a clean cache line to be incorrectly marked as dirty.
+
+config ARM_ERRATA_855872
+	bool "Cortex-A53: 855872: A Store-Exclusive instruction might pass when it should fail"
+	help
+	  This option adds a DMB to before each LDAXR and LDXR to avoid conditions
+	  of erratum 855872 on Cortex-A53 parts up to r0p4.
+	  Because of this erratum, the processor which acquires lock might pass when it should
+	  fail.
 endmenu
 
 source "arch/arm/common/Kconfig"
@@ -1759,6 +1767,26 @@ config ARM_MODULE_PLTS
 
 	  Say y if you are getting out of memory errors while loading modules
 
+config RANDOMIZE_BASE
+	bool "<FAKE> Randomize the address of the kernel image"
+	default y
+	help
+	  For FIX Bug: 69167010
+	  Add new config to prevent android-base.cfg locating RANDOMIZE_BASE config
+	  Randomizes the virtual address at which the kernel image is
+	  loaded, as a security feature that deters exploit attempts
+	  relying on knowledge of the location of kernel internals.
+
+	  It is the bootloader's job to provide entropy, by passing a
+	  random u64 value in /chosen/kaslr-seed at kernel entry.
+
+	  When booting via the UEFI stub, it will invoke the firmware's
+	  EFI_RNG_PROTOCOL implementation (if available) to supply entropy
+	  to the kernel proper. In addition, it will randomise the physical
+	  location of the kernel Image as well.
+
+	  If unsure, say N.
+
 source "mm/Kconfig"
 
 config FORCE_MAX_ZONEORDER
@@ -1894,6 +1922,22 @@ config BUILD_ARM_APPENDED_DTB_IMAGE_NAMES
 	help
 	  Space separated list of names of dtbs to append when
 	  building a concatenated zImage-dtb.
+
+config BUILD_ARM_DTB_OVERLAY_IMAGE
+	bool "Build a device tree overlay image"
+	depends on OF
+	help
+	  Enabling this option will casue overlay device tree
+	  to be built by default.
+	  Overlay DT contains device-specific configurations.
+	  Please be aware that bootloader supports DT merging.
+
+config BUILD_ARM_DTB_OVERLAY_IMAGE_NAMES
+	string "Default dtb overlay names"
+	depends on BUILD_ARM_DTB_OVERLAY_IMAGE
+	help
+	  Space separated list of names of dtbs to append when
+	  building a concatenated overlay image
 
 # Compressed boot loader in ROM.  Yes, we really want to ask about
 # TEXT and BSS so we preserve their values in the config files.

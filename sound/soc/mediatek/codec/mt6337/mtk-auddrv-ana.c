@@ -61,11 +61,11 @@ static DEFINE_SPINLOCK(ana_set_reg_lock);
 /*****************************************************************************
  *                         D A T A   T Y P E S
  *****************************************************************************/
-uint32 Ana_Get_Reg(uint32 offset)
+unsigned int Ana_Get_Reg(unsigned int offset)
 {
 	/* get pmic register */
 	int ret = 0;
-	uint32 Rdata = 0;
+	unsigned int Rdata = 0;
 #ifdef AUDIO_USING_WRAP_DRIVER
 	ret = pwrap_read(offset, &Rdata);
 #endif
@@ -74,11 +74,11 @@ uint32 Ana_Get_Reg(uint32 offset)
 }
 EXPORT_SYMBOL(Ana_Get_Reg);
 
-void Ana_Set_Reg(uint32 offset, uint32 value, uint32 mask)
+void Ana_Set_Reg(unsigned int offset, unsigned int value, unsigned int mask)
 {
 	/* set pmic register or analog CONTROL_IFACE_PATH */
 	int ret = 0;
-	uint32 Reg_Value;
+	unsigned int Reg_Value;
 	unsigned long flags = 0;
 
 	PRINTK_ANA_REG("Ana_Set_Reg offset= 0x%x , value = 0x%x mask = 0x%x\n", offset, value,
@@ -91,10 +91,16 @@ void Ana_Set_Reg(uint32 offset, uint32 value, uint32 mask)
 	ret = pwrap_write(offset, Reg_Value);
 	spin_unlock_irqrestore(&ana_set_reg_lock, flags);
 
+	/* no need check write-only reg*/
+	if (offset == TOP_CKPDN_CON0_SET || offset == TOP_CLKSQ_SET ||
+	    offset == TOP_CKPDN_CON0_CLR || offset == TOP_CLKSQ_CLR ||
+	    offset == AFE_DL_DC_COMP_CFG3 || offset == AFE_DL_DC_COMP_CFG4)
+		return;
+
 	Reg_Value = Ana_Get_Reg(offset);
 	if ((Reg_Value & mask) != (value & mask))
-		pr_warn("Ana_Set_Reg  mask = 0x%x ret = %d Reg_Value = 0x%x\n", mask, ret,
-			 Reg_Value);
+		pr_warn("%s, ret = %d offset = 0x%x, w_value = 0x%x, mask = 0x%x  r_value = 0x%x\n",
+			__func__, ret, offset, value, mask, Reg_Value);
 #endif
 }
 EXPORT_SYMBOL(Ana_Set_Reg);
@@ -286,6 +292,7 @@ EXPORT_SYMBOL(Ana_Log_Print);
 int Ana_Debug_Read(char *buffer, const int size)
 {
 	int n = 0;
+
 	n += scnprintf(buffer + n, size - n, "AFE_UL_DL_CON0 = 0x%x\n",
 			Ana_Get_Reg(AFE_UL_DL_CON0));
 	n += scnprintf(buffer + n, size - n, "AFE_DL_SRC2_CON0_H = 0x%x\n",

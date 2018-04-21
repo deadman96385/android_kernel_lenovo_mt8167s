@@ -16,7 +16,6 @@
 #include <linux/device-mapper.h>
 #include <crypto/hash.h>
 
-#define DM_VERITY_WAIT_DEV_TIMEOUT_MS	(2000)
 #define DM_VERITY_MAX_LEVELS		63
 
 enum verity_mode {
@@ -137,4 +136,5 @@ extern void verity_io_hints(struct dm_target *ti, struct queue_limits *limits);
 extern void verity_dtr(struct dm_target *ti);
 extern int verity_ctr(struct dm_target *ti, unsigned argc, char **argv);
 extern int verity_map(struct dm_target *ti, struct bio *bio);
+extern void dm_verity_avb_error_handler(void);
 #endif /* DM_VERITY_H */

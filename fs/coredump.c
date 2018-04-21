@@ -1,6 +1,7 @@
 #include <linux/slab.h>
 #include <linux/file.h>
 #include <linux/fdtable.h>
+#include <linux/freezer.h>
 #include <linux/mm.h>
 #include <linux/stat.h>
 #include <linux/fcntl.h>
@@ -399,7 +400,9 @@ static int coredump_wait(int exit_code, struct core_state *core_state)
 	if (core_waiters > 0) {
 		struct core_thread *ptr;
 
+		freezer_do_not_count();
 		wait_for_completion(&core_state->startup);
+		freezer_count();
 		/*
 		 * Wait for all the threads to become inactive, so that
 		 * all the thread context (extended register state, like
@@ -506,6 +509,51 @@ static int umh_pipe_setup(struct subprocess_info *info, struct cred *new)
 	return err;
 }
 
+#if defined(CONFIG_MTK_AEE_FEATURE) && defined(CONFIG_MTK_ENG_BUILD)
+#include <linux/suspend.h>
+
+static atomic_t coredump_request_count = ATOMIC_INIT(0);
+
+static int coredump_pm_notifier_cb(struct notifier_block *nb, unsigned long event, void *ptr)
+{
+	switch (event) {
+	case PM_SUSPEND_PREPARE:
+		if (atomic_read(&coredump_request_count) > 0) {
+			pr_info("%s coredump is on going", __func__);
+			return NOTIFY_BAD;
+		} else
+			return NOTIFY_DONE;
+	default:
+		return NOTIFY_DONE;
+	}
+	return NOTIFY_DONE;
+}
+
+/* Hibernation and suspend events */
+static struct notifier_block coredump_pm_notifier_block = {
+	.notifier_call = coredump_pm_notifier_cb,
+};
+
+static int __init init_coredump(void)
+{
+	/* register pm notifier */
+	int ret = register_pm_notifier(&coredump_pm_notifier_block);
+
+	if (ret)
+		pr_err("%s: failed to register_pm_notifier(%d)\n", __func__, ret);
+	return 0;
+}
+
+static void __exit exit_coredump(void)
+{
+	/* unregister pm notifier */
+	unregister_pm_notifier(&coredump_pm_notifier_block);
+}
+
+late_initcall(init_coredump);
+module_exit(exit_coredump);
+#endif
+
 void do_coredump(const siginfo_t *siginfo)
 {
 	struct core_state core_state;
@@ -532,6 +580,10 @@ void do_coredump(const siginfo_t *siginfo)
 		 */
 		.mm_flags = mm->flags,
 	};
+
+#if defined(CONFIG_MTK_AEE_FEATURE) && defined(CONFIG_MTK_ENG_BUILD)
+	atomic_inc(&coredump_request_count);
+#endif
 
 	audit_core_dumps(siginfo->si_signo);
 
@@ -727,7 +779,7 @@ void do_coredump(const siginfo_t *siginfo)
 			goto close_fail;
 		if (!(cprm.file->f_mode & FMODE_CAN_WRITE))
 			goto close_fail;
-		if (do_truncate(cprm.file->f_path.dentry, 0, 0, cprm.file))
+		if (do_truncate2(cprm.file->f_path.mnt, cprm.file->f_path.dentry, 0, 0, cprm.file))
 			goto close_fail;
 	}
 
@@ -757,6 +809,9 @@ fail_unlock:
 fail_creds:
 	put_cred(cred);
 fail:
+#if defined(CONFIG_MTK_AEE_FEATURE) && defined(CONFIG_MTK_ENG_BUILD)
+	atomic_dec(&coredump_request_count);
+#endif
 	return;
 }
 
@@ -773,11 +828,15 @@ int dump_emit(struct coredump_params *cprm, const void *addr, int nr)
 	if (cprm->written + nr > cprm->limit)
 		return 0;
 	while (nr) {
-		if (dump_interrupted())
+		if (dump_interrupted()) {
+			pr_err("%s: interrupted\n", __func__);
 			return 0;
+		}
 		n = __kernel_write(file, addr, nr, &pos);
-		if (n <= 0)
+		if (n <= 0) {
+			pr_err("%s: __kernel_write fail: %zd\n", __func__, n);
 			return 0;
+		}
 		file->f_pos = pos;
 		cprm->written += n;
 		nr -= n;
@@ -817,3 +876,21 @@ int dump_align(struct coredump_params *cprm, int align)
 	return mod ? dump_skip(cprm, align - mod) : 1;
 }
 EXPORT_SYMBOL(dump_align);
+
+/*
+ * Ensures that file size is big enough to contain the current file
+ * postion. This prevents gdb from complaining about a truncated file
+ * if the last "write" to the file was dump_skip.
+ */
+void dump_truncate(struct coredump_params *cprm)
+{
+	struct file *file = cprm->file;
+	loff_t offset;
+
+	if (file->f_op->llseek && file->f_op->llseek != no_llseek) {
+		offset = file->f_op->llseek(file, 0, SEEK_CUR);
+		if (i_size_read(file->f_mapping->host) < offset)
+			do_truncate(file->f_path.dentry, offset, 0, file);
+	}
+}
+EXPORT_SYMBOL(dump_truncate);

@@ -332,6 +332,7 @@ extern void sched_destroy_group(struct task_group *tg);
 extern void sched_offline_group(struct task_group *tg);
 
 extern void sched_move_task(struct task_struct *tsk);
+extern int find_best_idle_cpu(struct task_struct *p, bool prefer_idle);
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 extern int sched_group_set_shares(struct task_group *tg, unsigned long shares);
@@ -641,6 +642,10 @@ struct rq {
 #ifdef CONFIG_SCHED_HMP
 	struct task_struct *migrate_task;
 #endif
+
+#ifdef CONFIG_MTK_SCHED_VIP_TASKS
+	struct task_struct *vip_cache;
+#endif
 	/* cpu of this runqueue: */
 	int cpu;
 	int online;
@@ -922,6 +927,8 @@ static inline void sched_ttwu_pending(void) { }
 
 #endif /* CONFIG_SMP */
 
+extern unsigned int hmp_cpu_is_slowest(int cpu);
+
 #ifdef CONFIG_SCHED_HMP
 extern struct cpumask hmp_fast_cpu_mask;
 extern struct cpumask hmp_slow_cpu_mask;
@@ -932,7 +939,6 @@ static LIST_HEAD(hmp_domains);
 DECLARE_PER_CPU(struct hmp_domain *, hmp_cpu_domain);
 
 #define hmp_cpu_domain(cpu)     (per_cpu(hmp_cpu_domain, (cpu)))
-
 #endif
 
 #include "stats.h"
@@ -996,7 +1002,11 @@ static inline void __set_task_cpu(struct task_struct *p, unsigned int cpu)
 	 * per-task data have been completed by this moment.
 	 */
 	smp_wmb();
+#ifdef CONFIG_THREAD_INFO_IN_TASK
+	p->cpu = cpu;
+#else
 	task_thread_info(p)->cpu = cpu;
+#endif
 	p->wake_cpu = cpu;
 #endif
 }
@@ -1285,6 +1295,7 @@ extern const struct sched_class idle_sched_class;
 extern void update_group_capacity(struct sched_domain *sd, int cpu);
 
 extern void trigger_load_balance(struct rq *rq);
+extern void nohz_balance_clear_nohz_mask(int cpu);
 
 extern void idle_enter_fair(struct rq *this_rq);
 extern void idle_exit_fair(struct rq *this_rq);
@@ -1370,7 +1381,16 @@ extern void sched_max_util_task(int *cpu, int *pid, int *util, int *boost);
 #endif
 
 #ifdef CONFIG_MTK_SCHED_RQAVG_US
-extern int inc_nr_heavy_running(const char *invoker, struct task_struct *p, int inc, bool ack_cap);
+extern int inc_nr_heavy_running(int invoker, struct task_struct *p, int inc, bool ack_cap);
+
+#ifdef CONFIG_MTK_SCHED_CPULOAD
+extern void cal_cpu_load(int cpu);
+#endif
+
+#endif
+
+#ifdef CONFIG_MTK_SCHED_VIP_TASKS
+int vip_task_force_migrate(void);
 #endif
 
 extern void init_max_cpu_capacity(struct max_cpu_capacity *mcc);
@@ -1469,7 +1489,9 @@ extern void sched_avg_update(struct rq *rq);
 
 extern void arch_scale_set_curr_freq(int cpu, unsigned long freq);
 extern void arch_scale_set_max_freq(int cpu, unsigned long freq);
+extern void arch_scale_set_min_freq(int cpu, unsigned long freq);
 extern unsigned long arch_scale_get_max_freq(int cpu);
+extern unsigned long arch_scale_get_min_freq(int cpu);
 extern unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu);
 extern unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu);
 
@@ -1548,13 +1570,23 @@ enum cpu_dvfs_sched_type {
 	SCHE_INVALID,
 	SCHE_VALID,
 	SCHE_ONESHOT,
+	SCHE_IOWAIT,
+	SCHE_RT,
+	SCHE_DL,
 
 	NUM_SCHE_TYPE
 };
 
-extern unsigned int capacity_margin;
+#define DEFAULT_CAP_MARGIN_DVFS 1024 /* ~0% margin */
 
-#ifdef CONFIG_CPU_FREQ_GOV_SCHED
+extern unsigned int capacity_margin;
+extern unsigned int capacity_margin_dvfs;
+
+extern void update_sched_hint(int sys_util, int sys_cap);
+extern void sched_hint_check(u64 wallclock);
+extern u64 sched_ktime_clock(void);
+
+#if defined(CONFIG_CPU_FREQ_GOV_SCHED) || defined(CONFIG_CPU_FREQ_GOV_SCHEDPLUS)
 #define capacity_max SCHED_CAPACITY_SCALE
 extern struct static_key __sched_freq;
 
@@ -1575,6 +1607,7 @@ static inline void set_cfs_cpu_capacity(int cpu, bool request,
 	if (per_cpu(cpu_sched_capacity_reqs, cpu).cfs != capacity) {
 #endif
 		per_cpu(cpu_sched_capacity_reqs, cpu).cfs = capacity;
+
 		update_cpu_capacity_request(cpu, request, type);
 	}
 }
@@ -1589,7 +1622,7 @@ static inline void set_rt_cpu_capacity(int cpu, bool request,
 	if (per_cpu(cpu_sched_capacity_reqs, cpu).rt != capacity) {
 #endif
 		per_cpu(cpu_sched_capacity_reqs, cpu).rt = capacity;
-		update_cpu_capacity_request(cpu, request, type);
+		update_cpu_capacity_request(cpu, request, SCHE_RT);
 	}
 }
 
@@ -1603,7 +1636,7 @@ static inline void set_dl_cpu_capacity(int cpu, bool request,
 	if (per_cpu(cpu_sched_capacity_reqs, cpu).dl != capacity) {
 #endif
 		per_cpu(cpu_sched_capacity_reqs, cpu).dl = capacity;
-		update_cpu_capacity_request(cpu, request, type);
+		update_cpu_capacity_request(cpu, request, SCHE_DL);
 	}
 }
 #else

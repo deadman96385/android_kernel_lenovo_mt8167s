@@ -93,6 +93,25 @@ static unsigned int mt8167_afe_tdm_ch_fixup(unsigned int channels)
 		return 2;
 }
 
+static unsigned int mt8167_afe_tdm_out_ch_per_sdata(unsigned int mode,
+	unsigned int channels)
+{
+	if (mode == MT8167_AFE_TDM_OUT_TDM)
+		return mt8167_afe_tdm_ch_fixup(channels);
+	else
+		return 2;
+}
+
+static int mt8167_afe_tdm_out_bitwidth_fixup(unsigned int mode,
+	int bitwidth)
+{
+	if (mode == MT8167_AFE_TDM_OUT_HDMI ||
+	    mode == MT8167_AFE_TDM_OUT_I2S_32BITS)
+		return 32;
+	else
+		return bitwidth;
+}
+
 static snd_pcm_uframes_t mt8167_afe_pcm_pointer
 			 (struct snd_pcm_substream *substream)
 {
@@ -431,80 +450,6 @@ static int mt8167_afe_set_adda_in(struct mtk_afe *afe, unsigned int rate)
 		return -EINVAL;
 	}
 
-	if (afe->apply_6db_gain_in_ul_src) {
-		switch (rate) {
-		case 8000:
-		case 16000:
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_02_01,
-				0xFFEE002C);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_04_03,
-				0xFE2CFEFC);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_06_05,
-				0x00AEFEE0);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_08_07,
-				0xFF840134);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_10_09,
-				0xFE4EFFFC);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_12_11,
-				0x00D2022A);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_14_13,
-				0xFE0CFD88);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_16_15,
-				0x03640274);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_18_17,
-				0xFAF6FE14);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_20_19,
-				0x06CE00B2);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_22_21,
-				0xF7760184);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_24_23,
-				0x0A18FADC);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_26_25,
-				0xF4AC0B48);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_28_27,
-				0x0C1EE800);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_30_29,
-				0x739C5068);
-			regmap_update_bits(afe->regmap, AFE_ADDA_UL_SRC_CON0,
-				1 << 31, 1 << 31);
-			break;
-		case 32000:
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_02_01,
-				0x02A600B2);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_04_03,
-				0xFEF6010C);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_06_05,
-				0x00EEFE94);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_08_07,
-				0xFF840204);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_10_09,
-				0xFFB0FD52);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_12_11,
-				0x0180033A);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_14_13,
-				0xFCF0FC84);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_16_15,
-				0x04EE0342);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_18_17,
-				0xF904FDA6);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_20_19,
-				0x09100088);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_22_21,
-				0xF510028A);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_24_23,
-				0x0C40F896);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_26_25,
-				0xF3DA0F72);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_28_27,
-				0x0604E0C8);
-			regmap_write(afe->regmap, AFE_ADDA_UL_CF_CFG_30_29,
-				0x7A6E526A);
-			regmap_update_bits(afe->regmap, AFE_ADDA_UL_SRC_CON0,
-				1 << 31, 1 << 31);
-			break;
-		}
-	}
-
 	regmap_update_bits(afe->regmap, AFE_ADDA_UL_SRC_CON0, 0x001e0000, val);
 
 	regmap_update_bits(afe->regmap, AFE_ADDA_NEWIF_CFG1, 0xc00, val2);
@@ -532,6 +477,122 @@ static void mt8167_afe_set_adda_in_enable(struct mtk_afe *afe, bool enable)
 		mt8167_afe_enable_adda_on(afe);
 	else
 		mt8167_afe_disable_adda_on(afe);
+}
+
+static uint32_t mt8167_afe_rate_to_idx(uint32_t sample_rate)
+{
+	switch (sample_rate) {
+	case 8000:
+		return MT_AFE_I2S_SAMPLERATE_8K;
+	case 11025:
+		return MT_AFE_I2S_SAMPLERATE_11K;
+	case 12000:
+		return MT_AFE_I2S_SAMPLERATE_12K;
+	case 16000:
+		return MT_AFE_I2S_SAMPLERATE_16K;
+	case 22050:
+		return MT_AFE_I2S_SAMPLERATE_22K;
+	case 24000:
+		return MT_AFE_I2S_SAMPLERATE_24K;
+	case 32000:
+		return MT_AFE_I2S_SAMPLERATE_32K;
+	case 44100:
+		return MT_AFE_I2S_SAMPLERATE_44K;
+	case 48000:
+		return MT_AFE_I2S_SAMPLERATE_48K;
+	case 88000:
+		return MT_AFE_I2S_SAMPLERATE_88K;
+	case 96000:
+		return MT_AFE_I2S_SAMPLERATE_96K;
+	case 174000:
+		return MT_AFE_I2S_SAMPLERATE_174K;
+	case 192000:
+		return MT_AFE_I2S_SAMPLERATE_192K;
+	default:
+		break;
+	}
+	return MT_AFE_I2S_SAMPLERATE_44K;
+}
+
+void mt8167_afe_set_hw_digital_gain_mode(struct mtk_afe *afe, uint32_t gain_type, uint32_t sample_rate,
+				uint32_t sample_per_step)
+{
+	uint32_t value = sample_per_step << 8 | (mt8167_afe_rate_to_idx(sample_rate) << 4);
+
+	switch (gain_type) {
+	case MT8167_AFE_HW_DIGITAL_GAIN1:
+		regmap_update_bits(afe->regmap, AFE_GAIN1_CON0, 0xfff0, value);
+		break;
+	case MT8167_AFE_HW_DIGITAL_GAIN2:
+		regmap_update_bits(afe->regmap, AFE_GAIN2_CON0, 0xfff0, value);
+		break;
+	default:
+		break;
+	}
+}
+void mt8167_afe_set_hw_digital_gain_state(struct mtk_afe *afe, int gain_type, bool enable)
+{
+	switch (gain_type) {
+	case MT8167_AFE_HW_DIGITAL_GAIN1:
+		if (enable) {
+			/* Let current gain be 0 to ramp up */
+			regmap_update_bits(afe->regmap, AFE_GAIN1_CUR, 0xFFFFF, 0);
+		}
+		regmap_update_bits(afe->regmap, AFE_GAIN1_CON0, 0x1, enable);
+		break;
+	case MT8167_AFE_HW_DIGITAL_GAIN2:
+		if (enable) {
+			/* Let current gain be 0 to ramp up */
+			regmap_update_bits(afe->regmap, AFE_GAIN2_CUR, 0xFFFFF, 0);
+		}
+		regmap_update_bits(afe->regmap, AFE_GAIN2_CON0, 0x1, enable);
+		break;
+	default:
+		pr_warn("%s with no match type\n", __func__);
+		break;
+	}
+}
+
+static void mt8167_afe_enable_mrg_i2s(struct mtk_afe *afe)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&afe->afe_ctrl_lock, flags);
+	afe->mrgi2s_on_ref_cnt++;
+	spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
+
+	if (afe->mrgi2s_on_ref_cnt != 1)
+		return;
+
+	regmap_update_bits(afe->regmap, AFE_MRGIF_CON, 1 << 16, 1 << 16);
+	udelay(100);
+	regmap_update_bits(afe->regmap, AFE_MRGIF_CON, 0x1, 0x1);
+	udelay(100);
+}
+
+static void mt8167_afe_disable_mrg_i2s(struct mtk_afe *afe)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&afe->afe_ctrl_lock, flags);
+	afe->mrgi2s_on_ref_cnt--;
+	if (afe->mrgi2s_on_ref_cnt < 0)
+		afe->mrgi2s_on_ref_cnt = 0;
+	spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
+
+	if (afe->mrgi2s_on_ref_cnt != 0)
+		return;
+
+	regmap_update_bits(afe->regmap, AFE_MRGIF_CON, 1 << 16, 0x0);
+	regmap_update_bits(afe->regmap, AFE_MRGIF_CON, 0x1, 0x0);
+}
+
+static int mt8167_afe_set_mrg_i2s(struct mtk_afe *afe, unsigned int rate)
+{
+	unsigned int rate_idex = mt8167_afe_rate_to_idx(rate);
+
+	regmap_update_bits(afe->regmap, AFE_MRGIF_CON, 0xf00000, rate_idex << 20);
+	return 0;
 }
 
 static int mt8167_afe_set_mrg(struct mtk_afe *afe, unsigned int rate)
@@ -1136,6 +1197,15 @@ static int mt8167_afe_int_adda_startup(struct snd_pcm_substream *substream,
 
 	mt8167_afe_enable_main_clk(afe);
 
+	mt8167_afe_enable_afe_on(afe);
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC);
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
+	} else {
+		mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_ADC);
+	}
+	udelay(100);
+
 	return 0;
 }
 
@@ -1160,6 +1230,14 @@ static void mt8167_afe_int_adda_shutdown(struct snd_pcm_substream *substream,
 
 		be->prepared[stream] = false;
 	}
+
+	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC);
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_DAC_PREDIS);
+	} else {
+		mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_ADC);
+	}
+	mt8167_afe_disable_afe_on(afe);
 
 	mt8167_afe_disable_main_clk(afe);
 }
@@ -1291,6 +1369,80 @@ static int mt8167_afe_mrg_bt_trigger(struct snd_pcm_substream *substream, int cm
 	}
 }
 
+static int mt8167_afe_mrg_rx_startup(struct snd_pcm_substream *substream,
+				struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct mt8167_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+	int ret;
+
+	dev_dbg(afe->dev, "%s %s\n", __func__, memif->data->name);
+
+	snd_soc_set_runtime_hwparams(substream, &mt8167_afe_hardware);
+
+	ret = snd_pcm_hw_constraint_integer(runtime,
+					    SNDRV_PCM_HW_PARAM_PERIODS);
+	if (ret < 0) {
+		dev_err(afe->dev, "snd_pcm_hw_constraint_integer failed\n");
+		return ret;
+	}
+
+	memif->substream = substream;
+
+	mt8167_afe_enable_main_clk(afe);
+
+	return 0;
+}
+
+static void mt8167_afe_mrg_rx_shutdown(struct snd_pcm_substream *substream,
+				  struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct mt8167_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+
+	dev_dbg(afe->dev, "%s %s\n", __func__, memif->data->name);
+
+	if (memif->prepared) {
+		mt8167_afe_disable_afe_on(afe);
+		memif->prepared = false;
+	}
+
+	memif->substream = NULL;
+
+	mt8167_afe_disable_mrg_i2s(afe);
+
+	mt8167_afe_disable_main_clk(afe);
+}
+
+static int mt8167_afe_mrg_rx_hw_params(struct snd_pcm_substream *substream,
+			  struct snd_pcm_hw_params *params,
+			  struct snd_soc_dai *dai)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	int ret;
+
+	dev_dbg(afe->dev, "%s '%s' rate = %u\n", __func__,
+		snd_pcm_stream_str(substream), params_rate(params));
+
+	/*set hw gain*/
+	mt8167_afe_set_hw_digital_gain_mode(afe, MT8167_AFE_HW_DIGITAL_GAIN1, runtime->rate, 0x80);
+	mt8167_afe_set_hw_digital_gain_state(afe, MT8167_AFE_HW_DIGITAL_GAIN1, true);
+	mt8167_afe_set_hw_digital_gain(afe, afe->mrgrx_priv->mrgrx_volume, MT8167_AFE_HW_DIGITAL_GAIN1);
+
+	ret = mt8167_afe_set_mrg_i2s(afe, params_rate(params));
+	mt8167_afe_enable_mrg_i2s(afe);
+
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
 static int mt8167_afe_pcm0_startup(struct snd_pcm_substream *substream,
 			       struct snd_soc_dai *dai)
 {
@@ -1405,9 +1557,13 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	struct snd_pcm_runtime * const runtime = substream->runtime;
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
+	const unsigned int tdm_out_mode = afe->tdm_out_mode;
 	const unsigned int rate = runtime->rate;
 	const unsigned int channels = runtime->channels;
-	const int bit_width = dai->sample_bits;
+	const unsigned int out_channels_per_sdata =
+		mt8167_afe_tdm_out_ch_per_sdata(tdm_out_mode, runtime->channels);
+	const int phy_width = snd_pcm_format_physical_width(runtime->format);
+	const int out_bit_width = mt8167_afe_tdm_out_bitwidth_fixup(tdm_out_mode, phy_width);
 	const unsigned int stream = substream->stream;
 	unsigned int val;
 	unsigned int bck_inverse = 0;
@@ -1425,42 +1581,30 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 		clk_set_parent(afe->clocks[MT8167_CLK_I2S4_M_SEL], afe->clocks[MT8167_CLK_AUD2]);
 	}
 
-	if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI)
-		mt8167_afe_dais_set_clks(afe,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4],
-			      rate * MT8167_HDMI_OUT_MCLK_MULTIPLIER,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
-			      rate * 2 * 32);
-	else if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S)
-		mt8167_afe_dais_set_clks(afe,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4],
-			      rate * MT8167_TDM_OUT_MCLK_MULTIPLIER,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
-			      rate * 2 * bit_width);
-	else
-		mt8167_afe_dais_set_clks(afe,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4],
-			      rate * MT8167_TDM_OUT_MCLK_MULTIPLIER,
-			      afe->clocks[MT8167_CLK_APLL12_DIV4B],
-			      rate * mt8167_afe_tdm_ch_fixup(channels) * bit_width);
+	mt8167_afe_dais_set_clks(afe,
+		      afe->clocks[MT8167_CLK_APLL12_DIV4],
+		      rate * MT8167_TDM_OUT_MCLK_MULTIPLIER,
+		      afe->clocks[MT8167_CLK_APLL12_DIV4B],
+		      rate * out_channels_per_sdata * out_bit_width);
 
 	val = AFE_TDM_CON1_MSB_ALIGNED;
 
-	if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S &&
+	if ((tdm_out_mode == MT8167_AFE_TDM_OUT_I2S ||
+	     tdm_out_mode == MT8167_AFE_TDM_OUT_I2S_32BITS) &&
 	    (be->fmt_mode & SND_SOC_DAIFMT_FORMAT_MASK) == SND_SOC_DAIFMT_I2S) {
 		val |= AFE_TDM_CON1_1_BCK_DELAY |
 		       AFE_TDM_CON1_LRCK_INV;
 		bck_inverse = AUD_TCON3_HDMI_BCK_INV;
-	} else if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) {
+	} else if (tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) {
 		val |= AFE_TDM_CON1_1_BCK_DELAY |
 		       AFE_TDM_CON1_LRCK_INV;
-	} else if (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) {
+	} else if (tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) {
 		val |= AFE_TDM_CON1_1_BCK_DELAY;
 		bck_inverse = AUD_TCON3_HDMI_BCK_INV;
 	}
 
 	/* bit width related */
-	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) || (bit_width > 16)) {
+	if (out_bit_width > 16) {
 		val |= AFE_TDM_CON1_WLEN_32BIT |
 		       AFE_TDM_CON1_32_BCK_CYCLES |
 		       AFE_TDM_CON1_LRCK_WIDTH(32);
@@ -1471,9 +1615,9 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	}
 
 	/* channel per sdata */
-	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) && (channels > 4))
+	if (out_channels_per_sdata > 4)
 		val |= AFE_TDM_CON1_8CH_PER_SDATA;
-	else if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM) && (channels > 2))
+	else if (out_channels_per_sdata > 2)
 		val |= AFE_TDM_CON1_4CH_PER_SDATA;
 	else
 		val |= AFE_TDM_CON1_2CH_PER_SDATA;
@@ -1481,8 +1625,7 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	regmap_update_bits(afe->regmap, AFE_TDM_CON1, ~(u32)AFE_TDM_CON1_EN, val);
 
 	/* set tdm2 config */
-	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_HDMI) ||
-	    (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S)) {
+	if (out_channels_per_sdata == 2) {
 		switch (channels) {
 		case 1:
 		case 2:
@@ -1516,7 +1659,6 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 			val = 0;
 		}
 	} else {
-		/* MT8167_AFE_TDM_OUT_TDM */
 		val = AFE_TDM_CH_START_O28_O29;
 		val |= (AFE_TDM_CH_ZERO << 4);
 		val |= (AFE_TDM_CH_ZERO << 8);
@@ -1532,8 +1674,7 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	regmap_update_bits(afe->regmap, AFE_HDMI_OUT_CON0,
 			   AFE_HDMI_OUT_CON0_CH_MASK, channels << 4);
 
-	if ((afe->tdm_out_mode == MT8167_AFE_TDM_OUT_I2S) ||
-	    (afe->tdm_out_mode == MT8167_AFE_TDM_OUT_TDM))
+	if (tdm_out_mode != MT8167_AFE_TDM_OUT_HDMI)
 		regmap_update_bits(afe->regmap, AFE_I2S_CON1,
 			   AFE_I2S_CON1_TDMOUT_MUX_MASK, AFE_I2S_CON1_TDMOUT_TO_PAD);
 
@@ -1656,7 +1797,7 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = runtime->rate;
 	const unsigned int channels = runtime->channels;
-	const int bit_width = snd_pcm_format_width(runtime->format);
+	int phy_width = snd_pcm_format_physical_width(runtime->format);
 	const unsigned int stream = substream->stream;
 	unsigned int val;
 	unsigned int bck;
@@ -1666,6 +1807,11 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 		return 0;
 	}
 
+	dev_info(afe->dev, "%s bit_width = %d\n", __func__, phy_width);
+	/*support S24_LE*/
+	if (phy_width > 16)
+		phy_width = 32;
+
 	if (rate % 8000) {
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
 		clk_set_parent(afe->clocks[MT8167_CLK_I2S5_M_SEL], afe->clocks[MT8167_CLK_AUD1]);
@@ -1674,7 +1820,7 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 		clk_set_parent(afe->clocks[MT8167_CLK_I2S5_M_SEL], afe->clocks[MT8167_CLK_AUD2]);
 	}
 
-	bck = mt8167_afe_tdm_ch_fixup(channels) * rate * bit_width;
+	bck = mt8167_afe_tdm_ch_fixup(channels) * rate * phy_width;
 
 	mt8167_afe_dais_set_clks(afe, afe->clocks[MT8167_CLK_APLL12_DIV5],
 		rate * MT8167_TDM_IN_MCLK_MULTIPLIER,
@@ -1682,27 +1828,33 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 
 	val = 0;
 
-	if ((be->fmt_mode & SND_SOC_DAIFMT_FORMAT_MASK) == SND_SOC_DAIFMT_I2S)
-		val |= AFE_TDM_IN_CON1_I2S;
+	switch (be->fmt_mode & SND_SOC_DAIFMT_FORMAT_MASK) {
+	case SND_SOC_DAIFMT_I2S:
+		val |= AFE_TDM_IN_CON1_I2S |
+		       AFE_TDM_IN_CON1_LRCK_INV;
+		break;
+	default:
+		break;
+	}
 
 	/* bck&lrck phase */
 	switch (be->fmt_mode & SND_SOC_DAIFMT_INV_MASK) {
 	case SND_SOC_DAIFMT_IB_IF:
-		val |= AFE_TDM_IN_CON1_LRCK_INV |
-		       AFE_TDM_IN_CON1_BCK_INV;
+		val ^= AFE_TDM_IN_CON1_LRCK_INV;
+		val ^= AFE_TDM_IN_CON1_BCK_INV;
 		break;
 	case SND_SOC_DAIFMT_NB_IF:
-		val |= AFE_TDM_IN_CON1_LRCK_INV;
+		val ^= AFE_TDM_IN_CON1_LRCK_INV;
 		break;
 	case SND_SOC_DAIFMT_IB_NF:
-		val |= AFE_TDM_IN_CON1_BCK_INV;
+		val ^= AFE_TDM_IN_CON1_BCK_INV;
 		break;
 	default:
 		break;
 	}
 
 	/* bit width related */
-	if (bit_width > 16) {
+	if (phy_width > 16) {
 		val |= AFE_TDM_IN_CON1_WLEN_32BIT |
 		       AFE_TDM_IN_CON1_FAST_LRCK_CYCLE_32BCK |
 		       AFE_TDM_IN_CON1_LRCK_WIDTH(32);
@@ -1864,7 +2016,7 @@ static int mt8167_afe_dais_hw_params(struct snd_pcm_substream *substream,
 	int ret;
 
 	dev_dbg(afe->dev,
-		"%s %s period = %u rate = %u channels = %u size = %lu\n",
+		"%s %s period = %u rate = %u channels = %u size = %zu\n",
 		__func__, data->name, params_period_size(params),
 		params_rate(params), params_channels(params), request_size);
 
@@ -2084,6 +2236,65 @@ static int mt8167_afe_dais_trigger(struct snd_pcm_substream *substream, int cmd,
 	}
 }
 
+static int mt8167_afe_hw_gain1_startup(struct snd_pcm_substream *substream,
+				struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+
+	mt8167_afe_enable_main_clk(afe);
+	return 0;
+}
+
+static void mt8167_afe_hw_gain1_shutdown(struct snd_pcm_substream *substream,
+				  struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
+	const unsigned int stream = substream->stream;
+
+	if (be->prepared[stream]) {
+		regmap_update_bits(afe->regmap, AFE_GAIN1_CON0, AFE_GAIN1_CON0_EN_MASK, 0);
+		be->prepared[stream] = false;
+	}
+	mt8167_afe_disable_main_clk(afe);
+}
+
+static int mt8167_afe_hw_gain1_prepare(struct snd_pcm_substream *substream,
+				struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_pcm_runtime * const runtime = substream->runtime;
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
+	const unsigned int rate = runtime->rate;
+	const unsigned int stream = substream->stream;
+	int fs;
+	unsigned int val1, val2;
+
+	if (be->prepared[stream]) {
+		dev_info(afe->dev, "%s '%s' prepared already\n", __func__, snd_pcm_stream_str(substream));
+		return 0;
+	}
+
+	if (be->prepared[stream])
+		regmap_update_bits(afe->regmap, AFE_GAIN1_CON0, AFE_GAIN1_CON0_EN_MASK, 0);
+
+	fs = mt8167_afe_i2s_fs(rate);
+	regmap_update_bits(afe->regmap, AFE_GAIN1_CON0, AFE_GAIN1_CON0_MODE_MASK, (unsigned int)fs<<4);
+
+	regmap_read(afe->regmap, AFE_GAIN1_CON1, &val1);
+	regmap_read(afe->regmap, AFE_GAIN1_CUR, &val2);
+	if ((val1 & AFE_GAIN1_CON1_MASK) != (val2 & AFE_GAIN1_CUR_MASK))
+		regmap_update_bits(afe->regmap, AFE_GAIN1_CUR, AFE_GAIN1_CUR_MASK, val1);
+
+	regmap_update_bits(afe->regmap, AFE_GAIN1_CON0, AFE_GAIN1_CON0_EN_MASK, 1);
+	be->prepared[stream] = true;
+
+	return 0;
+}
+
 /* FE DAIs */
 static const struct snd_soc_dai_ops mt8167_afe_dai_ops = {
 	.startup	= mt8167_afe_dais_startup,
@@ -2092,6 +2303,13 @@ static const struct snd_soc_dai_ops mt8167_afe_dai_ops = {
 	.hw_free	= mt8167_afe_dais_hw_free,
 	.prepare	= mt8167_afe_dais_prepare,
 	.trigger	= mt8167_afe_dais_trigger,
+};
+static const struct snd_soc_dai_ops mt8167_afe_dai_mrg_playback_ops = {
+	.startup	= mt8167_afe_mrg_rx_startup,
+	.shutdown	= mt8167_afe_mrg_rx_shutdown,
+	.hw_params	= mt8167_afe_mrg_rx_hw_params,
+	.hw_free	= mt8167_afe_dais_hw_free,
+	.prepare	= mt8167_afe_dais_prepare,
 };
 
 /* BE DAIs */
@@ -2146,6 +2364,12 @@ static const struct snd_soc_dai_ops mt8167_afe_tdm_in_ops = {
 	.set_fmt	= mt8167_afe_tdm_in_set_fmt,
 };
 
+static const struct snd_soc_dai_ops mt8167_afe_hw_gain1_ops = {
+	.startup	= mt8167_afe_hw_gain1_startup,
+	.shutdown	= mt8167_afe_hw_gain1_shutdown,
+	.prepare	= mt8167_afe_hw_gain1_prepare,
+};
+
 static int mt8167_afe_suspend(struct device *dev);
 static int mt8167_afe_resume(struct device *dev);
 
@@ -2153,8 +2377,8 @@ static int mt8167_afe_dai_suspend(struct snd_soc_dai *dai)
 {
 	struct mtk_afe *afe = snd_soc_dai_get_drvdata(dai);
 
-	dev_dbg(afe->dev, "%s id %d suspended %d\n",
-		__func__, dai->id, afe->suspended);
+	/* dev_dbg(afe->dev, "%s id %d suspended %d\n", */
+		/* __func__, dai->id, afe->suspended); */
 
 	if (afe->suspended)
 		return 0;
@@ -2166,8 +2390,8 @@ static int mt8167_afe_dai_resume(struct snd_soc_dai *dai)
 {
 	struct mtk_afe *afe = snd_soc_dai_get_drvdata(dai);
 
-	dev_dbg(afe->dev, "%s id %d suspended %d\n",
-		__func__, dai->id, afe->suspended);
+	/* dev_dbg(afe->dev, "%s id %d suspended %d\n", */
+		/* __func__, dai->id, afe->suspended); */
 
 	if (!afe->suspended)
 		return 0;
@@ -2375,6 +2599,34 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 		.ops = &mt8167_afe_mrg_bt_ops,
 		.symmetric_rates = 1,
 	}, {
+		.name = "VIRTURL_MRG",
+		.id = MT8167_AFE_MEMIF_VIRTUAL_MRG,
+		.suspend = mt8167_afe_dai_suspend,
+		.resume = mt8167_afe_dai_resume,
+		.playback = {
+			.stream_name = "VIRTUAL_MRG",
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = SNDRV_PCM_RATE_8000 |
+					SNDRV_PCM_RATE_16000 |
+					SNDRV_PCM_RATE_32000 |
+					SNDRV_PCM_RATE_44100 |
+					SNDRV_PCM_RATE_48000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+		},
+		.capture = {
+			.stream_name = "MRG RX Capture",
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = SNDRV_PCM_RATE_8000 |
+				 SNDRV_PCM_RATE_16000 |
+				 SNDRV_PCM_RATE_32000 |
+				 SNDRV_PCM_RATE_44100 |
+				 SNDRV_PCM_RATE_48000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+		},
+		.ops = &mt8167_afe_dai_mrg_playback_ops,
+	}, {
 	/* BE DAIs */
 		.name = "PCM0",
 		.id = MT8167_AFE_IO_PCM_BT,
@@ -2437,6 +2689,20 @@ static struct snd_soc_dai_driver mt8167_afe_pcm_dais[] = {
 				   SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &mt8167_afe_tdm_in_ops,
+	}, {
+	/* BE DAIs */
+		.name = "HW_GAIN1",
+		.id = MT8167_AFE_IO_HW_GAIN1,
+		.capture = {
+			.stream_name = "HW GAIN1 Capture",
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = SNDRV_PCM_RATE_8000_192000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				   SNDRV_PCM_FMTBIT_S24_LE |
+				   SNDRV_PCM_FMTBIT_S32_LE,
+		},
+		.ops = &mt8167_afe_hw_gain1_ops,
 	},
 };
 
@@ -2453,13 +2719,12 @@ static struct snd_soc_dai_driver *mt8167_afe_get_dai_drv_by_id(unsigned int id)
 }
 
 static int mt8167_afe_set_memif_irq_by_mode(struct mt8167_afe_memif_data *data,
-	unsigned int mode)
+			unsigned int mode)
 {
 	int ret = 0;
 
 	if (data == NULL)
 		return -EINVAL;
-
 	switch (mode) {
 	case MT8167_AFE_IRQ_1:
 		data->irq_reg_cnt = AFE_IRQ_CNT1;
@@ -2487,9 +2752,7 @@ static int mt8167_afe_set_memif_irq_by_mode(struct mt8167_afe_memif_data *data,
 		break;
 	default:
 		ret = -EINVAL;
-		break;
 	}
-
 	return ret;
 }
 
@@ -2511,11 +2774,13 @@ static const struct snd_kcontrol_new mt8167_afe_o02_mix[] = {
 static const struct snd_kcontrol_new mt8167_afe_o03_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I05 Switch", AFE_CONN1, 21, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I07 Switch", AFE_CONN1, 23, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I10 Switch", AFE_GAIN1_CONN, 8, 1, 0),
 };
 
 static const struct snd_kcontrol_new mt8167_afe_o04_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I06 Switch", AFE_CONN2, 6, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I08 Switch", AFE_CONN2, 8, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I11 Switch", AFE_GAIN1_CONN, 10, 1, 0),
 };
 
 static const struct snd_kcontrol_new mt8167_afe_o05_mix[] = {
@@ -2523,6 +2788,7 @@ static const struct snd_kcontrol_new mt8167_afe_o05_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I03 Switch", AFE_CONN2, 18, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I05 Switch", AFE_CONN2, 19, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I07 Switch", AFE_CONN2, 20, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I15 Switch", AFE_CONN4, 6, 1, 0),
 };
 
 static const struct snd_kcontrol_new mt8167_afe_o06_mix[] = {
@@ -2530,6 +2796,7 @@ static const struct snd_kcontrol_new mt8167_afe_o06_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I04 Switch", AFE_CONN2, 23, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I06 Switch", AFE_CONN2, 24, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I08 Switch", AFE_CONN2, 25, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I16 Switch", AFE_CONN4, 8, 1, 0),
 };
 
 static const struct snd_kcontrol_new mt8167_afe_o09_mix[] = {
@@ -2545,6 +2812,17 @@ static const struct snd_kcontrol_new mt8167_afe_o10_mix[] = {
 static const struct snd_kcontrol_new mt8167_afe_o11_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I02 Switch", AFE_CONN3, 6, 1, 0),
 };
+
+static const struct snd_kcontrol_new mt8167_afe_o13_mix[] = {
+	SOC_DAPM_SINGLE_AUTODISABLE("I02 Switch", AFE_GAIN1_CONN2, 4, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I15 Switch", AFE_GAIN1_CONN2, 9, 1, 0),
+};
+
+static const struct snd_kcontrol_new mt8167_afe_o14_mix[] = {
+	SOC_DAPM_SINGLE_AUTODISABLE("I02 Switch", AFE_GAIN1_CONN2, 17, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I16 Switch", AFE_GAIN1_CONN2, 23, 1, 0),
+};
+
 
 static const char * const ain_text[] = {
 	"INT ADC", "EXT ADC"
@@ -2664,6 +2942,11 @@ static const struct snd_soc_dapm_widget mt8167_afe_pcm_widgets[] = {
 	SND_SOC_DAPM_MIXER("I07L", SND_SOC_NOPM, 0, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("I08L", SND_SOC_NOPM, 0, 0, NULL, 0),
 
+	SND_SOC_DAPM_MIXER("I15", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER("I16", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER("I10", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER("I11", SND_SOC_NOPM, 0, 0, NULL, 0),
+
 	SND_SOC_DAPM_MIXER("O00", SND_SOC_NOPM, 0, 0,
 			   mt8167_afe_o00_mix, ARRAY_SIZE(mt8167_afe_o00_mix)),
 	SND_SOC_DAPM_MIXER("O01", SND_SOC_NOPM, 0, 0,
@@ -2685,6 +2968,10 @@ static const struct snd_soc_dapm_widget mt8167_afe_pcm_widgets[] = {
 	SND_SOC_DAPM_MIXER("O11", SND_SOC_NOPM, 0, 0,
 			   mt8167_afe_o11_mix, ARRAY_SIZE(mt8167_afe_o11_mix)),
 
+	SND_SOC_DAPM_MIXER("O13", SND_SOC_NOPM, 0, 0,
+			   mt8167_afe_o13_mix, ARRAY_SIZE(mt8167_afe_o13_mix)),
+	SND_SOC_DAPM_MIXER("O14", SND_SOC_NOPM, 0, 0,
+			   mt8167_afe_o14_mix, ARRAY_SIZE(mt8167_afe_o14_mix)),
 	SND_SOC_DAPM_MUX("AIN Mux", SND_SOC_NOPM, 0, 0, &ain_mux),
 	SND_SOC_DAPM_MUX("DAIBT Mux", SND_SOC_NOPM, 0, 0, &daibt_mux),
 
@@ -2776,15 +3063,30 @@ static const struct snd_soc_dapm_route mt8167_afe_pcm_routes[] = {
 	{"O06", "I01 Switch", "I01"},
 	{"O05", "I03 Switch", "I03"},
 	{"O06", "I04 Switch", "I04"},
+
+	{"O05", "I15 Switch", "I15"},
+	{"O06", "I16 Switch", "I16"},
+
 	{"AWB", NULL, "O05"},
 	{"AWB", NULL, "O06"},
 
+	{"O13", "I15 Switch", "I15"},
+	{"O14", "I16 Switch", "I16"},
+	{"HW GAIN1 Capture", NULL, "O13"},
+	{"HW GAIN1 Capture", NULL, "O14"},
+	{"I10", NULL, "HW GAIN1 Capture"},
+	{"I11", NULL, "HW GAIN1 Capture"},
+	{"O03", "I10 Switch", "I10"},
+	{"O04", "I11 Switch", "I11"},
 	{"PCM0 Capture", NULL, "PCM0 In"},
 	{"MRG BT Capture", NULL, "MRG In"},
 	{"DAIBT Mux", "PCM", "PCM0 Capture"},
 	{"DAIBT Mux", "MRG", "MRG BT Capture"},
 	{"I02", NULL, "DAIBT Mux"},
 	{"O11", "I02 Switch", "I02"},
+	{"I15", NULL, "VIRTUAL_MRG"},
+	{"I16", NULL, "VIRTUAL_MRG"},
+	{"VIRTUAL_MRG", NULL, "MRG In"},
 	{"DAI", NULL, "O11"},
 
 	{"TDM_IN", NULL, "TDM IN Capture"},
@@ -3003,6 +3305,28 @@ static struct mt8167_afe_memif_data memif_data[MT8167_AFE_MEMIF_NUM] = {
 		.conn_format_mask = -1,
 		.prealloc_size = 0,
 		.buffer_align_bytes = 8,
+	}, {
+		.name = "VIRTURL_MRG",
+		.id = MT8167_AFE_MEMIF_VIRTUAL_MRG,
+		.reg_ofs_base = -1,
+		.reg_ofs_end = -1,
+		.reg_ofs_cur = -1,
+		.fs_shift = -1,
+		.mono_shift = -1,
+		.enable_shift = -1,
+		.irq_reg_cnt = -1,
+		.irq_cnt_shift = -1,
+		.irq_mode = -1,
+		.irq_fs_reg = -1,
+		.irq_fs_shift = -1,
+		.irq_clr_shift = 9,
+		.max_sram_size = 0,
+		.sram_offset = 0,
+		.format_reg = -1,
+		.format_shift = -1,
+		.conn_format_mask = -1,
+		.prealloc_size = 0,
+		.buffer_align_bytes = -1,
 	},
 };
 
@@ -3061,7 +3385,7 @@ static int mt8167_afe_suspend(struct device *dev)
 	struct mtk_afe *afe = dev_get_drvdata(dev);
 	int i;
 
-	dev_info(dev, "%s >>\n", __func__);
+	/* dev_info(dev, "%s >>\n", __func__); */
 
 	mt8167_afe_enable_main_clk(afe);
 
@@ -3073,7 +3397,7 @@ static int mt8167_afe_suspend(struct device *dev)
 
 	afe->suspended = true;
 
-	dev_info(dev, "%s <<\n", __func__);
+	/* dev_info(dev, "%s <<\n", __func__); */
 
 	return 0;
 }
@@ -3083,7 +3407,7 @@ static int mt8167_afe_resume(struct device *dev)
 	struct mtk_afe *afe = dev_get_drvdata(dev);
 	int i;
 
-	dev_info(dev, "%s >>\n", __func__);
+	/* dev_info(dev, "%s >>\n", __func__); */
 
 	mt8167_afe_enable_main_clk(afe);
 
@@ -3098,7 +3422,7 @@ static int mt8167_afe_resume(struct device *dev)
 
 	afe->suspended = false;
 
-	dev_info(dev, "%s <<\n", __func__);
+	/* dev_info(dev, "%s <<\n", __func__); */
 
 	return 0;
 }
@@ -3127,7 +3451,6 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 	struct mtk_afe *afe;
 	struct resource *res;
 	struct device_node *np = pdev->dev.of_node;
-	unsigned int irq_mode;
 
 	afe = devm_kzalloc(&pdev->dev, sizeof(*afe), GFP_KERNEL);
 	if (!afe)
@@ -3176,6 +3499,11 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 		afe->sram_size = resource_size(res);
 	}
 
+	afe->mrgrx_priv = devm_kzalloc(&pdev->dev, sizeof(struct mt8167_pcm_mrgrx_priv), GFP_KERNEL);
+	if (!(afe->mrgrx_priv))
+		return -ENOMEM;
+	afe->mrgrx_priv->mrgrx_volume = 0x10000;
+
 	/* initial audio related clock */
 	ret = mt8167_afe_init_audio_clk(afe);
 	if (ret) {
@@ -3214,22 +3542,19 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 		}
 	}
 
-	if (!of_property_read_u32(np, "mediatek,awb-irq-mode", &irq_mode) &&
-	    (irq_mode != memif_data[MT8167_AFE_MEMIF_AWB].irq_mode)) {
-		if (!mt8167_afe_set_memif_irq_by_mode(&memif_data[MT8167_AFE_MEMIF_AWB],
-		                                      irq_mode))
-			afe->awb_irq_mode = irq_mode;
-	}
+	if (of_property_read_u32(np, "mediatek,awb-irq-mode", &afe->awb_irq_mode))
+		afe->awb_irq_mode = MT8167_AFE_IRQ_2;
 
-	if (!of_property_read_u32(np, "mediatek,dai-irq-mode", &irq_mode) &&
-	    (irq_mode != memif_data[MT8167_AFE_MEMIF_DAI].irq_mode)) {
-		if (!mt8167_afe_set_memif_irq_by_mode(&memif_data[MT8167_AFE_MEMIF_DAI],
-		                                      irq_mode))
-			afe->dai_irq_mode = irq_mode;
-	}
+	if (afe->awb_irq_mode != memif_data[MT8167_AFE_MEMIF_AWB].irq_mode)
+		mt8167_afe_set_memif_irq_by_mode(&memif_data[MT8167_AFE_MEMIF_AWB],
+						 afe->awb_irq_mode);
 
-	if (of_property_read_bool(np, "mediatek,apply-6db-gain-in-ul-src"))
-		afe->apply_6db_gain_in_ul_src = true;
+	if (of_property_read_u32(np, "mediatek,dai-irq-mode", &afe->dai_irq_mode))
+		afe->dai_irq_mode = MT8167_AFE_IRQ_2;
+
+	if (afe->dai_irq_mode != memif_data[MT8167_AFE_MEMIF_DAI].irq_mode)
+		mt8167_afe_set_memif_irq_by_mode(&memif_data[MT8167_AFE_MEMIF_DAI],
+						 afe->dai_irq_mode);
 
 	ret = snd_soc_register_platform(&pdev->dev, &mt8167_afe_pcm_platform);
 	if (ret)

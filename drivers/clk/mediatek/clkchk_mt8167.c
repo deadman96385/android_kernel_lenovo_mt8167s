@@ -186,6 +186,10 @@ static const char * const *get_all_clk_names(void)
 		"uart2",
 		"bsi",
 		"gcpu_b",
+		"msdc0_infra",
+		"msdc1_infra",
+		"msdc2_infra",
+		"usb_78m",
 		/* TOP3 */
 		"rg_spinor",
 		"rg_msdc2",
@@ -311,9 +315,14 @@ static void print_enabled_clks(void)
 	for (; *cn; cn++) {
 		struct clk *c = __clk_lookup(*cn);
 		struct clk_hw *c_hw = __clk_get_hw(c);
-		struct clk_hw *p_hw = clk_hw_get_parent(c_hw);
+		struct clk_hw *p_hw;
 
-		if (IS_ERR_OR_NULL(c))
+		if (IS_ERR_OR_NULL(c) || !c_hw)
+			continue;
+
+		p_hw = clk_hw_get_parent(c_hw);
+
+		if (!p_hw)
 			continue;
 
 		if (!clk_hw_is_prepared(c_hw) && !__clk_get_enable_count(c))
@@ -357,6 +366,9 @@ static void check_pll_off(void)
 
 	for (c = off_plls; *c; c++) {
 		struct clk_hw *c_hw = __clk_get_hw(*c);
+
+		if (!c_hw)
+			continue;
 
 		if (!clk_hw_is_prepared(c_hw) && !clk_hw_is_enabled(c_hw))
 			continue;

@@ -51,16 +51,14 @@ static const char OOB_SIGNATURE[] = "bmt";
 static struct mtd_info *mtd_bmt;
 static struct nand_chip *nand_chip_bmt;
 
-#if defined(CONFIG_MTK_TLC_NAND_SUPPORT)
-#define BLOCK_SIZE_BMT		(devinfo.blocksize * 1024)
-#define PAGE_PER_SIZE_BMT	((devinfo.blocksize * 1024) / devinfo.pagesize)
+#define BLOCK_SIZE_BMT		((devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC) ? \
+		(devinfo.blocksize * 1024) : (1 << nand_chip_bmt->phys_erase_shift))
+#define PAGE_PER_SIZE_BMT	((devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC) ? \
+	((devinfo.blocksize * 1024) / devinfo.pagesize) : \
+	(1 << (nand_chip_bmt->phys_erase_shift-nand_chip_bmt->page_shift)))
 #define PAGE_ADDR(block)	((block) * PAGE_PER_SIZE_BMT)
-#else
-#define BLOCK_SIZE_BMT          (1 << nand_chip_bmt->phys_erase_shift)
-#define PAGE_PER_SIZE_BMT       (1 << (nand_chip_bmt->phys_erase_shift-nand_chip_bmt->page_shift))
-#define OFFSET(block)       (((u64)block) * BLOCK_SIZE_BMT)
-#define PAGE_ADDR(block)    ((block) * PAGE_PER_SIZE_BMT)
-#endif
+#define OFFSET_MLC(block)       (((u64)block) * BLOCK_SIZE_BMT)
+
 #define PAGE_SIZE_BMT		(1 << nand_chip_bmt->page_shift)
 
 /*********************************************************************
@@ -137,6 +135,7 @@ bool nand_write_page_bmt(u32 page, u8 *dat, u8 *oob)
 		row_addr = (((row_addr / page_per_block) << 1) * page_per_block) + (row_addr % page_per_block);
 
 	/* pr_debug("[xiaolei] nand_write_page_bmt  0x%x\n", (u32)dat); */
+	is_raw_part = true;
 	if (mtk_nand_exec_write_page(mtd_bmt, row_addr, PAGE_SIZE_BMT, dat, oob))
 		return false;
 	else
@@ -213,7 +212,7 @@ static bool valid_bmt_data(phys_bmt_struct *phys_table)
 
 	/* checksum correct? */
 	if (phys_table->header.checksum != checksum) {
-		pr_err("BMT Data checksum error: %x %x\n", phys_table->header.checksum,
+		nand_pr_err("BMT Data checksum error: %x %x", phys_table->header.checksum,
 			checksum);
 		return false;
 	}
@@ -243,7 +242,6 @@ static void fill_nand_bmt_buffer(bmt_struct *bmt, u8 *dat, u8 *oob)
 	phys_bmt = kmalloc(sizeof(phys_bmt_struct), GFP_KERNEL);
 
 	if (!phys_bmt) {
-		/* pr_err("[fill_nand_bmt_buffer]kmalloc phys_bmt_struct fail!\n"); */
 		while (1)
 			;
 	}
@@ -280,12 +278,9 @@ static int load_bmt_data(int start, int pool_size)
 	phys_table = kmalloc(sizeof(phys_bmt_struct), GFP_KERNEL);
 
 	if (!phys_table) {
-		/* pr_err("[load_bmt_data]kmalloc phys_bmt_struct fail!\n"); */
-		/* while (1) */
-		/*	; */
 		return -ENOMEM;
 	}
-	pr_err("[%s]: begin to search BMT from block 0x%x\n", __func__, bmt_index);
+	nand_info("begin to search BMT from block 0x%x\n", bmt_index);
 
 	for (bmt_index = start + pool_size - 1; bmt_index >= start; bmt_index--) {
 		if (nand_block_bad_bmt(OFFSET(bmt_index))) {
@@ -312,7 +307,7 @@ static int load_bmt_data(int start, int pool_size)
 		memcpy(phys_table, dat_buf + MAIN_SIGNATURE_OFFSET, sizeof(phys_bmt_struct));
 
 		if (!valid_bmt_data(phys_table)) {
-			pr_err("BMT data is not correct %d\n", bmt_index);
+			nand_pr_err("BMT data is not correct %d", bmt_index);
 			continue;
 		} else {
 			bmt.mapped_count = phys_table->header.mapped_count;
@@ -324,12 +319,14 @@ static int load_bmt_data(int start, int pool_size)
 			memcpy(&bmt.data_bmt,
 				(dat_buf + MAIN_SIGNATURE_OFFSET + sizeof(phys_bmt_struct)),
 				sizeof(struct data_bmt_struct));
-			pr_err("Data bmt bad_count:%d start_block:0x%x, end_block:0x%x\n", bmt.data_bmt.bad_count,
-				bmt.data_bmt.start_block, bmt.data_bmt.end_block);
+			nand_info("Data bmt bad_count:%d start_block:0x%x, end_block:0x%x",
+					bmt.data_bmt.bad_count,
+					bmt.data_bmt.start_block,
+					bmt.data_bmt.end_block);
 #endif
 
-			pr_err("bmt found at block: %d, mapped block: %d\n", bmt_index,
-				bmt.mapped_count);
+			nand_info("bmt found at block: %d, mapped block: %d",
+				bmt_index, bmt.mapped_count);
 
 			for (i = 0; i < bmt.mapped_count; i++) {
 #if 0
@@ -339,7 +336,7 @@ static int load_bmt_data(int start, int pool_size)
 					mark_block_bad_bmt(OFFSET(bmt.table[i].bad_index));
 				}
 #else
-				pr_err("block[%d] map to block[%d]\n", bmt.table[i].bad_index,
+				nand_info("block[%d] map to block[%d]", bmt.table[i].bad_index,
 					bmt.table[i].mapped_index);
 #endif
 			}
@@ -348,7 +345,7 @@ static int load_bmt_data(int start, int pool_size)
 		}
 	}
 
-	pr_err("bmt block not found!\n");
+	nand_pr_err("bmt block not found!\n");
 	kfree(phys_table);
 	return 0;
 }
@@ -398,9 +395,11 @@ static int find_available_block(bool start_from_end)
 		}
 
 		#if defined(CONFIG_MTK_TLC_NAND_SUPPORT)
-		if (!nand_erase_bmt(((u64)block) * (devinfo.blocksize * 1024))) {
-			pr_debug("Erase block 0x%x failed\n", block);
-			mark_block_bad_bmt(((u64)block) * (devinfo.blocksize * 1024));
+		if (devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC) {
+			if (!nand_erase_bmt(((u64)block) * (devinfo.blocksize * 1024))) {
+				pr_debug("Erase block 0x%x failed\n", block);
+				mark_block_bad_bmt(((u64)block) * (devinfo.blocksize * 1024));
+			}
 		}
 		#endif
 		pr_debug("Find block 0x%x available\n", block);
@@ -455,7 +454,7 @@ static int migrate_from_bad(u64 offset, u8 *write_dat, u8 *write_oob)
 	to_index = find_available_block(false);
 
 	if (!to_index) {
-		pr_err("Cannot find an available block for BMT\n");
+		nand_pr_err("Cannot find an available block for BMT");
 		return 0;
 	}
 
@@ -492,11 +491,10 @@ static int migrate_from_bad(u64 offset, u8 *write_dat, u8 *write_oob)
 		bRet = mtk_nand_write_tlc_block_hw(mtd_bmt, nand_chip_bmt, write_dat, to_index);
 		if (bRet != 0) {
 			pr_debug("Write to page 0x%x fail\n", PAGE_ADDR(to_index) + error_page);
-	#if defined(CONFIG_MTK_TLC_NAND_SUPPORT)
-			mark_block_bad_bmt(((u64)to_index) * (devinfo.blocksize * 1024));
-	#else
-			mark_block_bad_bmt(OFFSET(to_index));
-	#endif
+			if (devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
+				mark_block_bad_bmt(((u64)to_index) * (devinfo.blocksize * 1024));
+			else
+				mark_block_bad_bmt(OFFSET_MLC(to_index));
 			return migrate_from_bad(offset, write_dat, write_oob);
 		}
 	} else
@@ -516,11 +514,10 @@ static int migrate_from_bad(u64 offset, u8 *write_dat, u8 *write_oob)
 
 		if (!nand_write_page_bmt(PAGE_ADDR(to_index) + error_page, write_dat, oob_buf)) {
 			pr_debug("Write to page 0x%x fail\n", PAGE_ADDR(to_index) + error_page);
-			#if defined(CONFIG_MTK_TLC_NAND_SUPPORT)
+			if (devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
 				mark_block_bad_bmt(((u64)to_index) * (devinfo.blocksize * 1024));
-			#else
-			mark_block_bad_bmt(OFFSET(to_index));
-			#endif
+			else
+				mark_block_bad_bmt(OFFSET_MLC(to_index));
 			return migrate_from_bad(offset, write_dat, write_oob);
 		}
 	}
@@ -537,11 +534,11 @@ static int migrate_from_bad(u64 offset, u8 *write_dat, u8 *write_oob)
 				(PAGE_ADDR(to_index) + page, dat_buf, oob_buf)) {
 				pr_debug("Write to page 0x%x fail\n",
 					PAGE_ADDR(to_index) + page);
-				#if defined(CONFIG_MTK_TLC_NAND_SUPPORT)
-				mark_block_bad_bmt(((u64)to_index) * (devinfo.blocksize * 1024));
-				#else
-				mark_block_bad_bmt(OFFSET(to_index));
-				#endif
+					if (devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
+						mark_block_bad_bmt(((u64)to_index) * (devinfo.blocksize * 1024));
+					else
+						mark_block_bad_bmt(OFFSET_MLC(to_index));
+
 				return migrate_from_bad(offset, write_dat, write_oob);
 				}
 			}
@@ -567,7 +564,7 @@ static bool write_bmt_to_flash(u8 *dat, u8 *oob)
 		need_erase = false;
 		bmt_block_index = find_available_block(true);
 		if (!bmt_block_index) {
-			pr_info("Cannot find an available block for BMT\n");
+			nand_pr_err("Cannot find an available block for BMT");
 			return false;
 		}
 	}
@@ -583,12 +580,11 @@ static bool write_bmt_to_flash(u8 *dat, u8 *oob)
 	/* write bmt to flash */
 	if (need_erase) {
 		if (!nand_erase_bmt(((u64)bmt_block_index) * (devinfo.blocksize * 1024))) {
-			pr_debug("BMT block erase fail, mark bad: 0x%x\n", bmt_block_index);
-			#if defined(CONFIG_MTK_TLC_NAND_SUPPORT)
-			mark_block_bad_bmt(((u64)bmt_block_index) * (devinfo.blocksize * 1024));
-			#else
-			mark_block_bad_bmt(OFFSET(bmt_block_index));
-			#endif
+			nand_pr_err("BMT block erase fail, mark bad: 0x%x", bmt_block_index);
+			if (devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
+				mark_block_bad_bmt(((u64)bmt_block_index) * (devinfo.blocksize * 1024));
+			else
+			mark_block_bad_bmt(OFFSET_MLC(bmt_block_index));
 
 			bmt_block_index = 0;
 			return write_bmt_to_flash(dat, oob);	/* recursive call */
@@ -596,12 +592,11 @@ static bool write_bmt_to_flash(u8 *dat, u8 *oob)
 	}
 
 	if (!nand_write_page_bmt(PAGE_ADDR(bmt_block_index), dat, oob)) {
-		pr_debug("Write BMT data fail, need to write again\n");
-		#if defined(CONFIG_MTK_TLC_NAND_SUPPORT)
+		nand_pr_err("Write BMT data fail, need to write again");
+		if (devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC)
 		mark_block_bad_bmt(((u64)bmt_block_index) * (devinfo.blocksize * 1024));
-		#else
-		mark_block_bad_bmt(OFFSET(bmt_block_index));
-		#endif
+		else
+		mark_block_bad_bmt(OFFSET_MLC(bmt_block_index));
 		/* bmt.bad_count++; */
 
 		bmt_block_index = 0;
@@ -633,7 +628,8 @@ bmt_struct *reconstruct_bmt(bmt_struct *bmt)
 	memset(bmt->table, 0, bmt_block_count * sizeof(bmt_entry));
 
 	for (i = 0; i < bmt_block_count; i++, index++) {
-		if (nand_block_bad_bmt(OFFSET(index))) {
+		if (nand_block_bad_bmt(
+		    (devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC) ? OFFSET(index):OFFSET_MLC(index))) {
 			pr_debug("Skip bad block: 0x%x\n", index);
 			/* bmt->bad_count++; */
 			continue;
@@ -652,10 +648,11 @@ bmt_struct *reconstruct_bmt(bmt_struct *bmt)
 
 		pr_debug("Block 0x%x is mapped to bad block: 0x%x\n", index, bad_index);
 
-		if (!nand_block_bad_bmt(OFFSET(bad_index))) {
-			pr_debug("\tbut block 0x%x is not marked as bad, invalid mapping\n",
-				bad_index);
-			continue;	/* no need to erase here, it will be erased later when trying to write BMT */
+		if (!nand_block_bad_bmt(
+		    (devinfo.NAND_FLASH_TYPE == NAND_FLASH_TLC) ? OFFSET(bad_index) : OFFSET_MLC(bad_index))) {
+			pr_debug("\tbut block 0x%x is not marked as bad, invalid mapping\n", bad_index);
+			continue;
+			/* no need to erase here, it will be erased later when trying to write BMT */
 		}
 		mapped = is_block_mapped(bad_index);
 		if (mapped >= 0) {
@@ -721,7 +718,7 @@ bmt_struct *init_bmt(struct nand_chip *chip, int size)
 	mtd_bmt = &host->mtd;
 
 	pr_debug("mtd_bmt: %p, nand_chip_bmt: %p\n", mtd_bmt, nand_chip_bmt);
-	pr_err("bmt count: %d, system count: %d\n", bmt_block_count, system_block_count);
+	nand_info("bmt count: %d, system count: %d\n", bmt_block_count, system_block_count);
 
 	/* set this flag, and unmapped block in pool will be erased. */
 	pool_erased = 0;
@@ -769,7 +766,7 @@ bool update_bmt(u64 offset, update_reason_t reason, u8 *dat, u8 *oob)
 	struct data_bmt_struct *data_bmt_info = &bmt.data_bmt;
 #endif
 	temp = offset;
-	do_div(temp, ((devinfo.blocksize * 1024) & 0xFFFFFFFF));
+	do_div(temp, (((u64)devinfo.blocksize * 1024ULL) & ULLONG_MAX));
 	bad_index = (u32)temp;
 
 #ifdef CONFIG_MNTL_SUPPORT
@@ -783,22 +780,25 @@ bool update_bmt(u64 offset, update_reason_t reason, u8 *dat, u8 *oob)
 			data_bmt_info->entry[data_bmt_info->bad_count].flag = reason;
 
 			data_bmt_info->bad_count++;
-		} else
+		} else {
+			nand_pr_err("block(%d) has been in bad block list", bad_index);
+			dump_stack();
 			return false;
+		}
 	} else
 #endif
 	{
 		if (reason == UPDATE_WRITE_FAIL) {
-			pr_debug("Write fail, need to migrate\n");
+			nand_pr_err("Write fail, need to migrate");
 			map_index = migrate_from_bad(offset, dat, oob);
 			if (!map_index) {
-				pr_debug("migrate fail\n");
+				nand_pr_err("migrate fail");
 				return false;
 			}
 		} else {
 			map_index = find_available_block(false);
 			if (!map_index) {
-				pr_debug("Cannot find block in pool\n");
+				nand_pr_err("Cannot find block in pool");
 				return false;
 			}
 		}
@@ -829,11 +829,7 @@ bool update_bmt(u64 offset, update_reason_t reason, u8 *dat, u8 *oob)
 
 	mark_block_bad_bmt(offset);
 
-#ifdef CONFIG_MNTL_SUPPORT
-	return false;
-#else
 	return true;
-#endif
 }
 EXPORT_SYMBOL(update_bmt);
 
@@ -880,7 +876,6 @@ u16 get_mapping_block_index(int index)
 	}
 
 	return index;
-
 }
 EXPORT_SYMBOL(get_mapping_block_index);
 

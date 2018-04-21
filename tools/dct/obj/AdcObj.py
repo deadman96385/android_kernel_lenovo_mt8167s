@@ -1,6 +1,17 @@
 #! /usr/bin/python
 # -*- coding: utf-8 -*-
 
+# Copyright (C) 2016 MediaTek Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+
 import os
 import re
 import string
@@ -15,6 +26,7 @@ from utility.util import sorted_key
 class AdcObj(ModuleObj):
     def __init__(self):
         ModuleObj.__init__(self, 'cust_adc.h', 'cust_adc.dtsi')
+        self.__idx_map = {}
 
     def get_cfgInfo(self):
         pass
@@ -50,7 +62,7 @@ class AdcObj(ModuleObj):
 
         for key in sorted_list:
             value = ModuleObj.get_data(self)[key]
-            gen_str += '''#define AUXADC_%s_CHANNEL\t\t\t%s\n''' %(value.upper(), key[len(key) - 1])
+            gen_str += '''#define AUXADC_%s_CHANNEL\t\t\t%s\n''' %(value.upper(), key[3:])
 
         return gen_str
 
@@ -65,9 +77,9 @@ class AdcObj(ModuleObj):
             value = ModuleObj.get_data(self)[key]
 
             if value == "TEMPERATURE":
-                gen_str += '''\t\tmediatek,%s0 = <%d>;\n''' %(value.lower(), string.atoi(key[len(key) -1]))
+                gen_str += '''\t\tmediatek,%s0 = <%d>;\n''' %(value.lower(), string.atoi(key[3:]))
             else:
-                gen_str += '''\t\tmediatek,%s = <%d>;\n''' %(value.lower(), string.atoi(key[len(key) -1]))
+                gen_str += '''\t\tmediatek,%s = <%d>;\n''' %(value.lower(), string.atoi(key[3:]))
 
         gen_str += '''\t\tstatus = \"okay\";\n'''
         gen_str += '''\t};\n'''

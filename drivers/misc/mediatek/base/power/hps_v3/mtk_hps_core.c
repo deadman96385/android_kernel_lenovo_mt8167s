@@ -25,8 +25,11 @@
 #include <trace/events/sched.h>
 #include <mt-plat/aee.h>
 #include <mt-plat/met_drv.h>
+#include <mt-plat/mtk_ram_console.h>
 
+#include <mt-plat/met_drv.h>
 
+#define TLP_THRESHOLD 250
 /*
  * static
  */
@@ -96,7 +99,7 @@ unsigned int hps_get_per_cpu_load(int cpu, int isReset)
 	spin_unlock(&load_info_lock);
 	return ret;
 }
-
+#ifndef CONFIG_MTK_ACAO_SUPPORT
 static void hps_get_sysinfo(void)
 {
 	unsigned int cpu;
@@ -121,8 +124,10 @@ static void hps_get_sysinfo(void)
 	int max_idx1 = 0;
 	unsigned int big_task_L, big_task_B;
 	/* sched-assist hotplug: */
-	int dev_util = 0;
-	int max_task_util;
+	int sched_util = 0;
+	unsigned int rel_load, abs_load;
+	static int prev_tlp;
+	int win_tlp;
 
 	hps_ctxt.cur_loads = 0;
 	str1_ptr = str1;
@@ -132,13 +137,25 @@ static void hps_get_sysinfo(void)
 		unsigned long util, cap;
 
 		sched_get_cluster_util(idx, &util, &cap);
-		dev_util += util;
+		sched_util += util;
 
 		hps_sys.cluster_info[idx].loading = 0;
+		hps_sys.cluster_info[idx].rel_load = 0;
+		hps_sys.cluster_info[idx].abs_load = 0;
+		hps_sys.cluster_info[idx].sched_load = util;
 	}
 	/*for_each_possible_cpu(cpu) {*/
 	for_each_online_cpu(cpu) {
-		per_cpu(hps_percpu_ctxt, cpu).load = hps_cpu_get_percpu_load(cpu);
+		sched_get_percpu_load2(cpu, 1, &rel_load, &abs_load);
+		if (cpu < 4) {
+			per_cpu(hps_percpu_ctxt, cpu).load = rel_load;
+			hps_sys.cluster_info[cpu/4].rel_load += per_cpu(hps_percpu_ctxt, cpu).load;
+			hps_sys.cluster_info[cpu/4].abs_load += abs_load;
+		} else {
+			per_cpu(hps_percpu_ctxt, cpu).load = abs_load;
+			hps_sys.cluster_info[cpu/4].abs_load += per_cpu(hps_percpu_ctxt, cpu).load;
+			hps_sys.cluster_info[cpu/4].rel_load += rel_load;
+		}
 		hps_ctxt.cur_loads += per_cpu(hps_percpu_ctxt, cpu).load;
 
 		for (idx = 0 ; idx < hps_sys.cluster_num; idx++) {
@@ -161,6 +178,21 @@ static void hps_get_sysinfo(void)
 	/*Get heavy task information */
 	/*hps_ctxt.cur_nr_heavy_task = hps_cpu_get_nr_heavy_task(); */
 	for (idx = 0; idx < hps_sys.cluster_num; idx++) {
+
+		if (idx == 0) {
+			met_tag_oneshot(0, "sched_util_cid0", hps_sys.cluster_info[idx].sched_load);
+			met_tag_oneshot(0, "sched_load_rel0", hps_sys.cluster_info[idx].rel_load);
+			met_tag_oneshot(0, "sched_load_abs0", hps_sys.cluster_info[idx].abs_load);
+		} else if (idx == 1) {
+			met_tag_oneshot(0, "sched_util_cid1", hps_sys.cluster_info[idx].sched_load);
+			met_tag_oneshot(0, "sched_load_rel1", hps_sys.cluster_info[idx].rel_load);
+			met_tag_oneshot(0, "sched_load_abs1", hps_sys.cluster_info[idx].abs_load);
+		} else if (idx == 2) {
+			met_tag_oneshot(0, "sched_util_cid2", hps_sys.cluster_info[idx].sched_load);
+			met_tag_oneshot(0, "sched_load_rel2", hps_sys.cluster_info[idx].rel_load);
+			met_tag_oneshot(0, "sched_load_abs2", hps_sys.cluster_info[idx].abs_load);
+		}
+
 		if (hps_ctxt.heavy_task_enabled)
 #ifdef CONFIG_MTK_SCHED_RQAVG_US
 		{
@@ -216,20 +248,33 @@ static void hps_get_sysinfo(void)
 	hps_sys.cluster_info[1].bigTsk_value = big_task_L;
 	hps_sys.cluster_info[2].bigTsk_value = big_task_B;
 #endif
+	/*Get sys TLP information */
+	scaled_tlp = hps_cpu_get_tlp(&avg_tlp, &hps_ctxt.cur_iowait);
+
+	/*
+	 * scaled_tlp: tasks number of the last pill, which X 100.
+	 * avg_tlp: average tasks number during the detection period.
+	 * To pick max of scaled_tlp and avg_tlp.
+	 */
+	hps_ctxt.cur_tlp = max_t(int, scaled_tlp, (int)avg_tlp);
+
 	/*
 	 * For EAS evaluation
 	 */
-	sched_max_util_task(NULL, NULL, &max_task_util, NULL);
 
+	/* consider TLP in 2 windows */
+	win_tlp = (hps_ctxt.cur_tlp + prev_tlp)/2;
 	/* LL: relative threshold */
-	if ((int)dev_util < sodi_limit || max_task_util < 10) {
+#ifdef CONFIG_MTK_SCHED_EAS_POWER_SUPPORT
+	if ((int)sched_util < sodi_limit && win_tlp < TLP_THRESHOLD) {
 		/*
-		 *  If CPU utilization in system is small or
+		 *  If CPU util && TLP in system is small or
 		 *  only tiny task is running, a few CPU for it.
 		 */
 		hps_sys.cluster_info[0].up_threshold = DEF_CPU_UP_THRESHOLD;
 		hps_sys.cluster_info[0].down_threshold = DEF_CPU_DOWN_THRESHOLD;
 	} else {
+#endif /* CONFIG_MTK_SCHED_EAS_POWER_SUPPORT */
 		/* for more cores + low frequency policy */
 		hps_sys.cluster_info[0].up_threshold = DEF_EAS_UP_THRESHOLD_0;
 		hps_sys.cluster_info[0].down_threshold = DEF_EAS_DOWN_THRESHOLD_0;
@@ -246,7 +291,9 @@ static void hps_get_sysinfo(void)
 			hps_sys.cluster_info[2].up_threshold = DEF_CPU_UP_THRESHOLD;
 			hps_sys.cluster_info[2].down_threshold = DEF_CPU_DOWN_THRESHOLD;
 		}
+#ifdef CONFIG_MTK_SCHED_EAS_POWER_SUPPORT
 	}
+#endif /* CONFIG_MTK_SCHED_EAS_POWER_SUPPORT */
 
 	if (!hps_ctxt.eas_enabled) {
 		for (idx = 0; idx < hps_sys.cluster_num; idx++) {
@@ -255,28 +302,37 @@ static void hps_get_sysinfo(void)
 		}
 	}
 
-	/*Get sys TLP information */
-	scaled_tlp = hps_cpu_get_tlp(&avg_tlp, &hps_ctxt.cur_iowait);
+	prev_tlp = hps_ctxt.cur_tlp;
 
-	/*
-	 * scaled_tlp: tasks number of the last pill, which X 100.
-	 * avg_tlp: average tasks number during the detection period.
-	 * To pick max of scaled_tlp and avg_tlp.
-	 */
-	hps_ctxt.cur_tlp = max_t(int, scaled_tlp, (int)avg_tlp);
+	/* [MET] debug for geekbench */
+	met_tag_oneshot(0, "sched_tlp_cur", hps_ctxt.cur_tlp);
+
 	mt_sched_printf(sched_log, "[heavy_task] :%s, scaled_tlp:%d, avg_tlp:%d, max:%d",
 			__func__, scaled_tlp, (int)avg_tlp, (int)hps_ctxt.cur_tlp);
 }
-
+#endif
 /*
  * hps task main loop
  */
 static int _hps_task_main(void *data)
 {
 	int cnt = 0;
+#ifndef CONFIG_MTK_ACAO_SUPPORT
 	int idx;
 	unsigned int total_big_task = 0;
+	unsigned int total_hvy_task = 0;
+#endif
 	void (*algo_func_ptr)(void);
+
+#ifdef CONFIG_MTK_ACAO_SUPPORT
+	unsigned int cpu, first_cpu, i;
+	ktime_t enter_ktime;
+
+	enter_ktime = ktime_get();
+	aee_rr_rec_hps_cb_enter_times((u64) ktime_to_ms(enter_ktime));
+	aee_rr_rec_hps_cb_footprint(0);
+	aee_rr_rec_hps_cb_fp_times(0);
+#endif
 
 	hps_ctxt_print_basic(1);
 
@@ -303,15 +359,83 @@ static int _hps_task_main(void *data)
 			goto HPS_WAIT_EVENT;
 		}
 #endif
+#ifdef CONFIG_MTK_ACAO_SUPPORT
+ACAO_HPS_START:
+	aee_rr_rec_hps_cb_footprint(1);
+	aee_rr_rec_hps_cb_fp_times((u64) ktime_to_ms(ktime_get()));
 
+	mutex_lock(&hps_ctxt.para_lock);
+	memcpy(&hps_ctxt.online_core, &hps_ctxt.online_core_req, sizeof(cpumask_var_t));
+	mutex_unlock(&hps_ctxt.para_lock);
+
+	aee_rr_rec_hps_cb_footprint(2);
+	aee_rr_rec_hps_cb_fp_times((u64) ktime_to_ms(ktime_get()));
+	/*Debgu message dump*/
+	for (i = 0 ; i < 8 ; i++) {
+		if (cpumask_test_cpu(i, hps_ctxt.online_core))
+			pr_info("CPU %d ==>1\n", i);
+		else
+			pr_info("CPU %d ==>0\n", i);
+	}
+
+	if (!cpumask_empty(hps_ctxt.online_core)) {
+		aee_rr_rec_hps_cb_footprint(3);
+		aee_rr_rec_hps_cb_fp_times((u64) ktime_to_ms(ktime_get()));
+		first_cpu = cpumask_first(hps_ctxt.online_core);
+		if (first_cpu >= setup_max_cpus) {
+			pr_err("PPM request without first cpu online!\n");
+			goto ACAO_HPS_END;
+		}
+
+		if (!cpu_online(first_cpu))
+			cpu_up(first_cpu);
+		aee_rr_rec_hps_cb_footprint(4);
+		aee_rr_rec_hps_cb_fp_times((u64) ktime_to_ms(ktime_get()));
+
+		for_each_possible_cpu(cpu) {
+			if (cpumask_test_cpu(cpu, hps_ctxt.online_core)) {
+				if (!cpu_online(cpu)) {
+					aee_rr_rec_hps_cb_footprint(5);
+					aee_rr_rec_hps_cb_fp_times((u64) ktime_to_ms(ktime_get()));
+					cpu_up(cpu);
+
+					aee_rr_rec_hps_cb_footprint(6);
+					aee_rr_rec_hps_cb_fp_times((u64) ktime_to_ms(ktime_get()));
+				}
+			} else {
+				if (cpu_online(cpu)) {
+					aee_rr_rec_hps_cb_footprint(7);
+					aee_rr_rec_hps_cb_fp_times((u64) ktime_to_ms(ktime_get()));
+					cpu_down(cpu);
+					aee_rr_rec_hps_cb_footprint(8);
+					aee_rr_rec_hps_cb_fp_times((u64) ktime_to_ms(ktime_get()));
+				}
+			}
+			if (!cpumask_equal(hps_ctxt.online_core, hps_ctxt.online_core_req))
+				goto ACAO_HPS_START;
+		}
+	}
+	aee_rr_rec_hps_cb_footprint(9);
+	aee_rr_rec_hps_cb_fp_times((u64) ktime_to_ms(ktime_get()));
+
+ACAO_HPS_END:
+	aee_rr_rec_hps_cb_footprint(10);
+	aee_rr_rec_hps_cb_fp_times((u64) ktime_to_ms(ktime_get()));
+	set_current_state(TASK_INTERRUPTIBLE);
+	aee_rr_rec_hps_cb_footprint(11);
+	aee_rr_rec_hps_cb_fp_times((u64) ktime_to_ms(ktime_get()));
+	schedule();
+#else
 		/* if (!hps_ctxt.is_interrupt) { */
 
 		/*Get sys status */
 		mutex_lock(&hps_ctxt.lock);
 		hps_get_sysinfo();
-		total_big_task = 0;
-		for (idx = 0; idx < hps_sys.cluster_num; idx++)
+		total_hvy_task = total_big_task = 0;
+		for (idx = 0; idx < hps_sys.cluster_num; idx++) {
 			total_big_task += hps_sys.cluster_info[idx].bigTsk_value;
+			total_hvy_task += hps_sys.cluster_info[idx].hvyTsk_value;
+		}
 		mutex_unlock(&hps_ctxt.lock);
 		if (!hps_ctxt.is_interrupt ||
 		    ((u64) ktime_to_ms(ktime_sub(ktime_get(),
@@ -319,7 +443,7 @@ static int _hps_task_main(void *data)
 				       HPS_TIMER_INTERVAL_MS) {
 
 			mt_ppm_hica_update_algo_data(hps_ctxt.cur_loads, 0, hps_ctxt.cur_tlp);
-			mt_smart_update_sysinfo(hps_ctxt.cur_loads, hps_ctxt.cur_tlp, total_big_task);
+			mt_smart_update_sysinfo(hps_ctxt.cur_loads, hps_ctxt.cur_tlp, total_big_task, total_hvy_task);
 			/*Execute PPM main function */
 			mt_ppm_main();
 
@@ -356,7 +480,7 @@ HPS_WAIT_EVENT:
 			} else
 				atomic_set(&hps_ctxt.is_ondemand, 0);
 		}
-
+#endif
 		if (kthread_should_stop())
 			break;
 
@@ -431,6 +555,44 @@ void hps_task_wakeup(void)
 static void ppm_limit_callback(struct ppm_client_req req)
 {
 	struct ppm_client_req *p = (struct ppm_client_req *)&req;
+#ifdef CONFIG_MTK_ACAO_SUPPORT
+#if 1
+	mutex_lock(&hps_ctxt.para_lock);
+	memcpy(&hps_ctxt.online_core_req, p->online_core, sizeof(cpumask_var_t));
+	mutex_unlock(&hps_ctxt.para_lock);
+	hps_task_wakeup_nolock();
+#else
+	unsigned int cpu, first_cpu;
+	int i = 0;
+
+	pr_err("[ACAO] PPM request....\n");
+	for (i = 0 ; i < 8 ; i++) {
+	if (cpumask_test_cpu(i, p->online_core))
+		pr_err("CPU %d ==>1\n", i);
+	else
+		pr_err("CPU %d ==>0\n", i);
+	}
+
+	if (p->online_core) {
+		first_cpu = cpumask_first(p->online_core);
+	if (first_cpu >= setup_max_cpus) {
+		pr_err("PPM request without first cpu online!\n");
+		return;
+	}
+	if (!cpu_online(first_cpu))
+		cpu_up(first_cpu);
+		for_each_possible_cpu(cpu) {
+			if (cpumask_test_cpu(cpu, p->online_core)) {
+				if (!cpu_online(cpu))
+					cpu_up(cpu);
+			} else {
+				if (cpu_online(cpu))
+					cpu_down(cpu);
+			}
+		}
+	}
+#endif
+#else
 	int i;
 
 	mutex_lock(&hps_ctxt.para_lock);
@@ -457,7 +619,7 @@ static void ppm_limit_callback(struct ppm_client_req req)
 	mutex_unlock(&hps_ctxt.para_lock);
 	hps_ctxt.is_interrupt = 1;
 	hps_task_wakeup_nolock();
-
+#endif
 }
 
 /*
@@ -467,6 +629,7 @@ int hps_core_init(void)
 {
 	int r = 0;
 
+#ifndef CONFIG_MTK_ACAO_SUPPORT
 	hps_warn("hps_core_init\n");
 	if (hps_ctxt.periodical_by == HPS_PERIODICAL_BY_TIMER) {
 		/*init timer */
@@ -484,6 +647,7 @@ int hps_core_init(void)
 		hrtimer_start(&hps_ctxt.hr_timer, ktime, HRTIMER_MODE_REL);
 
 	}
+#endif
 	/* init and start task */
 	r = hps_task_start();
 	if (r) {

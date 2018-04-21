@@ -1,10 +1,15 @@
 /* Mediatek STAR MAC network driver.
  *
- * Copyright (c) 2016-2017 Mediatek Corporation
+ * Copyright (c) 2016-2017 MediaTek Inc.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation.
+ * program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
 #include <linux/clk.h>
@@ -93,8 +98,7 @@ static int alloc_rx_skbs(star_dev *star_dev)
 
 		retval = star_dma_rx_set(star_dev, dmaBuf,
 					 skb_tailroom(skb), (uintptr_t)skb);
-		STAR_PR_DEBUG("rx descriptor idx(%d) for skb(%p)\n",
-			      retval, skb);
+		STAR_PR_DEBUG("rx descriptor idx(%d) for skb(%p)\n", retval, skb);
 		if (retval < 0) {
 			dma_unmap_single(star_dev->dev, dmaBuf,
 					 skb_tailroom(skb), DMA_FROM_DEVICE);
@@ -822,23 +826,19 @@ static int star_resume(struct platform_device *pdev)
 			STAR_PR_INFO("Not support wol.\n");
 			ret = regulator_enable(star_prv->phy_regulator);
 			if (ret != 0)
-				STAR_PR_ERR("failed to regulator_enable(%d)\n",
-					    ret);
+				STAR_PR_ERR("failed to regulator_enable(%d)\n", ret);
 
 			ret = clk_prepare_enable(star_prv->core_clk);
 			if (ret < 0)
-				STAR_PR_ERR("failed to enable core-clk (%d)\n",
-					    ret);
+				STAR_PR_ERR("failed to enable core-clk (%d)\n", ret);
 
 			ret = clk_prepare_enable(star_prv->reg_clk);
 			if (ret < 0)
-				STAR_PR_ERR("failed to enable reg-clk (%d)\n",
-					    ret);
+				STAR_PR_ERR("failed to enable reg-clk (%d)\n", ret);
 
 			ret = clk_prepare_enable(star_prv->trans_clk);
 			if (ret < 0)
-				STAR_PR_ERR("failed to enable trans-clk (%d)\n",
-					    ret);
+				STAR_PR_ERR("failed to enable trans-clk (%d)\n", ret);
 
 			star_hw_init(star_dev);
 			star_mac_enable(netdev);

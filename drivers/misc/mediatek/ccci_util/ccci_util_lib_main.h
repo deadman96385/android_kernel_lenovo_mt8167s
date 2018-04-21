@@ -163,10 +163,10 @@ struct md_check_header_struct {
 #endif
 } __packed;
 
-typedef struct _free_padding_block {
+struct _free_padding_block {
 	unsigned int start_offset;
 	unsigned int length;
-} free_padding_block_t;
+};
 
 struct md_check_header_v6 {
 	unsigned char check_header[12]; /* magic number is "CHECK_HEADER"*/
@@ -195,7 +195,7 @@ struct md_check_header_v6 {
 	unsigned int  arm7_img_offset;
 	unsigned int  arm7_img_size;
 
-	free_padding_block_t padding_blk[8];
+	struct _free_padding_block padding_blk[8];
 
 	unsigned int  ap_md_smem_size;
 	unsigned int  md_to_md_smem_size;
@@ -228,6 +228,7 @@ struct md_check_header_v6 {
 extern char *ccci_get_ap_platform(void);
 extern int ccci_common_sysfs_init(void);
 extern void ccci_log_init(void);
-extern int ccci_util_fo_init(void);
+extern int __init ccci_util_fo_init(void);
 extern void ccci_timer_for_md_init(void);
 extern const char *ld_md_errno_to_str(int errno);
+extern int ccci_util_broadcast_init(void);

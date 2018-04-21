@@ -1,7 +1,7 @@
 #nand
 menuconfig MTK_MTD_NAND
 	tristate "MediaTek Nand Support"
-	depends on MTD_NAND
+	depends on MTD
 	help
 	  NAND flash memory, a type of non-volatile storage device,
 	  introduced by Toshiba in 1989. With formal commands,
@@ -60,6 +60,15 @@ config MTK_MLC_NAND_SUPPORT
 	  implement various method to enhance data robustness.
 	  While using MLC devices as booting device, please set this configuration as
 	  y to enable MLC features.
+
+config MTK_NAND_BITFLIP
+        tristate "Mediatek NAND Bit flip injection"
+        depends on MTK_MTD_NAND
+        help
+          The upper layer will do re-charge When bit flip is happened
+          Inject bitflip will simulate  the worst case of NAND device
+          It will trigger more GC/re-charge for stress testing
+          This option is for testing only
 
 config MTK_COMBO_NAND_SUPPORT
 	tristate "Mediatek COMBO NAND Support"

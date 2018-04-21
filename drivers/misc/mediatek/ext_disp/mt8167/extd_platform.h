@@ -38,7 +38,7 @@
 #define EXTD_OVERLAY_CNT  0
 #endif
 
-#define HW_DPI_VSYNC_SUPPORT 0
+#define HW_DPI_VSYNC_SUPPORT 1
 
 #define DISP_MODULE_RDMA DISP_MODULE_RDMA1
 #endif

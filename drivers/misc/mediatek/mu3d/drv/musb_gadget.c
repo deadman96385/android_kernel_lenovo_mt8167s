@@ -37,6 +37,7 @@
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
 #include <linux/slab.h>
+#include <linux/usb/composite.h>
 
 #include "musb_core.h"
 #include "mu3d_hal_osal.h"
@@ -580,6 +581,71 @@ void musb_g_rx(struct musb *musb, u8 epnum)
 
 /* ------------------------------------------------------------ */
 
+static int is_db_ok(struct musb *musb, struct musb_ep *musb_ep)
+{
+	struct usb_composite_dev *cdev = (musb->g).ep0->driver_data;
+	struct usb_configuration *c = cdev->config;
+	struct usb_gadget *gadget = &(musb->g);
+	int tmp;
+	int ret = 1;
+
+	for (tmp = 0; tmp < MAX_CONFIG_INTERFACES; tmp++) {
+		struct usb_function *f = c->interface[tmp];
+		struct usb_descriptor_header **descriptors;
+
+		if (!f)
+			break;
+
+		os_printk(K_INFO, "Ifc name=%s\n", f->name);
+
+		switch (gadget->speed) {
+		case USB_SPEED_SUPER:
+			descriptors = f->ss_descriptors;
+			break;
+		case USB_SPEED_HIGH:
+			descriptors = f->hs_descriptors;
+			break;
+		default:
+			descriptors = f->fs_descriptors;
+		}
+
+		for (; *descriptors; ++descriptors) {
+			struct usb_endpoint_descriptor *ep;
+			int is_in;
+			int epnum;
+
+			if ((*descriptors)->bDescriptorType != USB_DT_ENDPOINT)
+				continue;
+
+			ep = (struct usb_endpoint_descriptor *)*descriptors;
+
+			is_in = (ep->bEndpointAddress & 0x80) >> 7;
+			epnum = (ep->bEndpointAddress & 0x0f);
+
+			/*
+			 * Under saving mode, some kinds of EPs have to be set as Single Buffer
+			 * ACM OUT-BULK - Signle
+			 * ACM IN-BULK - Double
+			 * ADB OUT-BULK - Signle
+			 * ADB IN-BULK - Single
+			 */
+
+			/* ep must be matched */
+			if (ep->bEndpointAddress == (musb_ep->end_point).address) {
+
+			if (gadget->speed == USB_SPEED_SUPER) {
+				if (!strcmp(f->name, "Function FS Gadget"))
+					ret = 0;
+			}
+				goto end;
+			}
+		}
+	}
+end:
+	return ret;
+}
+
+
 static int musb_gadget_enable(struct usb_ep *ep, const struct usb_endpoint_descriptor *desc)
 {
 	unsigned long flags;
@@ -590,8 +656,8 @@ static int musb_gadget_enable(struct usb_ep *ep, const struct usb_endpoint_descr
 	u8 epnum = 0;
 	unsigned maxp = 0;
 	int status = -EINVAL;
-	TRANSFER_TYPE type = USB_CTRL;
-	USB_DIR dir = USB_TX;
+	enum TRANSFER_TYPE type = USB_CTRL;
+	enum USB_DIR dir = USB_TX;
 
 
 	if (!ep || !desc)
@@ -714,7 +780,19 @@ static int musb_gadget_enable(struct usb_ep *ep, const struct usb_endpoint_descr
 	 * So at FPGA stage and PIO, just use _ONE_ slot.
 	 */
 #ifdef USE_SSUSB_QMU
-	_ex_mu3d_hal_ep_enable(epnum, dir, type, maxp, 0, MAX_SLOT, 0, 0);
+	if (is_saving_mode()) {
+		if (is_db_ok(musb, musb_ep)) {
+			os_printk(K_INFO, "Saving mode, but EP%d supports DBBUF\n",
+				musb_ep->current_epnum);
+			_ex_mu3d_hal_ep_enable(epnum, dir, type, maxp, 0, MAX_SLOT, 0, 0);
+		} else {
+			os_printk(K_INFO, "EP%d supports single buffer\n", musb_ep->current_epnum);
+			_ex_mu3d_hal_ep_enable(epnum, dir, type, maxp, 0, 0, 0, 0);
+		}
+	} else {
+		os_printk(K_INFO, "EP%d supports DBBUF\n", musb_ep->current_epnum);
+		_ex_mu3d_hal_ep_enable(epnum, dir, type, maxp, 0, MAX_SLOT, 0, 0);
+	}
 #else
 	/*TODO: Check support mulitslots on real ship */
 	_ex_mu3d_hal_ep_enable(epnum, dir, type, maxp, 0, 0, 0, 0);
@@ -824,7 +902,7 @@ static int musb_gadget_disable(struct usb_ep *ep)
 			musb->active_ep, epnum, (musb_ep->is_in ? USB_TX : USB_RX));
 
 	if (musb->active_ep == 0 && musb->is_active == 0)
-		schedule_work(&musb->suspend_work);
+		queue_work(musb->st_wq, &musb->suspend_work);
 
 	spin_unlock_irqrestore(&(musb->lock), flags);
 
@@ -1326,7 +1404,17 @@ static void musb_gadget_fifo_flush(struct usb_ep *ep)
 	spin_unlock_irqrestore(&musb->lock, flags);
 }
 
-#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT) || defined(CONFIG_MTK_MD_DIRECT_LOGGING_SUPPORT)
+#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT)
+static int musb_gadget_get_address(struct usb_gadget *gadget)
+{
+	struct musb *musb = gadget_to_musb(gadget);
+
+	if (musb != NULL && musb->set_address == true)
+		return musb->address;
+	else
+		return 0;
+}
+
 static void musb_gadget_suspend_control(struct usb_ep *ep)
 {
 	struct musb_ep	*musb_ep = to_musb_ep(ep);
@@ -1398,37 +1486,6 @@ static void musb_gadget_resume_control(struct usb_ep *ep)
 #endif
 	spin_unlock_irqrestore(&musb->lock, flags);
 }
-
-static int musb_gadget_fifo_empty(struct usb_ep *ep)
-{
-	struct musb_ep *musb_ep = to_musb_ep(ep);
-	struct musb *musb = musb_ep->musb;
-	u8		epnum = musb_ep->current_epnum;
-	unsigned long	flags;
-	u32 txcsr0 = 0;
-	int ret = -EAGAIN;
-
-	spin_lock_irqsave(&musb->lock, flags);
-
-	if (musb_ep->is_in) { /* TX */
-		txcsr0 = os_readl(musb->endpoints[epnum].addr_txcsr0);
-
-		if (txcsr0 & TX_FIFOEMPTY) {
-#ifdef USE_SSUSB_QMU
-			if (_ex_mu3d_hal_qmu_status_done(epnum, USB_TX))
-				ret = 1;
-#else
-			ret = 1;
-#endif
-		}
-	} else {
-		ret = -ENOTSUPP;
-	}
-
-	spin_unlock_irqrestore(&musb->lock, flags);
-
-	return ret;
-}
 #endif
 
 static const struct usb_ep_ops musb_ep_ops = {
@@ -1442,10 +1499,9 @@ static const struct usb_ep_ops musb_ep_ops = {
 	.set_wedge = musb_gadget_set_wedge,
 	.fifo_status = musb_gadget_fifo_status,
 	.fifo_flush = musb_gadget_fifo_flush,
-#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT) || defined(CONFIG_MTK_MD_DIRECT_LOGGING_SUPPORT)
+#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT)
 	.suspend_control	= musb_gadget_suspend_control,
 	.resume_control	= musb_gadget_resume_control,
-	.fifo_empty = musb_gadget_fifo_empty
 #endif
 };
 
@@ -1587,7 +1643,7 @@ static struct musb *mu3d_clk_off_musb;
 static void do_mu3d_clk_off_work(struct work_struct *work)
 {
 	os_printk(K_NOTICE, "do_mu3d_clk_off_work, issue connection work\n");
-	schedule_delayed_work(&mu3d_clk_off_musb->connection_work, 0);
+	queue_delayed_work(mu3d_clk_off_musb->st_wq, &mu3d_clk_off_musb->connection_work, 0);
 }
 
 void set_usb_rdy(void)
@@ -1665,7 +1721,10 @@ static const struct usb_gadget_ops musb_gadget_operations = {
 	.vbus_draw = musb_gadget_vbus_draw,
 	.pullup = musb_gadget_pullup,
 	.udc_start = musb_gadget_start,
-	.udc_stop		= musb_gadget_stop,
+	.udc_stop = musb_gadget_stop,
+#if defined(CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT)
+	.get_address =	musb_gadget_get_address,
+#endif
 	/*REVISIT-J: Do we need implement "get_config_params" to config U1/U2 */
 };
 
@@ -1802,6 +1861,7 @@ int musb_gadget_setup(struct musb *musb)
 	if (is_otg_enabled(musb))
 		musb->g.is_otg = 1;
 
+	musb->g.quirk_ep_out_aligned_size = true;
 	musb_g_init_endpoints(musb);
 
 	musb->is_active = 0;

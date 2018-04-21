@@ -37,7 +37,7 @@
 #endif
 
 #ifdef CONFIG_GTP_REQUEST_FW_UPDATE
-#define GT1151_DEFAULT_FW              "gt1151_default_fw_v1.img"
+#define GT1151_DEFAULT_FW              "gt1151_default_"
 #endif
 #undef CONFIG_GTP_FOPEN_FW_UPDATE
 
@@ -68,38 +68,38 @@
 #define _bRW_MISCTL__PATCH_AREA_EN_  0x404D
 
 /*
- 1.  firmware structure
-    header: 128b
-
-    offset           size          content
-    0                 4              firmware length
-    4                 2              checksum
-    6                 6              target MASK name
-    12               3              target MASK version
-    15               6              TP subsystem PID
-    21               3              TP subsystem version
-    24               1              subsystem count
-    25               1              chip type                             0x91: GT1X,   0x92: GT2X
-    26               6              reserved
-    32               8              subsystem info[0]
-    32               8              subsystem info[1]
-    .....
-    120             8              subsystem info[11]
-
-    body: followed header
-
-    128             N0              subsystem[0]
-    128+N0       N1              subsystem[1]
-    ....
-
- 2. subsystem info structure
-    offset           size          content
-    0                 1              subsystem type
-    1                 2              subsystem length
-    3                 2              stored address in flash           addr = value * 256
-    5                 3              reserved
-
-*/
+ * 1.  firmware structure
+ *    header: 128b
+ *
+ *   offset           size          content
+ *   0                 4              firmware length
+ *   4                 2              checksum
+ *   6                 6              target MASK name
+ *   12               3              target MASK version
+ *   15               6              TP subsystem PID
+ *   21               3              TP subsystem version
+ *   24               1              subsystem count
+ *   25               1              chip type                             0x91: GT1X,   0x92: GT2X
+ *   26               6              reserved
+ *   32               8              subsystem info[0]
+ *   32               8              subsystem info[1]
+ *   .....
+ *   120             8              subsystem info[11]
+ *
+ *   body: followed header
+ *
+ *   128             N0              subsystem[0]
+ *   128+N0       N1              subsystem[1]
+ *   ....
+ *
+ * 2. subsystem info structure
+ *   offset           size          content
+ *   0                 1              subsystem type
+ *   1                 2              subsystem length
+ *   3                 2              stored address in flash           addr = value * 256
+ *   5                 3              reserved
+ *
+ */
 
 #define FW_HEAD_SIZE                         128
 #define FW_HEAD_SUBSYSTEM_INFO_SIZE          8
@@ -208,58 +208,6 @@ u32 getUint(u8 *buffer, int len)
 	}
 	return num;
 }
-#ifdef CONFIG_GTP_FOPEN_FW_UPDATE
-static int gt1x_search_update_files(void)
-{
-	int retry = 20 * 2;	/*ait 10s(max) if fs is not ready*/
-	struct file *pfile = NULL;
-	mm_segment_t old_fs;
-	int found = 0;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-
-	GTP_INFO("Search firmware file...");
-	while (retry-- > 0) {
-		msleep(500);
-
-		/*check if rootfs is ready*/
-		if (gt1x_check_fs_mounted("/data")) {
-			GTP_ERROR("filesystem is not ready!");
-			continue;
-		}
-		/*search firmware*/
-		pfile = filp_open(UPDATE_FILE_PATH_1, O_RDONLY, 0);
-		if (IS_ERR(pfile)) {
-			pfile = filp_open(UPDATE_FILE_PATH_2, O_RDONLY, 0);
-			if (!IS_ERR(pfile))
-				found |= FOUND_FW_PATH_2;
-		} else {
-			found |= FOUND_FW_PATH_1;
-		}
-
-		if (!IS_ERR(pfile))
-			filp_close(pfile, NULL);
-		/*search config file*/
-		pfile = filp_open(CONFIG_FILE_PATH_1, O_RDONLY, 0);
-		if (IS_ERR(pfile)) {
-			pfile = filp_open(CONFIG_FILE_PATH_2, O_RDONLY, 0);
-			if (!IS_ERR(pfile))
-				found |= FOUND_CFG_PATH_2;
-		} else {
-			found |= FOUND_CFG_PATH_1;
-		}
-		if (!IS_ERR(pfile))
-			filp_close(pfile, NULL);
-		if (found)
-			break;
-		GTP_INFO("Not found firmware or config file, retry.");
-	}
-	set_fs(old_fs);
-
-	return found;
-}
-#endif
 int gt1x_auto_update_proc(void *data)
 {
 
@@ -269,34 +217,6 @@ int gt1x_auto_update_proc(void *data)
 #elif defined(CONFIG_GTP_REQUEST_FW_UPDATE)
 	GTP_INFO("Start auto update thread...");
 	gt1x_update_firmware(NULL);
-#elif defined(CONFIG_GTP_FOPEN_FW_UPDATE)
-	int ret;
-	char *filename;
-	u8 config[GTP_CONFIG_MAX_LENGTH] = { 0 };
-
-	GTP_INFO("Start auto update thread...");
-	ret = gt1x_search_update_files();
-	if (ret & (FOUND_FW_PATH_1 | FOUND_FW_PATH_2)) {
-		if (ret & FOUND_FW_PATH_1)
-			filename = UPDATE_FILE_PATH_1;
-		else
-			filename = UPDATE_FILE_PATH_2;
-		gt1x_update_firmware(filename);
-	}
-
-	if (ret & (FOUND_CFG_PATH_1 | FOUND_CFG_PATH_2)) {
-		if (ret & FOUND_CFG_PATH_1)
-			filename = CONFIG_FILE_PATH_1;
-		else
-			filename = CONFIG_FILE_PATH_2;
-
-		if (gt1x_parse_config(filename, config) > 0) {
-			if (gt1x_i2c_write(GTP_REG_CONFIG_DATA, config, GTP_CONFIG_MAX_LENGTH))
-				GTP_ERROR("Update config failed!");
-			else
-				GTP_INFO("Update config successfully!");
-		}
-	}
 #endif
 	gt1x_auto_update_done();
 	return 0;
@@ -317,6 +237,7 @@ int gt1x_update_prepare(char *filename)
 	int retry = 5;
 #ifdef CONFIG_GTP_REQUEST_FW_UPDATE
 	const struct firmware *fw_entry;
+	char buf[64];
 #endif
 
 	if (filename == NULL) {
@@ -324,8 +245,9 @@ int gt1x_update_prepare(char *filename)
 		update_info.fw_name = NULL;
 		update_info.update_type = UPDATE_TYPE_HEADER;
 
-		GTP_DEBUG("Request default firmware\n");
-		ret = request_firmware(&fw_entry, GT1151_DEFAULT_FW, &gt1x_i2c_client->dev);
+		snprintf(buf, sizeof(buf), "%s%s.img", GT1151_DEFAULT_FW, CONFIG_GT1151_FIRMWARE);
+		GTP_INFO("Request default firmware version: %s\n", buf);
+		ret = request_firmware(&fw_entry, buf, &gt1x_i2c_client->dev);
 		if (ret) {
 			GTP_ERROR("load %s fail, error: %d\n", GT1151_DEFAULT_FW, ret);
 			return ret;
@@ -345,20 +267,6 @@ int gt1x_update_prepare(char *filename)
 		GTP_ERROR("No Fw in .h file!");
 		return ERROR_FW;
 #endif
-	} else {
-		GTP_INFO("Firmware: %s", filename);
-		update_info.old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		update_info.fw_name = filename;
-		update_info.update_type = UPDATE_TYPE_FILE;
-		update_info.fw_file = filp_open(update_info.fw_name, O_RDONLY, 0);
-		if (IS_ERR(update_info.fw_file)) {
-			GTP_ERROR("Open update file(%s) error!", update_info.fw_name);
-			set_fs(update_info.old_fs);
-			return ERROR_FILE;
-		}
-		update_info.fw_file->f_op->llseek(update_info.fw_file, 0, SEEK_SET);
-		update_info.fw_length = update_info.fw_file->f_op->llseek(update_info.fw_file, 0, SEEK_END);
 	}
 
 	while (retry > 0) {
@@ -399,7 +307,6 @@ int gt1x_update_prepare(char *filename)
  gt1x_update_pre_fail0:
 	kfree(update_info.firmware);
  gt1x_update_pre_fail1:
-	filp_close(update_info.fw_file, NULL);
 	return ret;
 }
 /**
@@ -408,21 +315,7 @@ int gt1x_update_prepare(char *filename)
  */
 u8 *gt1x_get_fw_data(u32 offset, int length)
 {
-	int ret;
-
-	if (update_info.update_type == UPDATE_TYPE_FILE) {
-		update_info.fw_file->f_op->llseek(update_info.fw_file, offset, SEEK_SET);
-		ret =
-		    update_info.fw_file->f_op->read(update_info.fw_file, (char *)update_info.buffer, length,
-						    &update_info.fw_file->f_pos);
-		if (ret < 0) {
-			GTP_ERROR("Read data error!");
-			return NULL;
-		}
-		return update_info.buffer;
-	} else {
-		return &update_info.fw_data[offset];
-	}
+	return &update_info.fw_data[offset];
 }
 
 int gt1x_check_firmware(void)
@@ -879,14 +772,6 @@ int gt1x_check_subsystem_in_flash(struct fw_subsystem_info *subsystem)
 
 void gt1x_update_cleanup(void)
 {
-	if (update_info.update_type == UPDATE_TYPE_FILE) {
-		if (update_info.fw_file != NULL) {
-			filp_close(update_info.fw_file, NULL);
-			update_info.fw_file = NULL;
-		}
-		set_fs(update_info.old_fs);
-	}
-
 	if (update_info.buffer != NULL) {
 		kfree(update_info.buffer);
 		update_info.buffer = NULL;
@@ -916,7 +801,7 @@ int gt1x_update_firmware(char *filename)
 	ret = gt1x_update_prepare(filename);
 	if (ret) {
 		update_info.status = UPDATE_STATUS_IDLE;
-		return ret;
+		goto gt1x_update_exit;
 	}
 	update_info.progress = 1;
 
@@ -1027,7 +912,7 @@ int __gt1x_hold_ss51_dsp_20(void)
 			GTP_DEBUG("Hold ss51 & dsp I2C error,retry:%d", retry);
 			continue;
 		}
-		if (0x0C == buf[0]) {
+		if (buf[0] == 0x0C) {
 			if (hold_times++ < 20)
 				continue;
 			else
@@ -1124,35 +1009,6 @@ void read_reg(u16 addr, int len)
 		read_len += cur_len;
 	}
 }
-
-void dump_to_file(u16 addr, int length, char *filepath)
-{
-	struct file *flp = NULL;
-	u8 buf[128];
-	const int READ_BLOCK_SIZE = 128;
-	int read_length = 0;
-	int len = 0;
-
-	GTP_INFO("Dump(0x%04X, %d bytes) to file: %s\n", addr, length, filepath);
-	flp = filp_open(filepath, O_RDWR | O_CREAT, 0666);
-	if (IS_ERR(flp)) {
-		GTP_ERROR("can not open file: %s\n", filepath);
-		return;
-	}
-	flp->f_op->llseek(flp, 0, SEEK_SET);
-
-	while (length > 0) {
-		len = (length > READ_BLOCK_SIZE ? READ_BLOCK_SIZE : length);
-		memset(buf, 0x33, len);
-		if (gt1x_i2c_read(addr + read_length, buf, len))
-			memset(buf, 0x33, len);
-		flp->f_op->write(flp, (char *)buf, len, &flp->f_pos);
-		read_length += len;
-		length -= len;
-	}
-	filp_close(flp, NULL);
-}
-
 int gt1x_hold_ss51_dsp_no_reset(void)
 {
 	int ret = ERROR;

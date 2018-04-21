@@ -68,7 +68,7 @@ static imgsensor_info_struct imgsensor_info = {
 	.sensor_id = GC2355_SENSOR_ID,	/* record sensor id defined in Kd_imgsensor.h */
 
 	/* .checksum_value = 0x9d1c9dad,        //checksum value for Camera Auto Test */
-	.checksum_value = 0xd9b3ac52,	/* checksum value for Camera Auto Test */
+	.checksum_value = 0x39c5d60,	/* checksum value for Camera Auto Test */
 
 	.pre = {
 		.pclk = 42000000,	/* record different mode's pclk */
@@ -161,7 +161,7 @@ static imgsensor_info_struct imgsensor_info = {
 	.mipi_sensor_type = MIPI_OPHY_NCSI2,	/* 0,MIPI_OPHY_NCSI2;  1,MIPI_OPHY_CSI2 */
 	/* 0,MIPI_SETTLEDELAY_AUTO; 1,MIPI_SETTLEDELAY_MANNUAL */
 	.mipi_settle_delay_mode = MIPI_SETTLEDELAY_AUTO,
-	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_B,	/* sensor output first pixel color */
+	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_R,	/* sensor output first pixel color */
 	.mclk = 24,		/* mclk value, suggest 24 or 26 for 24Mhz or 26Mhz */
 	.mipi_lane_num = SENSOR_MIPI_2_LANE,	/* mipi lane num */
 	.i2c_addr_table = {0x78, 0xff},	/* record sensor support all write id addr, only supprt 4must end with 0xff */
@@ -515,19 +515,19 @@ static void sensor_init(void)
 	/* /////////////////////////////////////////////////// */
 	/* ////////////////      ANALOG & CISCTL      /////////////// */
 	/* /////////////////////////////////////////////////// */
-	write_cmos_sensor(0x03, 0x0b);  /* 07 */
-	write_cmos_sensor(0x04, 0xb8);  /* d0 */
-	write_cmos_sensor(0x05, 0x01);  /* 03 */
-	write_cmos_sensor(0x06, 0x22);  /* 4c */
+	write_cmos_sensor(0x03, 0x07);
+	write_cmos_sensor(0x04, 0xd0);
+	write_cmos_sensor(0x05, 0x03);
+	write_cmos_sensor(0x06, 0x4c);
 	write_cmos_sensor(0x07, 0x00);
-	write_cmos_sensor(0x08, 0x14);  /* 12 */
+	write_cmos_sensor(0x08, 0x12);
 	write_cmos_sensor(0x0a, 0x00);
 	write_cmos_sensor(0x0c, 0x04);
 	write_cmos_sensor(0x0d, 0x04);
 	write_cmos_sensor(0x0e, 0xc0);
 	write_cmos_sensor(0x0f, 0x06);
 	write_cmos_sensor(0x10, 0x50);
-	write_cmos_sensor(0x17, 0x14);	/* mirror */
+	write_cmos_sensor(0x17, 0x17);	/* mirror */
 	write_cmos_sensor(0x19, 0x0b);
 	write_cmos_sensor(0x1b, 0x48);
 	write_cmos_sensor(0x1c, 0x12);
@@ -960,6 +960,8 @@ static kal_uint32 slim_video(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 static kal_uint32 get_resolution(MSDK_SENSOR_RESOLUTION_INFO_STRUCT *sensor_resolution)
 {
 	LOG_INF("E\n");
+
+	spin_lock(&imgsensor_drv_lock);
 	sensor_resolution->SensorFullWidth = imgsensor_info.cap.grabwindow_width;
 	sensor_resolution->SensorFullHeight = imgsensor_info.cap.grabwindow_height;
 
@@ -975,6 +977,8 @@ static kal_uint32 get_resolution(MSDK_SENSOR_RESOLUTION_INFO_STRUCT *sensor_reso
 
 	sensor_resolution->SensorSlimVideoWidth = imgsensor_info.slim_video.grabwindow_width;
 	sensor_resolution->SensorSlimVideoHeight = imgsensor_info.slim_video.grabwindow_height;
+	spin_unlock(&imgsensor_drv_lock);
+
 	return ERROR_NONE;
 }				/*    get_resolution    */
 
@@ -984,6 +988,7 @@ static kal_uint32 get_info(MSDK_SCENARIO_ID_ENUM scenario_id,
 {
 	LOG_INF("scenario_id = %d\n", scenario_id);
 
+	spin_lock(&imgsensor_drv_lock);
 
 	/* sensor_info->SensorVideoFrameRate = imgsensor_info.normal_video.max_framerate/10; *//* not use */
 	/* sensor_info->SensorStillCaptureFrameRate= imgsensor_info.cap.max_framerate/10; *//* not use */
@@ -1083,6 +1088,7 @@ static kal_uint32 get_info(MSDK_SCENARIO_ID_ENUM scenario_id,
 		    imgsensor_info.pre.mipi_data_lp2hs_settle_dc;
 		break;
 	}
+	spin_unlock(&imgsensor_drv_lock);
 
 	return ERROR_NONE;
 }				/*    get_info  */
@@ -1283,7 +1289,10 @@ static kal_uint32 get_default_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenar
 						    MUINT32 *framerate)
 {
 	LOG_INF("scenario_id = %d\n", scenario_id);
+	if (framerate == NULL)
+		return ERROR_NONE;
 
+	spin_lock(&imgsensor_drv_lock);
 	switch (scenario_id) {
 	case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
 		*framerate = imgsensor_info.pre.max_framerate;
@@ -1303,6 +1312,7 @@ static kal_uint32 get_default_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenar
 	default:
 		break;
 	}
+	spin_unlock(&imgsensor_drv_lock);
 
 	return ERROR_NONE;
 }
@@ -1397,7 +1407,47 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 		LOG_INF("SENSOR_FEATURE_GET_CROP_INFO scenarioId:%d\n", (UINT32) *feature_data);
 
 		wininfo = (SENSOR_WINSIZE_INFO_STRUCT *) (uintptr_t) (*(feature_data + 1));
-
+#if 1
+		switch (*feature_data_32) {
+		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
+			if (copy_to_user((void *)wininfo, (void *)&imgsensor_winsize_info[1],
+				sizeof(SENSOR_WINSIZE_INFO_STRUCT))) {
+				LOG_INF("copy to user failed\n");
+				return -EFAULT;
+			}
+			break;
+		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
+			if (copy_to_user((void *)wininfo, (void *)&imgsensor_winsize_info[2],
+				sizeof(SENSOR_WINSIZE_INFO_STRUCT))) {
+				LOG_INF("copy to user failed\n");
+				return -EFAULT;
+			}
+			break;
+		case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
+			if (copy_to_user((void *)wininfo, (void *)&imgsensor_winsize_info[3],
+				sizeof(SENSOR_WINSIZE_INFO_STRUCT))) {
+				LOG_INF("copy to user failed\n");
+				return -EFAULT;
+			}
+			break;
+		case MSDK_SCENARIO_ID_SLIM_VIDEO:
+			if (copy_to_user((void *)wininfo, (void *)&imgsensor_winsize_info[4],
+				sizeof(SENSOR_WINSIZE_INFO_STRUCT))) {
+				LOG_INF("copy to user failed\n");
+				return -EFAULT;
+			}
+			break;
+		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
+			if (copy_to_user((void *)wininfo, (void *)&imgsensor_winsize_info[0],
+				sizeof(SENSOR_WINSIZE_INFO_STRUCT))) {
+				LOG_INF("copy to user failed\n");
+				return -EFAULT;
+			}
+			break;
+		default:
+			break;
+		}
+#else
 		switch (*feature_data_32) {
 		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
 			memcpy((void *)wininfo, (void *)&imgsensor_winsize_info[1],
@@ -1416,11 +1466,13 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 			       sizeof(SENSOR_WINSIZE_INFO_STRUCT));
 			break;
 		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
-		default:
 			memcpy((void *)wininfo, (void *)&imgsensor_winsize_info[0],
 			       sizeof(SENSOR_WINSIZE_INFO_STRUCT));
 			break;
+		default:
+			break;
 		}
+#endif
 	case SENSOR_FEATURE_SET_IHDR_SHUTTER_GAIN:
 		LOG_INF("SENSOR_SET_SENSOR_IHDR LE=%d, SE=%d, Gain=%d\n", (UINT16) *feature_data,
 			(UINT16) *(feature_data + 1), (UINT16) *(feature_data + 2));

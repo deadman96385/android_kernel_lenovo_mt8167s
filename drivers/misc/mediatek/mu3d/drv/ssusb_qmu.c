@@ -32,9 +32,9 @@
 */
 void qmu_done_tx(struct musb *musb, u8 ep_num, unsigned long flags)
 {
-	TGPD *gpd = Tx_gpd_last[ep_num];
+	struct TGPD *gpd = Tx_gpd_last[ep_num];
 	/* QMU GPD address --> CPU DMA address */
-	TGPD *gpd_current = (TGPD *) (uintptr_t) (os_readl(USB_QMU_TQCPR(ep_num)));
+	struct TGPD *gpd_current = (struct TGPD *) (uintptr_t) (os_readl(USB_QMU_TQCPR(ep_num)));
 	struct musb_ep *musb_ep = &musb->endpoints[ep_num].ep_in;
 	struct usb_request *request = NULL;
 	struct musb_request *req = NULL;
@@ -201,9 +201,9 @@ void qmu_done_tx(struct musb *musb, u8 ep_num, unsigned long flags)
 */
 void qmu_done_rx(struct musb *musb, u8 ep_num, unsigned long flags)
 {
-	TGPD *gpd = Rx_gpd_last[ep_num];
+	struct TGPD *gpd = Rx_gpd_last[ep_num];
 	/* QMU GPD address --> CPU DMA address */
-	TGPD *gpd_current = (TGPD *) (uintptr_t) (os_readl(USB_QMU_RQCPR(ep_num)));
+	struct TGPD *gpd_current = (struct TGPD *) (uintptr_t) (os_readl(USB_QMU_RQCPR(ep_num)));
 	struct musb_ep *musb_ep = &musb->endpoints[ep_num].ep_out;
 	struct usb_request *request = NULL;
 	struct musb_request *req;
@@ -264,11 +264,12 @@ void qmu_done_rx(struct musb *musb, u8 ep_num, unsigned long flags)
 	if (TGPD_IS_FLAGS_HWO(gpd)) {
 		qmu_printk(K_ERR, "[RXD][ERROR] HWO=1!!\n");
 		WARN_ON(1);
+		goto exit;
 	}
 
 	while (gpd != gpd_current && !TGPD_IS_FLAGS_HWO(gpd)) {
-		DEV_UINT32 rcv_len = (DEV_UINT32) TGPD_GET_BUF_LEN(gpd);
-		DEV_UINT32 buf_len = (DEV_UINT32) TGPD_GET_DataBUF_LEN(gpd);
+		unsigned int rcv_len = (unsigned int) TGPD_GET_BUF_LEN(gpd);
+		unsigned int buf_len = (unsigned int) TGPD_GET_DataBUF_LEN(gpd);
 
 		if (rcv_len > buf_len)
 			qmu_printk(K_ERR, "[RXD][ERROR] %s rcv(%d) > buf(%d) AUK!?\n", __func__,
@@ -284,20 +285,19 @@ void qmu_done_rx(struct musb *musb, u8 ep_num, unsigned long flags)
 			   gpd, TGPD_GET_FLAG(gpd), TGPD_GET_NEXT(gpd), rcv_len, buf_len,
 			   TGPD_GET_DATA(gpd));
 #endif
-		request->actual += rcv_len;
 #if defined(CONFIG_USB_MU3D_DRV_36BIT)
 		if (!TGPD_GET_NEXT_RX(gpd) || !TGPD_GET_DATA_RX(gpd)) {
-			qmu_printk(K_ERR, "[RXD][ERROR] %s EP%d ,gpd=%p\n", __func__, ep_num,
+			qmu_printk(K_WARNIN, "[RXD][WARN] %s EP%d ,gpd=%p\n", __func__, ep_num,
 				   gpd);
-			WARN_ON(1);
+			goto exit;
 		}
 
 		gpd = TGPD_GET_NEXT_RX(gpd);
 #else
 		if (!TGPD_GET_NEXT(gpd) || !TGPD_GET_DATA(gpd)) {
-			qmu_printk(K_ERR, "[RXD][ERROR] %s EP%d ,gpd=%p\n", __func__, ep_num,
+			qmu_printk(K_WARNIN, "[RXD][WARN] %s EP%d ,gpd=%p\n", __func__, ep_num,
 				   gpd);
-			WARN_ON(1);
+			goto exit;
 		}
 
 		gpd = TGPD_GET_NEXT(gpd);
@@ -308,8 +308,10 @@ void qmu_done_rx(struct musb *musb, u8 ep_num, unsigned long flags)
 			qmu_printk(K_ERR, "[RXD][ERROR] %s EP%d ,gpd=%p\n", __func__, ep_num,
 				   gpd);
 			WARN_ON(1);
+			goto exit;
 		}
 
+		request->actual += rcv_len;
 		Rx_gpd_last[ep_num] = gpd;
 		musb_g_giveback(musb_ep, request, 0);
 		req = next_request(musb_ep);
@@ -339,7 +341,7 @@ void qmu_done_rx(struct musb *musb, u8 ep_num, unsigned long flags)
 		qmu_printk(K_INFO, "[RXD][ERROR] RecvLen=%d, Endpoint=%d\n",
 			   (u32) TGPD_GET_BUF_LEN(gpd), (u32) TGPD_GET_EPaddr(gpd));
 	}
-
+exit:
 	qmu_printk(K_DEBUG, "[RXD] %s EP%d, Last=%p, End=%p, complete\n", __func__,
 		   ep_num, Rx_gpd_last[ep_num], Rx_gpd_end[ep_num]);
 }
@@ -370,7 +372,7 @@ void qmu_error_recovery(unsigned long data)
 {
 #ifdef USE_SSUSB_QMU
 	u8 ep_num;
-	USB_DIR dir;
+	enum USB_DIR dir;
 	unsigned long flags;
 	struct musb *musb = (struct musb *)data;
 	struct musb_ep *musb_ep;
@@ -515,7 +517,7 @@ done:
 #endif
 }
 
-void qmu_exception_interrupt(struct musb *musb, DEV_UINT32 wQmuVal)
+void qmu_exception_interrupt(struct musb *musb, unsigned int wQmuVal)
 {
 	u32 wErrVal;
 	int i = (int)wQmuVal;
@@ -577,7 +579,7 @@ void qmu_exception_interrupt(struct musb *musb, DEV_UINT32 wQmuVal)
 	}
 
 	if ((wQmuVal & RXQ_EMPTY_INT) || (wQmuVal & TXQ_EMPTY_INT)) {
-		DEV_UINT32 wEmptyVal = os_readl(U3D_QEMIR);
+		unsigned int wEmptyVal = os_readl(U3D_QEMIR);
 
 		qmu_printk(K_DEBUG, "%s Empty in QMU mode![0x%x]\r\n",
 			   (wQmuVal & TXQ_EMPTY_INT) ? "TX" : "RX", wEmptyVal);

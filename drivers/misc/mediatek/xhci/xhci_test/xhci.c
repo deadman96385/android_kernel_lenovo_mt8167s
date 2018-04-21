@@ -142,7 +142,7 @@ irqreturn_t mtktest_xhci_mtk_irq(struct usb_hcd *hcd)
 		g_otg_wait_con = true;
 		g_otg_hnp_become_dev = false;
 		g_otg_hnp_become_host = true;
-		mb();
+		mb(); /* */
 		writel(SSUSB_CHG_A_ROLE_A_CLR, SSUSB_OTG_STS_CLR);
 		/*set host sel*/
 		log_err("[OTG_H] going to set dma to host\n");
@@ -164,7 +164,7 @@ irqreturn_t mtktest_xhci_mtk_irq(struct usb_hcd *hcd)
 	if (temp3 & SSUSB_CHG_B_ROLE_A) {
 		log_notice("[OTG_H] get SSUSB_CHG_B_ROLE_A\n");
 		g_otg_hnp_become_dev = true;
-		mb();
+		mb();  /* */
 		writel(SSUSB_CHG_B_ROLE_A_CLR, SSUSB_OTG_STS_CLR);
 		spin_unlock(&xhci->lock);
 		return IRQ_HANDLED;
@@ -233,41 +233,31 @@ enum usbif_idpin_state {
 #endif
 
 static struct xhci_hcd  *mtk_xhci;
+
+void mtktest_mtk_xhci_set(struct xhci_hcd *xhci)
+{
+	mtk_xhci = xhci;
+}
+
+
 static bool mtk_id_nxt_state = IDPIN_IN;
 #define IDDIG_EINT_PIN (16)
 
 static bool mtktest_set_iddig_out_detect(void)
 {
-#if 0
-	mt_eint_set_polarity(IDDIG_EINT_PIN, MT_EINT_POL_POS);
-	mt_eint_unmask(IDDIG_EINT_PIN);
-#else
 	irq_set_irq_type(mtk_idpin_irqnum, IRQF_TRIGGER_HIGH);
-	/*enable_irq(mtk_idpin_irqnum);*/
-#endif
 
 	return 0;
 }
 
 static bool mtktest_set_iddig_in_detect(void)
 {
-#if 0
-	mt_eint_set_polarity(IDDIG_EINT_PIN, MT_EINT_POL_NEG);
-	mt_eint_unmask(IDDIG_EINT_PIN);
-#else
 	irq_set_irq_type(mtk_idpin_irqnum, IRQF_TRIGGER_LOW);
-	/*enable_irq(mtk_idpin_irqnum);*/
-#endif
-
 	return 0;
 }
-#if 0
-static void mtktest_xhci_eint_iddig_isr(void)
-{
-#else
+
 static irqreturn_t mtktest_xhci_eint_iddig_isr(int irqnum, void *data)
 {
-#endif
 	bool cur_id_state = mtk_id_nxt_state;
 
 	if (cur_id_state == IDPIN_IN) { /* HOST*/
@@ -280,7 +270,7 @@ static irqreturn_t mtktest_xhci_eint_iddig_isr(int irqnum, void *data)
 		mtk_id_nxt_state = IDPIN_OUT;
 
 		g_otg_iddig = 0;
-		mb();
+		mb();  /* */
 
 		/* make id pin to detect the plug-out */
 		mtktest_set_iddig_out_detect();
@@ -295,7 +285,7 @@ static irqreturn_t mtktest_xhci_eint_iddig_isr(int irqnum, void *data)
 		mtk_id_nxt_state = IDPIN_IN;
 
 		g_otg_iddig = 1;
-		mb();
+		mb();  /* */
 		/* make id pin to detect the plug-in */
 		mtktest_set_iddig_in_detect();
 
@@ -307,14 +297,9 @@ static irqreturn_t mtktest_xhci_eint_iddig_isr(int irqnum, void *data)
 	return 0;
 }
 
-void mtktest_mtk_xhci_set(struct xhci_hcd *xhci)
-{
-	mtk_xhci = xhci;
-}
 
 void mtktest_mtk_xhci_eint_iddig_init(void)
 {
-#ifdef CONFIG_USB_MTK_DUALMODE
 	int retval = 0;
 	struct device_node *node;
 	int iddig_gpio, iddig_debounce;
@@ -342,14 +327,11 @@ void mtktest_mtk_xhci_eint_iddig_init(void)
 	}
 	/* microseconds */
 	/* mt_gpio_set_debounce(iddig_gpio, 0); */
-#endif
 	g_otg_iddig = 1;
 
-#ifdef CONFIG_USB_MTK_DUALMODE
 	retval =
 		request_irq(mtk_idpin_irqnum, mtktest_xhci_eint_iddig_isr, IRQF_TRIGGER_LOW, "usbif_iddig_eint",
 			NULL);
-#endif
 
 
 	log_notice("[OTG_H] XHCI test driver GPIO iddig setting done.\n");
@@ -357,18 +339,12 @@ void mtktest_mtk_xhci_eint_iddig_init(void)
 
 void mtktest_mtk_xhci_eint_iddig_deinit(void)
 {
-#if 0
-	mt_eint_registration(IDDIG_EINT_PIN, EINTF_TRIGGER_LOW, NULL, false);
-#else
 	disable_irq_nosync(mtk_idpin_irqnum);
 
 	free_irq(mtk_idpin_irqnum, NULL);
 
-#endif
-
 	log_notice("[OTG_H] XHCI test driver GPIO iddig deinit done.\n");
 }
-
 
 #endif
 
@@ -713,7 +689,7 @@ int mtktest_xhci_mtk_run(struct usb_hcd *hcd)
 	mtktest_mtk_xhci_set(xhci);
 
 	#if TEST_OTG
-	mb();
+	mb();  /* */
 	if (!g_otg_test) {
 	#endif
 		mtktest_enableXhciAllPortPower(xhci);
@@ -738,8 +714,9 @@ void mtktest_xhci_mtk_stop(struct usb_hcd *hcd)
 /*USBIF*/
 #ifdef TEST_OTG
 	mtktest_disableXhciAllPortPower(xhci);
+#ifdef CONFIG_USB_MTK_IDDIG
 	mtktest_mtk_xhci_eint_iddig_deinit();
-
+#endif
 #endif
 
 	spin_lock_irq(&xhci->lock);

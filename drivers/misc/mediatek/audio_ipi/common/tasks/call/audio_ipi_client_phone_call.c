@@ -56,38 +56,38 @@
 static struct wake_lock call_pcm_dump_wake_lock;
 
 
-typedef enum {
+enum { /* dump_data_t */
 	DUMP_UL = 0,
 	DUMP_DL = 1,
 	NUM_DUMP_DATA = 2
-} dump_data_t;
+};
 
 
 
-typedef struct {
+struct dump_work_t {
 	struct work_struct work;
 	char *dma_addr;
-} dump_work_t;
+};
 
 
-typedef struct {
-	dump_data_t dump_data_type;
+struct dump_package_t {
+	uint8_t dump_data_type;
 	char *data_addr;
-} dump_package_t;
+};
 
 
-typedef struct {
-	dump_package_t dump_package[256];
+struct dump_queue_t {
+	struct dump_package_t dump_package[256];
 	uint8_t idx_r;
 	uint8_t idx_w;
-} dump_queue_t;
+};
 
 
-static dump_queue_t *dump_queue;
+static struct dump_queue_t *dump_queue;
 static DEFINE_SPINLOCK(dump_queue_lock);
 
 
-static dump_work_t dump_work[NUM_DUMP_DATA];
+static struct dump_work_t dump_work[NUM_DUMP_DATA];
 static struct workqueue_struct *dump_workqueue[NUM_DUMP_DATA];
 
 struct task_struct *dump_task;
@@ -104,25 +104,29 @@ static uint32_t dump_data_routine_cnt_pass;
 static bool b_enable_dump;
 
 
-#define FRAME_BUF_SIZE   (640)
+#define MAX_FRAME_BUF_SIZE   (1280)
 
-typedef struct pcm_dump_ul_t {
-	char ul_in_ch1[FRAME_BUF_SIZE];
-	char ul_in_ch2[FRAME_BUF_SIZE];
-	char aec_in[FRAME_BUF_SIZE];
-	char ul_out[FRAME_BUF_SIZE];
-} pcm_dump_ul_t;
+struct pcm_dump_ul_t {
+	char ul_in_ch1[MAX_FRAME_BUF_SIZE];
+	char ul_in_ch2[MAX_FRAME_BUF_SIZE];
+	char ul_in_ch3[MAX_FRAME_BUF_SIZE];
+	char aec_in[MAX_FRAME_BUF_SIZE];
+	char ul_out[MAX_FRAME_BUF_SIZE];
+	uint32_t frame_buf_size;
+};
 
-typedef struct pcm_dump_dl_t {
-	char dl_in[FRAME_BUF_SIZE];
-	char dl_out[FRAME_BUF_SIZE];
-} pcm_dump_dl_t;
+struct pcm_dump_dl_t {
+	char dl_in[MAX_FRAME_BUF_SIZE];
+	char dl_out[MAX_FRAME_BUF_SIZE];
+	uint32_t frame_buf_size;
+};
 
 
-static audio_resv_dram_t *p_resv_dram;
+static struct audio_resv_dram_t *p_resv_dram;
 
 struct file *file_ul_in_ch1;
 struct file *file_ul_in_ch2;
+struct file *file_ul_in_ch3;
 struct file *file_ul_out;
 struct file *file_aec_in;
 struct file *file_dl_in;
@@ -136,6 +140,7 @@ void open_dump_file(void)
 
 	char string_ul_in_ch1[16] = "ul_in_ch1.pcm";
 	char string_ul_in_ch2[16] = "ul_in_ch2.pcm";
+	char string_ul_in_ch3[16] = "ul_in_ch3.pcm";
 	char string_aec_in[16]    = "aec_in.pcm";
 	char string_ul_out[16]    = "ul_out.pcm";
 	char string_dl_in[16]     = "dl_in.pcm";
@@ -143,6 +148,7 @@ void open_dump_file(void)
 
 	char path_ul_in_ch1[64];
 	char path_ul_in_ch2[64];
+	char path_ul_in_ch3[64];
 	char path_aec_in[64];
 	char path_ul_out[64];
 	char path_dl_in[64];
@@ -164,6 +170,8 @@ void open_dump_file(void)
 		 DUMP_DSP_PCM_DATA_PATH, string_time, string_ul_in_ch1);
 	snprintf(path_ul_in_ch2, sizeof(path_ul_in_ch2), "%s/%s_%s",
 		 DUMP_DSP_PCM_DATA_PATH, string_time, string_ul_in_ch2);
+	snprintf(path_ul_in_ch3, sizeof(path_ul_in_ch3), "%s/%s_%s",
+		 DUMP_DSP_PCM_DATA_PATH, string_time, string_ul_in_ch3);
 	snprintf(path_aec_in, sizeof(path_aec_in), "%s/%s_%s",
 		 DUMP_DSP_PCM_DATA_PATH, string_time, string_aec_in);
 	snprintf(path_ul_out, sizeof(path_ul_out), "%s/%s_%s",
@@ -182,6 +190,12 @@ void open_dump_file(void)
 	file_ul_in_ch2 = filp_open(path_ul_in_ch2, O_CREAT | O_WRONLY, 0);
 	if (IS_ERR(file_ul_in_ch2)) {
 		AUD_LOG_W("file_ul_in_ch2 < 0\n");
+		return;
+	}
+
+	file_ul_in_ch3 = filp_open(path_ul_in_ch3, O_CREAT | O_WRONLY, 0);
+	if (IS_ERR(file_ul_in_ch3)) {
+		AUD_LOG_W("file_ul_in_ch3 < 0\n");
 		return;
 	}
 
@@ -210,9 +224,9 @@ void open_dump_file(void)
 	}
 
 	if (dump_queue == NULL) {
-		dump_queue = kmalloc(sizeof(dump_queue_t), GFP_KERNEL);
+		dump_queue = kmalloc(sizeof(struct dump_queue_t), GFP_KERNEL);
 		if (dump_queue != NULL)
-			memset_io(dump_queue, 0, sizeof(dump_queue_t));
+			memset_io(dump_queue, 0, sizeof(struct dump_queue_t));
 	}
 
 	if (!dump_task) {
@@ -263,6 +277,10 @@ void close_dump_file(void)
 		filp_close(file_ul_in_ch2, NULL);
 		file_ul_in_ch2 = NULL;
 	}
+	if (!IS_ERR(file_ul_in_ch3)) {
+		filp_close(file_ul_in_ch3, NULL);
+		file_ul_in_ch3 = NULL;
+	}
 	if (!IS_ERR(file_ul_out)) {
 		filp_close(file_ul_out, NULL);
 		file_ul_out = NULL;
@@ -287,12 +305,12 @@ void close_dump_file(void)
 void phone_call_recv_message(struct ipi_msg_t *p_ipi_msg)
 {
 	int ret = 0;
-	dump_data_t idx;
+	uint8_t idx;
 
 	AUD_ASSERT(p_ipi_msg->task_scene == TASK_SCENE_PHONE_CALL);
 
 	if (p_ipi_msg->msg_id == IPI_MSG_D2A_PCM_DUMP_DATA_NOTIFY) {
-		idx = (dump_data_t)p_ipi_msg->param2;
+		idx = (uint8_t)p_ipi_msg->param2;
 
 		irq_cnt[idx]++;
 		dump_work[idx].dma_addr = p_ipi_msg->dma_addr;
@@ -313,14 +331,14 @@ void phone_call_task_unloaded(void)
 
 static void dump_data_routine_ul(struct work_struct *ws)
 {
-	dump_work_t *dump_work = NULL;
+	struct dump_work_t *dump_work = NULL;
 	char *data_addr = NULL;
 
 	unsigned long flags = 0;
 
 	irq_cnt_w[DUMP_UL]++;
 
-	dump_work = container_of(ws, dump_work_t, work);
+	dump_work = container_of(ws, struct dump_work_t, work);
 	data_addr = get_resv_dram_vir_addr(dump_work->dma_addr);
 	AUD_LOG_V("data %p, dma %p, vp %p, pp %p\n",
 		  data_addr, dump_work->dma_addr,
@@ -338,14 +356,14 @@ static void dump_data_routine_ul(struct work_struct *ws)
 
 static void dump_data_routine_dl(struct work_struct *ws)
 {
-	dump_work_t *dump_work = NULL;
+	struct dump_work_t *dump_work = NULL;
 	char *data_addr = NULL;
 
 	unsigned long flags = 0;
 
 	irq_cnt_w[DUMP_DL]++;
 
-	dump_work = container_of(ws, dump_work_t, work);
+	dump_work = container_of(ws, struct dump_work_t, work);
 	data_addr = get_resv_dram_vir_addr(dump_work->dma_addr);
 	AUD_LOG_V("data %p, dma %p, vp %p, pp %p\n",
 		  data_addr, dump_work->dma_addr,
@@ -368,8 +386,8 @@ static int dump_kthread(void *data)
 
 	uint8_t current_idx = 0;
 
-	pcm_dump_ul_t *pcm_dump_ul = NULL;
-	pcm_dump_dl_t *pcm_dump_dl = NULL;
+	struct pcm_dump_ul_t *pcm_dump_ul = NULL;
+	struct pcm_dump_dl_t *pcm_dump_dl = NULL;
 
 	struct sched_param param = {.sched_priority = 85 }; /* RTPM_PRIO_AUDIO_PLAYBACK */
 
@@ -405,34 +423,41 @@ static int dump_kthread(void *data)
 		switch (dump_queue->dump_package[current_idx].dump_data_type) {
 		case DUMP_UL: {
 			pcm_dump_ul =
-				(pcm_dump_ul_t *)dump_queue->dump_package[current_idx].data_addr;
+				(struct pcm_dump_ul_t *)dump_queue->dump_package[current_idx].data_addr;
 			AUD_LOG_V("pcm_dump_ul = %p\n", pcm_dump_ul);
 			if (!IS_ERR(file_ul_in_ch1)) {
 				ret = file_ul_in_ch1->f_op->write(
 					      file_ul_in_ch1,
 					      pcm_dump_ul->ul_in_ch1,
-					      FRAME_BUF_SIZE,
+					      pcm_dump_ul->frame_buf_size,
 					      &file_ul_in_ch1->f_pos);
 			}
 			if (!IS_ERR(file_ul_in_ch2)) {
 				ret = file_ul_in_ch2->f_op->write(
 					      file_ul_in_ch2,
 					      pcm_dump_ul->ul_in_ch2,
-					      FRAME_BUF_SIZE,
+					      pcm_dump_ul->frame_buf_size,
 					      &file_ul_in_ch2->f_pos);
+			}
+			if (!IS_ERR(file_ul_in_ch3)) {
+				ret = file_ul_in_ch3->f_op->write(
+					      file_ul_in_ch3,
+					      pcm_dump_ul->ul_in_ch3,
+					      pcm_dump_ul->frame_buf_size,
+					      &file_ul_in_ch3->f_pos);
 			}
 			if (!IS_ERR(file_aec_in)) {
 				ret = file_aec_in->f_op->write(
 					      file_aec_in,
 					      pcm_dump_ul->aec_in,
-					      FRAME_BUF_SIZE,
+					      pcm_dump_ul->frame_buf_size,
 					      &file_aec_in->f_pos);
 			}
 			if (!IS_ERR(file_ul_out)) {
 				ret = file_ul_out->f_op->write(
 					      file_ul_out,
 					      pcm_dump_ul->ul_out,
-					      FRAME_BUF_SIZE,
+					      pcm_dump_ul->frame_buf_size,
 					      &file_ul_out->f_pos);
 			}
 			irq_cnt_k[DUMP_UL]++;
@@ -440,20 +465,20 @@ static int dump_kthread(void *data)
 		}
 		case DUMP_DL: {
 			pcm_dump_dl =
-				(pcm_dump_dl_t *)dump_queue->dump_package[current_idx].data_addr;
+				(struct pcm_dump_dl_t *)dump_queue->dump_package[current_idx].data_addr;
 			AUD_LOG_V("pcm_dump_sl = %p\n", pcm_dump_dl);
 			if (!IS_ERR(file_dl_in)) {
 				ret = file_dl_in->f_op->write(
 					      file_dl_in,
 					      pcm_dump_dl->dl_in,
-					      FRAME_BUF_SIZE,
+					      pcm_dump_dl->frame_buf_size,
 					      &file_dl_in->f_pos);
 			}
 			if (!IS_ERR(file_dl_out)) {
 				ret = file_dl_out->f_op->write(
 					      file_dl_out,
 					      pcm_dump_dl->dl_out,
-					      FRAME_BUF_SIZE,
+					      pcm_dump_dl->frame_buf_size,
 					      &file_dl_out->f_pos);
 			}
 			irq_cnt_k[DUMP_DL]++;

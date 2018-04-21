@@ -55,7 +55,7 @@
 #define ISENSE_CHANNEL_NUMBER	 1
 #endif
 #define VCHARGER_CHANNEL_NUMBER  2
-#define VBATTEMP_CHANNEL_NUMBER  4
+#define VBATTEMP_CHANNEL_NUMBER  3
 
 
 /* ADC resistor  */

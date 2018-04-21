@@ -63,12 +63,17 @@ static void completion_pages(struct work_struct *work)
 	bio_for_each_segment_all(bv, bio, i) {
 		struct page *page = bv->bv_page;
 
-		int ret = ext4_decrypt(page);
-		if (ret) {
-			WARN_ON_ONCE(1);
-			SetPageError(page);
-		} else
+		if (bio_encrypted(bio)) {
 			SetPageUptodate(page);
+		} else {
+			int ret = ext4_decrypt(page);
+
+			if (ret) {
+				WARN_ON_ONCE(1);
+				SetPageError(page);
+			} else
+				SetPageUptodate(page);
+		}
 		unlock_page(page);
 	}
 	ext4_release_crypto_ctx(ctx);
@@ -152,11 +157,17 @@ ext4_submit_bio_read(struct bio *bio)
 		struct page *first_page = bio->bi_io_vec[0].bv_page;
 
 		if (first_page != NULL) {
+			char *path, pathbuf[MAX_TRACE_PATHBUF_LEN];
+
+			path = android_fstrace_get_pathname(pathbuf,
+						    MAX_TRACE_PATHBUF_LEN,
+						    first_page->mapping->host);
 			trace_android_fs_dataread_start(
 				first_page->mapping->host,
 				page_offset(first_page),
 				bio->bi_iter.bi_size,
 				current->pid,
+				path,
 				current->comm);
 		}
 	}
@@ -304,6 +315,9 @@ int ext4_mpage_readpages(struct address_space *mapping,
 		 */
 		if (bio && (last_block_in_bio != blocks[0] - 1)) {
 		submit_and_realloc:
+#ifdef CONFIG_EXT4_FS_ENCRYPTION
+			ext4_set_bio_crypt_context(inode, bio);
+#endif
 			ext4_submit_bio_read(bio);
 			bio = NULL;
 		}
@@ -312,7 +326,7 @@ int ext4_mpage_readpages(struct address_space *mapping,
 
 			if (ext4_encrypted_inode(inode) &&
 			    S_ISREG(inode->i_mode)) {
-				ctx = ext4_get_crypto_ctx(inode);
+				ctx = ext4_get_crypto_ctx(inode, GFP_NOFS);
 				if (IS_ERR(ctx))
 					goto set_error_page;
 			}
@@ -336,6 +350,9 @@ int ext4_mpage_readpages(struct address_space *mapping,
 		if (((map.m_flags & EXT4_MAP_BOUNDARY) &&
 		     (relative_block == map.m_len)) ||
 		    (first_hole != blocks_per_page)) {
+#ifdef CONFIG_EXT4_FS_ENCRYPTION
+			ext4_set_bio_crypt_context(inode, bio);
+#endif
 			ext4_submit_bio_read(bio);
 			bio = NULL;
 		} else
@@ -343,6 +360,9 @@ int ext4_mpage_readpages(struct address_space *mapping,
 		goto next_page;
 	confused:
 		if (bio) {
+#ifdef CONFIG_EXT4_FS_ENCRYPTION
+			ext4_set_bio_crypt_context(inode, bio);
+#endif
 			ext4_submit_bio_read(bio);
 			bio = NULL;
 		}
@@ -355,7 +375,11 @@ int ext4_mpage_readpages(struct address_space *mapping,
 			page_cache_release(page);
 	}
 	BUG_ON(pages && !list_empty(pages));
-	if (bio)
+	if (bio) {
+#ifdef CONFIG_EXT4_FS_ENCRYPTION
+		ext4_set_bio_crypt_context(inode, bio);
+#endif
 		ext4_submit_bio_read(bio);
+	}
 	return 0;
 }

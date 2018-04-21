@@ -2,6 +2,7 @@ config MFD_RT5081_PMU
 	bool "Support for RT5081 PMU part"
 	depends on I2C
 	select MFD_CORE
+	select RT_REGMAP
 	help
 	  Select Y
 	  to enable
@@ -17,9 +18,22 @@ config RT5081_PMU_CHARGER
 	  supprot for RT5081
 	  charger device.
 
+config RT5081_PMU_CHARGER_TYPE_DETECT
+	bool "RT5081 PMU Charger Type Detect"
+	depends on RT5081_PMU_CHARGER
+	depends on MTK_EXTERNAL_CHARGER_TYPE_DETECT
+	default MTK_EXTERNAL_CHARGER_TYPE_DETECT
+	help
+	  Say Y here
+	  to enable
+	  supprot for RT5081
+	  charger type detect.
+
 config RT5081_PMU_FLED
 	bool "RT5081 PMU FLED Part"
 	depends on LEDS_CLASS && MFD_RT5081_PMU
+	select FLASHLIGHT
+	select RT_FLASH_LED
 	help
 	  Say Y here
 	  to enable
@@ -46,7 +60,7 @@ config RT5081_PMU_RGBLED
 
 config RT5081_PMU_LDO
 	bool "rt5081 PMU LDO Part"
-	depends on MFD_RT5081_PMU
+	depends on REGULATOR && REGULATOR_MTK && MFD_RT5081_PMU
 	help
 	  Say Y here
 	  to enable
@@ -55,9 +69,10 @@ config RT5081_PMU_LDO
 
 config RT5081_PMU_DSV
 	bool "rt5081 PMU DSV Part"
-	depends on MFD_RT5081_PMU
+	depends on REGULATOR && REGULATOR_MTK && MFD_RT5081_PMU
 	help
 	  Say Y here to
 	  enable support
 	  for
 	  RT5081 dsv device.
+

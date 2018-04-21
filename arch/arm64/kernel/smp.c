@@ -69,6 +69,9 @@
 #include "mtk_sched_mon.h"
 #endif
 
+DEFINE_PER_CPU_READ_MOSTLY(int, cpu_number);
+EXPORT_PER_CPU_SYMBOL(cpu_number);
+
 /*
  * as from 2.5, kernels no longer have an init_tasks structure
  * so we need some other way of telling a new secondary core
@@ -82,11 +85,11 @@ enum ipi_msg_type {
 	IPI_CPU_STOP,
 	IPI_TIMER,
 	IPI_IRQ_WORK,
+	IPI_WAKEUP,
 #ifdef CONFIG_TRUSTY
 	IPI_CUSTOM_FIRST,
 	IPI_CUSTOM_LAST = 15,
 #endif
-	IPI_WAKEUP
 };
 
 #ifdef CONFIG_TRUSTY
@@ -117,6 +120,9 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 	 * We need to tell the secondary core where to find its stack and the
 	 * page tables.
 	 */
+#ifdef CONFIG_THREAD_INFO_IN_TASK
+	secondary_data.task = idle;
+#endif
 	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
 	__flush_dcache_area(&secondary_data, sizeof(secondary_data));
 
@@ -145,6 +151,9 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 
 	TIMESTAMP_REC(hotplug_ts_rec, TIMESTAMP_FILTER,  cpu, 0, 0, 0);
 
+#ifdef CONFIG_THREAD_INFO_IN_TASK
+	secondary_data.task = NULL;
+#endif
 	secondary_data.stack = NULL;
 
 	return ret;
@@ -162,7 +171,12 @@ static void smp_store_cpu_info(unsigned int cpuid)
 asmlinkage void secondary_start_kernel(void)
 {
 	struct mm_struct *mm = &init_mm;
-	unsigned int cpu = smp_processor_id();
+	unsigned int cpu;
+
+	cpu = task_cpu(current);
+	set_my_cpu_offset(per_cpu_offset(cpu));
+
+	aee_rr_rec_hotplug_footprint(cpu, 1);
 
 	aee_rr_rec_hotplug_footprint(cpu, 1);
 
@@ -174,7 +188,6 @@ asmlinkage void secondary_start_kernel(void)
 	current->active_mm = mm;
 	aee_rr_rec_hotplug_footprint(cpu, 2);
 
-	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
 	aee_rr_rec_hotplug_footprint(cpu, 3);
 
 	/*
@@ -684,6 +697,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		if (max_cpus == 0)
 			break;
 
+		per_cpu(cpu_number, cpu) = cpu;
+
 		if (cpu == smp_processor_id())
 			continue;
 
@@ -816,11 +831,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_CALL_FUNC:
 		irq_enter();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_start(ipinr);
+		mt_trace_IPI_start(ipinr);
 #endif
 		generic_smp_call_function_interrupt();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_end(ipinr);
+		mt_trace_IPI_end(ipinr);
 #endif
 		irq_exit();
 		break;
@@ -828,11 +843,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_CPU_STOP:
 		irq_enter();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_start(ipinr);
+		mt_trace_IPI_start(ipinr);
 #endif
 		ipi_cpu_stop(cpu);
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_end(ipinr);
+		mt_trace_IPI_end(ipinr);
 #endif
 		irq_exit();
 		break;
@@ -841,11 +856,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_TIMER:
 		irq_enter();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_start(ipinr);
+		mt_trace_IPI_start(ipinr);
 #endif
 		tick_receive_broadcast();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_end(ipinr);
+		mt_trace_IPI_end(ipinr);
 #endif
 		irq_exit();
 		break;
@@ -855,11 +870,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_IRQ_WORK:
 		irq_enter();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_start(ipinr);
+		mt_trace_IPI_start(ipinr);
 #endif
 		irq_work_run();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_end(ipinr);
+		mt_trace_IPI_end(ipinr);
 #endif
 		irq_exit();
 		break;
@@ -918,8 +933,10 @@ static void handle_custom_ipi_irq(struct irq_desc *desc)
 	unsigned int irq = irq_desc_get_irq(desc);
 
 	if (!desc->action) {
+/*
 		pr_crit("CPU%u: Unknown IPI message 0x%x, no custom handler\n",
 			smp_processor_id(), irq);
+*/
 		return;
 	}
 

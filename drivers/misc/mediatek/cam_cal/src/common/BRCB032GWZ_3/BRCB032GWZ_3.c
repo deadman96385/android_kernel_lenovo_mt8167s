@@ -27,7 +27,6 @@
 #include <linux/uaccess.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
-#include "kd_camera_hw.h"
 #include "cam_cal.h"
 #include "cam_cal_define.h"
 #include "BRCB032GWZ_3.h"
@@ -566,7 +565,6 @@ static int CAM_CAL_Open(struct inode *a_pstInode, struct file *a_pstFile)
 	CAM_CALDB("[BRCB032GWZ_3_CAM_CAL] CAM_CAL_Open\n");
 	spin_lock(&g_CAM_CALLock);
 	if (g_u4Opened) {
-		spin_unlock(&g_CAM_CALLock);
 		result = -EBUSY;
 	} else {
 		g_u4Opened = 1;

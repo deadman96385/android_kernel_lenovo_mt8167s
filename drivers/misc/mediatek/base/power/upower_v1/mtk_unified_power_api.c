@@ -12,7 +12,7 @@
  */
 
 #include "mtk_unified_power_internal.h"
-#include "mtk_unified_power.h"
+#include "mtk_upower.h"
 
 /* PTP will update volt in init2 isr handler */
 void upower_update_volt_by_eem(enum upower_bank bank, unsigned int *volt, unsigned int opp_num)
@@ -105,13 +105,39 @@ struct upower_tbl_info **upower_get_tbl(void)
 
 	return ptr;
 #endif
-	if (upower_enable)
-		return &p_upower_tbl_infos;
-	else
-		return NULL;
+	return &p_upower_tbl_infos;
 
 }
 EXPORT_SYMBOL(upower_get_tbl);
+
+/* for EAS to get pointer of core's tbl */
+struct upower_tbl *upower_get_core_tbl(unsigned int cpu)
+{
+	struct upower_tbl *ptr_tbl;
+	struct upower_tbl_info *ptr_tbl_info;
+	enum upower_bank bank = UPOWER_BANK_LL;
+
+	if (!upower_enable)
+		return NULL;
+
+	if (cpu < 4) /* cpu 0-3 */
+		bank = UPOWER_BANK_LL;
+	else if (cpu < 8) /* cpu 4-7 */
+		bank = UPOWER_BANK_LL + 1;
+	else if (cpu < 10) /* cpu 8-9 */
+		bank = UPOWER_BANK_LL + 2;
+
+#ifdef UPOWER_L_PLUS
+	if (cpu == UPOWER_L_PLUS_CORE)
+		bank = UPOWER_BANK_L_PLUS;
+#endif
+
+	ptr_tbl_info = p_upower_tbl_infos;
+	ptr_tbl = ptr_tbl_info[bank].p_upower_tbl;
+
+	return ptr_tbl;
+}
+EXPORT_SYMBOL(upower_get_core_tbl);
 
 /* for PPM to get lkg or dyn power*/
 unsigned int upower_get_power(enum upower_bank bank, unsigned int opp, enum
@@ -122,9 +148,6 @@ upower_dtype type)
 	unsigned int volt_idx = UPOWER_OPP_NUM - opp - 1;
 	struct upower_tbl *ptr_tbl;
 	struct upower_tbl_info *ptr_tbl_info;
-
-	if (upower_enable == 0)
-		return 0;
 
 	#ifdef UPOWER_PROFILE_API_TIME
 	upower_get_start_time_us(GET_PWR);

@@ -253,9 +253,13 @@ struct pwr_ctrl {
 	u8 emi_boost_dvfs_req_mask_b;
 	u8 cpu_md_emi_dvfs_req_prot_dis;
 	u8 dramc_spcmd_apsrc_req_mask_b;
+	u8 emi_boost_dvfs_req_2_mask_b;
+	u8 emi_bw_dvfs_req_2_mask;
 
 	/* SW_CRTL_EVENT */
 	u8 sw_ctrl_event_on;
+	/* SW_CRTL_EVENT_2 */
+	u8 sw_ctrl_event_on_2;
 
 	/* SPM_SW_RSV_6 */
 	u8 md_srcclkena_0_2d_dvfs_req_mask_b;
@@ -263,6 +267,7 @@ struct pwr_ctrl {
 	u8 dvfs_up_2d_dvfs_req_mask_b;
 	u8 disable_off_load_lpm;
 	u8 en_sdio_dvfs_setting;
+	u8 en_emi_grouping;
 
 	/* SPM_SW_RSV_6 version control */
 	u8 rsv6_legacy_version;
@@ -486,6 +491,7 @@ extern struct spm_lp_scen __spm_suspend;
 extern struct spm_lp_scen __spm_dpidle;
 extern struct spm_lp_scen __spm_sodi3;
 extern struct spm_lp_scen __spm_sodi;
+extern struct spm_lp_scen __spm_mcsodi;
 extern struct spm_lp_scen __spm_mcdi;
 extern struct spm_lp_scen __spm_talking;
 extern struct spm_lp_scen __spm_ddrdfs;
@@ -496,6 +502,7 @@ extern void __spm_kick_im_to_fetch(const struct pcm_desc *pcmdesc);
 
 extern void __spm_init_pcm_register(void);	/* init r0 and r7 */
 extern void __spm_init_event_vector(const struct pcm_desc *pcmdesc);
+extern void __spm_src_req_update(const struct pwr_ctrl *pwrctrl);
 extern void __spm_set_power_control(const struct pwr_ctrl *pwrctrl);
 extern void __spm_set_vcorefs_wakeup_event(const struct pwr_ctrl *src_pwr_ctrl);
 extern void __spm_set_wakeup_event(const struct pwr_ctrl *pwrctrl);
@@ -503,7 +510,7 @@ extern void __spm_kick_pcm_to_run(const struct pwr_ctrl *pwrctrl);
 
 extern void __spm_get_wakeup_status(struct wake_status *wakesta);
 extern void __spm_clean_after_wakeup(void);
-extern wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
+extern unsigned int __spm_output_wake_reason(const struct wake_status *wakesta,
 					      const struct pcm_desc *pcmdesc, bool suspend);
 
 extern void __spm_dbgout_md_ddr_en(bool enable);
@@ -540,13 +547,17 @@ extern void __spm_pmic_pg_force_on(void);
 extern void __spm_pmic_pg_force_off(void);
 extern void __spm_pmic_low_iq_mode(int en);
 extern void __spm_set_pcm_wdt(int en);
-extern u32 _spm_get_wake_period(int pwake_time, wake_reason_t last_wr);
+extern u32 _spm_get_wake_period(int pwake_time, unsigned int last_wr);
 extern struct dram_info *g_dram_info_dummy_read;
 
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
 extern int can_spm_pmic_set_vcore_voltage(void);
 #endif
 
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+extern void spm_set_dfd_wakeup_src(bool enable);
+extern bool spm_get_dfd_wakeup_src(void);
+#endif
 /**************************************
  * Macro and Inline
  **************************************/
@@ -556,11 +567,11 @@ extern int can_spm_pmic_set_vcore_voltage(void);
 	 (!!(resume) << 6) |			\
 	 ((event) & 0x3f))
 
-#define spm_emerg(fmt, args...)		pr_emerg("[SPM] " fmt, ##args)
-#define spm_alert(fmt, args...)		pr_alert("[SPM] " fmt, ##args)
-#define spm_crit(fmt, args...)		pr_crit("[SPM] " fmt, ##args)
-#define spm_err(fmt, args...)		pr_err("[SPM] " fmt, ##args)
-#define spm_warn(fmt, args...)		pr_warn("[SPM] " fmt, ##args)
+#define spm_emerg(fmt, args...)		pr_info("[SPM] " fmt, ##args)
+#define spm_alert(fmt, args...)		pr_info("[SPM] " fmt, ##args)
+#define spm_crit(fmt, args...)		pr_info("[SPM] " fmt, ##args)
+#define spm_err(fmt, args...)		pr_info("[SPM] " fmt, ##args)
+#define spm_warn(fmt, args...)		pr_info("[SPM] " fmt, ##args)
 #define spm_notice(fmt, args...)	pr_notice("[SPM] " fmt, ##args)
 #define spm_info(fmt, args...)		pr_info("[SPM] " fmt, ##args)
 #define spm_debug(fmt, args...)		pr_info("[SPM] " fmt, ##args)	/* pr_debug show nothing */
@@ -575,6 +586,7 @@ do {					\
 #define wfi_with_sync()					\
 do {							\
 	isb();						\
+	/* add mb() before wfi */			\
 	mb();						\
 	__asm__ __volatile__("wfi" : : : "memory");	\
 } while (0)

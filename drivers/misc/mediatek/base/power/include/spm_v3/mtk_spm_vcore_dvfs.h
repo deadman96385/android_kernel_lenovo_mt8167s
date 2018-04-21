@@ -20,6 +20,7 @@
 /* Feature will disable both of DVS/DFS are 0 */
 #define SPM_VCORE_DVS_EN       1
 #define SPM_DDR_DFS_EN         1
+#define SPM_MM_CLK_EN          0
 
 #define SPM_DVFS_TIMEOUT       1000	/* 1ms */
 
@@ -41,6 +42,7 @@ enum dvfsrc_hrt_kir {
 enum vcorefs_smc_cmd {
 	VCOREFS_SMC_CMD_0,
 	VCOREFS_SMC_CMD_1,
+	VCOREFS_SMC_CMD_2,
 	NUM_VCOREFS_SMC_CMD,
 };
 
@@ -54,5 +56,7 @@ extern int spm_vcorefs_pwarp_cmd(void);
 extern void spm_dvfsrc_set_channel_bw(enum dvfsrc_channel);
 extern void spm_dvfsrc_hrt_bw_config(enum dvfsrc_hrt_kir hrt_kir, bool config);
 extern int spm_vcorefs_get_opp(void);
+extern void dvfsrc_md_scenario_update(bool);
+extern void spm_msdc_wqhd_workaround(bool);
 
 #endif /* __MTK_SPM_VCORE_DVFS_H__ */

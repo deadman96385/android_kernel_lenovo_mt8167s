@@ -36,6 +36,13 @@
 #ifdef CONFIG_MTK_DCS
 #include <mt-plat/mtk_meminfo.h>
 #endif
+#include <mt-plat/mtk_chip.h>
+
+#if 0 /* TODO: 6758 EP */
+#if defined(CONFIG_MACH_MT6758)
+#include <mtk_dramc.h>
+#endif
+#endif
 
 /**************************************
  * Config and Parameter
@@ -55,6 +62,77 @@ DEFINE_SPINLOCK(__spm_lock);
 #define PCM_TIMER_RAMP_BASE_SUSPEND_LONG	0x927C00 /* 5min */
 static u32 pcm_timer_ramp_max_sec_loop = 1;
 
+#if defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758)
+const char *wakesrc_str[32] = {
+	[0] = " R12_PCMTIMER",
+	[1] = " R12_SSPM_WDT_EVENT_B",
+	[2] = " R12_KP_IRQ_B",
+	[3] = " R12_APWDT_EVENT_B",
+	[4] = " R12_APXGPT1_EVENT_B",
+	[5] = " R12_SYS_TIMER_EVENT_B",
+	[6] = " R12_EINT_EVENT_B",
+	[7] = " R12_C2K_WDT_IRQ_B",
+	[8] = " R12_CCIF0_EVENT_B",
+	[9] = " R12_WAKE_UP_EVENT_MCSODI_SRC1_B",
+	[10] = " R12_SSPM_SPM_IRQ_B",
+	[11] = " R12_SCP_IPC_MD2SPM_B",
+	[12] = " R12_SCP_WDT_EVENT_B",
+	[13] = " R12_PCM_WDT_WAKEUP_B",
+	[14] = " R12_USBX_CDSC_B",
+	[15] = " R12_USBX_POWERDWN_B",
+	[16] = " R12_CONN2AP_WAKEUP_B",
+	[17] = " R12_EINT_EVENT_SECURE_B",
+	[18] = " R12_CCIF1_EVENT_B",
+	[19] = " R12_UART0_IRQ_B",
+	[20] = " R12_AFE_IRQ_MCU_B",
+	[21] = " R12_THERMAL_CTRL_EVENT_B",
+	[22] = " R12_SCP_CIRQ_IRQ_B",
+	[23] = " R12_CONN2AP_WDT_IRQ_B",
+	[24] = " R12_CSYSPWRUPREQ_B",
+	[25] = " R12_MD1_WDT_B",
+	[26] = " R12_MD2AP_PEER_WAKEUP_EVENT",
+	[27] = " R12_SEJ_EVENT_B",
+	[28] = " R12_SSPM_WAKEUP_SSPM",
+	[29] = " R12_CPU_IRQ_B",
+	[30] = " R12_SCP_WAKEUP_SCP",
+	[31] = " R12_BIT31",
+};
+#elif defined(CONFIG_MACH_MT6775)
+const char *wakesrc_str[32] = {
+	[0] = " R12_PCMTIMER",
+	[1] = " R12_SSPM_WDT_EVENT_B",
+	[2] = " R12_KP_IRQ_B",
+	[3] = " R12_APWDT_EVENT_B",
+	[4] = " R12_APXGPT1_EVENT_B",
+	[5] = " R12_SYS_TIMER_EVENT_B",
+	[6] = " R12_EINT_EVENT_B",
+	[7] = " R12_C2K_WDT_IRQ_B",
+	[8] = " R12_CCIF0_EVENT_B",
+	[9] = " R12_LOWBATTERY_IRQ_B",
+	[10] = " R12_SSPM_SPM_IRQ_B",
+	[11] = " R12_SCP_IPC_MD2SPM_B",
+	[12] = " R12_SCP_WDT_EVENT_B",
+	[13] = " R12_PCM_WDT_WAKEUP_B",
+	[14] = " R12_USBX_CDSC_B",
+	[15] = " R12_USBX_POWERDWN_B",
+	[16] = " R12_CONN2AP_WAKEUP_B",
+	[17] = " R12_EINT_EVENT_SECURE_B",
+	[18] = " R12_CCIF1_EVENT_B",
+	[19] = " R12_UART0_IRQ_B",
+	[20] = " R12_AFE_IRQ_MCU_B",
+	[21] = " R12_THERMAL_CTRL_EVENT_B",
+	[22] = " R12_SCP_CIRQ_IRQ_B",
+	[23] = " R12_CONN2AP_WDT_IRQ_B",
+	[24] = " R12_CSYSPWRUPREQ_B",
+	[25] = " R12_MD1_WDT_B",
+	[26] = " R12_MD2AP_PEER_WAKEUP_EVENT",
+	[27] = " R12_SEJ_EVENT_B",
+	[28] = " R12_SSPM_WAKEUP_SSPM",
+	[29] = " R12_CPU_IRQ_B",
+	[30] = " R12_SCP_WAKEUP_SCP",
+	[31] = " R12_BIT31",
+};
+#else
 const char *wakesrc_str[32] = {
 	[0] = " R12_PCMTIMER",
 	[1] = " R12_SSPM_WDT_EVENT_B",
@@ -89,46 +167,74 @@ const char *wakesrc_str[32] = {
 	[30] = " R12_SCP_WAKEUP_SCP",
 	[31] = " R12_BIT31",
 };
+#endif
 
 /**************************************
  * Function and API
  **************************************/
 int __spm_check_opp_level_impl(int ch)
 {
-	int opp = vcorefs_get_sw_opp();
+	int opp = 0;
+
+#if !defined(CONFIG_MACH_MT6775)	/* TODO: Fix it for MT6775 */
+
+#if defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758)
+#ifdef CONFIG_MTK_TINYSYS_SCP_SUPPORT
+	opp = scp_get_dvfs_opp();
+	if (opp < 0)
+		opp = vcorefs_get_sw_opp();
+#else
+	opp = vcorefs_get_sw_opp();
+#endif
+#else
 #ifdef CONFIG_MTK_TINYSYS_SCP_SUPPORT
 	int scp_opp = scp_get_dvfs_opp();
 
+	opp = vcorefs_get_sw_opp();
 	if (scp_opp >= 0)
 		opp = min(scp_opp, opp);
+#else
+	opp = vcorefs_get_sw_opp();
 #endif /* CONFIG_MTK_TINYSYS_SCP_SUPPORT */
+#endif
 
+#endif
 	return opp;
 }
 
 int __spm_check_opp_level(int ch)
 {
+	int opp;
+#if defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758)
+	int level[3] = {2, 1, 0};
+#else
 	int level[4] = {4, 3, 1, 0};
-	int opp = 0;
 
 	if (ch == 2)
 		level[1] = 3;
 	else
 		level[1] = 2;
-
+#endif
 	opp = __spm_check_opp_level_impl(ch);
 
 	if (opp < 0 || opp >= ARRAY_SIZE(level)) {
 		spm_crit2("%s: error opp number %d\n", __func__, opp);
 		opp = 0;
 	}
-
 	return level[opp];
+
+}
+
+unsigned int __attribute__ ((weak)) get_vcore_ptp_volt(unsigned int seg)
+{
+	spm_crit2("NO %s !!!\n", __func__);
+	return 0;
 }
 
 unsigned int __spm_get_vcore_volt_pmic_val(bool is_vcore_volt_lower, int ch)
 {
 	unsigned int vcore_volt_pmic_val = 0;
+
 	int opp = 0;
 
 	opp = __spm_check_opp_level_impl(ch);
@@ -137,10 +243,24 @@ unsigned int __spm_get_vcore_volt_pmic_val(bool is_vcore_volt_lower, int ch)
 		spm_crit2("%s: error opp number %d\n", __func__, opp);
 		opp = 0;
 	}
-
-	vcore_volt_pmic_val = (is_vcore_volt_lower) ? VOLT_TO_PMIC_VAL(56800) : get_vcore_ptp_volt(opp);
-
+	vcore_volt_pmic_val = (is_vcore_volt_lower) ? VOLT_TO_PMIC_VAL(60000) : get_vcore_ptp_volt(opp);
 	return vcore_volt_pmic_val;
+}
+
+void __spm_update_pcm_flags_dcs_workaround(struct pwr_ctrl *pwrctrl, int ch)
+{
+#ifdef CONFIG_MACH_MT6799
+#ifdef CONFIG_MTK_DCS
+	/* dcs s0 workaround only applied when ch is 2 */
+	if (mt_get_chip_sw_ver() == CHIP_SW_VER_02 &&
+		((spm_get_resource_usage() & SPM_RESOURCE_DRAM) || ch == 4))
+		pwrctrl->pcm_flags |= SPM_FLAG_DIS_DCSS0_LOW;
+#else
+	/* dcs s0 work around default off */
+	if (mt_get_chip_sw_ver() == CHIP_SW_VER_02)
+		pwrctrl->pcm_flags |= SPM_FLAG_DIS_DCSS0_LOW;
+#endif
+#endif
 }
 
 int __spm_get_pcm_timer_val(const struct pwr_ctrl *pwrctrl)
@@ -232,42 +352,46 @@ do {						\
 
 void rekick_vcorefs_scenario(void)
 {
+#if defined(CONFIG_MACH_MT6799)
 	int flag;
 
 	if (spm_read(PCM_REG15_DATA) == 0x0) {
 		flag = spm_dvfs_flag_init();
 		spm_go_to_vcorefs(flag);
 	}
+#endif
 }
 
-wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
+unsigned int __spm_output_wake_reason(const struct wake_status *wakesta,
 		const struct pcm_desc *pcmdesc, bool suspend, const char *scenario)
 {
 	int i;
 	char buf[LOG_BUF_SIZE] = { 0 };
-	wake_reason_t wr = WR_UNKNOWN;
+	char log_buf[1024] = { 0 };
+	int log_size = 0;
+	unsigned int wr = WR_UNKNOWN;
 
 	if (wakesta->assert_pc != 0) {
 		/* add size check for vcoredvfs */
 		spm_print(suspend, "PCM ASSERT AT %u (%s), r13 = 0x%x, debug_flag = 0x%x\n",
 			  wakesta->assert_pc, scenario, wakesta->r13, wakesta->debug_flag);
 
-		aee_kernel_warning("SPM Warning", "SPM F/W ASSERT WARNING");
+		/* aee_kernel_warning("SPM Warning", "SPM F/W ASSERT WARNING"); */
 
 		return WR_PCM_ASSERT;
 	}
 
 	if (wakesta->r12 & WAKE_SRC_R12_PCMTIMER) {
 		if (wakesta->wake_misc & WAKE_MISC_PCM_TIMER) {
-			strcat(buf, " PCM_TIMER");
+			strncat(buf, " PCM_TIMER", strlen(" PCM_TIMER"));
 			wr = WR_PCM_TIMER;
 		}
 		if (wakesta->wake_misc & WAKE_MISC_TWAM) {
-			strcat(buf, " TWAM");
+			strncat(buf, " TWAM", strlen(" TWAM"));
 			wr = WR_WAKE_SRC;
 		}
 		if (wakesta->wake_misc & WAKE_MISC_CPU_WAKE) {
-			strcat(buf, " CPU");
+			strncat(buf, " CPU", strlen(" CPU"));
 			wr = WR_WAKE_SRC;
 		}
 	}
@@ -281,15 +405,15 @@ wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
 	}
 	WARN_ON(strlen(buf) >= LOG_BUF_SIZE);
 
-	spm_print(suspend, "wake up by %s, timer_out = %u, r13 = 0x%x, debug_flag = 0x%x, ch = %u\n",
+	log_size += sprintf(log_buf, "wake up by %s, timer_out = %u, r13 = 0x%x, debug_flag = 0x%x, ch = %u\n",
 		  buf, wakesta->timer_out, wakesta->r13, wakesta->debug_flag, wakesta->dcs_ch);
 
-	spm_print(suspend,
+	log_size += sprintf(log_buf + log_size,
 		  "r12 = 0x%x, r12_ext = 0x%x, raw_sta = 0x%x, idle_sta = 0x%x, event_reg = 0x%x, isr = 0x%x\n",
 		  wakesta->r12, wakesta->r12_ext, wakesta->raw_sta, wakesta->idle_sta,
 		  wakesta->event_reg, wakesta->isr);
 
-	spm_print(suspend,
+	log_size += sprintf(log_buf + log_size,
 		"raw_ext_sta = 0x%x, wake_misc = 0x%x, pcm_flag = 0x%x 0x%x 0x%x, req = 0x%x, resource = 0x%x\n",
 		wakesta->raw_ext_sta,
 		wakesta->wake_misc,
@@ -298,6 +422,10 @@ wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
 		spm_read(SPM_SW_RSV_4),
 		spm_read(SPM_SRC_REQ),
 		spm_get_resource_usage());
+
+	WARN_ON(log_size >= 1024);
+
+	spm_print(suspend, "%s", log_buf);
 
 	return wr;
 }
@@ -342,34 +470,14 @@ void spm_set_dummy_read_addr(int debug)
 	mt_secure_call(MTK_SIP_KERNEL_SPM_DUMMY_READ, rank0_addr, rank1_addr, 0);
 }
 
-void __spm_set_pcm_wdt(int en)
-{
-	/* enable PCM WDT (normal mode) to start count if needed */
-	if (en) {
-		u32 con1;
-
-		con1 = spm_read(PCM_CON1) & ~(RG_PCM_WDT_WAKE_LSB);
-		spm_write(PCM_CON1, SPM_REGWR_CFG_KEY | con1);
-
-		if (spm_read(PCM_TIMER_VAL) > PCM_TIMER_MAX)
-			spm_write(PCM_TIMER_VAL, PCM_TIMER_MAX);
-		spm_write(PCM_WDT_VAL, spm_read(PCM_TIMER_VAL) + PCM_WDT_TIMEOUT);
-		spm_write(PCM_CON1, con1 | SPM_REGWR_CFG_KEY | RG_PCM_WDT_EN_LSB);
-	} else {
-		spm_write(PCM_CON1, SPM_REGWR_CFG_KEY | (spm_read(PCM_CON1) &
-		~RG_PCM_WDT_EN_LSB));
-	}
-
-}
-
 int __attribute__ ((weak)) get_dynamic_period(int first_use, int first_wakeup_time,
 					      int battery_capacity_level)
 {
-	pr_err("NO %s !!!\n", __func__);
-	return 5400;
+	/* pr_err("NO %s !!!\n", __func__); */
+	return 5401;
 }
 
-u32 _spm_get_wake_period(int pwake_time, wake_reason_t last_wr)
+u32 _spm_get_wake_period(int pwake_time, unsigned int last_wr)
 {
 	int period = SPM_WAKE_PERIOD;
 

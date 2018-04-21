@@ -22,4 +22,20 @@
 #include "mt6335/mtk_pmic_api.h"
 #endif
 
+#ifdef CONFIG_MTK_PMIC_CHIP_MT6355
+#include "mt6355/mtk_pmic_api.h"
+#endif
+
+#ifdef CONFIG_MTK_PMIC_CHIP_MT6356
+#include "mt6356/mtk_pmic_api.h"
+#endif
+
+#ifdef CONFIG_MTK_PMIC_CHIP_MT6357
+#include "mt6357/mtk_pmic_api.h"
+#endif
+
+#ifdef CONFIG_MTK_PMIC_CHIP_MT6358
+#include "mt6358/mtk_pmic_api.h"
+#endif
+
 #endif				/* _PMIC_API_H_ */

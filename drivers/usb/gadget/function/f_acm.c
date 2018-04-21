@@ -358,9 +358,18 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	 * to them by stalling.  Options include get/set/clear comm features
 	 * (not that useful) and SEND_BREAK.
 	 */
+	{
+		static DEFINE_RATELIMIT_STATE(ratelimit, 1 * HZ, 10);
+		static int skip_cnt;
 
-	pr_notice("[XLOG_INFO][USB_ACM]%s: ttyGS%d req%02x.%02x v%04x i%04x len=%d\n", __func__,
-			acm->port_num, ctrl->bRequestType, ctrl->bRequest, w_value, w_index, w_length);
+		if (__ratelimit(&ratelimit)) {
+			pr_notice("[USB_ACM]%s: ttyGS%d req%02x.%02x v%04x i%04x len=%d, skip_cnt:%d\n", __func__,
+					acm->port_num, ctrl->bRequestType, ctrl->bRequest,
+					w_value, w_index, w_length, skip_cnt);
+			skip_cnt = 0;
+		} else
+			skip_cnt++;
+	}
 
 	switch ((ctrl->bRequestType << 8) | ctrl->bRequest) {
 
@@ -386,9 +395,19 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 				sizeof(struct usb_cdc_line_coding));
 		memcpy(req->buf, &acm->port_line_coding, value);
 
-		pr_notice("[XLOG_INFO][USB_ACM]%s: rate=%d,stop=%d,parity=%d,data=%d\n", __func__,
-				acm->port_line_coding.dwDTERate, acm->port_line_coding.bCharFormat,
-				acm->port_line_coding.bParityType, acm->port_line_coding.bDataBits);
+		{
+			static DEFINE_RATELIMIT_STATE(ratelimit, 1 * HZ, 10);
+			static int skip_cnt;
+
+			if (__ratelimit(&ratelimit)) {
+				pr_notice("[USB_ACM]%s: rate=%d,stop=%d,parity=%d,data=%d, skip_cnt:%d\n", __func__,
+						acm->port_line_coding.dwDTERate, acm->port_line_coding.bCharFormat,
+						acm->port_line_coding.bParityType, acm->port_line_coding.bDataBits,
+						skip_cnt);
+				skip_cnt = 0;
+			} else
+				skip_cnt++;
+		}
 
 		break;
 
@@ -549,13 +568,15 @@ static int acm_notify_serial_state(struct f_acm *acm)
 {
 	struct usb_composite_dev *cdev = acm->port.func.config->cdev;
 	int			status;
+	__le16			serial_state;
 
 	spin_lock(&acm->lock);
 	if (acm->notify_req) {
 		dev_dbg(&cdev->gadget->dev, "acm ttyGS%d serial state %04x\n",
 			acm->port_num, acm->serial_state);
+		serial_state = cpu_to_le16(acm->serial_state);
 		status = acm_cdc_notify(acm, USB_CDC_NOTIFY_SERIAL_STATE,
-				0, &acm->serial_state, sizeof(acm->serial_state));
+				0, &serial_state, sizeof(acm->serial_state));
 	} else {
 		acm->pending = true;
 		status = 0;
@@ -833,6 +854,9 @@ static struct usb_function_instance *acm_alloc_instance(void)
 		kfree(opts);
 		return ERR_PTR(ret);
 	}
+
+	pr_info("%s opts->port_num=%d\n", __func__, opts->port_num);
+
 	config_group_init_type_name(&opts->func_inst.group, "",
 			&acm_func_type);
 	return &opts->func_inst;

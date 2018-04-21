@@ -16,7 +16,8 @@
 
 #include <linux/platform_device.h>
 
-#define BUS_DBG_CON			(BUS_DBG_BASE + 0x0000)
+#define BUS_DBG_CON			(BUS_DBG_BASE)
+#define BUS_DBG_CON_INFRA		(BUS_DBG_INFRA_BASE)
 #define BUS_DBG_TIMER_CON0		(BUS_DBG_BASE + 0x0004)
 #define BUS_DBG_TIMER_CON1		(BUS_DBG_BASE + 0x0008)
 #define BUS_DBG_TIMER_R0		(BUS_DBG_BASE + 0x000C)
@@ -31,7 +32,11 @@
 #define BUS_DBG_AW_TRACK_H(__n)		(BUS_DBG_BASE + 0x0204 + 8 * (__n))
 #define BUS_DBG_AW_TRANS_TID(__n)	(BUS_DBG_BASE + 0x0280 + 4 * (__n))
 
-#define BUS_DBG_BUS_MHZ             (266)
+#ifndef CONFIG_MACH_MT6758
+	#define BUS_DBG_BUS_MHZ             (266)
+#else
+	#define BUS_DBG_BUS_MHZ             (135)
+#endif
 #define BUS_DBG_NUM_TRACKER         (8)
 
 #define BUS_DBG_CON_BUS_DBG_EN      (0x00000001)
@@ -110,6 +115,7 @@ struct mt_systracker_driver {
 
 struct systracker_entry_t {
 	unsigned int dbg_con;
+	unsigned int dbg_con_infra;
 	unsigned int ar_track_l[BUS_DBG_NUM_TRACKER];
 	unsigned int ar_track_h[BUS_DBG_NUM_TRACKER];
 	unsigned int ar_trans_tid[BUS_DBG_NUM_TRACKER];
@@ -135,6 +141,8 @@ extern void dump_regs(const char *fmt, const char v1, const unsigned int reg, co
 extern struct mt_systracker_driver *get_mt_systracker_drv(void);
 
 extern void __iomem *BUS_DBG_BASE;
+extern void __iomem *BUS_DBG_INFRA_BASE;
+extern void __iomem *BUS_DBG_CON_REG;
 extern int systracker_irq;
 extern struct systracker_config_t track_config;
 extern struct systracker_entry_t track_entry;
@@ -158,6 +166,6 @@ extern void systracker_enable(void);
 extern void systracker_test_cleanup(void);
 
 
-/* #define SYSTRACKER_TEST_SUIT */  /* enable for driver poring test suit */
+#define SYSTRACKER_TEST_SUIT /* enable for driver poring test suit */
 /* #define TRACKER_DEBUG 0 */
 #endif

@@ -26,7 +26,7 @@
 #define K_DEBUG	(1<<0)
 
 /*Set the debug level for xhci driver*/
-extern u32 xhci_debug_level;
+extern int xhci_debug_level;
 
 extern struct xhci_hcd *mtk_xhci;
 
@@ -41,10 +41,16 @@ extern void xhci_mtk_unregister_plat(void);
 extern int mtk_xhci_driver_load(bool vbus_on);
 extern void mtk_xhci_driver_unload(bool vbus_off);
 extern void mtk_xhci_disable_vbus(void);
+extern void mtk_xhci_enable_vbus(void);
+
 
 
 extern bool mtk_is_host_mode(void);
 extern bool musb_check_ipo_state(void);
 bool mtk_is_charger_4_vol(void);
+
+#if CONFIG_MTK_GAUGE_VERSION == 30
+extern void enable_boost_polling(bool poll_en);
+#endif
 
 #endif

@@ -30,6 +30,7 @@
 
 static kuid_t uid = KUIDT_INIT(0);
 static kgid_t gid = KGIDT_INIT(1000);
+static DEFINE_SEMAPHORE(sem_mutex);
 /*
 *The thermal policy is meaningless here.
 *We only use it to make this thermal zone work.
@@ -303,7 +304,7 @@ static ssize_t mtktsdram_write(struct file *file, const char __user *buffer, siz
 
 	if (sscanf
 	    (ptr_mtktsdram_data->desc,
-	     "%d %d %d %s %d %d %s %d %d %s %d %d %s %d %d %s %d %d %s %d %d %s %d %d %s %d %d %s %d %d %s %d",
+	     "%d %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d",
 		&num_trip,
 		&ptr_mtktsdram_data->trip[0], &ptr_mtktsdram_data->t_type[0], ptr_mtktsdram_data->bind0,
 		&ptr_mtktsdram_data->trip[1], &ptr_mtktsdram_data->t_type[1], ptr_mtktsdram_data->bind1,
@@ -317,6 +318,7 @@ static ssize_t mtktsdram_write(struct file *file, const char __user *buffer, siz
 		&ptr_mtktsdram_data->trip[9], &ptr_mtktsdram_data->t_type[9], ptr_mtktsdram_data->bind9,
 		&ptr_mtktsdram_data->time_msec) == 32) {
 		mtktsdram_dprintk("[mtktsdram_write] mtktsdram_unregister_thermal\n");
+		down(&sem_mutex);
 		mtktsdram_unregister_thermal();
 
 		for (i = 0; i < num_trip; i++)
@@ -362,6 +364,7 @@ static ssize_t mtktsdram_write(struct file *file, const char __user *buffer, siz
 
 		mtktsdram_dprintk("[mtktsdram_write] mtktsdram_register_thermal\n");
 		mtktsdram_register_thermal();
+		up(&sem_mutex);
 
 		kfree(ptr_mtktsdram_data);
 		return count;

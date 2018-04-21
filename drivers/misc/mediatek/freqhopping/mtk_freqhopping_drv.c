@@ -33,7 +33,7 @@
 #define FH_PLL_COUNT		(g_p_fh_hal_drv->pll_cnt)
 static struct mt_fh_hal_driver *g_p_fh_hal_drv;
 
-static fh_pll_t *g_fh_drv_pll;
+static struct fh_pll_t *g_fh_drv_pll;
 static struct freqhopping_ssc *g_fh_drv_usr_def;
 static unsigned int g_drv_pll_count;
 static int mt_freqhopping_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
@@ -60,7 +60,7 @@ static int mt_fh_drv_probe(struct platform_device *dev)
 	if (err)
 		FH_MSG("register fh driver error!");
 
-	return err;
+	return 0;
 }
 
 static int mt_fh_drv_remove(struct platform_device *dev)
@@ -71,7 +71,15 @@ static int mt_fh_drv_remove(struct platform_device *dev)
 
 static void mt_fh_drv_shutdown(struct platform_device *dev)
 {
+	int id = 0;
+
 	FH_MSG("mt_fh_shutdown");
+
+	pr_alert("Disable SSC before system reset.\n");
+
+	for (id = 0; id < FH_PLL_COUNT; id++)
+		freqhopping_config(id, 0, false);
+
 }
 
 static int mt_fh_drv_suspend(struct platform_device *dev, pm_message_t state)
@@ -92,6 +100,12 @@ static int mt_fh_drv_resume(struct platform_device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id mt_fhctl_of_match[] = {
+	{ .compatible = "mediatek,fhctl", },
+	{},
+};
+#endif
 
 static struct platform_driver freqhopping_driver = {
 	.probe = mt_fh_drv_probe,
@@ -102,6 +116,9 @@ static struct platform_driver freqhopping_driver = {
 	.driver = {
 		   .name = FREQ_HOPPING_DEVICE,
 		   .owner = THIS_MODULE,
+#ifdef CONFIG_OF
+		   .of_match_table = mt_fhctl_of_match,
+#endif
 		   },
 };
 #endif
@@ -121,7 +138,11 @@ static int mt_fh_enable_usrdef(struct freqhopping_ioctl *fh_ctl)
 		g_p_fh_hal_drv->mt_fh_lock(&flags);
 		memcpy(&g_fh_drv_usr_def[pll_id], &(fh_ctl->ssc_setting),
 		       sizeof(g_fh_drv_usr_def[pll_id]));
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+		g_p_fh_hal_drv->fh_pll_set(pll_id, USER_DEFINED, true);
+#else
 		g_fh_drv_pll[pll_id].user_defined = true;
+#endif
 		g_p_fh_hal_drv->mt_fh_unlock(&flags);
 	}
 	/* FH_MSG("Exit"); */
@@ -141,7 +162,11 @@ static int mt_fh_disable_usrdef(struct freqhopping_ioctl *fh_ctl)
 	if (fh_ctl->pll_id < FH_PLL_COUNT) {
 		g_p_fh_hal_drv->mt_fh_lock(&flags);
 		memset(&g_fh_drv_usr_def[pll_id], 0, sizeof(g_fh_drv_usr_def[pll_id]));
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+		g_p_fh_hal_drv->fh_pll_set(pll_id, USER_DEFINED, false);
+#else
 		g_fh_drv_pll[pll_id].user_defined = false;
+#endif
 		g_p_fh_hal_drv->mt_fh_unlock(&flags);
 	}
 	/* FH_MSG("Exit"); */
@@ -363,7 +388,7 @@ static ssize_t freqhopping_status_proc_write(struct file *file, const char *buff
 /* static int freqhopping_debug_proc_read(char *page, char **start, off_t off, int count, int *eof, void *data) */
 static int freqhopping_debug_proc_read(struct seq_file *m, void *v)
 {
-	FH_IO_PROC_READ_T arg;
+	struct FH_IO_PROC_READ_T arg;
 
 	arg.m = m;
 	arg.v = v;

@@ -284,7 +284,7 @@ static int32_t cmdq_sec_fill_iwc_command_msg_unlocked(struct iwcCmdqMessage_t *p
 	/* TEE will insert some instr,DAPC and M4U configuration */
 	const uint32_t reservedCommandSize = 4 * CMDQ_INST_SIZE;
 	struct CmdBufferStruct *cmd_buffer = NULL;
-
+	uint32_t buffer_index = 0;
 
 	CMDQ_MSG("enter fill_iwc_command_msg_unlock\n");
 
@@ -312,36 +312,33 @@ static int32_t cmdq_sec_fill_iwc_command_msg_unlocked(struct iwcCmdqMessage_t *p
 
 
 	if (pTask != NULL && thread != CMDQ_INVALID_THREAD) {
-		uint8_t *current_va = (uint8_t *)pIwc->command.pVABase;
 		/* basic data */
 		pIwc->command.scenario = pTask->scenario;
 		pIwc->command.thread = thread;
 		pIwc->command.priority = pTask->priority;
 		pIwc->command.engineFlag = pTask->engineFlag;
-		pIwc->command.hNormalTask = (0LL | (uint64_t) (pTask));
+		pIwc->command.hNormalTask = (0LL | (unsigned long) (pTask));
+		pIwc->command.commandSize = pTask->bufferSize;
 
-
-
+		buffer_index = 0;
 		list_for_each_entry(cmd_buffer, &pTask->cmd_buffer_list, listEntry) {
-			bool is_last = list_is_last(&cmd_buffer->listEntry, &pTask->cmd_buffer_list);
-			uint32_t copy_size = is_last ?
-				CMDQ_CMD_BUFFER_SIZE - pTask->buf_available_size :
-				CMDQ_CMD_BUFFER_SIZE - CMDQ_INST_SIZE;
-			uint32_t *end_va = (u32 *)(current_va + copy_size);
+			uint32_t copy_size = list_is_last(&cmd_buffer->listEntry, &pTask->cmd_buffer_list) ?
+				CMDQ_CMD_BUFFER_SIZE - pTask->buf_available_size : CMDQ_CMD_BUFFER_SIZE;
+			uint32_t *start_va = (pIwc->command.pVABase +
+				buffer_index * CMDQ_CMD_BUFFER_SIZE / CMDQ_INST_SIZE * 2);
+			uint32_t *end_va = start_va + copy_size / sizeof(uint32_t);
 
-			memcpy(current_va, (cmd_buffer->pVABase), (copy_size));
+			memcpy(start_va, (cmd_buffer->pVABase), (copy_size));
 
 			/* we must reset the jump inst since now buffer is continues */
-			if (is_last && ((end_va[-1] >> 24) & 0xff) == CMDQ_CODE_JUMP &&
+			if (((end_va[-1] >> 24) & 0xff) == CMDQ_CODE_JUMP &&
 				(end_va[-1] & 0x1) == 1) {
 				end_va[-1] = CMDQ_CODE_JUMP << 24;
 				end_va[-2] = 0x8;
 			}
 
-			current_va += copy_size;
+			buffer_index++;
 		}
-
-		pIwc->command.commandSize = (uint32_t)(current_va - (uint8_t *)pIwc->command.pVABase);
 
 		/* cookie */
 		pIwc->command.waitCookie = pTask->secData.waitCookie;
@@ -380,6 +377,7 @@ static int32_t cmdq_sec_fill_iwc_command_msg_unlocked(struct iwcCmdqMessage_t *p
 	}
 
 	CMDQ_MSG("[SEC]<--SESSION_MSG[%d]\n", status);
+	CMDQ_MSG("leaving fill_iwc_command_msg_unlock\n");
 	return status;
 }
 #endif
@@ -413,7 +411,7 @@ static int32_t cmdq_sec_execute_session_unlocked(struct cmdqSecContextStruct *ha
 
 	do {
 		/* Register share memory */
-		MTEEC_PARAM cmdq_param[4];
+		union MTEEC_PARAM cmdq_param[4];
 		unsigned int paramTypes;
 		KREE_SHAREDMEM_HANDLE cmdq_share_handle = 0;
 		struct KREE_SHAREDMEM_PARAM cmdq_shared_param;
@@ -612,7 +610,7 @@ int32_t cmdq_sec_test_proc(int testValue)
 	const int32_t tgid = current->tgid;
 	cmdqSecContextHandle handle = NULL;
 	/* fill param */
-	MTEEC_PARAM param[4];
+	union MTEEC_PARAM param[4];
 	unsigned int paramTypes;
 	TZ_RESULT ret;
 
@@ -1155,7 +1153,7 @@ int32_t cmdqSecRegisterSecureBuffer(struct transmitBufferStruct *pSecureData)
 int32_t cmdqSecServiceCall(struct transmitBufferStruct *pSecureData, int32_t cmd)
 {
 #ifdef CMDQ_SECURE_PATH_SUPPORT
-		MTEEC_PARAM cmdq_param[4];
+		union MTEEC_PARAM cmdq_param[4];
 		unsigned int paramTypes = TZ_ParamTypes1(TZPT_MEMREF_INPUT);
 		TZ_RESULT tzRes = TZ_RESULT_SUCCESS;
 

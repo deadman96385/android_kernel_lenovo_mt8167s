@@ -39,6 +39,11 @@
 #include <mt-plat/sync_write.h>
 
 /* #include <mt_smi.h> */
+#ifdef CONFIG_MTK_SMI_EXT
+#include "mtk_smi.h"
+#include "mmdvfs_config_util.h"
+#endif
+#include "smi_public.h"
 
 #include "linux/clk.h"
 
@@ -69,7 +74,7 @@
 #endif
 
 #define MJC_WriteReg32(addr, data)  mt_reg_sync_writel(data, addr)
-#define MJC_Reg32(addr)             (*(volatile unsigned int *)(addr))
+#define MJC_Reg32(addr)             (readl((void *)addr) & 0xFFFFFFFF)
 
 /* Define */
 
@@ -77,28 +82,17 @@
 #define MTK_MJC_DEV_MAJOR_NUMBER 168
 #define MJC_FORCE_REG_NUM 100
 
-#undef CONFIG_MTK_SMI_EXT
-
 /* variable */
 static DEFINE_SPINLOCK(ContextLock);
 static DEFINE_SPINLOCK(HWLock);
-static MJC_CONTEXT_T grContext;	/* spinlock : ContextLock */
-static MJC_CONTEXT_T grHWLockContext;	/* spinlock : HWLock */
+static struct MJC_CONTEXT_T grContext;	/* spinlock : ContextLock */
+static struct MJC_CONTEXT_T grHWLockContext;	/* spinlock : HWLock */
 
 static dev_t mjc_devno = MKDEV(MTK_MJC_DEV_MAJOR_NUMBER, 0);
 static struct cdev *g_mjc_cdev;
 static struct class *pMjcClass;
 static struct device *mjcDevice;
 
-static struct clk *clk_MT_CG_GALS_M0_2X;      /* MM_CG_GALS_M0_2X */
-static struct clk *clk_MT_CG_GALS_M1_2X;      /* MM_CG_GALS_M1_2X */
-static struct clk *clk_MT_CG_UPSZ0;           /* MM_CG_UPSZ0 */
-static struct clk *clk_MT_CG_UPSZ1;           /* MM_CG_UPSZ1 */
-static struct clk *clk_MT_CG_FIFO0;           /* MM_CG_FIFO0 */
-static struct clk *clk_MT_CG_FIFO1;           /* MM_CG_FIFO1 */
-static struct clk *clk_MT_CG_SMI_COMMON;      /* MM_DISP0_SMI_COMMON */
-static struct clk *clk_MT_CG_SMI_COMMON_2X;   /* MM_DISP0_SMI_COMMON_2X */
-static struct clk *clk_MT_CG_LARB8;           /* MM_CG_LARB8 */
 static struct clk *clk_MJC_SMI_LARB;          /* SMI MJC larb */
 static struct clk *clk_MJC_TOP_CLK_0;
 static struct clk *clk_MJC_TOP_CLK_1;
@@ -109,11 +103,11 @@ static struct clk *clk_SCP_SYS_MM0;
 static struct clk *clk_SCP_SYS_MJC;
 static struct clk *clk_TOP_MUX_MJC;
 static struct clk *clk_TOP_SYSPLL_D5;
-static struct clk *clk_TOP_VCODECPLL_D7;
+static struct clk *clk_TOP_UNIVPLL_D3;
 
 unsigned long gulRegister, gu1PaReg, gu1PaSize, gulCGRegister;
 int gi4IrqID;
-MJC_WRITE_REG_T gfWriteReg[MJC_FORCE_REG_NUM];
+struct MJC_WRITE_REG_T gfWriteReg[MJC_FORCE_REG_NUM];
 
 
 /*****************************************************************************
@@ -126,7 +120,7 @@ MJC_WRITE_REG_T gfWriteReg[MJC_FORCE_REG_NUM];
  * RETURNS
  *    None.
  ****************************************************************************/
-static int _mjc_CreateEvent(MJC_EVENT_T *a_prParam)
+static int _mjc_CreateEvent(struct MJC_EVENT_T *a_prParam)
 {
 	wait_queue_head_t *prWaitQueue;
 	unsigned char *pu1Flag;
@@ -161,7 +155,7 @@ static int _mjc_CreateEvent(MJC_EVENT_T *a_prParam)
  * RETURNS
  *    None.
  ****************************************************************************/
-static int _mjc_CloseEvent(MJC_EVENT_T *a_prParam)
+static int _mjc_CloseEvent(struct MJC_EVENT_T *a_prParam)
 {
 	wait_queue_head_t *prWaitQueue;
 	unsigned char *pu1Flag;
@@ -187,7 +181,7 @@ static int _mjc_CloseEvent(MJC_EVENT_T *a_prParam)
  * RETURNS
  *    None.
  ****************************************************************************/
-static int _mjc_WaitEvent(MJC_EVENT_T *a_prParam)
+static int _mjc_WaitEvent(struct MJC_EVENT_T *a_prParam)
 {
 	wait_queue_head_t *prWaitQueue;
 	long timeout_jiff;
@@ -220,7 +214,7 @@ static int _mjc_WaitEvent(MJC_EVENT_T *a_prParam)
  * RETURNS
  *    None.
  ****************************************************************************/
-static int _mjc_SetEvent(MJC_EVENT_T *a_prParam)
+static int _mjc_SetEvent(struct MJC_EVENT_T *a_prParam)
 {
 	wait_queue_head_t *prWaitQueue;
 
@@ -369,58 +363,10 @@ static int mjc_open(struct inode *pInode, struct file *pFile)
 		MJCMSG("[ERROR] mjc_open() clk_SCP_SYS_MJC is not enabled, ret = %d\n", ret);
 	}
 
-	ret = clk_prepare_enable(clk_MT_CG_GALS_M0_2X);
+	ret = smi_bus_enable(SMI_LARB_MJCSYS, "mjc-larb");
 	if (ret) {
 		/* print error log & error handling */
-		MJCMSG("[ERROR] mjc_open() clk_MT_CG_GALS_M0_2X is not enabled, ret = %d\n", ret);
-	}
-
-	ret = clk_prepare_enable(clk_MT_CG_GALS_M1_2X);
-	if (ret) {
-		/* print error log & error handling */
-		MJCMSG("[ERROR] mjc_open() clk_MT_CG_GALS_M1_2X is not enabled, ret = %d\n", ret);
-	}
-
-	ret = clk_prepare_enable(clk_MT_CG_UPSZ0);
-	if (ret) {
-		/* print error log & error handling */
-		MJCMSG("[ERROR] mjc_open() clk_MT_CG_UPSZ0 is not enabled, ret = %d\n", ret);
-	}
-
-	ret = clk_prepare_enable(clk_MT_CG_UPSZ1);
-	if (ret) {
-		/* print error log & error handling */
-		MJCMSG("[ERROR] mjc_open() clk_MT_CG_UPSZ1 is not enabled, ret = %d\n", ret);
-	}
-
-	ret = clk_prepare_enable(clk_MT_CG_FIFO0);
-	if (ret) {
-		/* print error log & error handling */
-		MJCMSG("[ERROR] mjc_open() clk_MT_CG_FIFO0 is not enabled, ret = %d\n", ret);
-	}
-
-	ret = clk_prepare_enable(clk_MT_CG_FIFO1);
-	if (ret) {
-		/* print error log & error handling */
-		MJCMSG("[ERROR] mjc_open() clk_MT_CG_FIFO1 is not enabled, ret = %d\n", ret);
-	}
-
-	ret = clk_prepare_enable(clk_MT_CG_SMI_COMMON);
-	if (ret) {
-		/* print error log & error handling */
-		MJCMSG("[ERROR] mjc_open() clk_MT_CG_SMI_COMMON is not enabled, ret = %d\n", ret);
-	}
-
-	ret = clk_prepare_enable(clk_MT_CG_SMI_COMMON_2X);
-	if (ret) {
-		/* print error log & error handling */
-		MJCMSG("[ERROR] mjc_open() clk_MT_CG_SMI_COMMON_2X is not enabled, ret = %d\n", ret);
-	}
-
-	ret = clk_prepare_enable(clk_MT_CG_LARB8);
-	if (ret) {
-		/* print error log & error handling */
-		MJCMSG("[ERROR] mjc_open() clk_MT_CG_LARB8 is not enabled, ret = %d\n", ret);
+		MJCMSG("[ERROR] mjc_open() smi_bus_enable is failed, ret = %d\n", ret);
 	}
 
 	ret = clk_prepare_enable(clk_MJC_SMI_LARB);
@@ -512,7 +458,7 @@ static int mjc_release(struct inode *pInode, struct file *pFile)
 	clk_disable_unprepare(clk_TOP_MUX_MJC);
 
 #ifdef CONFIG_MTK_SMI_EXT
-	ret = mmdvfs_set_step(SMI_BWC_SCEN_VPMJC, MMDVFS_VOLTAGE_LOW);
+	ret = mmdvfs_set_fine_step(SMI_BWC_SCEN_VPMJC, MMDVFS_FINE_STEP_UNREQUEST);
 	if (ret != 0) {
 		/* Add one line comment for avoid kernel coding style, WARNING:BRACES: */
 		MJCMSG("[ERROR] mjc_ioctl() OOPS: mmdvfs_set_step error!");
@@ -524,15 +470,7 @@ static int mjc_release(struct inode *pInode, struct file *pFile)
 	m4u_unregister_fault_callback(M4U_PORT_MJC_DMA_RD);
 	m4u_unregister_fault_callback(M4U_PORT_MJC_DMA_WR);
 
-	clk_disable_unprepare(clk_MT_CG_LARB8);
-	clk_disable_unprepare(clk_MT_CG_SMI_COMMON_2X);
-	clk_disable_unprepare(clk_MT_CG_SMI_COMMON);
-	clk_disable_unprepare(clk_MT_CG_FIFO1);
-	clk_disable_unprepare(clk_MT_CG_FIFO0);
-	clk_disable_unprepare(clk_MT_CG_UPSZ1);
-	clk_disable_unprepare(clk_MT_CG_UPSZ0);
-	clk_disable_unprepare(clk_MT_CG_GALS_M1_2X);
-	clk_disable_unprepare(clk_MT_CG_GALS_M0_2X);
+	smi_bus_disable(SMI_LARB_MJCSYS, "mjc-larb");
 	clk_disable_unprepare(clk_MJC_SMI_LARB);
 	clk_disable_unprepare(clk_MJC_TOP_CLK_0);
 	clk_disable_unprepare(clk_MJC_TOP_CLK_1);
@@ -561,12 +499,12 @@ static long mjc_ioctl(struct file *pfile, unsigned int u4cmd, unsigned long u4ar
 	unsigned long ulAdd;
 	unsigned long ulFlags;
 
-	MJC_IOCTL_LOCK_HW_T rLockHW;
-	MJC_IOCTL_ISR_T rIsr;
-	MJC_READ_REG_T rReadReg;
-	MJC_WRITE_REG_T rWriteReg;
-	MJC_IOCTL_SRC_CLK_T rSrcClk;
-	MJC_IOCTL_REG_INFO_T rRegInfo;
+	struct MJC_IOCTL_LOCK_HW_T rLockHW;
+	struct MJC_IOCTL_ISR_T rIsr;
+	struct MJC_READ_REG_T rReadReg;
+	struct MJC_WRITE_REG_T rWriteReg;
+	struct MJC_IOCTL_SRC_CLK_T rSrcClk;
+	struct MJC_IOCTL_REG_INFO_T rRegInfo;
 
 	int cnt = 0;
 
@@ -578,15 +516,15 @@ static long mjc_ioctl(struct file *pfile, unsigned int u4cmd, unsigned long u4ar
 			MJCDBG("+ mjc_ioctl() MJC_LOCKHW + tid = %d\n", current->pid);
 
 			if (copy_from_user
-			    (&rLockHW, (void __user *)u4arg, sizeof(MJC_IOCTL_LOCK_HW_T))) {
+			    (&rLockHW, (void __user *)u4arg, sizeof(struct MJC_IOCTL_LOCK_HW_T))) {
 				MJCMSG("[ERROR] mjc_ioctl() MJC_LOCKHW copy_from_user fail\n");
 				return -1;
 			}
 
-			if (sizeof(MJC_IOCTL_LOCK_HW_T) != rLockHW.u4StructSize) {
+			if (sizeof(struct MJC_IOCTL_LOCK_HW_T) != rLockHW.u4StructSize) {
 				MJCMSG
 				    ("[ERROR] mjc_ioctl() MJC_LOCKHW context size mismatch (user:%d, kernel:%zu)\n",
-				     rLockHW.u4StructSize, sizeof(MJC_IOCTL_LOCK_HW_T));
+				     rLockHW.u4StructSize, sizeof(struct MJC_IOCTL_LOCK_HW_T));
 				return -1;
 			}
 
@@ -631,15 +569,15 @@ static long mjc_ioctl(struct file *pfile, unsigned int u4cmd, unsigned long u4ar
 		{
 			MJCDBG("mjc_ioctl() MJC_WAITISR + tid = %d\n", current->pid);
 
-			if (copy_from_user(&rIsr, (void __user *)u4arg, sizeof(MJC_IOCTL_ISR_T))) {
+			if (copy_from_user(&rIsr, (void __user *)u4arg, sizeof(struct MJC_IOCTL_ISR_T))) {
 				MJCMSG("[ERROR] mjc_ioctl() MJC_WAITISR copy_from_user fail\n");
 				return -1;
 			}
 
-			if (sizeof(MJC_IOCTL_ISR_T) != rIsr.u4StructSize) {
+			if (sizeof(struct MJC_IOCTL_ISR_T) != rIsr.u4StructSize) {
 				MJCMSG
 				    ("[ERROR] mjc_ioctl() MJC_WAITISR context size mismatch (user:%d, kernel:%zu)\n",
-				     rIsr.u4StructSize, sizeof(MJC_IOCTL_ISR_T));
+				     rIsr.u4StructSize, sizeof(struct MJC_IOCTL_ISR_T));
 				return -1;
 			}
 
@@ -670,7 +608,7 @@ static long mjc_ioctl(struct file *pfile, unsigned int u4cmd, unsigned long u4ar
 		{
 			MJCDBG("mjc_ioctl() MJC_READ_REG + tid = %d\n", current->pid);
 
-			if (copy_from_user(&rReadReg, (void __user *)u4arg, sizeof(MJC_READ_REG_T))) {
+			if (copy_from_user(&rReadReg, (void __user *)u4arg, sizeof(struct MJC_READ_REG_T))) {
 				MJCMSG("[ERROR] mjc_ioctl() MJC_READ_REG copy_from_user failed\n");
 				return -1;
 			}
@@ -688,7 +626,7 @@ static long mjc_ioctl(struct file *pfile, unsigned int u4cmd, unsigned long u4ar
 			MJCDBG("read 0x%lx (0x%lx)= 0x%x (0x%x)\n", rReadReg.reg, ulAdd,
 			       rReadReg.val, rReadReg.mask);
 
-			if (copy_to_user((void __user *)u4arg, &rReadReg, sizeof(MJC_READ_REG_T))) {
+			if (copy_to_user((void __user *)u4arg, &rReadReg, sizeof(struct MJC_READ_REG_T))) {
 				MJCMSG("[ERROR] mjc_ioctl() MJC_READ_REG, copy_to_user failed\n");
 				return -1;
 			}
@@ -700,7 +638,7 @@ static long mjc_ioctl(struct file *pfile, unsigned int u4cmd, unsigned long u4ar
 			MJCDBG("mjc_ioctl() MJC_WRITE_REG + tid = %d\n", current->pid);
 
 			if (copy_from_user
-			    (&rWriteReg, (void __user *)u4arg, sizeof(MJC_WRITE_REG_T))) {
+			    (&rWriteReg, (void __user *)u4arg, sizeof(struct MJC_WRITE_REG_T))) {
 				MJCMSG("[ERROR] mjc_ioctl() MJC_WRITE_REG copy_from_user failed\n");
 				return -1;
 			}
@@ -764,15 +702,15 @@ static long mjc_ioctl(struct file *pfile, unsigned int u4cmd, unsigned long u4ar
 			MJCDBG("mjc_ioctl() MJC_SOURCE_CLK + tid = %d\n", current->pid);
 
 			if (copy_from_user
-			    (&rSrcClk, (void __user *)u4arg, sizeof(MJC_IOCTL_SRC_CLK_T))) {
+			    (&rSrcClk, (void __user *)u4arg, sizeof(struct MJC_IOCTL_SRC_CLK_T))) {
 				MJCMSG("[ERROR] mjc_ioctl() MJC_SOURCE_CLK copy_from_user fail\n");
 				return -1;
 			}
 
-			if (sizeof(MJC_IOCTL_SRC_CLK_T) != rSrcClk.u4StructSize) {
+			if (sizeof(struct MJC_IOCTL_SRC_CLK_T) != rSrcClk.u4StructSize) {
 				MJCMSG
 				    ("[ERROR] mjc_ioctl() MJC_SOURCE_CLK context size mismatch (user:%d, kernel:%zu)\n",
-				     rSrcClk.u4StructSize, sizeof(MJC_IOCTL_SRC_CLK_T));
+				     rSrcClk.u4StructSize, sizeof(struct MJC_IOCTL_SRC_CLK_T));
 				return -1;
 			}
 
@@ -786,7 +724,7 @@ static long mjc_ioctl(struct file *pfile, unsigned int u4cmd, unsigned long u4ar
 
 			if (rSrcClk.u2OutputFramerate == 600) {	/* frame rate 60 case */
 #ifdef CONFIG_MTK_SMI_EXT
-				ret = mmdvfs_set_step(SMI_BWC_SCEN_VPMJC, MMDVFS_VOLTAGE_LOW);
+				ret = mmdvfs_set_fine_step(SMI_BWC_SCEN_VPMJC, MMDVFS_FINE_STEP_OPP3);
 				if (ret) {
 					/* Add one line comment for avoid kernel coding style, WARNING:BRACES: */
 					MJCMSG("[ERROR] mjc_ioctl() OOPS: mmdvfs_set_step error!");
@@ -799,13 +737,13 @@ static long mjc_ioctl(struct file *pfile, unsigned int u4cmd, unsigned long u4ar
 				}
 			} else if (rSrcClk.u2OutputFramerate == 1200) {	/* frame rate 120 case */
 #ifdef CONFIG_MTK_SMI_EXT
-				ret = mmdvfs_set_step(SMI_BWC_SCEN_VPMJC, MMDVFS_VOLTAGE_HIGH);
+				ret = mmdvfs_set_fine_step(SMI_BWC_SCEN_VPMJC, MMDVFS_FINE_STEP_OPP0);
 				if (ret) {
 					/* Add one line comment for avoid kernel coding style, WARNING:BRACES: */
 					MJCMSG("[ERROR] mjc_ioctl() OOPS: mmdvfs_set_step error!");
 				}
 #endif
-				ret = clk_set_parent(clk_TOP_MUX_MJC, clk_TOP_VCODECPLL_D7); /* IMGPLL (432) */
+				ret = clk_set_parent(clk_TOP_MUX_MJC, clk_TOP_UNIVPLL_D3); /* UNIVPLL (416) */
 				if (ret) {
 					/* print error log & error handling */
 					MJCMSG("[ERROR] mjc_ioctl() TOP_IMGPLL_CK is not enabled, ret = %d\n", ret);
@@ -825,15 +763,15 @@ static long mjc_ioctl(struct file *pfile, unsigned int u4cmd, unsigned long u4ar
 			MJCDBG("mjc_ioctl() MJC_REG_INFO + tid = %d\n", current->pid);
 
 			if (copy_from_user
-			    (&rRegInfo, (void __user *)u4arg, sizeof(MJC_IOCTL_REG_INFO_T))) {
+			    (&rRegInfo, (void __user *)u4arg, sizeof(struct MJC_IOCTL_REG_INFO_T))) {
 				MJCMSG("[ERROR] mjc_ioctl() MJC_REG_INFO copy_from_user fail\n");
 				return -1;
 			}
 
-			if (sizeof(MJC_IOCTL_REG_INFO_T) != rRegInfo.u4StructSize) {
+			if (sizeof(struct MJC_IOCTL_REG_INFO_T) != rRegInfo.u4StructSize) {
 				MJCMSG
 				    ("[ERROR] mjc_ioctl() MJC_REG_INFO context size mismatch (user:%d, kernel:%zu)\n",
-				     rRegInfo.u4StructSize, sizeof(MJC_IOCTL_REG_INFO_T));
+				     rRegInfo.u4StructSize, sizeof(struct MJC_IOCTL_REG_INFO_T));
 				return -1;
 			}
 
@@ -844,7 +782,7 @@ static long mjc_ioctl(struct file *pfile, unsigned int u4cmd, unsigned long u4ar
 			       rRegInfo.ulRegPSize);
 
 			if (copy_to_user
-			    ((void __user *)u4arg, &rRegInfo, sizeof(MJC_IOCTL_REG_INFO_T))) {
+			    ((void __user *)u4arg, &rRegInfo, sizeof(struct MJC_IOCTL_REG_INFO_T))) {
 				MJCMSG("[ERROR] mjc_ioctl() MJC_REG_INFO copy_to_user fail\n");
 				return -1;
 			}
@@ -1018,60 +956,6 @@ static int mjc_probe(struct platform_device *pDev)
 	}
 	disable_irq(gi4IrqID);
 
-	clk_MT_CG_GALS_M0_2X = devm_clk_get(&pDev->dev, "MT_CG_GALS_M0_2X");
-	if (IS_ERR(clk_MT_CG_GALS_M0_2X)) {
-		MJCMSG("[ERROR] Unable to devm_clk_get MJC_SMI_LARB\n");
-		return PTR_ERR(clk_MT_CG_GALS_M0_2X);
-	}
-
-	clk_MT_CG_GALS_M1_2X = devm_clk_get(&pDev->dev, "MT_CG_GALS_M1_2X");
-	if (IS_ERR(clk_MT_CG_GALS_M1_2X)) {
-		MJCMSG("[ERROR] Unable to devm_clk_get MJC_SMI_LARB\n");
-		return PTR_ERR(clk_MT_CG_GALS_M1_2X);
-	}
-
-	clk_MT_CG_UPSZ0 = devm_clk_get(&pDev->dev, "MT_CG_UPSZ0");
-	if (IS_ERR(clk_MT_CG_UPSZ0)) {
-		MJCMSG("[ERROR] Unable to devm_clk_get MJC_SMI_LARB\n");
-		return PTR_ERR(clk_MT_CG_UPSZ0);
-	}
-
-	clk_MT_CG_UPSZ1 = devm_clk_get(&pDev->dev, "MT_CG_UPSZ1");
-	if (IS_ERR(clk_MT_CG_UPSZ1)) {
-		MJCMSG("[ERROR] Unable to devm_clk_get MJC_SMI_LARB\n");
-		return PTR_ERR(clk_MT_CG_UPSZ1);
-	}
-
-	clk_MT_CG_FIFO0 = devm_clk_get(&pDev->dev, "MT_CG_FIFO0");
-	if (IS_ERR(clk_MT_CG_FIFO0)) {
-		MJCMSG("[ERROR] Unable to devm_clk_get MJC_SMI_LARB\n");
-		return PTR_ERR(clk_MT_CG_FIFO0);
-	}
-
-	clk_MT_CG_FIFO1 = devm_clk_get(&pDev->dev, "MT_CG_FIFO1");
-	if (IS_ERR(clk_MT_CG_FIFO1)) {
-		MJCMSG("[ERROR] Unable to devm_clk_get MJC_SMI_LARB\n");
-		return PTR_ERR(clk_MT_CG_FIFO1);
-	}
-
-	clk_MT_CG_SMI_COMMON = devm_clk_get(&pDev->dev, "MT_CG_SMI_COMMON");
-	if (IS_ERR(clk_MT_CG_SMI_COMMON)) {
-		MJCMSG("[ERROR] Unable to devm_clk_get MJC_SMI_LARB\n");
-		return PTR_ERR(clk_MT_CG_SMI_COMMON);
-	}
-
-	clk_MT_CG_SMI_COMMON_2X = devm_clk_get(&pDev->dev, "MT_CG_SMI_COMMON_2X");
-	if (IS_ERR(clk_MT_CG_SMI_COMMON_2X)) {
-		MJCMSG("[ERROR] Unable to devm_clk_get MJC_SMI_LARB\n");
-		return PTR_ERR(clk_MT_CG_SMI_COMMON_2X);
-	}
-
-	clk_MT_CG_LARB8 = devm_clk_get(&pDev->dev, "MT_CG_LARB8");
-	if (IS_ERR(clk_MT_CG_LARB8)) {
-		MJCMSG("[ERROR] Unable to devm_clk_get MT_CG_LARB8\n");
-		return PTR_ERR(clk_MT_CG_LARB8);
-	}
-
 	clk_MJC_SMI_LARB = devm_clk_get(&pDev->dev, "mjc-smi-larb");
 	if (IS_ERR(clk_MJC_SMI_LARB)) {
 		MJCMSG("[ERROR] Unable to devm_clk_get MJC_SMI_LARB\n");
@@ -1126,10 +1010,10 @@ static int mjc_probe(struct platform_device *pDev)
 		return PTR_ERR(clk_TOP_MUX_MJC);
 	}
 
-	clk_TOP_VCODECPLL_D7 = devm_clk_get(&pDev->dev, "vcodecpll_d7");
-	if (IS_ERR(clk_TOP_VCODECPLL_D7)) {
-		MJCMSG("[ERROR] Unable to devm_clk_get clk_TOP_VCODECPLL_D7\n");
-		return PTR_ERR(clk_TOP_VCODECPLL_D7);
+	clk_TOP_UNIVPLL_D3 = devm_clk_get(&pDev->dev, "univpll_d3");
+	if (IS_ERR(clk_TOP_UNIVPLL_D3)) {
+		MJCMSG("[ERROR] Unable to devm_clk_get clk_TOP_UNIVPLL_D3\n");
+		return PTR_ERR(clk_TOP_UNIVPLL_D3);
 	}
 
 	clk_TOP_SYSPLL_D5 = devm_clk_get(&pDev->dev, "syspll_d5");

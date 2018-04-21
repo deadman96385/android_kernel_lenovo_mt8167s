@@ -45,6 +45,8 @@
 
 static kuid_t uid = KUIDT_INIT(0);
 static kgid_t gid = KGIDT_INIT(1000);
+static DEFINE_SEMAPHORE(sem_mutex);
+static int isTimerCancelled;
 
 static unsigned int interval;	/* seconds, 0 : no auto polling */
 static unsigned int trip_temp[10] = { 85000, 80000, 70000, 60000, 50000, 40000, 30000, 20000, 10000, 5000 };
@@ -118,6 +120,11 @@ static unsigned long get_tx_bytes(void)
 	}
 	read_unlock(&dev_base_lock);
 	return tx_bytes;
+}
+
+int tspa_get_MD_tx_tput(void)
+{
+	return tx_throughput;
 }
 
 static int pa_cal_stats(unsigned long data)
@@ -388,9 +395,6 @@ static int tspa_sysrst_get_cur_state(struct thermal_cooling_device *cdev, unsign
 
 static int tspa_sysrst_set_cur_state(struct thermal_cooling_device *cdev, unsigned long state)
 {
-#ifdef CONFIG_MTK_AEE_FEATURE
-	static int tspa_sysrst_triggered;
-#endif
 
 	cl_dev_sysrst_state = state;
 	if (cl_dev_sysrst_state == 1) {
@@ -399,18 +403,8 @@ static int tspa_sysrst_set_cur_state(struct thermal_cooling_device *cdev, unsign
 		pr_debug("*****************************************");
 		pr_debug("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 
-
-#if 0 /* Temp solution to catch MD log. */
 		/* To trigger data abort to reset the system for thermal protection. */
 		*(unsigned int *)0x0 = 0xdead;
-#else
-#ifdef CONFIG_MTK_AEE_FEATURE
-		if (tspa_sysrst_triggered == 0) {
-			aee_kernel_warning("tspa_sysrst", "RF HT, plz get MD log!");
-			tspa_sysrst_triggered = 1;
-		}
-#endif
-#endif
 	}
 	return 0;
 }
@@ -475,7 +469,7 @@ static ssize_t mtktspa_write(struct file *file, const char __user *buffer, size_
 
 	if (sscanf
 	    (ptr_mtktspa_data->desc,
-	     "%d %d %d %s %d %d %s %d %d %s %d %d %s %d %d %s %d %d %s %d %d %s %d %d %s %d %d %s %d %d %s %d",
+	     "%d %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d %d %19s %d",
 	     &num_trip, &ptr_mtktspa_data->trip[0], &ptr_mtktspa_data->t_type[0], ptr_mtktspa_data->bind0,
 	     &ptr_mtktspa_data->trip[1], &ptr_mtktspa_data->t_type[1], ptr_mtktspa_data->bind1,
 	     &ptr_mtktspa_data->trip[2], &ptr_mtktspa_data->t_type[2], ptr_mtktspa_data->bind2,
@@ -487,6 +481,7 @@ static ssize_t mtktspa_write(struct file *file, const char __user *buffer, size_
 	     &ptr_mtktspa_data->trip[8], &ptr_mtktspa_data->t_type[8], ptr_mtktspa_data->bind8,
 	     &ptr_mtktspa_data->trip[9], &ptr_mtktspa_data->t_type[9], ptr_mtktspa_data->bind9,
 	     &ptr_mtktspa_data->time_msec) == 32) {
+		down(&sem_mutex);
 		mtktspa_dprintk("[mtktspa_write] mtktspa_unregister_thermal\n");
 		mtktspa_unregister_thermal();
 
@@ -497,6 +492,7 @@ static ssize_t mtktspa_write(struct file *file, const char __user *buffer, size_
 			#endif
 			mtktspa_dprintk("[mtktspa_write] bad argument\n");
 			kfree(ptr_mtktspa_data);
+			up(&sem_mutex);
 			return -EINVAL;
 		}
 
@@ -545,6 +541,7 @@ static ssize_t mtktspa_write(struct file *file, const char __user *buffer, size_
 
 		mtktspa_dprintk("[mtktspa_write] mtktspa_register_thermal\n");
 		mtktspa_register_thermal();
+		up(&sem_mutex);
 
 		kfree(ptr_mtktspa_data);
 		return count;
@@ -602,8 +599,15 @@ static void mtkts_pa_cancel_thermal_timer(void)
 	/* pr_debug("mtkts_pa_cancel_thermal_timer\n"); */
 
 	/* stop thermal framework polling when entering deep idle */
-	if (thz_dev)
+	if (down_trylock(&sem_mutex))
+		return;
+
+	if (thz_dev) {
 		cancel_delayed_work(&(thz_dev->poll_queue));
+		isTimerCancelled = 1;
+	}
+
+	up(&sem_mutex);
 }
 
 
@@ -611,8 +615,20 @@ static void mtkts_pa_start_thermal_timer(void)
 {
 	/* pr_debug("mtkts_pa_start_thermal_timer\n"); */
 	/* resume thermal framework polling when leaving deep idle */
+
+	if (!isTimerCancelled)
+		return;
+
+	isTimerCancelled = 0;
+
+	if (down_trylock(&sem_mutex))
+		return;
+
 	if (thz_dev != NULL && interval != 0)
-		mod_delayed_work(system_freezable_wq, &(thz_dev->poll_queue), round_jiffies(msecs_to_jiffies(3000)));
+		mod_delayed_work(system_freezable_power_efficient_wq,
+				&(thz_dev->poll_queue), round_jiffies(msecs_to_jiffies(3000)));
+
+	up(&sem_mutex);
 }
 
 

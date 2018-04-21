@@ -5,10 +5,14 @@
  *  Copyright (C) 2015 Richtek Technology Corp.
  *  cy_huang <cy_huang@richtek.com>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License version 2 as
+ *  published by the Free Software Foundation.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *  See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
 #ifndef __RT5509_H
@@ -18,7 +22,7 @@
 #include <mt-plat/rt-regmap.h>
 
 #define RT5509_DEVICE_NAME		"rt5509"
-#define RT5509_DRV_VER			"1.0.8_M"
+#define RT5509_DRV_VER			"1.0.12_M"
 
 #ifdef CONFIG_RT_REGMAP
 #define RT5509_SIMULATE_DEVICE	0
@@ -58,13 +62,30 @@ struct rt5509_pdata {
 	struct rt5509_proprietary_param *p_param;
 };
 
+struct rt5509_calib_classdev {
+	struct device *dev;
+	uint32_t n20db;
+	uint32_t n15db;
+	uint32_t n10db;
+	uint32_t gsense_otp;
+	uint32_t rspk;
+	uint32_t dcr_offset;
+	uint32_t rapp;
+	int32_t rspkmin;
+	int32_t rspkmax;
+	int32_t alphaspk;
+	int (*trigger_read)(struct rt5509_calib_classdev *);
+	int (*trigger_write)(struct rt5509_calib_classdev *);
+	int (*trigger_calculation)(struct rt5509_calib_classdev *);
+};
+
 struct rt5509_chip {
 	struct i2c_client *i2c;
 	struct device *dev;
 	struct rt5509_pdata *pdata;
 	struct snd_soc_codec *codec;
 	struct platform_device *pdev;
-	struct proc_dir_entry *root_entry;
+	struct rt5509_calib_classdev calib_dev;
 	struct rt_regmap_device *rd;
 #if RT5509_SIMULATE_DEVICE
 	void *sim;
@@ -75,15 +96,19 @@ struct rt5509_chip {
 	u8 mode_store;
 	u8 func_en;
 	u8 spk_prot_en;
+	u8 alc_gain;
 	u8 alc_min_gain;
+	u8 classd_gain_store;
+	u8 pgain_gain_store;
+	u8 sig_gain_store;
+	u16 sig_max_store;
+	u16 pilot_freq;
 	u8 recv_spec_set:1;
 	u8 bypass_dsp:1;
 	u8 calibrated:1;
 	u8 tdm_mode:1;
 	u8 rlr_func:1;
 	int dev_cnt;
-	int calib_start;
-	int param_put;
 };
 
 /* RT5509_REGISTER_LIST */
@@ -262,6 +287,7 @@ struct rt5509_chip {
 #define RT5509_REG_ECO_CTRL		0xB5
 #define RT5509_REG_BSTTM		0xB8
 #define RT5509_REG_ALCMINGAIN		0xB9
+#define RT5509_REG_RESVECO0		0xBA
 #define RT5509_REG_OTPCONF		0xC0
 #define RT5509_REG_OTPADDR		0xC1
 #define RT5509_REG_OTPDIN		0xC2

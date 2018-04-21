@@ -36,8 +36,13 @@
 #define FT_GESTRUE_MODE_SWITCH_REG 0xD0
 #define FT_GESTRUE_GETID_REG 0xD3
 
+#ifdef CONFIG_TOUCHSCREEN_FT5X26_WUXGA
+#define TPD_RES_X		1200
+#define TPD_RES_Y		1920
+#else
 #define TPD_RES_X		800
 #define TPD_RES_Y		1280
+#endif
 
 /* #define CONFIG_TPD_HAVE_CALIBRATION */
 /* #define TPD_CALIBRATION_MATRIX	{962, 0, 0, 0, 1600, 0, 0, 0}; */
@@ -47,28 +52,6 @@
 #define TPD_CALIBRATION_MATRIX_ROTATION_FACTORY {-4096, 0, 800*4096, 0, -4096, 1280*4096, 0, 0}
 /* #define TPD_CALIBRATION_MATRIX_ROTATION_NORMAL  {-5328, 0, 800*4096, 0, 4096, 0, 0, 0}; */
 /* #define TPD_CALIBRATION_MATRIX_ROTATION_FACTORY  {-5328, 0, 800*4096, 0, 4096, 0, 0, 0}; */
-
-
-/*
-#define FTP_DEBUG_ON                   0
-#define FTP_ERROR(fmt,arg...)          dprintf(CRITICAL,"<FTP-ERR>"fmt"\n", ##arg)
-#define FTP_INFO(fmt,arg...)           dprintf(CRITICAL,"<FTP-INF>"fmt"\n", ##arg)
-
-#if FTP_DEBUG_ON
-#define FTP_DEBUG(fmt,arg...)          do{\
-					 dprintf(CRITICAL,"<FTP-DBG>"fmt"\n", ##arg);\
-				       }while(0)
-#else
-#define FTP_DEBUG(fmt,arg...)
-#endif
-*/
-#define FTS_DBG
-#ifdef FTS_DBG
-#define DBG(fmt, args...)				printk("[FTS]" fmt, ## args)
-#else
-#define DBG(fmt, args...)				do {} while (0)
-#endif
-
 
 typedef void (*GES_CBFUNC)(u8);
 /*****************************************************************************

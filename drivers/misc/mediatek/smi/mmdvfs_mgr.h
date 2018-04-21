@@ -14,6 +14,7 @@
 #ifndef __MMDVFS_MGR_H__
 #define __MMDVFS_MGR_H__
 
+#include <linux/plist.h>
 #include <aee.h>
 #include "mtk_smi.h"
 
@@ -24,10 +25,10 @@
 #define _GET_BITS_VAL_(_bits_, _val_) (((_val_) & (_BITMASK_(_bits_))) >> ((0) ? _bits_))
 
 /* MMDVFS extern APIs */
-extern void mmdvfs_init(MTK_SMI_BWC_MM_INFO *info);
-extern void mmdvfs_handle_cmd(MTK_MMDVFS_CMD *cmd);
-extern void mmdvfs_notify_scenario_enter(MTK_SMI_BWC_SCEN scen);
-extern void mmdvfs_notify_scenario_exit(MTK_SMI_BWC_SCEN scen);
+extern void mmdvfs_init(struct MTK_SMI_BWC_MM_INFO *info);
+extern void mmdvfs_handle_cmd(struct MTK_MMDVFS_CMD *cmd);
+extern void mmdvfs_notify_scenario_enter(enum MTK_SMI_BWC_SCEN scen);
+extern void mmdvfs_notify_scenario_exit(enum MTK_SMI_BWC_SCEN scen);
 extern void mmdvfs_notify_scenario_concurrency(unsigned int u4Concurrency);
 extern void mmdvfs_mhl_enable(int enable);
 extern void mmdvfs_mjc_enable(int enable);
@@ -49,19 +50,28 @@ extern unsigned int DISP_GetScreenHeight(void);
 
 enum {
 	MMDVFS_CAM_MON_SCEN = SMI_BWC_SCEN_CNT, MMDVFS_SCEN_MHL, MMDVFS_SCEN_MJC, MMDVFS_SCEN_DISP,
-	MMDVFS_SCEN_ISP, MMDVFS_SCEN_VP_HIGH_RESOLUTION, MMDVFS_SCEN_VPU, MMDVFS_MGR, MMDVFS_SCEN_COUNT
+	MMDVFS_SCEN_ISP, MMDVFS_SCEN_VP_HIGH_RESOLUTION, MMDVFS_SCEN_VPU, MMDVFS_MGR,
+	MMDVFS_SCEN_VPU_KERNEL, MMDVFS_PMQOS_ISP, MMDVFS_SCEN_VP_WFD, MMDVFS_SCEN_COUNT
 };
+
+#define LEGACY_CAM_SCENS ((1 << SMI_BWC_SCEN_VR) | \
+	(1 << SMI_BWC_SCEN_VR_SLOW) |	\
+	(1 << SMI_BWC_SCEN_VSS) |	\
+	(1 << SMI_BWC_SCEN_CAM_PV) |	\
+	(1 << SMI_BWC_SCEN_CAM_CP) |	\
+	(1 << SMI_BWC_SCEN_ICFP) |	\
+	(1 << MMDVFS_SCEN_ISP))
 
 enum mmdvfs_vpu_clk {
 		vpu_clk_0, vpu_clk_1, vpu_clk_2, vpu_clk_3
 };
 
 enum mmdvfs_vpu_if_clk {
-		vpu_if_clk_0, vpu_if_clk_1,	vpu_if_clk_2,	vpu_if_clk_3
+		vpu_if_clk_0, vpu_if_clk_1, vpu_if_clk_2, vpu_if_clk_3
 };
 
 enum mmdvfs_vimvo_vol {
-		vimvo_vol_0, vimvo_vol_1,	vimvo_vol_2,	vimvo_vol_3
+		vimvo_vol_0, vimvo_vol_1, vimvo_vol_2, vimvo_vol_3
 };
 
 
@@ -75,6 +85,13 @@ struct mmdvfs_state_change_event {
 	int vpu_clk_step;
 	int vpu_if_clk_step;
 	int vimvo_vol_step;
+};
+
+
+struct mmdvfs_pm_qos_request {
+	struct plist_node node;   /* reserved for QoS function */
+	int pm_qos_class;
+	struct delayed_work work; /* reserved for timeout handling */
 };
 
 #define MMDVFS_EVENT_PREPARE_CALIBRATION_START 0
@@ -100,7 +117,7 @@ extern void dump_mmdvfs_info(void);
 
 
 /* Extern from other module */
-extern MTK_SMI_BWC_SCEN smi_get_current_profile(void);
+extern enum MTK_SMI_BWC_SCEN smi_get_current_profile(void);
 extern int is_mmdvfs_freq_hopping_disabled(void);
 extern int is_mmdvfs_freq_mux_disabled(void);
 extern int is_force_max_mmsys_clk(void);
@@ -150,13 +167,21 @@ extern int primary_display_switch_mode_for_mmdvfs(int sess_mode, unsigned int se
 #define MMDVFS_PROFILE_D2_P_PLUS (7)
 #define MMDVFS_PROFILE_D3 (8)
 #define MMDVFS_PROFILE_E1 (9)
+#define MMDVFS_PROFILE_WHY (10)
+#define MMDVFS_PROFILE_WHY2 (11)
+#define MMDVFS_PROFILE_ALA (12)
+#define MMDVFS_PROFILE_BIA (13)
+#define MMDVFS_PROFILE_VIN (14)
+#define MMDVFS_PROFILE_ZIO (15)
+#define MMDVFS_PROFILE_SYL (16)
+#define MMDVFS_PROFILE_CAN (17)
 
 /* Macro used to resovling step setting ioctl command */
 #define MMDVFS_IOCTL_CMD_STEP_FIELD_LEN (8)
 #define MMDVFS_IOCTL_CMD_STEP_FIELD_MASK (0xFF)
 #define MMDVFS_IOCTL_CMD_MMCLK_FIELD_MASK (0xFF00)
 #define MMDVFS_IOCTL_CMD_DDR_TYPE_AUTO_SELECT (0xFF)
-
+#define MMDVFS_IOCTL_CMD_VPU_STEP_UNREQUEST (0xFFFF)
 
 
 /* Backward compatible */
@@ -166,23 +191,23 @@ extern int primary_display_switch_mode_for_mmdvfs(int sess_mode, unsigned int se
 #define MMDVFS_DISPLAY_SIZE_HD  (1280 * 832)
 #define MMDVFS_DISPLAY_SIZE_FHD (1920 * 1216)
 
-typedef enum {
+enum mmdvfs_lcd_size_enum {
 	MMDVFS_LCD_SIZE_HD, MMDVFS_LCD_SIZE_FHD, MMDVFS_LCD_SIZE_WQHD, MMDVFS_LCD_SIZE_END_OF_ENUM
-} mmdvfs_lcd_size_enum;
+};
 
 
 #ifndef CONFIG_MTK_SMI_EXT
 #define mmdvfs_set_step(scenario, step)
 #define mmdvfs_set_fine_step(scenario, step)
 #else
-int mmdvfs_set_step(MTK_SMI_BWC_SCEN scenario, mmdvfs_voltage_enum step);
-int mmdvfs_set_fine_step(MTK_SMI_BWC_SCEN smi_scenario, int mmdvfs_fine_step);
+int mmdvfs_set_step(enum MTK_SMI_BWC_SCEN scenario, enum mmdvfs_voltage_enum step);
+int mmdvfs_set_fine_step(enum MTK_SMI_BWC_SCEN smi_scenario, int mmdvfs_fine_step);
 #endif /* CONFIG_MTK_SMI_EXT */
 
 extern int mmdvfs_get_mmdvfs_profile(void);
 extern int is_mmdvfs_supported(void);
-extern int mmdvfs_set_mmsys_clk(MTK_SMI_BWC_SCEN scenario, int mmsys_clk_mode);
-extern mmdvfs_lcd_size_enum mmdvfs_get_lcd_resolution(void);
+extern int mmdvfs_set_mmsys_clk(enum MTK_SMI_BWC_SCEN scenario, int mmsys_clk_mode);
+extern enum mmdvfs_lcd_size_enum mmdvfs_get_lcd_resolution(void);
 extern int register_mmdvfs_state_change_cb(int mmdvfs_client_id, mmdvfs_state_change_cb func);
 extern void mmdvfs_notify_prepare_action(struct mmdvfs_prepare_action_event *event);
 extern int register_mmdvfs_prepare_cb(int mmdvfs_client_id, mmdvfs_prepare_action_cb func);
@@ -193,6 +218,17 @@ extern void mmdvfs_default_step_set(int default_step);
 extern void mmdvfs_default_start_delayed_setting(void);
 extern void mmdvfs_default_stop_delayed_setting(void);
 extern void mmdvfs_debug_set_mmdvfs_clks_enabled(int clk_enable_request);
+extern int mmdvfs_get_current_fine_step(void);
+
+
+extern void mmdvfs_pm_qos_update_request(struct mmdvfs_pm_qos_request *req,
+u32 mmdvfs_pm_qos_class, u32 new_value);
+extern void mmdvfs_pm_qos_remove_request(struct mmdvfs_pm_qos_request *req);
+extern void mmdvfs_pm_qos_add_request(struct mmdvfs_pm_qos_request *req,
+u32 mmdvfs_pm_qos_class, u32 value);
+extern u32 mmdvfs_qos_get_thres_count(struct mmdvfs_pm_qos_request *req, u32 mmdvfs_pm_qos_class);
+extern u32 mmdvfs_qos_get_thres_value(struct mmdvfs_pm_qos_request *req, u32 mmdvfs_pm_qos_class, u32 thres_idx);
+extern u32 mmdvfs_qos_get_cur_thres(struct mmdvfs_pm_qos_request *req, u32 mmdvfs_pm_qos_class);
 
 #include "mmdvfs_config_util.h"
 

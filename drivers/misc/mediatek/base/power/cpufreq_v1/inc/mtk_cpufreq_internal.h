@@ -1,27 +1,18 @@
 /*
- * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2016 MediaTek Inc.
  *
- * This program is free software: you can redistribute it and/or modify
+ * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
-/*
- * @file mt_cpufreq_internal.h
- * @brief CPU DVFS driver interface
- */
-
-#ifndef __MT_CPUFREQ_INTERNAL_H__
-#define __MT_CPUFREQ_INTERNAL_H__
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef __MTK_CPUFREQ_INTERNAL_H__
+#define __MTK_CPUFREQ_INTERNAL_H__
 
 /* system includes */
 #include <linux/kernel.h>
@@ -60,12 +51,6 @@ extern "C" {
 #include "mach/mtk_cpufreq_api.h"
 #include "mtk_cpufreq_config.h"
 #include "mtk_cpufreq_struct.h"
-
-#define CPU_LEVEL_0             (0x0)
-#define CPU_LEVEL_1             (0x1)
-#define CPU_LEVEL_2             (0x2)
-#define CPU_LEVEL_3             (0x3)
-#define CPU_LV_TO_OPP_IDX(lv)   ((lv))	/* cpu_level to opp_idx */
 
 #define MAX(a, b) ((a) >= (b) ? (a) : (b))
 #define MIN(a, b) ((a) >= (b) ? (b) : (a))
@@ -106,22 +91,26 @@ extern struct mutex cpufreq_para_mutex;
 /* Debugging */
 extern unsigned int func_lv_mask;
 #define DEBUG 1
-#undef TAG
-#define TAG     "[Power/cpufreq] "
 
-#define cpufreq_err(fmt, args...)		\
-	pr_err(TAG"[ERROR]"fmt, ##args)
-#define cpufreq_warn(fmt, args...)		\
-	pr_warn(TAG"[WARNING]"fmt, ##args)
-#define cpufreq_info(fmt, args...)		\
-	pr_warn(TAG""fmt, ##args)
-#define cpufreq_dbg(fmt, args...)		\
-	pr_debug(TAG""fmt, ##args)
+#define TAG	"[Power/cpufreq] "
+#define tag_pr_err(fmt, args...)	pr_err(TAG fmt, ##args)
+#define tag_pr_notice(fmt, args...)	pr_notice(TAG fmt, ##args)
+#define tag_pr_info(fmt, args...)	pr_info(TAG fmt, ##args)
+#define tag_pr_debug(fmt, args...)	pr_debug(TAG fmt, ##args)
+
 #define cpufreq_ver(fmt, args...)		\
-	do {					\
-		if (func_lv_mask)		\
-			cpufreq_info(TAG""fmt, ##args);	\
-	} while (0)
+do {						\
+	if (func_lv_mask)			\
+		tag_pr_info(fmt, ##args);	\
+} while (0)
+
+#define GEN_DB_ON(condition, fmt, args...)			\
+({								\
+	int _r = !!(condition);					\
+	if (unlikely(_r))					\
+		aee_kernel_exception("CPUDVFS", fmt, ##args);	\
+	unlikely(_r);						\
+})
 
 #define FUNC_LV_MODULE         BIT(0)  /* module, platform driver interface */
 #define FUNC_LV_CPUFREQ        BIT(1)  /* cpufreq driver interface          */
@@ -136,9 +125,9 @@ extern unsigned int func_lv_mask;
 */
 #ifdef CONFIG_CPU_DVFS_SHOWLOG
 #define FUNC_ENTER(lv) \
-	do { if ((lv) & func_lv_mask) cpufreq_dbg(">> %s()\n", __func__); } while (0)
+	do { if ((lv) & func_lv_mask) tag_pr_debug(">> %s()\n", __func__); } while (0)
 #define FUNC_EXIT(lv) \
-	do { if ((lv) & func_lv_mask) cpufreq_dbg("<< %s():%d\n", __func__, __LINE__); } while (0)
+	do { if ((lv) & func_lv_mask) tag_pr_debug("<< %s():%d\n", __func__, __LINE__); } while (0)
 #else
 #define FUNC_ENTER(lv)
 #define FUNC_EXIT(lv)
@@ -173,6 +162,7 @@ static const struct file_operations name ## _proc_fops = {		\
 }
 
 #define PROC_ENTRY(name)	{__stringify(name), &name ## _proc_fops}
+#define PROC_ENTRY_DATA(name)	{__stringify(name), &name ## _proc_fops, g_ ## name}
 
 /*
  * BIT Operation
@@ -190,6 +180,8 @@ static const struct file_operations name ## _proc_fops = {		\
 #define cpufreq_write(addr, val)            mt_reg_sync_writel((val), ((void *)addr))
 #define cpufreq_write_mask(addr, mask, val) \
 cpufreq_write(addr, (cpufreq_read(addr) & ~(_BITMASK_(mask))) | _BITS_(mask, val))
+
+extern struct mt_cpu_dvfs cpu_dvfs[NR_MT_CPU_DVFS];
 
 #define for_each_cpu_dvfs(i, p)			for (i = 0, p = cpu_dvfs; i < NR_MT_CPU_DVFS; i++, p = &cpu_dvfs[i])
 #define for_each_cpu_dvfs_only(i, p)	\
@@ -209,17 +201,6 @@ cpufreq_write(addr, (cpufreq_read(addr) & ~(_BITMASK_(mask))) | _BITS_(mask, val
 #define cpu_dvfs_get_cur_volt(p)				(p->opp_tbl[p->idx_opp_tbl].cpufreq_volt)
 #define cpu_dvfs_get_volt_by_idx(p, idx)		(p->opp_tbl[idx].cpufreq_volt)
 
-/* Table Define */
-#define FP(pos, clk) { \
-	.pos_div = pos,			\
-	.clk_div = clk,			\
-}
-
-struct mt_cpu_freq_method {
-	const char pos_div;
-	const char clk_div;
-};
-
 struct opp_idx_tbl {
 	struct mt_cpu_dvfs *p;
 	struct mt_cpu_freq_method *slot;
@@ -230,25 +211,6 @@ enum opp_idx_type {
 		TARGET_OPP_IDX = 1,
 
 		NR_OPP_IDX,
-};
-
-#define OP(khz, volt) {            \
-	.cpufreq_khz = khz,             \
-	.cpufreq_volt = volt,           \
-}
-
-struct mt_cpu_freq_info {
-	const unsigned int cpufreq_khz;
-	unsigned int cpufreq_volt;
-};
-
-struct opp_tbl_info {
-	struct mt_cpu_freq_info *const opp_tbl;
-	const int size;
-};
-
-struct opp_tbl_m_info {
-	struct mt_cpu_freq_method *const opp_tbl_m;
 };
 
 enum mt_cpu_dvfs_action_id {
@@ -299,27 +261,18 @@ extern void _mt_cpufreq_dvfs_request_wrapper(struct mt_cpu_dvfs *p, int new_opp_
 extern int set_cur_volt_wrapper(struct mt_cpu_dvfs *p, unsigned int volt);
 extern void set_cur_freq_wrapper(struct mt_cpu_dvfs *p, unsigned int cur_khz, unsigned int target_khz);
 
-extern struct buck_ctrl_t buck_ctrl[NR_MT_BUCK];
-extern struct pll_ctrl_t pll_ctrl[NR_MT_PLL];
-extern struct hp_action_tbl cpu_dvfs_hp_action[16];
-extern struct mt_cpu_dvfs cpu_dvfs[NR_MT_CPU_DVFS];
 extern struct mt_cpu_dvfs *id_to_cpu_dvfs(enum mt_cpu_dvfs_id id);
 extern struct buck_ctrl_t *id_to_buck_ctrl(enum mt_cpu_dvfs_buck_id id);
 extern struct pll_ctrl_t *id_to_pll_ctrl(enum mt_cpu_dvfs_pll_id id);
-extern struct regulator *regulator_proc2;
 
-extern unsigned int _mt_cpufreq_get_cpu_level(void);
 extern u32 get_devinfo_with_index(u32 index);
 extern int turbo_flag;
 
 extern void _kick_PBM_by_cpu(void);
 extern unsigned int dvfs_power_mode;
+extern unsigned int sched_dvfs_enable;
 extern unsigned int do_dvfs_stress_test;
 extern int dvfs_disable_flag;
-extern int release_dvfs;
-extern int thres_ll;
-extern int thres_l;
-extern int thres_b;
 extern ktime_t now[NR_SET_V_F];
 extern ktime_t delta[NR_SET_V_F];
 extern ktime_t max[NR_SET_V_F];
@@ -329,28 +282,22 @@ extern int is_in_suspend(void);
 
 extern int cpufreq_procfs_init(void);
 extern char *_copy_from_user_for_proc(const char __user *buffer, size_t count);
-extern void _mt_cpufreq_aee_init(void);
 
-/* #ifdef CONFIG_CPU_DVFS_AEE_RR_REC */
-#if 1
 /* SRAM debugging*/
 extern void aee_rr_rec_cpu_dvfs_vproc_big(u8 val);
 extern void aee_rr_rec_cpu_dvfs_vproc_little(u8 val);
 extern void aee_rr_rec_cpu_dvfs_oppidx(u8 val);
-extern u8 aee_rr_curr_cpu_dvfs_oppidx(void);
 extern void aee_rr_rec_cpu_dvfs_cci_oppidx(u8 val);
-extern u8 aee_rr_curr_cpu_dvfs_cci_oppidx(void);
 extern void aee_rr_rec_cpu_dvfs_status(u8 val);
-extern u8 aee_rr_curr_cpu_dvfs_status(void);
 extern void aee_rr_rec_cpu_dvfs_step(u8 val);
-extern u8 aee_rr_curr_cpu_dvfs_step(void);
 extern void aee_rr_rec_cpu_dvfs_cb(u8 val);
-extern u8 aee_rr_curr_cpu_dvfs_cb(void);
 extern void aee_rr_rec_cpufreq_cb(u8 val);
-extern u8 aee_rr_curr_cpufreq_cb(void);
-#endif
 
-#ifdef __cplusplus
-}
-#endif
-#endif
+extern u8 aee_rr_curr_cpu_dvfs_oppidx(void);
+extern u8 aee_rr_curr_cpu_dvfs_cci_oppidx(void);
+extern u8 aee_rr_curr_cpu_dvfs_status(void);
+extern u8 aee_rr_curr_cpu_dvfs_step(void);
+extern u8 aee_rr_curr_cpu_dvfs_cb(void);
+extern u8 aee_rr_curr_cpufreq_cb(void);
+
+#endif	/* __MTK_CPUFREQ_INTERNAL_H__ */

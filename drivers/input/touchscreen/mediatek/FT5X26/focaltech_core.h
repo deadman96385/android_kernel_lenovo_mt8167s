@@ -73,7 +73,7 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/mount.h>
 #include <linux/unistd.h>
 #include <linux/proc_fs.h>
@@ -87,29 +87,22 @@
 /**********************Custom define begin**********************************************/
 
 
-#if (KERNEL_VERSION(3, 8, 0) < LINUX_VERSION_CODE)
 #if defined(MODULE) || defined(CONFIG_HOTPLUG)
 #define __devexit_p(x)				x
 #else
 #define __devexit_p(x)				NULL
 #endif
-/* Used for HOTPLUG */
-#define __devinit					__section(.devinit.text) __cold notrace
-#define __devinitdata				__section(.devinit.data)
-#define __devinitconst				__section(.devinit.rodata)
-#define __devexit					__section(.devexit.text) __exitused __cold notrace
-#define __devexitdata				__section(.devexit.data)
-#define __devexitconst				__section(.devexit.rodata)
-#endif
 
 
 #define TPD_POWER_SOURCE_CUSTOM				MT6323_POWER_LDO_VGP1
-#define IIC_PORT							0				/* MT6572: 1  MT6589:0 , Based on the I2C index you choose for TPM */
-#define TPD_HAVE_BUTTON									/* if have virtual key,need define the MACRO */
-#define TPD_BUTTON_HEIGH				(40)			/* 100 */
-#define TPD_KEY_COUNT				3				/* 4 */
-#define TPD_KEYS					{ KEY_MENU, KEY_HOMEPAGE, KEY_BACK}
-#define TPD_KEYS_DIM				{{80, 900, 20, TPD_BUTTON_HEIGH}, {240, 900, 20, TPD_BUTTON_HEIGH}, {400, 900, 20, TPD_BUTTON_HEIGH} }
+#define IIC_PORT		0	/* MT6572: 1  MT6589:0 , Based on the I2C index you choose for TPM */
+#define TPD_HAVE_BUTTON		/*if have virtual key,need define the MACRO*/
+#define TPD_BUTTON_HEIGH				(40) /* 100 */
+#define TPD_KEY_COUNT				3 /* 4 */
+#define TPD_KEYS					{KEY_MENU, KEY_HOMEPAGE, KEY_BACK}
+#define TPD_KEYS_DIM		{{80, 900, 20, TPD_BUTTON_HEIGH}, \
+								{240, 900, 20, TPD_BUTTON_HEIGH}, \
+								{400, 900, 20, TPD_BUTTON_HEIGH} }
 #define FT_ESD_PROTECT					0
 /*********************Custom Define end*************************************************/
 #define MT_PROTOCOL_B
@@ -143,7 +136,7 @@
 #define TPD_DELAY					(2*HZ/100)
 /* #define TPD_RES_X					1080//480 */
 /* #define TPD_RES_Y					1280//800 */
-#define TPD_CALIBRATION_MATRIX			{962, 0, 0, 0, 1600, 0, 0, 0};
+#define TPD_CALIBRATION_MATRIX			{962, 0, 0, 0, 1600, 0, 0, 0}
 #define FT_PROXIMITY_ENABLE					0
 /* #define TPD_AUTO_UPGRADE */
 /* #define TPD_HAVE_CALIBRATION */
@@ -151,13 +144,13 @@
 /* #define TPD_CLOSE_POWER_IN_SLEEP */
 /******************************************************************************/
 /* Chip Device Type */
-#define IC_FT5X06							0				/* x=2,3,4 */
-#define IC_FT5606							1				/* ft5506/FT5606/FT5816 */
-#define IC_FT5316							2				/* ft5x16 */
-#define IC_FT6208							3				/* ft6208 */
-#define IC_FT6x06						4				/* ft6206/FT6306 */
-#define IC_FT5x06i						5				/* ft5306i */
-#define IC_FT5x36						6				/* ft5336/ft5436/FT5436i */
+#define IC_FT5X06		0 /* x=2,3,4 */
+#define IC_FT5606		1 /* ft5506/FT5606/FT5816 */
+#define IC_FT5316		2 /* ft5x16 */
+#define IC_FT6208		3 /* ft6208 */
+#define IC_FT6x06		4 /* ft6206/FT6306 */
+#define IC_FT5x06i	5 /* ft5306i */
+#define IC_FT5x36		6 /* ft5336/ft5436/FT5436i */
 
 
 
@@ -176,22 +169,23 @@
 #define FTS_GESTRUE_POINTS					255
 #define FTS_GESTRUE_POINTS_ONETIME		62
 #define FTS_GESTRUE_POINTS_HEADER			8
-#define FTS_GESTURE_OUTPUT_ADRESS			0xD3
+#define FTS_GESTURE_OUTPUT_ADDRESS			0xD3
 #define FTS_GESTURE_OUTPUT_UNIT_LENGTH		4
 
-/*#define KEY_GESTURE_U					KEY_U
-#define KEY_GESTURE_UP						KEY_UP
-#define KEY_GESTURE_DOWN					KEY_DOWN
-#define KEY_GESTURE_LEFT					KEY_LEFT
-#define KEY_GESTURE_RIGHT					KEY_RIGHT
-#define KEY_GESTURE_O						KEY_O
-#define KEY_GESTURE_E						KEY_E
-#define KEY_GESTURE_M						KEY_M
-#define KEY_GESTURE_L						KEY_L
-#define KEY_GESTURE_W						KEY_W
-#define KEY_GESTURE_S						KEY_S
-#define KEY_GESTURE_V						KEY_V
-#define KEY_GESTURE_Z						KEY_Z
+/*
+*#define KEY_GESTURE_U					KEY_U
+*#define KEY_GESTURE_UP						KEY_UP
+*#define KEY_GESTURE_DOWN					KEY_DOWN
+*#define KEY_GESTURE_LEFT					KEY_LEFT
+*#define KEY_GESTURE_RIGHT					KEY_RIGHT
+*#define KEY_GESTURE_O						KEY_O
+*#define KEY_GESTURE_E						KEY_E
+*#define KEY_GESTURE_M						KEY_M
+*#define KEY_GESTURE_L						KEY_L
+*#define KEY_GESTURE_W						KEY_W
+*#define KEY_GESTURE_S						KEY_S
+*#define KEY_GESTURE_V						KEY_V
+*#define KEY_GESTURE_Z						KEY_Z
 */
 #define GESTURE_LEFT						0x20
 #define GESTURE_RIGHT						0x21
@@ -270,7 +264,7 @@ struct fts_ts_data {
 /*******************************************************************************
 * Global variable or extern global variabls/functions
 *******************************************************************************/
-/* Function Switchs: define to open,  comment to close */
+/* Function Switches: define to open,  comment to close */
 #define FTS_GESTRUE_EN						0
 #define MTK_EN								1
 #define FTS_APK_DEBUG
@@ -326,17 +320,47 @@ extern void fts_reset_tp(int HighOrLow);
 extern int fts_create_sysfs(struct i2c_client *client);
 /* Apk and ADB functions */
 extern int fts_create_apk_debug_channel(struct i2c_client *client);
+extern u32 get_devinfo_with_index(u32 index);
+extern void fts_get_upgrade_array(void);
 
-
+#define AC_CHARGE_DETECT 1
+#if AC_CHARGE_DETECT
+extern bool upmu_is_chr_det(void);
+#endif
 /*******************************************************************************
 * Static function prototypes
 *******************************************************************************/
-/*#if	1
-#define FTS_DBG
-#ifdef FTS_DBG
-#define FTS_DBG(fmt, args...)				printk("[FTS]" fmt, ## args)
-#else
-#define FTS_DBG(fmt, args...)				do{}while(0)
+int fts_6x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int fts_6336GU_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int fts_6x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int fts_5x36_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int fts_5x06_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int fts_5x46_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int fts_5822_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int fts_5x26_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int fts_8606_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int fts_8606_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int fts_8716_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int fts_8716_writepram(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int fts_3x07_ctpm_fw_upgrade(struct i2c_client *client, u8 *pbt_buf, u32 dw_length);
+int hidi2c_to_stdi2c(struct i2c_client *client);
+
+#if USB_CHARGE_DETECT
+extern int FG_charging_status;
 #endif
-#endif*/
+/* #if FT_ESD_PROTECT */
+extern int apk_debug_flag;
+/* #endif */
+/*******************************************************************************
+* Static function prototypes
+*******************************************************************************/
+#define FTS_DBG_FEATURE
+#ifdef FTS_DBG_FEATURE
+#define FTS_DBG(fmt, args...)		\
+	pr_debug("[FTS] <-dbg-> [%04d] [@%s]" fmt, __LINE__, __func__, ##args)
+#else
+#define FTS_DBG(fmt, args...) do {} while (0)
+#endif
+#define FTS_ERR(fmt, args...)   \
+	pr_notice("[FTS] <-err->[%04d] [@%s]" fmt, __LINE__, __func__, ##args)
 #endif

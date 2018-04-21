@@ -17,6 +17,8 @@
 #include "mtk_spm_internal.h"
 #include "mtk_idle_internal.h"
 
+#define SPM_MCSODI_PROFILE_RATIO (0)
+#define SPM_ALLWFI_PROFILE_RATIO (0)
 #define SPM_MET_TAGGING  0
 #define IDLE_LOG_BUF_LEN 512
 
@@ -27,12 +29,12 @@
 #define APXGPT_SYS_TICKS_PER_US ((u32)(13))
 #define APXGPT_RTC_TICKS_PER_MS ((u32)(32))
 
-typedef struct mtk_idle_twam {
+struct mtk_idle_twam {
 	u32 event;
 	const char **str;
 	bool running;
 	bool speed_mode;
-} idle_twam_t, *p_idle_twam_t;
+};
 
 struct mtk_idle_buf {
 	char buf[IDLE_LOG_BUF_LEN];
@@ -42,14 +44,14 @@ struct mtk_idle_buf {
 #define reset_idle_buf(idle) ((idle).p_idx = (idle).buf)
 #define get_idle_buf(idle)   ((idle).buf)
 #define idle_buf_append(idle, fmt, args...) \
-	((idle).p_idx += snprintf((idle).p_idx, IDLE_LOG_BUF_LEN - strlen((idle).buf), fmt, ##args))
+	((idle).p_idx += scnprintf((idle).p_idx, IDLE_LOG_BUF_LEN - strlen((idle).buf), fmt, ##args))
 
 extern const char *reason_name[NR_REASONS];
 
 void mtk_idle_twam_callback(struct twam_sig *ts);
 void mtk_idle_twam_disable(void);
 void mtk_idle_twam_enable(u32 event);
-p_idle_twam_t mtk_idle_get_twam(void);
+struct mtk_idle_twam *mtk_idle_get_twam(void);
 
 void  dpidle_profile_time(int idx);
 void  soidle3_profile_time(int idx);

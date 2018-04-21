@@ -370,7 +370,7 @@ void m4u_test_ion(void)
 
 static int m4u_debug_set(void *data, u64 val)
 {
-	m4u_domain_t *domain = data;
+	struct m4u_domain *domain = data;
 
 	M4UMSG("m4u_debug_set:val=%llu\n", val);
 
@@ -506,13 +506,13 @@ static int m4u_debug_set(void *data, u64 val)
 	{
 		unsigned int mva;
 
-		mva = m4u_do_mva_alloc_fix(0x90000000, 0x10000000, NULL);
+		mva = m4u_do_mva_alloc_fix(0, 0x90000000, 0x10000000, NULL);
 		M4UINFO("mva alloc fix done:mva=0x%x\n", mva);
-		mva = m4u_do_mva_alloc_fix(0xb0000000, 0x10000000, NULL);
+		mva = m4u_do_mva_alloc_fix(0, 0xb0000000, 0x10000000, NULL);
 		M4UINFO("mva alloc fix done:mva=0x%x\n", mva);
-		mva = m4u_do_mva_alloc_fix(0xa0000000, 0x10000000, NULL);
+		mva = m4u_do_mva_alloc_fix(0, 0xa0000000, 0x10000000, NULL);
 		M4UINFO("mva alloc fix done:mva=0x%x\n", mva);
-		mva = m4u_do_mva_alloc_fix(0xa4000000, 0x10000000, NULL);
+		mva = m4u_do_mva_alloc_fix(0, 0xa4000000, 0x10000000, NULL);
 		M4UINFO("mva alloc fix done:mva=0x%x\n", mva);
 		m4u_mvaGraph_dump();
 		m4u_do_mva_free(0x90000000, 0x10000000);
@@ -543,11 +543,17 @@ static int m4u_debug_set(void *data, u64 val)
 		m4u_dump_pfh_tlb(0);
 		break;
 	case 18:
-		m4u_dump_main_tlb(1, 0);
+	{
+		if (TOTAL_M4U_NUM > 1)
+			m4u_dump_main_tlb(1, 0);
 		break;
+	}
 	case 19:
-		m4u_dump_pfh_tlb(1);
+	{
+		if (TOTAL_M4U_NUM > 1)
+			m4u_dump_pfh_tlb(1);
 		break;
+	}
 	case 20:
 	{
 		M4U_PORT_STRUCT rM4uPort;
@@ -586,6 +592,10 @@ static int m4u_debug_set(void *data, u64 val)
 		unsigned int *pSrc;
 
 		pSrc = vmalloc(128);
+		if (!pSrc) {
+			M4UMSG("vmalloc failed!\n");
+			return 0;
+		}
 		memset(pSrc, 55, 128);
 		m4u_cache_sync(NULL, 0, 0, 0, 0, M4U_CACHE_FLUSH_ALL);
 
@@ -831,7 +841,7 @@ static void m4u_test_end(int invalid_tlb)
 #endif
 
 #if (M4U_DVT != 0)
-static int __vCatchTranslationFault(m4u_domain_t *domain, unsigned int layer,
+static int __vCatchTranslationFault(struct m4u_domain *domain, unsigned int layer,
 				    unsigned int seed_mva)
 {
 	imu_pgd_t *pgd;
@@ -884,7 +894,7 @@ static int __vCatchTranslationFault(m4u_domain_t *domain, unsigned int layer,
 	return 0;
 }
 
-static int __vCatchInvalidPhyFault(m4u_domain_t *domain, int g4_mode, unsigned int seed_mva)
+static int __vCatchInvalidPhyFault(struct m4u_domain *domain, int g4_mode, unsigned int seed_mva)
 {
 	imu_pgd_t *pgd;
 	imu_pte_t *pte;
@@ -938,7 +948,7 @@ static int __vCatchInvalidPhyFault(m4u_domain_t *domain, int g4_mode, unsigned i
 #if (M4U_DVT != 0)
 static int m4u_test_set(void *data, u64 val)
 {
-	m4u_domain_t *domain = data;
+	struct m4u_domain *domain = data;
 
 	M4UMSG("m4u_test_set:val=%llu\n", val);
 
@@ -1336,8 +1346,8 @@ DEFINE_SIMPLE_ATTRIBUTE(m4u_log_level_fops, m4u_log_level_get, m4u_log_level_set
 
 static int m4u_debug_freemva_set(void *data, u64 val)
 {
-	m4u_domain_t *domain = data;
-	m4u_buf_info_t *pMvaInfo;
+	struct m4u_domain *domain = data;
+	struct m4u_buf_info *pMvaInfo;
 	unsigned int mva = (unsigned int)val;
 
 	M4UMSG("free mva: 0x%x\n", mva);
@@ -1449,7 +1459,7 @@ const struct file_operations m4u_debug_register_fops = {
 int m4u_debug_init(struct m4u_device *m4u_dev)
 {
 	struct dentry *debug_file;
-	m4u_domain_t *domain = m4u_get_domain_by_id(0);
+	struct m4u_domain *domain = m4u_get_domain_by_id(0);
 
 	m4u_dev->debug_root = debugfs_create_dir("m4u", NULL);
 

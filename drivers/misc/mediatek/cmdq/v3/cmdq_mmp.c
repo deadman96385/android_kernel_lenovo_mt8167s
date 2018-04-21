@@ -44,6 +44,8 @@ void cmdq_mmp_init(void)
 		    mmprofile_register_event(CMDQ_MMP_events.CMDQ, "alloc_task");
 		CMDQ_MMP_events.wait_task =
 		    mmprofile_register_event(CMDQ_MMP_events.CMDQ, "wait_task");
+		CMDQ_MMP_events.wait_task_done =
+		    mmprofile_register_event(CMDQ_MMP_events.CMDQ, "wait_task_done");
 		CMDQ_MMP_events.wait_thread =
 		    mmprofile_register_event(CMDQ_MMP_events.CMDQ, "wait_thread");
 		CMDQ_MMP_events.MDP_reset =
@@ -52,6 +54,8 @@ void cmdq_mmp_init(void)
 		    mmprofile_register_event(CMDQ_MMP_events.CMDQ, "thread_suspend");
 		CMDQ_MMP_events.thread_resume =
 		    mmprofile_register_event(CMDQ_MMP_events.CMDQ, "thread_resume");
+		CMDQ_MMP_events.alloc_buffer =
+		    mmprofile_register_event(CMDQ_MMP_events.CMDQ, "alloc_buffer");
 
 		mmprofile_enable_event_recursive(CMDQ_MMP_events.CMDQ, 1);
 	}

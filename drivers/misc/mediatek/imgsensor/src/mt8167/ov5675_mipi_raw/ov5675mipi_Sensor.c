@@ -1,3 +1,15 @@
+/*
+ * Copyright (C) 2015 MediaTek Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
 /*****************************************************************************
  *
  * Filename:
@@ -47,13 +59,15 @@
 #define LOG_INF(format, args...)	pr_info("[%s] " format, __func__, ##args)
 static DEFINE_SPINLOCK(imgsensor_drv_lock);
 
+static void capture_setting(kal_uint16 currefps);
+
 /* 30, 85, 120, 14 */
 #define SETTLE_DELAY 180
 
 static imgsensor_info_struct imgsensor_info = {
 	.sensor_id = OV5675MIPI_SENSOR_ID,	/* record sensor id defined in Kd_imgsensor.h */
 
-	.checksum_value = 0x523c51f6,	/* checksum value for Camera Auto Test */
+	.checksum_value = 0x4d88fa8d,	/*0x6252c5ee,  checksum value for Camera Auto Test */
 
 	.pre = {
 		.pclk = 45000000,	/* 45000000      //record different mode's pclk */
@@ -126,7 +140,7 @@ static imgsensor_info_struct imgsensor_info = {
 		       },
 	.margin = 4,		/* sensor framelength & shutter margin */
 	.min_shutter = 4,	/* min shutter */
-	.max_frame_length = 0x7fff,	/* max framelength by sensor register's limitation */
+	.max_frame_length = 0x7FFF,	/* max framelength by sensor register's limitation */
 	.ae_shut_delay_frame = 0,
 	.ae_sensor_gain_delay_frame = 0,
 	.ae_ispGain_delay_frame = 2,	/* isp gain delay frame for AE cycle */
@@ -134,8 +148,8 @@ static imgsensor_info_struct imgsensor_info = {
 	.ihdr_le_firstline = 0,	/* 1,le first ; 0, se first */
 	.sensor_mode_num = 5,	/* support sensor mode num */
 
+	.pre_delay_frame = 2,   /* enter preview delay frame num */
 	.cap_delay_frame = 2,	/* enter capture delay frame num */
-	.pre_delay_frame = 2,	/* enter preview delay frame num */
 	.video_delay_frame = 2,	/* enter video delay frame num */
 	.hs_video_delay_frame = 2,	/* enter high speed video  delay frame num */
 	.slim_video_delay_frame = 2,	/* enter slim video delay frame num */
@@ -211,7 +225,7 @@ static void set_max_framerate(UINT16 framerate, kal_bool min_framelength_en)
 	kal_uint32 frame_length = imgsensor.frame_length;
 	/* unsigned long flags; */
 
-	LOG_INF("framerate = %d, min framelength should enable = %d\n", framerate,
+	LOG_INF("framerate = %d, min framelength enable = %d\n", framerate,
 		min_framelength_en);
 
 	frame_length = imgsensor.pclk / framerate * 10 / imgsensor.line_length;
@@ -219,6 +233,11 @@ static void set_max_framerate(UINT16 framerate, kal_bool min_framelength_en)
 	imgsensor.frame_length =
 	    (frame_length > imgsensor.min_frame_length) ? frame_length : imgsensor.min_frame_length;
 	imgsensor.dummy_line = imgsensor.frame_length - imgsensor.min_frame_length;
+
+	LOG_INF("line = %d, frame = %d, dummy line:%d, max_framelen:%d\n",
+		imgsensor.line_length, imgsensor.frame_length,
+		imgsensor.dummy_line, imgsensor_info.max_frame_length);
+
 	/* dummy_line = frame_length - imgsensor.min_frame_length; */
 	/* if (dummy_line < 0) */
 	/* imgsensor.dummy_line = 0; */
@@ -645,9 +664,9 @@ static void sensor_init(void)
 	write_cmos_sensor(0x3c96, 0x00);
 	write_cmos_sensor(0x3d8c, 0x71);
 	write_cmos_sensor(0x3d8d, 0xE7);
-/* write_cmos_sensor(0x0100,0x01); */
+	write_cmos_sensor(0x0100, 0x00);
 
-	mDELAY(100);
+	mDELAY(10);
 
 
 	LOG_INF("OV5675_Sensor_Init_2lane down\n");
@@ -657,8 +676,7 @@ static void sensor_init(void)
 
 static void preview_setting(void)
 {
-	mDELAY(100);
-	write_cmos_sensor(0x0100, 0x01);
+	capture_setting(300);
 #if 0
 	LOG_INF(" OV5675PreviewSetting_2lane enter\n");
 
@@ -711,7 +729,7 @@ static void preview_setting(void)
 
 static void capture_setting(kal_uint16 currefps)
 {
-#if 0
+#if 1
 	LOG_INF("OV5675CaptureSetting_2lane enter! currefps:%d\n", currefps);
 	if (currefps == 150) {	/* 15fps for PIP */
 
@@ -787,12 +805,12 @@ static void capture_setting(kal_uint16 currefps)
 	}
 
 #endif
-
+	mDELAY(10);
 }
 
 static void normal_video_setting(kal_uint16 currefps)
 {
-#if 0
+#if 1
 	LOG_INF("normal_video_setting Enter! currefps:%d\n", currefps);
 	/* preview_setting(); */
 	capture_setting(currefps);
@@ -801,7 +819,7 @@ static void normal_video_setting(kal_uint16 currefps)
 
 static void hs_video_setting(void)
 {
-#if 0
+#if 1
 	LOG_INF("hs_video_setting enter!\n");
 
 /* VGA 120fps */
@@ -846,7 +864,7 @@ static void hs_video_setting(void)
 
 static void slim_video_setting(void)
 {
-#if 0
+#if 1
 	LOG_INF("slim_video_setting enter!\n");
 	preview_setting();
 #endif
@@ -1475,6 +1493,9 @@ static kal_uint32 get_default_framerate_by_scenario(MSDK_SCENARIO_ID_ENUM scenar
 						    MUINT32 *framerate)
 {
 	LOG_INF("scenario_id = %d\n", scenario_id);
+	if (framerate == NULL) {
+		return ERROR_NONE;
+	}
 
 	switch (scenario_id) {
 	case MSDK_SCENARIO_ID_CAMERA_PREVIEW:

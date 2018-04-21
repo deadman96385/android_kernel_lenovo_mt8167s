@@ -52,7 +52,7 @@ struct eth_dev {
 	spinlock_t		req_lock;	/* guard {tx}_reqs */
 	spinlock_t		reqrx_lock;	/* guard {rx}_reqs */
 	struct list_head	tx_reqs, rx_reqs;
-	unsigned		tx_qlen;
+	atomic_t		tx_qlen;
 /* Minimum number of TX USB request queued to UDC */
 #define TX_REQ_THRESHOLD	5
 	int			no_tx_req_used;
@@ -332,8 +332,6 @@ extern unsigned long rndis_test_tx_stop;
 extern unsigned long rndis_test_tx_usb_out;
 extern unsigned long rndis_test_tx_complete;
 
-#ifdef CONFIG_MTK_MD_DIRECT_TETHERING_SUPPORT
 extern void rx_fill(struct eth_dev *dev, gfp_t gfp_flags);
-#endif
 
 #endif /* __U_ETHER_H */

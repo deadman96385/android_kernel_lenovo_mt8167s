@@ -63,6 +63,7 @@ static struct mt6336_ctrl *core_ctrl;
 static bool first_connect = true;
 #endif
 
+static DEFINE_MUTEX(chrdet_lock);
 
 #if  defined(CONFIG_MTK_FPGA)
 /*****************************************************************************
@@ -140,7 +141,7 @@ static void hw_bc12_init(void)
 	bc12_set_register_value(MT6336_RG_A_BC12_IPD_EN, 0);
 	/* RG_A_BC12_IPD_HALF_EN = 0 */
 	bc12_set_register_value(MT6336_RG_A_BC12_IPD_HALF_EN, 0);
-#if defined(CONFIG_PROJECT_PHY)
+#if defined(CONFIG_PROJECT_PHY) || defined(CONFIG_PHY_MTK_SSUSB)
 	Charger_Detect_Init();
 #endif
 	/* VBUS asserted, wait > 300ms (min.) */
@@ -267,7 +268,7 @@ static unsigned int hw_bc12_step_2b1(void)
 	/* Latch output OUT1 */
 	wChargerAvail = bc12_get_register_value(MT6336_AD_QI_BC12_CMP_OUT);
 #if defined(__CHRDET_RG_DUMP__)
-	pr_err("%s(%d): %d", __func__, bc12_get_register_value(MT6336_PMIC_HWCID), wChargerAvail);
+	pr_err("%s(%d): %d\n", __func__, bc12_get_register_value(MT6336_PMIC_HWCID), wChargerAvail);
 #endif
 
 	/* Delay 10ms */
@@ -299,7 +300,7 @@ static unsigned int hw_bc12_step_2b2(void)
 	/* Latch output OUT2 */
 	wChargerAvail = bc12_get_register_value(MT6336_AD_QI_BC12_CMP_OUT);
 #if defined(__CHRDET_RG_DUMP__)
-	pr_err("%s(%d): %d", __func__, bc12_get_register_value(MT6336_PMIC_HWCID), wChargerAvail);
+	pr_err("%s(%d): %d\n", __func__, bc12_get_register_value(MT6336_PMIC_HWCID), wChargerAvail);
 #endif
 
 	/* Delay 10ms */
@@ -348,7 +349,7 @@ static unsigned int hw_bc12_step_3a(void)
 	 */
 	wChargerAvail = bc12_get_register_value(MT6336_AD_QI_BC12_CMP_OUT);
 #if defined(__CHRDET_RG_DUMP__)
-	pr_err("%s(%d): %d", __func__, bc12_get_register_value(MT6336_PMIC_HWCID), wChargerAvail);
+	pr_err("%s(%d): %d\n", __func__, bc12_get_register_value(MT6336_PMIC_HWCID), wChargerAvail);
 #endif
 
 	/* Delay 20ms */
@@ -383,7 +384,7 @@ static unsigned int hw_bc12_step_3b(void)
 	 */
 	wChargerAvail = bc12_get_register_value(MT6336_AD_QI_BC12_CMP_OUT);
 #if defined(__CHRDET_RG_DUMP__)
-	pr_err("%s(%d): %d", __func__, bc12_get_register_value(MT6336_PMIC_HWCID), wChargerAvail);
+	pr_err("%s(%d): %d\n", __func__, bc12_get_register_value(MT6336_PMIC_HWCID), wChargerAvail);
 #endif
 
 	/* Delay 10ms */
@@ -410,11 +411,14 @@ static unsigned int hw_bc12_step_4(void)
 	bc12_set_register_value(MT6336_RG_A_BC12_IPD_HALF_EN, 0);
 	/* Delay 10ms */
 	usleep_range(10000, 20000);
+	bc12_set_register_value(MT6336_RG_A_BC12_IPD_EN, 0);
+	/* Delay 10ms */
+	usleep_range(10000, 20000);
 
 	/* RGS_BC12_CMP_OUT */
-	wChargerAvail = bc12_set_register_value(MT6336_AD_QI_BC12_CMP_OUT, 0);
+	wChargerAvail = bc12_get_register_value(MT6336_AD_QI_BC12_CMP_OUT);
 #if defined(__CHRDET_RG_DUMP__)
-	pr_err("%s(%d): %d", __func__, bc12_get_register_value(MT6336_PMIC_HWCID), wChargerAvail);
+	pr_err("%s(%d): %d\n", __func__, bc12_get_register_value(MT6336_PMIC_HWCID), wChargerAvail);
 #endif
 
 	/* Delay 10ms */
@@ -426,7 +430,7 @@ static unsigned int hw_bc12_step_4(void)
 
 static void hw_bc12_done(void)
 {
-#if defined(CONFIG_PROJECT_PHY)
+#if defined(CONFIG_PROJECT_PHY) || defined(CONFIG_PHY_MTK_SSUSB)
 	Charger_Detect_Release();
 #endif
 	/* RG_BC12_BB_CTRL = 0 */
@@ -590,6 +594,7 @@ void do_charger_detect(void)
 
 	/* enable ctrl to lock power, keeping MT6336 in normal mode */
 	mt6336_ctrl_enable(core_ctrl);
+	mutex_lock(&chrdet_lock);
 
 	if (upmu_get_rgs_chrdet() == true) {
 		pr_err("charger IN\n");
@@ -614,6 +619,7 @@ void do_charger_detect(void)
 		power_supply_changed(g_mt_charger->usb_psy);
 	}
 
+	mutex_unlock(&chrdet_lock);
 	/* enter low power mode*/
 	mt6336_ctrl_disable(core_ctrl);
 }
@@ -748,7 +754,8 @@ static enum power_supply_property mt_usb_properties[] = {
 #ifdef __SW_CHRDET_IN_PROBE_PHASE__
 static void do_charger_detection_work(struct work_struct *data)
 {
-	do_charger_detect();
+	if (upmu_get_rgs_chrdet() == true)
+		do_charger_detect();
 }
 #endif
 
@@ -815,6 +822,7 @@ static int mt_charger_probe(struct platform_device *pdev)
 	device_init_wakeup(&pdev->dev, 1);
 
 	core_ctrl = mt6336_ctrl_get("mt6336_chrdet");
+	mutex_init(&chrdet_lock);
 
 #ifdef __SW_CHRDET_IN_PROBE_PHASE__
 	/* do charger detect here to prevent HW miss interrupt*/

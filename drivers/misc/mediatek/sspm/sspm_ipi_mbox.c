@@ -24,6 +24,7 @@
 #include "sspm_mbox.h"
 #include "sspm_ipi.h"
 #include "sspm_ipi_mbox.h"
+#define IPI_MONITOR
 #include "sspm_ipi_define.h"
 
 #define TIMEOUT_COMPLETE msecs_to_jiffies(2000)
@@ -44,25 +45,175 @@ u64 ipi_t5[IPI_TS_TEST_MAX];
 static int test_cnt;
 #endif
 
+#ifdef IPI_MONITOR
+#define IPI_MONITOR_TIMESTAMP
+struct ipi_monitor {
+	unsigned int has_time: 1,    /* 0: has no timestamp of t1/t2/t3 otherwise 1*/
+				 state   : 2,    /* 0: no IPI, 1: t1 finished, 2: t2 finished, 3: t3 finished */
+				 seqno   : 29;   /* count of the IPI pin used */
+#ifdef IPI_MONITOR_TIMESTAMP
+	unsigned long long t0;
+	unsigned long long t4;
+	unsigned long long t5;
+#endif /* IPI_MONITOR_TIMESTAMP */
+};
+static struct ipi_monitor ipimon[IPI_ID_TOTAL];
+static int ipi_last;
+static spinlock_t lock_monitor;
+#ifdef IPI_MONITOR_TIMESTAMP
+static int err_pin;
+static unsigned long long err_ts;
+#endif /* IPI_MONITOR_TIMESTAMP */
+
+
+static void ipi_monitor_dump_timeout(int mid, int opts)
+{
+	int i;
+	unsigned long flags = 0;
+
+	spin_lock_irqsave(&lock_monitor, flags);
+#ifdef IPI_MONITOR_TIMESTAMP
+	err_pin = -1;
+	err_ts = 0xffffffffffffffffLL;
+	for (i = 0; i < IPI_ID_TOTAL; i++) {
+		if ((ipimon[i].state == 1) || (ipimon[i].state == 2)) {
+			if (ipimon[i].t0 < err_ts) {
+				err_ts = ipimon[i].t0;
+				err_pin = i;
+			}
+		}
+	}
+	if (err_pin >= 0) {
+		pr_err("Error: possible error IPI %d pin=%s: t0=%lld\n",
+			   err_pin, pin_name[err_pin], err_ts);
+	}
+#endif /* IPI_MONITOR_TIMESTAMP */
+	pr_err("Error: IPI %d pin=%s mode=%d timeout at %lld (lastOK IPI=%d)\n",
+		   mid, pin_name[mid], opts, cpu_clock(0), ipi_last);
+#ifdef IPI_MONITOR_TIMESTAMP
+	for (i = 0; i < IPI_ID_TOTAL; i++) {
+		if ((ipimon[i].state == 0) || (ipimon[i].state == 3))
+			pr_err("IPI %d: seqno=%d, state=%d, t0=%lld, t4=%lld, t5=%lld\n",
+					i, ipimon[i].seqno, ipimon[i].state,
+					ipimon[i].t0, ipimon[i].t4, ipimon[i].t5);
+		else
+			pr_err("IPI %d: seqno=%d, state_err=%d, t0=%lld, t4=%lld, t5=%lld\n",
+					i, ipimon[i].seqno, ipimon[i].state,
+					ipimon[i].t0, ipimon[i].t4, ipimon[i].t5);
+	}
+#else
+	for (i = 0; i < IPI_ID_TOTAL; i++) {
+		if ((ipimon[i].state == 0) || (ipimon[i].state == 3))
+			pr_err("IPI %d: seqno=%d, state=%d\n",
+				   i, ipimon[i].seqno, ipimon[i].state);
+		else
+			pr_err("IPI %d: seqno=%d, state_err=%d\n",
+				   i, ipimon[i].seqno, ipimon[i].state);
+	}
+#endif /* IPI_MONITOR_TIMESTAMP */
+	spin_unlock_irqrestore(&lock_monitor, flags);
+	pr_err("Error: SSPM IPI=%d timeout\n", mid);
+
+	sspm_ipi_timeout_cb(mid);
+
+	BUG_ON(1);
+}
+#endif
+
+static void ipi_check_send(int mid)
+{
+#ifdef SSPM_STF_ENABLED
+	if (test_table[mid].data)
+		test_table[mid].start_us = (unsigned int)(cpu_clock(0)/1000);
+#endif /* SSPM_STF_ENABLED */
+#ifdef GET_IPI_TIMESTAMP
+	if ((mid == IPI_TS_TEST_PIN) && (test_cnt < IPI_TS_TEST_MAX))
+		ipi_t0[test_cnt] = cpu_clock(0);
+#endif /* GET_IPI_TIMESTAMP */
+#ifdef IPI_MONITOR
+	ipimon[mid].seqno++;
+#ifdef IPI_MONITOR_TIMESTAMP
+	ipimon[mid].t0 = cpu_clock(0);
+	ipimon[mid].t4 = 0;
+	ipimon[mid].t5 = 0;
+#endif /* IPI_MONITOR_TIMESTAMP */
+	ipimon[mid].state = 1;
+#endif /* IPI_MONITOR */
+}
+
+static void ipi_check_ack(int mid, int opts, int ret)
+{
+	if (ret == 0) {
+#ifdef SSPM_STF_ENABLED
+		if (test_table[mid].data) {
+			struct chk_data *pdata = test_table[mid].data;
+			int cnt = test_table[mid].test_cnt;
+
+			pdata[cnt].time_spent = ((unsigned int)(cpu_clock(0)/1000) - test_table[mid].start_us);
+			if (retbuf)
+				pdata[cnt].ack_data_feedback = *((unsigned int *)retbuf);
+			else
+				pdata[cnt].ack_data_feedback = 0;
+			test_table[mid].test_cnt++;
+		}
+#endif /* SSPM_STF_ENABLED */
+#ifdef GET_IPI_TIMESTAMP
+		if ((mid == IPI_TS_TEST_PIN) && (test_cnt < IPI_TS_TEST_MAX)) {
+			ipi_t5[test_cnt] = cpu_clock(0);
+			test_cnt++;
+		}
+		if (test_cnt >= IPI_TS_TEST_MAX) {
+			int i;
+
+			for (i = 0; i < IPI_TS_TEST_MAX; i++)
+				pr_err("IPI %d: t0=%llu, t4=%llu, t5=%llu\n",
+					   i, ipi_t0[i], ipi_t4[i], ipi_t5[i]);
+			test_cnt = 0;
+		}
+#endif /* GET_IPI_TIMESTAMP */
+#ifdef IPI_MONITOR
+#ifdef IPI_MONITOR_TIMESTAMP
+		ipimon[mid].t5 = cpu_clock(0);
+#endif /* IPI_MONITOR_TIMESTAMP */
+		ipimon[mid].state = 3;
+		ipi_last = mid;
+	} else { /* timeout case */
+		ipi_monitor_dump_timeout(mid, opts);
+	}
+#else
+	}
+#endif /* IPI_MONITOR */
+
+}
+
 atomic_t lock_send[TOTAL_SEND_PIN];
 atomic_t lock_ack[TOTAL_SEND_PIN];
 spinlock_t lock_polling[TOTAL_SEND_PIN];
 /* used for IPI module isr to sync with its task */
 struct completion sema_ipi_task[TOTAL_RECV_PIN];
 struct mutex mutex_ipi_reg;
-static void ipi_isr_cb(unsigned int mbox, void __iomem *base, unsigned int irq);
+static int sspm_ipi_inited;
+static unsigned int ipi_isr_cb(unsigned int mbox, void __iomem *base, unsigned int irq);
 
 int sspm_ipi_init(void)
 {
-	int i;
+	int i, ret;
+	struct _pin_send *pin;
+
+#ifdef IPI_MONITOR
+	spin_lock_init(&lock_monitor);
+#ifdef IPI_MONITOR_TIMESTAMP
+	for (i = 0; i < IPI_ID_TOTAL; i++)
+		ipimon[i].has_time = 1;
+#endif /* IPI_MONITOR_TIMESTAMP */
+#endif /* IPI_MONITOR */
 
 	mutex_init(&mutex_ipi_reg);
 	for (i = 0; i < TOTAL_SEND_PIN; i++) {
+
 		mutex_init(&send_pintable[i].mutex_send);
 		init_completion(&send_pintable[i].comp_ack);
-	}
 
-	for (i = 0; i < TOTAL_SEND_PIN; i++) {
 		atomic_set(&lock_send[i], 1);
 		atomic_set(&lock_ack[i], 0);
 		spin_lock_init(&lock_polling[i]);
@@ -74,12 +225,29 @@ int sspm_ipi_init(void)
 		return -1;
 	}
 
-	return check_table_tag(IPI_MBOX_TOTAL);
+	for (i = 0; i < TOTAL_SEND_PIN; i++) {
+		pin = &(send_pintable[i]);
+		pin->prdata = sspm_mbox_addr(pin->mbox, pin->slot);
+	}
+
+	ret = check_table_tag(IPI_MBOX_TOTAL);
+	if (ret == 0)
+		sspm_ipi_inited = 1;
+
+	return ret;
+}
+
+extern int sspm_ipi_is_inited(void)
+{
+	return sspm_ipi_inited;
 }
 
 int sspm_ipi_recv_registration(int mid, struct ipi_action *act)
 {
 	struct _pin_recv *pin;
+
+	if (sspm_ipi_inited == 0)
+		return IPI_SERVICE_NOT_INITED;
 
 	if ((mid < 0) || (mid >= TOTAL_RECV_PIN))
 		return IPI_SERVICE_NOT_AVAILABLE;
@@ -95,13 +263,14 @@ int sspm_ipi_recv_registration(int mid, struct ipi_action *act)
 		mutex_unlock(&mutex_ipi_reg);
 		return IPI_REG_ALREADY;
 	}
-	pin->act = act;
 
 	mutex_unlock(&mutex_ipi_reg);
 	init_completion(&sema_ipi_task[mid]);
+	pin->act = act;
 
 	return IPI_REG_OK;
 }
+EXPORT_SYMBOL(sspm_ipi_recv_registration);
 
 int sspm_ipi_recv_registration_ex(int mid, spinlock_t *lock, struct ipi_action *act)
 {
@@ -119,6 +288,9 @@ int sspm_ipi_recv_wait(int mid)
 {
 	struct _pin_recv *pin;
 
+	if (sspm_ipi_inited == 0)
+		return IPI_SERVICE_NOT_INITED;
+
 	if ((mid < 0) || (mid >= TOTAL_RECV_PIN))
 		return IPI_SERVICE_NOT_AVAILABLE;
 
@@ -132,39 +304,52 @@ int sspm_ipi_recv_wait(int mid)
 
 	return 0;
 }
+EXPORT_SYMBOL(sspm_ipi_recv_wait);
+
+void sspm_ipi_recv_complete(int mid)
+{
+	complete(&sema_ipi_task[mid]);
+}
+EXPORT_SYMBOL(sspm_ipi_recv_complete);
+
+int sspm_ipi_recv_unregistration(int mid)
+{
+	struct _pin_recv *pin;
+
+	pin = &(recv_pintable[mid]);
+	pin->act = NULL;
+	return IPI_REG_OK;
+}
+EXPORT_SYMBOL(sspm_ipi_recv_unregistration);
+
 
 static void ipi_do_ack(struct _mbox_info *mbox, unsigned int in_irq, void __iomem *base)
 {
 	/* executed from ISR */
 	int idx_end = mbox->end;
 	int idx_start = mbox->start;
-	int i, mbno, lock;
+	int i;
 	struct _pin_send *pin = &(send_pintable[idx_start]);
 
 	for (i = idx_start; i <= idx_end; i++, pin++) {
 		if ((in_irq & 0x01) == 0x01) { /* irq bit enable */
 
+			atomic_inc(&lock_ack[i]);
+			/* check if pin user send in WAIT mode, wait lock & continue if not */
+			if (mutex_is_locked(&pin->mutex_send)) { /* WAIT mode */
+
 #ifdef GET_IPI_TIMESTAMP
-			if ((i == IPI_TS_TEST_PIN) && (test_cnt < IPI_TS_TEST_MAX))
-				ipi_t4[test_cnt] = cpu_clock(0);
-#endif
+				if ((i == IPI_TS_TEST_PIN) && (test_cnt < IPI_TS_TEST_MAX))
+					ipi_t4[test_cnt] = cpu_clock(0);
+#endif /* GET_IPI_TIMESTAMP */
+#ifdef IPI_MONITOR
+#ifdef IPI_MONITOR_TIMESTAMP
+				ipimon[i].t4 = cpu_clock(0);
+#endif /* IPI_MONITOR_TIMESTAMP */
+				ipimon[i].state = 2;
+#endif /* IPI_MONITOR */
 
-			if (pin->retdata)
-				pin->prdata = (uint32_t *)(base + ((pin->slot) * MBOX_SLOT_SIZE));
-
-			/* check if lock flags has been changed */
-			if (pin->lock & IPI_LOCK_CHANGE)
-				lock = pin->lock & IPI_LOCK_NEW;
-			else
-				lock = pin->lock & IPI_LOCK_ORIGNAL;
-
-			/* give retval semaphore to ipi_send_async_wait() */
-			if (lock == 0) { /* use completion */
 				complete(&pin->comp_ack);
-			} else { /* use spin method */
-				mbno = pin->mbox;
-				mbox = &(mbox_table[mbno]);
-				atomic_inc(&lock_ack[i + mbox->start]);
 			}
 		}
 		in_irq >>= 1;
@@ -224,53 +409,26 @@ static void ipi_do_recv(struct _mbox_info *mbox, unsigned int in_irq, void __iom
 	} /* check INT_IRQ bits */
 }
 
-int sspm_ipi_send_sync(int mid, int opts, void *buffer, int len, void *retbuf)
-{
-	int ret;
-
-	ret = sspm_ipi_send_async(mid, opts, buffer, len);
-	if (ret != 0)
-		return ret;
-
-	ret = sspm_ipi_send_async_wait(mid, opts, retbuf);
-	return ret;
-}
-
-int sspm_ipi_send_sync_ex(int mid, int opts, void *buffer, int len, void *retbuf, int retlen)
-{
-	int ret;
-
-	ret = sspm_ipi_send_async(mid, opts, buffer, len);
-	if (ret != 0)
-		return ret;
-
-	ret = sspm_ipi_send_async_wait_ex(mid, opts, retbuf, retlen);
-	return ret;
-}
-
-int sspm_ipi_send_async(int mid, int opts, void *buffer, int len)
+int sspm_ipi_send_async(int mid, int opts, void *buffer, int slot)
 {
 	int mbno, ret, lock = 0;
 	struct _pin_send *pin;
 	struct _mbox_info *mbox;
 	static int timeout;
 
+	if (sspm_ipi_inited == 0)
+		return IPI_SERVICE_NOT_INITED;
+
 	if ((mid < 0) || (mid >= TOTAL_SEND_PIN))
 		return IPI_SERVICE_NOT_AVAILABLE;
 
-#ifdef SSPM_STF_ENABLED
-	if (test_table[mid].data)
-		test_table[mid].start_us = (unsigned int)(cpu_clock(0)/1000);
-#endif
-
-#ifdef GET_IPI_TIMESTAMP
-	if ((mid == IPI_TS_TEST_PIN) && (test_cnt < IPI_TS_TEST_MAX))
-		ipi_t0[test_cnt] = cpu_clock(0);
-#endif
-
 	pin = &(send_pintable[mid]);
-	if (len > pin->size)
+	if (!pin->async)
+		return IPI_PIN_MISUES;
+	if (slot > pin->size)
 		return IPI_NO_MEMORY;
+
+	ipi_check_send(mid);
 
 	mbno = pin->mbox;
 	mbox = &(mbox_table[mbno]);
@@ -303,14 +461,18 @@ int sspm_ipi_send_async(int mid, int opts, void *buffer, int len)
 		atomic_dec(&lock_send[mid]);
 	}
 
+	atomic_set(&lock_ack[mid], 0);
 	mbno = pin->mbox;
 	mbox = &(mbox_table[mbno]);
 	/* note: the bit of INT(OUT)_IRQ is depending on mid */
-	if (len == 0)
-		len = pin->size;
+	if (slot == 0)
+		slot = pin->size;
 
-	ret = sspm_mbox_send(mbno, pin->slot, mid - mbox->start, buffer, len);
+	ret = sspm_mbox_send(mbno, pin->slot, mid - mbox->start, buffer, slot);
 	if (ret != 0) {
+#ifdef IPI_MONITOR
+		ipimon[mid].seqno--;
+#endif
 		/* release lock */
 		if (lock == 0) /* use mutex */
 			mutex_unlock(&pin->mutex_send);
@@ -327,18 +489,17 @@ int sspm_ipi_send_async(int mid, int opts, void *buffer, int len)
 
 int sspm_ipi_send_async_wait(int mid, int opts, void *retbuf)
 {
-	int len = 1;
+	int slot = 1;
 
 	if (retbuf == NULL)
-		len = 0;
+		slot = 0;
 
-	return sspm_ipi_send_async_wait_ex(mid, opts, retbuf, len);
+	return sspm_ipi_send_async_wait_ex(mid, opts, retbuf, slot);
 }
 
-int sspm_ipi_send_async_wait_ex(int mid, int opts, void *retbuf, int retlen)
+int sspm_ipi_send_async_wait_ex(int mid, int opts, void *retbuf, int retslot)
 {
 	int ret = 0, lock = 0, polling = 0;
-	int timeout;
 	struct _pin_send *pin;
 	unsigned long wait_comp;
 
@@ -346,8 +507,9 @@ int sspm_ipi_send_async_wait_ex(int mid, int opts, void *retbuf, int retlen)
 		return IPI_SERVICE_NOT_AVAILABLE;
 
 	pin = &(send_pintable[mid]);
-
-	if (retlen > pin->size)
+	if (!pin->async)
+		return IPI_PIN_MISUES;
+	if (retslot > pin->size)
 		return IPI_NO_MEMORY;
 
 	if (!(opts & IPI_OPT_REDEF_MASK)) {
@@ -366,40 +528,40 @@ int sspm_ipi_send_async_wait_ex(int mid, int opts, void *retbuf, int retlen)
 
 	if (lock == 0) { /* use completion */
 		wait_comp = wait_for_completion_timeout(&pin->comp_ack, TIMEOUT_COMPLETE);
-		if (wait_comp == 0) /* timeout */
+		if ((wait_comp == 0) && (atomic_read(&lock_ack[mid]) == 0)) {
+			/* wait mode timeout */
 			ret = IPI_TIMEOUT_ACK;
-	} else { /* use spin method */
-		if (polling == 0) {
-			timeout = 0xffff;
-			while (atomic_read(&lock_ack[mid]) == 0) {
-				timeout--;
-				udelay(10); /* fix me later, should we add this one? */
-				if (timeout == 0) {
-					ret = IPI_TIMEOUT_ACK;
-					break;
-				}
-			}
-			atomic_set(&lock_ack[mid], 0);
 		} else {
+			if (retbuf)
+				memcpy_from_sspm(retbuf, pin->prdata, (MBOX_SLOT_SIZE * retslot));
+		}
+		atomic_set(&lock_ack[mid], 0);
+	} else { /* use spin method */
+		int retries = 2000000;
+
+		while (retries-- > 0) {
 			int mbno = pin->mbox;
 			struct _mbox_info *mbox = &(mbox_table[mbno]);
-			unsigned int *raddr;
-
-			if (pin->retdata == 0)
-				raddr = NULL;
 
 			ret = sspm_mbox_polling(mbno, mid - mbox->start, pin->slot,
-					retbuf, retlen, 0x0000fffff);
+									retbuf, retslot, 2000);
 
-			if (ret < 0)
-				ret = IPI_TIMEOUT_ACK;
+			if (ret == 0)
+				break;
+
+			if (atomic_read(&lock_ack[mid])) {
+				if (retbuf)
+					memcpy_from_sspm(retbuf, pin->prdata, (MBOX_SLOT_SIZE * retslot));
+
+				ret = 0;
+				break;
+			}
+			udelay(1);
 		}
-	}
+		atomic_set(&lock_ack[mid], 0);
 
-	if ((ret == 0) && (pin->retdata != 0) && (retbuf != NULL)) {
-		/* copy return value to retbuf */
-		if ((lock == 0) || (polling == 0))
-			memcpy_from_sspm(retbuf, pin->prdata, (MBOX_SLOT_SIZE * retlen));
+		if (retries == 0)
+			ret = IPI_TIMEOUT_ACK;
 	}
 
 	/* Release mutex */
@@ -411,35 +573,7 @@ int sspm_ipi_send_async_wait_ex(int mid, int opts, void *retbuf, int retlen)
 	if (pin->lock & IPI_LOCK_CHANGE)
 		pin->lock &= IPI_LOCK_ORIGNAL;
 
-#ifdef SSPM_STF_ENABLED
-	if (test_table[mid].data) {
-		struct chk_data *pdata = test_table[mid].data;
-		int cnt = test_table[mid].test_cnt;
-
-		pdata[cnt].time_spent = ((unsigned int)(cpu_clock(0)/1000) - test_table[mid].start_us);
-		if (retbuf)
-			pdata[cnt].ack_data_feedback = *((unsigned int *)retbuf);
-		else
-			pdata[cnt].ack_data_feedback = 0;
-		test_table[mid].test_cnt++;
-	}
-#endif
-
-#ifdef GET_IPI_TIMESTAMP
-	if ((mid == IPI_TS_TEST_PIN) && (test_cnt < IPI_TS_TEST_MAX)) {
-		ipi_t5[test_cnt] = cpu_clock(0);
-		test_cnt++;
-	}
-	if (test_cnt >= IPI_TS_TEST_MAX) {
-		int i;
-
-		for (i = 0; i < IPI_TS_TEST_MAX; i++)
-			pr_err("IPI %d: t0=%llu, t4=%llu, t5=%llu\n",
-				   i, ipi_t0[i], ipi_t4[i], ipi_t5[i]);
-		test_cnt = 0;
-	}
-#endif
-
+	ipi_check_ack(mid, opts, ret);
 	return ret;
 }
 
@@ -452,8 +586,9 @@ int sspm_ipi_send_ack(int mid, unsigned int *data)
 
 	return sspm_ipi_send_ack_ex(mid, data, len);
 }
+EXPORT_SYMBOL(sspm_ipi_send_ack);
 
-int sspm_ipi_send_ack_ex(int mid, void *data, int retlen)
+int sspm_ipi_send_ack_ex(int mid, void *data, int retslot)
 {
 	struct _pin_recv *pin;
 	struct _mbox_info *mbox;
@@ -463,7 +598,7 @@ int sspm_ipi_send_ack_ex(int mid, void *data, int retlen)
 		return IPI_SERVICE_NOT_AVAILABLE;
 
 	pin = &(recv_pintable[mid]);
-	if (retlen > pin->size)
+	if (retslot > pin->size)
 		return IPI_NO_MEMORY;
 
 	mbno = pin->mbox;
@@ -471,7 +606,7 @@ int sspm_ipi_send_ack_ex(int mid, void *data, int retlen)
 	irq = mid - (mbox->start);
 	/* return data length */
 	if ((pin->retdata) && (data != NULL))
-		len = retlen;
+		len = retslot;
 	else
 		len = 0;
 	/* where to put the return data */
@@ -484,8 +619,9 @@ int sspm_ipi_send_ack_ex(int mid, void *data, int retlen)
 	return 0;
 }
 
-int sspm_ipi_send_sync_new(int mid, int opts, void *buffer, int len,
-						   void *retbuf, int retlen)
+#include <mtk_spm.h>
+int sspm_ipi_send_sync(int mid, int opts, void *buffer, int slot,
+						   void *retbuf, int retslot)
 {
 	unsigned long flags = 0;
 	unsigned long wait_comp;
@@ -493,14 +629,19 @@ int sspm_ipi_send_sync_new(int mid, int opts, void *buffer, int len,
 	struct _pin_send *pin;
 	struct _mbox_info *mbox;
 
+	if (sspm_ipi_inited == 0)
+		return IPI_SERVICE_NOT_INITED;
+
 	/* check if mid is in the predefined range */
 	if ((mid < 0) || (mid >= TOTAL_SEND_PIN))
 		return IPI_SERVICE_NOT_AVAILABLE;
 
 	/* get the predefined pin info from mid */
 	pin = &(send_pintable[mid]);
-	if ((len > pin->size) || (retlen > pin->size))
+	if ((slot > pin->size) || (retslot > pin->size))
 		return IPI_NO_MEMORY;
+
+	sspm_ipi_lock_spm_scenario(1, mid, opts, pin_name[mid]);
 
 	/* check if IPI can be send in different mode */
 	if (opts&IPI_OPT_POLLING) {  /* POLLING mode */
@@ -509,70 +650,107 @@ int sspm_ipi_send_sync_new(int mid, int opts, void *buffer, int len,
 
 		if (mutex_is_locked(&pin->mutex_send)) {
 			spin_unlock_irqrestore(&lock_polling[mid], flags);
-			pr_err("Warning: IPI pin=%d has been used in WAIT mode\n", mid);
+			sspm_ipi_lock_spm_scenario(0, mid, opts, pin_name[mid]);
+			pr_err("Error: IPI pin=%d has been used in WAIT mode\n", mid);
+			BUG_ON(1);
 			return IPI_USED_IN_WAIT;
 		}
+
 	} else {                       /* WAIT mode */
 		/* Check if users call in atomic/interrupt/IRQ disabled */
 		if (preempt_count() || in_interrupt() || irqs_disabled()) {
-			panic("IPI panic: pin id=%d, atomic=%d, interrupt=%ld, irq disabled=%d\n",
+			pr_err("IPI panic: pin id=%d, atomic=%d, interrupt=%ld, irq disabled=%d\n",
 				  mid, preempt_count(), in_interrupt(), irqs_disabled());
+			BUG_ON(1);
 		}
 
 		mutex_lock(&pin->mutex_send);
 	}
 
+	ipi_check_send(mid);
 	mbno = pin->mbox;
 	mbox = &(mbox_table[mbno]);
 	/* note: the bit of INT(OUT)_IRQ is depending on mid */
-	if (len == 0)
-		len = pin->size;
+	if (slot == 0)
+		slot = pin->size;
 
+	atomic_set(&lock_ack[mid], 0);
 	/* send IPI data to SSPM */
-	ret = sspm_mbox_send(mbno, pin->slot, mid - mbox->start, buffer, len);
+	ret = sspm_mbox_send(mbno, pin->slot, mid - mbox->start, buffer, slot);
 	if (ret != 0) {
+#ifdef IPI_MONITOR
+		ipimon[mid].seqno--;
+#endif
 		/* release lock */
 		if (opts&IPI_OPT_POLLING) /* POLLING mode */
 			spin_unlock_irqrestore(&lock_polling[mid], flags);
 		else
 			mutex_unlock(&pin->mutex_send);
 
+		sspm_ipi_lock_spm_scenario(0, mid, opts, pin_name[mid]);
 		return IPI_HW_ERROR;
 	}
 
 	/* if there is no retdata in predefined table */
-	if ((pin->retdata == 0) || (retlen == 0))
+	if ((pin->retdata == 0) || (retslot == 0))
 		retbuf = NULL;
 
 	/* wait ACK from SSPM */
 	if (opts&IPI_OPT_POLLING) { /* POLLING mode */
-		ret = sspm_mbox_polling(mbno, mid - mbox->start, pin->slot,
-							retbuf, retlen, 0x0000fffff);
-		if (ret < 0)
+		int retries = 2000000;
+
+		while (retries-- > 0) {
+			ret = sspm_mbox_polling(mbno, mid - mbox->start, pin->slot,
+							retbuf, retslot, 2000);
+
+			if (ret == 0)
+				break;
+
+			if (atomic_read(&lock_ack[mid])) {
+				if (retbuf)
+					memcpy_from_sspm(retbuf, pin->prdata, (MBOX_SLOT_SIZE * retslot));
+
+				ret = 0;
+				break;
+			}
+			udelay(1);
+		}
+		atomic_set(&lock_ack[mid], 0);
+
+		if (retries == 0) /* polling mode timeout */
 			ret = IPI_TIMEOUT_ACK;
+
+		ipi_check_ack(mid, opts, ret);
 
 		spin_unlock_irqrestore(&lock_polling[mid], flags);
 
 	} else {                    /* WAIT mode */
 		wait_comp = wait_for_completion_timeout(&pin->comp_ack, TIMEOUT_COMPLETE);
-		if (wait_comp == 0) /* timeout */
+		if ((wait_comp == 0) && (atomic_read(&lock_ack[mid]) == 0)) {
+			/* wait mode timeout */
 			ret = IPI_TIMEOUT_ACK;
-		else {
-			if ((retbuf) && (pin->prdata))
-				memcpy_from_sspm(retbuf, pin->prdata, (MBOX_SLOT_SIZE * retlen));
+		} else {
+			if (retbuf)
+				memcpy_from_sspm(retbuf, pin->prdata, (MBOX_SLOT_SIZE * retslot));
+
 		}
+		atomic_set(&lock_ack[mid], 0);
+		ipi_check_ack(mid, opts, ret);
+
 		mutex_unlock(&pin->mutex_send);
 	}
 
+	sspm_ipi_lock_spm_scenario(0, mid, opts, pin_name[mid]);
 	return ret;
 }
+EXPORT_SYMBOL(sspm_ipi_send_sync);
 
-static void ipi_isr_cb(unsigned int mbno, void __iomem *base, unsigned int irq)
+static unsigned int ipi_isr_cb(unsigned int mbno, void __iomem *base, unsigned int irq)
 {
 	struct _mbox_info *mbox;
 
 	if (mbno >= IPI_MBOX_TOTAL)
-		return;
+		return irq;
 
 	mbox = &(mbox_table[mbno]);
 
@@ -580,4 +758,6 @@ static void ipi_isr_cb(unsigned int mbno, void __iomem *base, unsigned int irq)
 		ipi_do_ack(mbox, irq, base);
 	else if (mbox->mode == 1) /* ipi_do_recv */
 		ipi_do_recv(mbox, irq, base);
+
+	return irq;
 }

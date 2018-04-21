@@ -81,6 +81,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_MAX9877 if I2C
 	select SND_SOC_MC13783 if MFD_MC13XXX
 	select SND_SOC_ML26124 if I2C
+	select SND_SOC_MT6358
 	select SND_SOC_NAU8825 if I2C
 	select SND_SOC_PCM1681 if I2C
 	select SND_SOC_PCM1792A if SPI_MASTER
@@ -696,6 +697,12 @@ config SND_SOC_TLV320AIC3X
 config SND_SOC_TLV320DAC33
 	tristate
 
+config SND_SOC_TLV320WN
+	tristate
+
+config SND_SOC_TAS5782M
+	tristate
+
 config SND_SOC_TS3A227E
 	tristate "TI Headset/Mic detect and keypress chip"
 	depends on I2C
@@ -913,6 +920,9 @@ config SND_SOC_MC13783
 	tristate
 
 config SND_SOC_ML26124
+	tristate
+
+config SND_SOC_MT6358
 	tristate
 
 config SND_SOC_NAU8825

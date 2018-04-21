@@ -350,9 +350,83 @@
 #define SMI_LARB7_PORT_NUM  17
 #define SMI_LARB8_PORT_NUM  4
 
+#elif defined(SMI_ALA)
+#define SMI_LARB_NUM     8
+
+#define SMI_LARB0_PORT_NUM  7
+#define SMI_LARB1_PORT_NUM  6
+#define SMI_LARB2_PORT_NUM  3
+#define SMI_LARB3_PORT_NUM  5
+#define SMI_LARB4_PORT_NUM  10
+#define SMI_LARB5_PORT_NUM  12
+#define SMI_LARB6_PORT_NUM  19
+#define SMI_LARB7_PORT_NUM  11
+
+#elif defined(SMI_BIA)
+#define SMI_LARB_NUM     4
+
+#define SMI_LARB0_PORT_NUM  10
+#define SMI_LARB1_PORT_NUM  10
+#define SMI_LARB2_PORT_NUM  18
+#define SMI_LARB3_PORT_NUM  11
+
+#elif defined(SMI_VIN)
+#define SMI_LARB_NUM     8
+
+#define SMI_LARB0_PORT_NUM  7
+#define SMI_LARB1_PORT_NUM  6
+#define SMI_LARB2_PORT_NUM  3
+#define SMI_LARB3_PORT_NUM  5
+#define SMI_LARB4_PORT_NUM  10
+#define SMI_LARB5_PORT_NUM  12
+#define SMI_LARB6_PORT_NUM  21
+#define SMI_LARB7_PORT_NUM  11
+
+#elif defined(SMI_ZIO)
+#define SMI_LARB_NUM     3
+
+#define SMI_LARB0_PORT_NUM  7
+#define SMI_LARB1_PORT_NUM  11
+#define SMI_LARB2_PORT_NUM  11
+
+#elif defined(SMI_CAN)
+#define SMI_LARB_NUM     8
+
+#define SMI_LARB0_PORT_NUM  7
+#define SMI_LARB1_PORT_NUM  6
+#define SMI_LARB2_PORT_NUM  3
+#define SMI_LARB3_PORT_NUM  5
+#define SMI_LARB4_PORT_NUM  10
+#define SMI_LARB5_PORT_NUM  25
+#define SMI_LARB6_PORT_NUM  31
+#define SMI_LARB7_PORT_NUM  11
+
+#elif defined(SMI_SYL)
+#define SMI_LARB_NUM     7
+
+#define SMI_LARB0_PORT_NUM  10
+#define SMI_LARB1_PORT_NUM  7
+#define SMI_LARB2_PORT_NUM  3
+#define SMI_LARB3_PORT_NUM  5
+#define SMI_LARB4_PORT_NUM  11
+#define SMI_LARB5_PORT_NUM  25
+#define SMI_LARB6_PORT_NUM  31
+
 #elif defined(SMI_DUMMY)
 #define SMI_LARB_NUM     1
 #endif
+
+#define SMI_LARB0_REG_INDX 0
+#define SMI_LARB1_REG_INDX 1
+#define SMI_LARB2_REG_INDX 2
+#define SMI_LARB3_REG_INDX 3
+#define SMI_LARB4_REG_INDX 4
+#define SMI_LARB5_REG_INDX 5
+#define SMI_LARB6_REG_INDX 6
+#define SMI_LARB7_REG_INDX 7
+#define SMI_LARB8_REG_INDX 8
+#define SMI_COMMON_REG_INDX SMI_LARB_NUM
+#define SMI_REG_REGION_MAX (SMI_LARB_NUM + 1)
 
 #define SMI_LARB_STAT                   (0x0)
 #define SMI_LARB_IRQ_EN                 (0x4)

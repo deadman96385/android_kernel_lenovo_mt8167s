@@ -45,9 +45,11 @@
 #include <mtk_idle_profile.h>
 #include <mtk_spm_reg.h>
 #include <mtk_spm_internal.h>
+#include <mtk_spm_resource_req.h>
+#include <mtk_spm_resource_req_internal.h>
 #include <mtk_cpufreq_hybrid.h>
 
-#if defined(CONFIG_MACH_MT6757)
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
 #include <mtk_dramc.h>
 #endif
 #include <linux/uaccess.h>
@@ -59,7 +61,7 @@
 
 #define FEATURE_ENABLE_SODI2P5
 
-#if defined(CONFIG_MACH_KIBOPLUS)
+#if defined(CONFIG_ARCH_MT6755)
 #define USING_STD_TIMER_OPS
 #endif
 
@@ -193,7 +195,7 @@ void __attribute__((weak)) msdc_clk_status(int *status)
 	*status = 0x0;
 }
 
-wake_reason_t __attribute__((weak)) spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 sodi_flags)
+unsigned int __attribute__((weak)) spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 sodi_flags)
 {
 	return WR_UNKNOWN;
 }
@@ -208,12 +210,12 @@ void __attribute__((weak)) spm_sodi_mempll_pwr_mode(bool pwr_mode)
 
 }
 
-wake_reason_t __attribute__((weak)) spm_go_to_sodi3(u32 spm_flags, u32 spm_data, u32 sodi_flags)
+unsigned int __attribute__((weak)) spm_go_to_sodi3(u32 spm_flags, u32 spm_data, u32 sodi_flags)
 {
 	return WR_UNKNOWN;
 }
 
-wake_reason_t __attribute__((weak)) spm_go_to_sodi(u32 spm_flags, u32 spm_data, u32 sodi_flags)
+unsigned int __attribute__((weak)) spm_go_to_sodi(u32 spm_flags, u32 spm_data, u32 sodi_flags)
 {
 	return WR_UNKNOWN;
 }
@@ -463,20 +465,24 @@ bool is_cpus_offline_or_isolated(cpumask_var_t mask)
 /************************************************
  * SODI3 part
  ************************************************/
-static DEFINE_MUTEX(soidle3_locked);
+static DEFINE_SPINLOCK(soidle3_condition_mask_spin_lock);
 
 static void enable_soidle3_by_mask(int grp, unsigned int mask)
 {
-	mutex_lock(&soidle3_locked);
+	unsigned long flags;
+
+	spin_lock_irqsave(&soidle3_condition_mask_spin_lock, flags);
 	soidle3_condition_mask[grp] &= ~mask;
-	mutex_unlock(&soidle3_locked);
+	spin_unlock_irqrestore(&soidle3_condition_mask_spin_lock, flags);
 }
 
 static void disable_soidle3_by_mask(int grp, unsigned int mask)
 {
-	mutex_lock(&soidle3_locked);
+	unsigned long flags;
+
+	spin_lock_irqsave(&soidle3_condition_mask_spin_lock, flags);
 	soidle3_condition_mask[grp] |= mask;
-	mutex_unlock(&soidle3_locked);
+	spin_unlock_irqrestore(&soidle3_condition_mask_spin_lock, flags);
 }
 
 void enable_soidle3_by_bit(int id)
@@ -484,7 +490,8 @@ void enable_soidle3_by_bit(int id)
 	int grp = id / 32;
 	unsigned int mask = 1U << (id % 32);
 
-	/*BUG_ON(INVALID_GRP_ID(grp));*/
+	if (INVALID_GRP_ID(grp))
+		return;
 	enable_soidle3_by_mask(grp, mask);
 }
 EXPORT_SYMBOL(enable_soidle3_by_bit);
@@ -494,7 +501,8 @@ void disable_soidle3_by_bit(int id)
 	int grp = id / 32;
 	unsigned int mask = 1U << (id % 32);
 
-	/*BUG_ON(INVALID_GRP_ID(grp));*/
+	if (INVALID_GRP_ID(grp))
+		return;
 	disable_soidle3_by_mask(grp, mask);
 }
 EXPORT_SYMBOL(disable_soidle3_by_bit);
@@ -568,7 +576,7 @@ bool soidle3_can_enter(int cpu)
 	}
 #endif
 
-	if (cpu % 4) {
+	if ((cpu % 4) || (spm_get_resource_usage() & SPM_RESOURCE_CPU)) {
 		reason = BY_CPU;
 		goto out;
 	}
@@ -779,20 +787,24 @@ void soidle3_after_wfi(int cpu)
 /************************************************
  * SODI part
  ************************************************/
-static DEFINE_MUTEX(soidle_locked);
+static DEFINE_SPINLOCK(soidle_condition_mask_spin_lock);
 
 static void enable_soidle_by_mask(int grp, unsigned int mask)
 {
-	mutex_lock(&soidle_locked);
+	unsigned long flags;
+
+	spin_lock_irqsave(&soidle_condition_mask_spin_lock, flags);
 	soidle_condition_mask[grp] &= ~mask;
-	mutex_unlock(&soidle_locked);
+	spin_unlock_irqrestore(&soidle_condition_mask_spin_lock, flags);
 }
 
 static void disable_soidle_by_mask(int grp, unsigned int mask)
 {
-	mutex_lock(&soidle_locked);
+	unsigned long flags;
+
+	spin_lock_irqsave(&soidle_condition_mask_spin_lock, flags);
 	soidle_condition_mask[grp] |= mask;
-	mutex_unlock(&soidle_locked);
+	spin_unlock_irqrestore(&soidle_condition_mask_spin_lock, flags);
 }
 
 void enable_soidle_by_bit(int id)
@@ -800,7 +812,8 @@ void enable_soidle_by_bit(int id)
 	int grp = id / 32;
 	unsigned int mask = 1U << (id % 32);
 
-	/*BUG_ON(INVALID_GRP_ID(grp));*/
+	if (INVALID_GRP_ID(grp))
+		return;
 	enable_soidle_by_mask(grp, mask);
 	/* enable the settings for SODI3 at the same time */
 	enable_soidle3_by_mask(grp, mask);
@@ -812,7 +825,8 @@ void disable_soidle_by_bit(int id)
 	int grp = id / 32;
 	unsigned int mask = 1U << (id % 32);
 
-	/*BUG_ON(INVALID_GRP_ID(grp));*/
+	if (INVALID_GRP_ID(grp))
+		return;
 	disable_soidle_by_mask(grp, mask);
 	/* disable the settings for SODI3 at the same time */
 	disable_soidle3_by_mask(grp, mask);
@@ -857,7 +871,7 @@ bool soidle_can_enter(int cpu)
 	}
 #endif
 
-	if (cpu % 4) {
+	if ((cpu % 4) || (spm_get_resource_usage() & SPM_RESOURCE_CPU)) {
 		reason = BY_CPU;
 		goto out;
 	}
@@ -1171,20 +1185,24 @@ void mcidle_after_wfi(int cpu)
 /************************************************
  * deep idle part
  ************************************************/
-static DEFINE_MUTEX(dpidle_locked);
+static DEFINE_SPINLOCK(dpidle_condition_mask_spin_lock);
 
 static void enable_dpidle_by_mask(int grp, unsigned int mask)
 {
-	mutex_lock(&dpidle_locked);
+	unsigned long flags;
+
+	spin_lock_irqsave(&dpidle_condition_mask_spin_lock, flags);
 	dpidle_condition_mask[grp] &= ~mask;
-	mutex_unlock(&dpidle_locked);
+	spin_unlock_irqrestore(&dpidle_condition_mask_spin_lock, flags);
 }
 
 static void disable_dpidle_by_mask(int grp, unsigned int mask)
 {
-	mutex_lock(&dpidle_locked);
+	unsigned long flags;
+
+	spin_lock_irqsave(&dpidle_condition_mask_spin_lock, flags);
 	dpidle_condition_mask[grp] |= mask;
-	mutex_unlock(&dpidle_locked);
+	spin_unlock_irqrestore(&dpidle_condition_mask_spin_lock, flags);
 }
 
 void enable_dpidle_by_bit(int id)
@@ -1192,7 +1210,8 @@ void enable_dpidle_by_bit(int id)
 	int grp = id / 32;
 	unsigned int mask = 1U << (id % 32);
 
-	/*BUG_ON(INVALID_GRP_ID(grp));*/
+	if (INVALID_GRP_ID(grp))
+		return;
 	enable_dpidle_by_mask(grp, mask);
 }
 EXPORT_SYMBOL(enable_dpidle_by_bit);
@@ -1202,7 +1221,8 @@ void disable_dpidle_by_bit(int id)
 	int grp = id / 32;
 	unsigned int mask = 1U << (id % 32);
 
-	/*BUG_ON(INVALID_GRP_ID(grp));*/
+	if (INVALID_GRP_ID(grp))
+		return;
 	disable_dpidle_by_mask(grp, mask);
 }
 EXPORT_SYMBOL(disable_dpidle_by_bit);
@@ -1255,7 +1275,7 @@ static bool dpidle_can_enter(int cpu)
 	}
 #endif
 
-	if (cpu % 4) {
+	if ((cpu % 4) || (spm_get_resource_usage() & SPM_RESOURCE_CPU)) {
 		reason = BY_CPU;
 		goto out;
 	}
@@ -1451,7 +1471,8 @@ void enable_slidle_by_bit(int id)
 	int grp = id / 32;
 	unsigned int mask = 1U << (id % 32);
 
-	/*BUG_ON(INVALID_GRP_ID(grp));*/
+	if (INVALID_GRP_ID(grp))
+		return;
 	enable_slidle_by_mask(grp, mask);
 }
 EXPORT_SYMBOL(enable_slidle_by_bit);
@@ -1461,7 +1482,8 @@ void disable_slidle_by_bit(int id)
 	int grp = id / 32;
 	unsigned int mask = 1U << (id % 32);
 
-	/*BUG_ON(INVALID_GRP_ID(grp));*/
+	if (INVALID_GRP_ID(grp))
+		return;
 	disable_slidle_by_mask(grp, mask);
 }
 EXPORT_SYMBOL(disable_slidle_by_bit);
@@ -1506,7 +1528,7 @@ static void go_to_slidle(int cpu)
 {
 	slidle_before_wfi(cpu);
 
-	mb();
+	mb();	/* memory barrier */
 	__asm__ __volatile__("wfi" : : : "memory");
 
 	slidle_after_wfi(cpu);
@@ -1530,7 +1552,7 @@ static noinline void go_to_rgidle(int cpu)
 {
 	rgidle_before_wfi(cpu);
 	isb();
-	mb();
+	mb();	/* memory barrier */
 	__asm__ __volatile__("wfi" : : : "memory");
 
 	rgidle_after_wfi(cpu);
@@ -1542,7 +1564,7 @@ static noinline void go_to_rgidle(int cpu)
 static inline void soidle_pre_handler(void)
 {
 	hps_del_timer();
-#if defined(CONFIG_MACH_MT6757)
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
 	if ((get_ddr_type() == TYPE_LPDDR4) || (get_ddr_type() == TYPE_LPDDR4X))
 		del_zqcs_timer();
 #endif
@@ -1556,7 +1578,7 @@ static inline void soidle_pre_handler(void)
 static inline void soidle_post_handler(void)
 {
 	hps_restart_timer();
-#if defined(CONFIG_MACH_MT6757)
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
 	if ((get_ddr_type() == TYPE_LPDDR4) || (get_ddr_type() == TYPE_LPDDR4X))
 		add_zqcs_timer();
 #endif
@@ -1611,7 +1633,7 @@ u32 slp_spm_deepidle_flags = {
 static inline void dpidle_pre_handler(void)
 {
 	hps_del_timer();
-#if defined(CONFIG_MACH_MT6757)
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
 	if ((get_ddr_type() == TYPE_LPDDR4) || (get_ddr_type() == TYPE_LPDDR4X))
 		del_zqcs_timer();
 #endif
@@ -1626,7 +1648,7 @@ static inline void dpidle_pre_handler(void)
 static inline void dpidle_post_handler(void)
 {
 	hps_restart_timer();
-#if defined(CONFIG_MACH_MT6757)
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
 	if ((get_ddr_type() == TYPE_LPDDR4) || (get_ddr_type() == TYPE_LPDDR4X))
 		add_zqcs_timer();
 #endif
@@ -1729,10 +1751,12 @@ int mtk_idle_select(int cpu)
 	if (cpu == 0 || cpu == 4)
 		mtk_idle_dump_cnt_in_interval();
 
+	lockdep_off();
 	for (i = 0; i < NR_TYPES; i++) {
 		if (idle_select_handlers[i] (cpu))
 			break;
 	}
+	lockdep_on();
 	/* FIXME: return the corresponding idle state after verification successed */
 	return i;
 }
@@ -1742,12 +1766,14 @@ int dpidle_enter(int cpu)
 	int ret = IDLE_TYPE_DP;
 
 	mtk_idle_ratio_calc_start(IDLE_TYPE_DP, cpu);
+	lockdep_off();
 
 	dpidle_pre_handler();
 #ifndef CONFIG_MTK_FPGA
 	spm_go_to_dpidle(slp_spm_deepidle_flags, (u32)cpu, dpidle_dump_log);
 #endif
 	dpidle_post_handler();
+	lockdep_on();
 
 	mtk_idle_ratio_calc_stop(IDLE_TYPE_DP, cpu);
 
@@ -1800,6 +1826,7 @@ int soidle3_enter(int cpu)
 		soidle3_time = idle_get_current_time_ms();
 
 	mtk_idle_ratio_calc_start(IDLE_TYPE_SO3, cpu);
+	lockdep_off();
 
 	soidle_pre_handler();
 	soidle3_update_flags();
@@ -1815,6 +1842,7 @@ int soidle3_enter(int cpu)
 #endif /* DEFAULT_MMP_ENABLE */
 
 	soidle_post_handler();
+	lockdep_on();
 
 	mtk_idle_ratio_calc_stop(IDLE_TYPE_SO3, cpu);
 
@@ -1851,6 +1879,7 @@ int soidle_enter(int cpu)
 		soidle_time = idle_get_current_time_ms();
 
 	mtk_idle_ratio_calc_start(IDLE_TYPE_SO, cpu);
+	lockdep_off();
 
 	soidle_pre_handler();
 
@@ -1865,6 +1894,7 @@ int soidle_enter(int cpu)
 #endif /* DEFAULT_MMP_ENABLE */
 
 	soidle_post_handler();
+	lockdep_on();
 
 	mtk_idle_ratio_calc_stop(IDLE_TYPE_SO, cpu);
 
@@ -2151,7 +2181,7 @@ static ssize_t mcidle_state_write(struct file *filp,
 			mcidle_time_critera = param;
 
 		return count;
-	} else if (!kstrtoint(cmd_buf, 10, &param) == 1) {
+	} else if (!kstrtoint(cmd_buf, 10, &param)) {
 		idle_switch[IDLE_TYPE_MC] = param;
 
 		return count;
@@ -2281,7 +2311,7 @@ static ssize_t dpidle_state_write(struct file *filp,
 			dpidle_dump_log = param;
 
 		return count;
-	} else if (!kstrtoint(cmd_buf, 10, &param) == 1) {
+	} else if (!kstrtoint(cmd_buf, 10, &param)) {
 		idle_switch[IDLE_TYPE_DP] = param;
 
 		return count;
@@ -2432,7 +2462,7 @@ static ssize_t soidle3_state_write(struct file *filp,
 #endif
 		}
 		return count;
-	} else if (!kstrtoint(cmd_buf, 10, &param) == 1) {
+	} else if (!kstrtoint(cmd_buf, 10, &param)) {
 		idle_switch[IDLE_TYPE_SO3] = param;
 		return count;
 	}
@@ -2558,7 +2588,7 @@ static ssize_t soidle_state_write(struct file *filp,
 			idle_dbg("sodi_flags = 0x%x\n", sodi_flags);
 		}
 		return count;
-	} else if (!kstrtoint(cmd_buf, 10, &param) == 1) {
+	} else if (!kstrtoint(cmd_buf, 10, &param)) {
 		idle_switch[IDLE_TYPE_SO] = param;
 		return count;
 	}
@@ -2640,7 +2670,7 @@ static ssize_t slidle_state_write(struct file *filp, const char __user *userbuf,
 			disable_slidle_by_bit(param);
 
 		return count;
-	} else if (!kstrtoint(userbuf, 10, &param) == 1) {
+	} else if (!kstrtoint(userbuf, 10, &param)) {
 		idle_switch[IDLE_TYPE_SL] = param;
 		return count;
 	}
@@ -2817,7 +2847,7 @@ static void mtk_idle_profile_init(void)
 	mtk_idle_block_setting(IDLE_TYPE_RG, rgidle_cnt, NULL, NULL);
 }
 
-void mtk_cpuidle_framework_init(void)
+void __init mtk_cpuidle_framework_init(void)
 {
 #ifndef USING_STD_TIMER_OPS
 	int err = 0;

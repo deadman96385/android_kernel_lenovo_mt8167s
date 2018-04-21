@@ -23,21 +23,10 @@
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
+#include <linux/atomic.h>
 #include <aee.h>
 
-/* Define SMI_INTERNAL_CCF_SUPPORT when CCF needs to be enabled */
-#if !defined(CONFIG_MTK_CLKMGR) && !defined(SMI_DUMMY)
-#define SMI_INTERNAL_CCF_SUPPORT
-#endif
-
-#if defined(SMI_INTERNAL_CCF_SUPPORT)
-#include <linux/clk.h>
-/* for ccf clk CB */
-#include "clk-mt6799-pg.h"
-#endif				/* defined(SMI_INTERNAL_CCF_SUPPORT) */
-
 #include <linux/io.h>
-
 #include <linux/ioctl.h>
 #include <linux/fs.h>
 
@@ -46,13 +35,30 @@
 #include <linux/compat.h>
 #endif
 
-#include "mtk_smi.h"
-
-#if defined(SMI_WHI)
-#define MMDVFS_HOOK
+/* Define SMI_INTERNAL_CCF_SUPPORT when CCF needs to be enabled */
+#if !defined(CONFIG_MTK_CLKMGR) && !defined(SMI_DUMMY) && !defined(CONFIG_FPGA_EARLY_PORTING)
+#define SMI_INTERNAL_CCF_SUPPORT
 #endif
 
+#include <linux/clk.h>
+/* for ccf clk CB */
+#if defined(SMI_WHI)
+#include "clk-mt6799-pg.h"
+#elif defined(SMI_ALA)
+#include "clk-mt6759-pg.h"
+#elif defined(SMI_BIA)
+#include "clk-mt6763-pg.h"
+#elif defined(SMI_VIN)
+#include "clk-mt6758-pg.h"
+#elif defined(SMI_ZIO)
+#include "clk-mt6739-pg.h"
+#elif defined(SMI_CAN)
+#include "clk-mt6775-pg.h"
+#elif defined(SMI_SYL)
+#include "clk-mt6771-pg.h"
+#endif
 
+#include "mtk_smi.h"
 #include "smi_reg.h"
 #include "smi_common.h"
 #include "smi_debug.h"
@@ -78,8 +84,11 @@
 /* debug level */
 static unsigned int smi_debug_level;
 static unsigned int mmdvfs_debug_level;
+static unsigned int mmdvfs_scen_log_mask = 1 << MMDVFS_SCEN_COUNT;
+
 /* Record MMDVFS debug level */
-unsigned int *g_mmvfs_debug_level = &mmdvfs_debug_level;
+unsigned int *g_mmdvfs_debug_level = &mmdvfs_debug_level;
+unsigned int *g_mmdvfs_scen_log_mask = &mmdvfs_scen_log_mask;
 
 #define SMIDBG(level, x...)            \
 		do {                        \
@@ -108,6 +117,13 @@ unsigned int *g_mmvfs_debug_level = &mmdvfs_debug_level;
 
 #define __ATTR_OF(_name)	(&_name##_attr.attr)
 
+#if defined(SMI_WHI)
+#define SMI_MMSYS_REG_INDX (SMI_COMMON_REG_INDX + 1)
+static unsigned long long mmsys_reg;
+#endif
+
+#define SMI_MMIT_PORTING 0
+
 struct SMI_struct {
 	spinlock_t SMI_lock;
 	unsigned int pu4ConcurrencyTable[SMI_BWC_SCEN_CNT];	/* one bit represent one module */
@@ -116,44 +132,19 @@ struct SMI_struct {
 static struct SMI_struct g_SMIInfo;
 
 /* LARB BASE ADDRESS */
-unsigned long gLarbBaseAddr[SMI_LARB_NUM] = { 0 };
-
+static unsigned long gSMIBaseAddrs[SMI_REG_REGION_MAX];
 static int smi_prepare_count;
 static int smi_enable_count;
+static atomic_t larbs_clock_count[SMI_REG_REGION_MAX];
 
 static unsigned int smi_first_restore = 1;
 char *smi_get_region_name(unsigned int region_indx);
 
 static struct smi_device *smi_dev;
+static struct smi_larb_device *smi_larb_dev[SMI_LARB_NUM];
 
 static struct device *smiDeviceUevent;
-
 static struct cdev *pSmiDev;
-
-#define SMI_COMMON_REG_INDX 0
-#define SMI_LARB0_REG_INDX 1
-#define SMI_LARB1_REG_INDX 2
-#define SMI_LARB2_REG_INDX 3
-#define SMI_LARB3_REG_INDX 4
-#define SMI_LARB4_REG_INDX 5
-#define SMI_LARB5_REG_INDX 6
-#define SMI_LARB6_REG_INDX 7
-#define SMI_LARB7_REG_INDX 8
-#define SMI_LARB8_REG_INDX 9
-#if defined(SMI_WHI)
-#define SMI_MMSYS_REG_INDX 10
-static unsigned long mmsys_reg;
-#endif
-
-#if defined(SMI_WHI)
-#define SMI_REG_REGION_MAX 10
-
-#elif defined(SMI_DUMMY)
-#define SMI_REG_REGION_MAX 1
-
-#endif
-
-static unsigned long gSMIBaseAddrs[SMI_REG_REGION_MAX];
 
 struct smi_device {
 	struct device *dev;
@@ -161,48 +152,19 @@ struct smi_device {
 #if defined(SMI_WHI)
 	void __iomem *mmsys;
 #endif
-#if defined(SMI_INTERNAL_CCF_SUPPORT)
-	struct clk *smi_common_fifo0_clk;
-	struct clk *smi_common_fifo1_clk;
-	struct clk *smi_common_upsz0_clk;
-	struct clk *smi_common_upsz1_clk;
-	struct clk *smi_common_gals0_clk;
-	struct clk *smi_common_gals1_clk;
-	struct clk *smi_common_clk;
-	struct clk *smi_common_2x_clk;
-	struct clk *smi_larb0_clk;
-	struct clk *smi_larb1_clk;
-	struct clk *smi_larb2_clk;
-	struct clk *smi_larb3_clk;
-	struct clk *smi_larb4_vdec_clk;
-	struct clk *smi_larb4_mm_clk;
-	struct clk *smi_larb5_img_clk;
-	struct clk *smi_larb5_mm_clk;
-	struct clk *smi_larb6_cam_clk;
-	struct clk *smi_larb6_mm_clk;
-	struct clk *smi_larb7_venc0_clk;
-	struct clk *smi_larb7_venc1_clk;
-	struct clk *smi_larb7_venc2_clk;
-	struct clk *smi_larb7_mm_clk;
-	struct clk *smi_larb8_mjc0_clk;
-	struct clk *smi_larb8_mjc1_clk;
-	struct clk *smi_larb8_mm_clk;
-	struct clk *mm_mtcmos;    /* LARB0/1 */
-	struct clk *img_mtcmos;   /* LARB2/5 */
-	struct clk *cam_mtcmos;   /* LARB3/6 */
-	struct clk *vde_mtcmos;   /* LARB4 */
-	struct clk *ven_mtcmos;   /* LARB7 */
-	struct clk *mjc_mtcmos;   /* LARB8 */
-#endif
+	struct clk **clocks;
 };
 
+struct smi_larb_device {
+	struct device_node *of_node;
+	void __iomem *reg;
+	struct clk **clocks;
+};
 
 static unsigned int wifi_disp_transaction;
 
 /* larb backuprestore */
-#if defined(SMI_INTERNAL_CCF_SUPPORT)
 static bool fglarbcallback;
-#endif
 /* tuning mode, 1 for register ioctl */
 static unsigned int enable_ioctl;
 static unsigned int disable_freq_hopping = 1;
@@ -218,33 +180,129 @@ static unsigned int *pLarbRegBackUp[SMI_LARB_NUM];
 /* force_always_on_mm_clks_mask function is debug only */
 static unsigned int force_always_on_mm_clks_mask = 1;
 
-MTK_SMI_BWC_MM_INFO g_smi_bwc_mm_info = {
+struct MTK_SMI_BWC_MM_INFO g_smi_bwc_mm_info = {
 	0, 0, {0, 0}, {0, 0}, {0, 0}, {0, 0}, 0, 0, 0,
 	SF_HWC_PIXEL_MAX_NORMAL
 };
 
 enum smi_clk_operation {
-	SMI_PREPARE_CLK,
-	SMI_ENABLE_CLK,
-	SMI_DISABLE_CLK,
-	SMI_UNPREPARE_CLK
+	BUS_ENABLE,
+	BUS_DISABLE
 };
 
-static void smi_common_clk_operation(enum smi_clk_operation op);
-static unsigned long get_register_base(int i);
+#if defined(SMI_WHI)
+static const unsigned int nr_mtcmos_clks[SMI_REG_REGION_MAX] = {
+	2, 2, 2, 2, 3, 3, 3, 5, 4, 9
+};
+static char *smi_clk_name_larb0[] = {"mtcmos-mm", "smi-larb0"};
+static char *smi_clk_name_larb1[] = {"mtcmos-mm", "smi-larb1"};
+static char *smi_clk_name_larb2[] = {"mtcmos-img", "smi-larb2"};
+static char *smi_clk_name_larb3[] = {"mtcmos-cam", "smi-larb3"};
+static char *smi_clk_name_larb4[] = {"mtcmos-vde", "smi-larb4-mm", "smi-larb4-vdec"};
+static char *smi_clk_name_larb5[] = {"mtcmos-img", "smi-larb5-mm", "smi-larb5-img"};
+static char *smi_clk_name_larb6[] = {"mtcmos-cam", "smi-larb6-mm", "smi-larb6-cam"};
+static char *smi_clk_name_larb7[] = {"mtcmos-ven", "smi-larb7-mm",
+	"smi-larb7-venc-0", "smi-larb7-venc-1", "smi-larb7-venc-2"
+};
+static char *smi_clk_name_larb8[] = {
+	"mtcmos-mjc", "smi-larb8-mm", "smi-larb8-mjc-0", "smi-larb8-mjc-1"
+};
+static char *smi_clk_name_common[] = {
+	"mtcmos-mm", "smi-common-GALS0", "smi-common-GALS1",
+	"smi-common-FIFO0", "smi-common-FIFO1", "smi-common-UPSZ0", "smi-common-UPSZ1",
+	"smi-common", "smi-common-2X"
+};
+static char **smi_clk_name[SMI_REG_REGION_MAX] = {
+	smi_clk_name_larb0, smi_clk_name_larb1, smi_clk_name_larb2, smi_clk_name_larb3,
+	smi_clk_name_larb4, smi_clk_name_larb5, smi_clk_name_larb6, smi_clk_name_larb7,
+	smi_clk_name_larb8, smi_clk_name_common
+};
+#elif defined(SMI_BIA)
+static const unsigned int nr_mtcmos_clks[SMI_REG_REGION_MAX] = {2, 2, 3, 3, 4};
+static char *smi_clk_name_larb0[] = {"mtcmos-mm", "mm-larb0"};
+static char *smi_clk_name_larb1[] = {"mtcmos-isp", "img-larb1"};
+static char *smi_clk_name_larb2[] = {"mtcmos-cam", "gals-cam2mm", "cam-larb2"};
+static char *smi_clk_name_larb3[] = {"mtcmos-ven", "venc-larb", "venc-venc"};
+static char *smi_clk_name_common[] = {
+	"mtcmos-mm", "smi-common-gals0", "smi-common-gals1", "smi-common"
+};
+static char **smi_clk_name[SMI_REG_REGION_MAX] = {
+	smi_clk_name_larb0, smi_clk_name_larb1, smi_clk_name_larb2,
+	smi_clk_name_larb3, smi_clk_name_common
+};
+#elif defined(SMI_VIN)
+static const unsigned int nr_mtcmos_clks[SMI_REG_REGION_MAX] = {2, 2, 3, 3, 3, 3, 3, 4, 4};
+static char *smi_clk_name_larb0[] = {"mtcmos-mm", "mm-larb0"};
+static char *smi_clk_name_larb1[] = {"mtcmos-mm", "mm-larb1"};
+static char *smi_clk_name_larb2[] = {"mtcmos-isp", "gals-ipu2mm", "img-larb2"};
+static char *smi_clk_name_larb3[] = {"mtcmos-cam", "gals-ipu2mm", "cam-larb3"};
+static char *smi_clk_name_larb4[] = {"mtcmos-vde", "gals-vdec2mm", "vdec-larb4"};
+static char *smi_clk_name_larb5[] = {"mtcmos-isp", "gals-img2mm", "img-larb5"};
+static char *smi_clk_name_larb6[] = {"mtcmos-cam", "gals-cam2mm", "cam-larb6"};
+static char *smi_clk_name_larb7[] = {
+	"mtcmos-ven", "gals-venc2mm", "venc-larb7-cke1venc", "venc-larb7-jpgenc"
+};
+static char *smi_clk_name_common[] = {
+	"mtcmos-mm", "smi-common-gals-comm0", "smi-common-gals-comm1", "smi-common"
+};
+static char **smi_clk_name[SMI_REG_REGION_MAX] = {
+	smi_clk_name_larb0, smi_clk_name_larb1, smi_clk_name_larb2, smi_clk_name_larb3,
+	smi_clk_name_larb4, smi_clk_name_larb5, smi_clk_name_larb6, smi_clk_name_larb7,
+	smi_clk_name_common
+};
+#elif defined(SMI_ZIO)
+static const unsigned int nr_mtcmos_clks[SMI_REG_REGION_MAX] = {2, 3, 2, 4};
+static char *smi_clk_name_larb0[] = {"mtcmos-mm", "mm-larb0"};
+static char *smi_clk_name_larb1[] = {"mtcmos-ven", "venc-larb", "venc-venc"};
+static char *smi_clk_name_larb2[] = {"mtcmos-img", "img-larb2"};
+static char *smi_clk_name_common[] = {
+	"mtcmos-mm", "smi-common-gals0", "smi-common-gals1", "smi-common"
+};
+static char **smi_clk_name[SMI_REG_REGION_MAX] = {
+	smi_clk_name_larb0, smi_clk_name_larb1, smi_clk_name_larb2, smi_clk_name_common
+};
+#elif defined(SMI_CAN)
+static const unsigned int nr_mtcmos_clks[SMI_REG_REGION_MAX] = {2, 2, 4, 4, 4, 3, 3, 4, 4};
+static char *smi_clk_name_larb0[] = {"mtcmos-mm", "mm-larb0"};
+static char *smi_clk_name_larb1[] = {"mtcmos-mm", "mm-larb1"};
+static char *smi_clk_name_larb2[] = {"mtcmos-isp", "gals-ipu2mm", "gals-ipu12mm", "img-larb2"};
+static char *smi_clk_name_larb3[] = {"mtcmos-cam", "gals-ipu2mm", "gals-ipu12mm", "cam-larb3"};
+static char *smi_clk_name_larb4[] = {"mtcmos-vde", "gals-vdec2mm", "vdec-cken", "vdec-larb"};
+static char *smi_clk_name_larb5[] = {"mtcmos-isp", "gals-img2mm", "img-larb5"};
+static char *smi_clk_name_larb6[] = {"mtcmos-cam", "gals-cam2mm", "cam-larb6"};
+static char *smi_clk_name_larb7[] = {"mtcmos-ven", "gals-venc2mm", "venc-cke0", "venc-cke1"};
+static char *smi_clk_name_common[] = {
+	"mtcmos-mm", "smi-common-gals-comm0", "smi-common-gals-comm1", "smi-common"
+};
+static char **smi_clk_name[SMI_REG_REGION_MAX] = {
+	smi_clk_name_larb0, smi_clk_name_larb1, smi_clk_name_larb2, smi_clk_name_larb3,
+	smi_clk_name_larb4, smi_clk_name_larb5, smi_clk_name_larb6, smi_clk_name_larb7,
+	smi_clk_name_common
+};
+#elif defined(SMI_SYL)
+static const unsigned int nr_mtcmos_clks[SMI_REG_REGION_MAX] = {2, 3, 3, 3, 4, 3, 3, 4};
+static char *smi_clk_name_larb0[] = {"mtcmos-mm", "mm-larb0"};
+static char *smi_clk_name_larb1[] = {"mtcmos-vde", "vdec-vdec", "vdec-larb1"};
+static char *smi_clk_name_larb2[] = {"mtcmos-isp", "gals-ipu2mm", "img-larb2"};
+static char *smi_clk_name_larb3[] = {"mtcmos-cam", "gals-ipu12mm", "cam-larb3"};
+static char *smi_clk_name_larb4[] = {"mtcmos-ven", "venc-larb4", "venc-venc", "venc-jpgenc"};
+static char *smi_clk_name_larb5[] = {"mtcmos-isp", "gals-img2mm", "img-larb5"};
+static char *smi_clk_name_larb6[] = {"mtcmos-cam", "gals-cam2mm", "cam-larb6"};
+static char *smi_clk_name_common[] = {
+	"mtcmos-mm", "smi-common-gals-comm0", "smi-common-gals-comm1", "smi-common"
+};
+static char **smi_clk_name[SMI_REG_REGION_MAX] = {
+	smi_clk_name_larb0, smi_clk_name_larb1, smi_clk_name_larb2, smi_clk_name_larb3,
+	smi_clk_name_larb4, smi_clk_name_larb5, smi_clk_name_larb6, smi_clk_name_common
+};
+#endif
+
 static void smi_driver_setting(void);
-static char *smi_get_scenario_name(MTK_SMI_BWC_SCEN scen);
-static void smi_bus_optimization_clock_control(int optimization_larbs, enum smi_clk_operation oper);
 static void smi_apply_common_basic_setting(void);
 static void smi_apply_larb_basic_setting(int larb);
 static void smi_apply_basic_setting(void);
 static void smi_apply_larb_mmu_setting(int larb);
 static void smi_apply_mmu_setting(void);
-
-
-#if defined(SMI_INTERNAL_CCF_SUPPORT)
-static struct clk *get_smi_clk(char *smi_clk_name);
-#endif
 
 #if IS_ENABLED(CONFIG_COMPAT)
 static long MTK_SMI_COMPAT_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
@@ -252,16 +310,13 @@ static long MTK_SMI_COMPAT_ioctl(struct file *filp, unsigned int cmd, unsigned l
 #define MTK_SMI_COMPAT_ioctl  NULL
 #endif
 
-
 /* Use this function to get base address of Larb resgister */
 /* to support error checking */
 unsigned long get_larb_base_addr(int larb_id)
 {
 	if (larb_id >= SMI_LARB_NUM || larb_id < 0)
 		return SMI_ERROR_ADDR;
-	else
-		return gLarbBaseAddr[larb_id];
-
+	return gSMIBaseAddrs[larb_id];
 }
 
 unsigned long get_common_base_addr(void)
@@ -270,532 +325,243 @@ unsigned long get_common_base_addr(void)
 }
 
 #if defined(SMI_INTERNAL_CCF_SUPPORT)
-struct clk *get_smi_clk(char *smi_clk_name)
+unsigned int smi_clk_get_ref_count(const unsigned int reg_indx)
 {
-	struct clk *smi_clk_ptr = NULL;
-
-	smi_clk_ptr = devm_clk_get(smi_dev->dev, smi_clk_name);
-	if (IS_ERR(smi_clk_ptr)) {
-		SMIMSG("cannot get %s\n", smi_clk_name);
-		smi_clk_ptr = NULL;
-	}
-	return smi_clk_ptr;
-}
-
-#if !defined(CONFIG_MTK_FPGA) && !defined(CONFIG_FPGA_EARLY_PORTING)
-static void smi_prepare_clk(struct clk *smi_clk, char *name)
-{
-	if (smi_clk) {
-		int ret = 0;
-
-		ret = clk_prepare(smi_clk);
-		if (ret) {
-			SMIMSG("clk_prepare return error %d, %s\n", ret, name);
-		} else {
-			SMIDBG(3, "clk:%s prepare done.\n", name);
-			SMIDBG(3, "smi_prepare_count=%d\n", ++smi_prepare_count);
-		}
-	} else {
-		SMIMSG("clk_prepare error, smi_clk can't be NULL, %s\n", name);
-	}
-}
-
-static void smi_enable_clk(struct clk *smi_clk, char *name)
-{
-	if (smi_clk) {
-		int ret = 0;
-
-		ret = clk_enable(smi_clk);
-		if (ret) {
-			SMIMSG("clk_enable return error %d, %s\n", ret, name);
-		} else {
-			SMIDBG(3, "clk:%s enable done.\n", name);
-			SMIDBG(3, "smi_enable_count=%d\n", ++smi_enable_count);
-		}
-	} else {
-		SMIMSG("clk_enable error, smi_clk can't be NULL, %s\n", name);
-	}
-}
-
-static void smi_unprepare_clk(struct clk *smi_clk, char *name)
-{
-	if (smi_clk) {
-		clk_unprepare(smi_clk);
-		SMIDBG(3, "clk:%s unprepare done.\n", name);
-		SMIDBG(3, "smi_prepare_count=%d\n", --smi_prepare_count);
-	} else {
-		SMIMSG("smi_unprepare error, smi_clk can't be NULL, %s\n", name);
-	}
-}
-
-static void smi_disable_clk(struct clk *smi_clk, char *name)
-{
-	if (smi_clk) {
-		clk_disable(smi_clk);
-		SMIDBG(3, "clk:%s disable done.\n", name);
-		SMIDBG(3, "smi_enable_count=%d\n", --smi_enable_count);
-	} else {
-		SMIMSG("smi_disable error, smi_clk can't be NULL, %s\n", name);
-	}
-}
-
-#endif /* !defined(CONFIG_MTK_FPGA) && !defined(CONFIG_FPGA_EARLY_PORTING) */
-/* end MTCMOS*/
-#endif				/* defined(SMI_INTERNAL_CCF_SUPPORT) */
-
-static void smi_common_clk_operation(enum smi_clk_operation op)
-{
-	switch (op) {
-	case SMI_PREPARE_CLK:
-		smi_prepare_clk(smi_dev->smi_common_gals0_clk, "smi_common_gals0_clk");
-		smi_prepare_clk(smi_dev->smi_common_gals1_clk, "smi_common_gals1_clk");
-		smi_prepare_clk(smi_dev->smi_common_fifo0_clk, "smi_common_fifo0_clk");
-		smi_prepare_clk(smi_dev->smi_common_fifo1_clk, "smi_common_fifo1_clk");
-		smi_prepare_clk(smi_dev->smi_common_upsz0_clk, "smi_common_upsz0_clk");
-		smi_prepare_clk(smi_dev->smi_common_upsz1_clk, "smi_common_upsz1_clk");
-		smi_prepare_clk(smi_dev->smi_common_clk, "smi_common_clk");
-		smi_prepare_clk(smi_dev->smi_common_2x_clk, "smi_common_2x_clk");
-		break;
-	case SMI_ENABLE_CLK:
-		smi_enable_clk(smi_dev->smi_common_gals0_clk, "smi_common_gals0_clk");
-		smi_enable_clk(smi_dev->smi_common_gals1_clk, "smi_common_gals1_clk");
-		smi_enable_clk(smi_dev->smi_common_fifo0_clk, "smi_common_fifo0_clk");
-		smi_enable_clk(smi_dev->smi_common_fifo1_clk, "smi_common_fifo1_clk");
-		smi_enable_clk(smi_dev->smi_common_upsz0_clk, "smi_common_upsz0_clk");
-		smi_enable_clk(smi_dev->smi_common_upsz1_clk, "smi_common_upsz1_clk");
-		smi_enable_clk(smi_dev->smi_common_clk, "smi_common_clk");
-		smi_enable_clk(smi_dev->smi_common_2x_clk, "smi_common_2x_clk");
-		break;
-	case SMI_DISABLE_CLK:
-		smi_disable_clk(smi_dev->smi_common_2x_clk, "smi_common_2x_clk");
-		smi_disable_clk(smi_dev->smi_common_clk, "smi_common_clk");
-		smi_disable_clk(smi_dev->smi_common_upsz1_clk, "smi_common_upsz1_clk");
-		smi_disable_clk(smi_dev->smi_common_upsz0_clk, "smi_common_upsz0_clk");
-		smi_disable_clk(smi_dev->smi_common_fifo1_clk, "smi_common_fifo1_clk");
-		smi_disable_clk(smi_dev->smi_common_fifo0_clk, "smi_common_fifo0_clk");
-		smi_disable_clk(smi_dev->smi_common_gals1_clk, "smi_common_gals1_clk");
-		smi_disable_clk(smi_dev->smi_common_gals0_clk, "smi_common_gals0_clk");
-		break;
-	case SMI_UNPREPARE_CLK:
-		smi_unprepare_clk(smi_dev->smi_common_2x_clk, "smi_common_2x_clk");
-		smi_unprepare_clk(smi_dev->smi_common_clk, "smi_common_clk");
-		smi_unprepare_clk(smi_dev->smi_common_upsz1_clk, "smi_common_upsz1_clk");
-		smi_unprepare_clk(smi_dev->smi_common_upsz0_clk, "smi_common_upsz0_clk");
-		smi_unprepare_clk(smi_dev->smi_common_fifo1_clk, "smi_common_fifo1_clk");
-		smi_unprepare_clk(smi_dev->smi_common_fifo0_clk, "smi_common_fifo0_clk");
-		smi_unprepare_clk(smi_dev->smi_common_gals1_clk, "smi_common_gals1_clk");
-		smi_unprepare_clk(smi_dev->smi_common_gals0_clk, "smi_common_gals0_clk");
-		break;
-	default:
-		break;
-	}
-}
-
-static int larb_clock_enable(int larb_id, int enable_mtcmos)
-{
-#if !defined(CONFIG_MTK_FPGA) && !defined(CONFIG_FPGA_EARLY_PORTING) && !defined(SMI_DUMMY)
-	char name[30];
-
-	sprintf(name, "larb%d", larb_id);
-
-	switch (larb_id) {
-	case 0:
-		if (enable_mtcmos)
-			smi_enable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		smi_common_clk_operation(SMI_ENABLE_CLK);
-		smi_enable_clk(smi_dev->smi_larb0_clk, "smi_larb0_clk");
-		break;
-	case 1:
-		if (enable_mtcmos)
-			smi_enable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		smi_common_clk_operation(SMI_ENABLE_CLK);
-		smi_enable_clk(smi_dev->smi_larb1_clk, "smi_larb1_clk");
-		break;
-	case 2:
-		if (enable_mtcmos) {
-			smi_enable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_enable_clk(smi_dev->img_mtcmos, "img_mtcmos");
-		}
-		smi_common_clk_operation(SMI_ENABLE_CLK);
-		smi_enable_clk(smi_dev->smi_larb2_clk, "smi_larb2_clk");
-		break;
-	case 3:
-		if (enable_mtcmos) {
-			smi_enable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_enable_clk(smi_dev->cam_mtcmos, "cam_mtcmos");
-		}
-		smi_common_clk_operation(SMI_ENABLE_CLK);
-		smi_enable_clk(smi_dev->smi_larb3_clk, "smi_larb3_clk");
-		break;
-	case 4:
-		if (enable_mtcmos) {
-			smi_enable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_enable_clk(smi_dev->vde_mtcmos, "vde_mtcmos");
-		}
-		smi_common_clk_operation(SMI_ENABLE_CLK);
-		smi_enable_clk(smi_dev->smi_larb4_vdec_clk, "smi_larb4_vdec_clk");
-		smi_enable_clk(smi_dev->smi_larb4_mm_clk, "smi_larb4_mm_clk");
-		break;
-	case 5:
-		if (enable_mtcmos) {
-			smi_enable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_enable_clk(smi_dev->img_mtcmos, "img_mtcmos");
-		}
-		smi_common_clk_operation(SMI_ENABLE_CLK);
-		smi_enable_clk(smi_dev->smi_larb5_img_clk, "smi_larb5_img_clk");
-		smi_enable_clk(smi_dev->smi_larb5_mm_clk, "smi_larb5_mm_clk");
-		break;
-	case 6:
-		if (enable_mtcmos) {
-			smi_enable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_enable_clk(smi_dev->cam_mtcmos, "cam_mtcmos");
-		}
-		smi_common_clk_operation(SMI_ENABLE_CLK);
-		smi_enable_clk(smi_dev->smi_larb6_cam_clk, "smi_larb6_cam_clk");
-		smi_enable_clk(smi_dev->smi_larb6_mm_clk, "smi_larb6_mm_clk");
-		break;
-	case 7:
-		if (enable_mtcmos) {
-			smi_enable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_enable_clk(smi_dev->ven_mtcmos, "ven_mtcmos");
-		}
-		smi_common_clk_operation(SMI_ENABLE_CLK);
-		smi_enable_clk(smi_dev->smi_larb7_venc0_clk, "smi_larb7_venc0_clk");
-		smi_enable_clk(smi_dev->smi_larb7_venc1_clk, "smi_larb7_venc1_clk");
-		smi_enable_clk(smi_dev->smi_larb7_venc2_clk, "smi_larb7_venc2_clk");
-		smi_enable_clk(smi_dev->smi_larb7_mm_clk, "smi_larb7_mm_clk");
-		break;
-	case 8:
-		if (enable_mtcmos) {
-			smi_enable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_enable_clk(smi_dev->mjc_mtcmos, "mjc_mtcmos");
-		}
-		smi_common_clk_operation(SMI_ENABLE_CLK);
-		smi_enable_clk(smi_dev->smi_larb8_mjc0_clk, "smi_larb8_mjc0_clk");
-		smi_enable_clk(smi_dev->smi_larb8_mjc1_clk, "smi_larb8_mjc1_clk");
-		smi_enable_clk(smi_dev->smi_larb8_mm_clk, "smi_larb8_mm_clk");
-		break;
-	default:
-		break;
-	}
-#else
-	SMIMSG("larb_clock_enable is not available\n");
-#endif
+	if (reg_indx < SMI_REG_REGION_MAX)
+		return (unsigned int)atomic_read(&(larbs_clock_count[reg_indx]));
 	return 0;
 }
 
-static int larb_clock_prepare(int larb_id, int enable_mtcmos)
+static struct clk *smi_clk_get_by_name(const unsigned int reg_indx, const char *clk_name)
 {
-#if !defined(CONFIG_MTK_FPGA) && !defined(CONFIG_FPGA_EARLY_PORTING) && defined(SMI_INTERNAL_CCF_SUPPORT)
-	char name[30];
+	struct clk *clk_ptr = NULL;
 
-	sprintf(name, "larb%d", larb_id);
+	if (reg_indx >= SMI_REG_REGION_MAX)
+		SMIMSG("Invalid reg_indx %d: smi_clk_get_by_name(%d, %s)\n", reg_indx, reg_indx, clk_name);
+	else if (reg_indx == SMI_COMMON_REG_INDX)
+		clk_ptr = of_clk_get_by_name(smi_dev->dev->of_node, clk_name);
+	else
+		clk_ptr = of_clk_get_by_name(smi_larb_dev[reg_indx]->of_node, clk_name);
 
-	switch (larb_id) {
-	case 0:
-		if (enable_mtcmos)
-			smi_prepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		smi_common_clk_operation(SMI_PREPARE_CLK);
-		smi_prepare_clk(smi_dev->smi_larb0_clk, "smi_larb0_clk");
-		break;
-	case 1:
-		if (enable_mtcmos)
-			smi_prepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		smi_common_clk_operation(SMI_PREPARE_CLK);
-		smi_prepare_clk(smi_dev->smi_larb1_clk, "smi_larb1_clk");
-		break;
-	case 2:
-		if (enable_mtcmos) {
-			smi_prepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_prepare_clk(smi_dev->img_mtcmos, "img_mtcmos");
-		}
-		smi_common_clk_operation(SMI_PREPARE_CLK);
-		smi_prepare_clk(smi_dev->smi_larb2_clk, "smi_larb2_clk");
-		break;
-	case 3:
-		if (enable_mtcmos) {
-			smi_prepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_prepare_clk(smi_dev->cam_mtcmos, "cam_mtcmos");
-		}
-		smi_common_clk_operation(SMI_PREPARE_CLK);
-		smi_prepare_clk(smi_dev->smi_larb3_clk, "smi_larb3_clk");
-		break;
-	case 4:
-		if (enable_mtcmos) {
-			smi_prepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_prepare_clk(smi_dev->vde_mtcmos, "vde_mtcmos");
-		}
-		smi_common_clk_operation(SMI_PREPARE_CLK);
-		smi_prepare_clk(smi_dev->smi_larb4_vdec_clk, "smi_larb4_vdec_clk");
-		smi_prepare_clk(smi_dev->smi_larb4_mm_clk, "smi_larb4_mm_clk");
-		break;
-	case 5:
-		if (enable_mtcmos) {
-			smi_prepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_prepare_clk(smi_dev->img_mtcmos, "img_mtcmos");
-		}
-		smi_common_clk_operation(SMI_PREPARE_CLK);
-		smi_prepare_clk(smi_dev->smi_larb5_img_clk, "smi_larb5_img_clk");
-		smi_prepare_clk(smi_dev->smi_larb5_mm_clk, "smi_larb5_mm_clk");
-		break;
-	case 6:
-		if (enable_mtcmos) {
-			smi_prepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_prepare_clk(smi_dev->cam_mtcmos, "cam_mtcmos");
-		}
-		smi_common_clk_operation(SMI_PREPARE_CLK);
-		smi_prepare_clk(smi_dev->smi_larb6_cam_clk, "smi_larb6_cam_clk");
-		smi_prepare_clk(smi_dev->smi_larb6_mm_clk, "smi_larb6_mm_clk");
-		break;
-	case 7:
-		if (enable_mtcmos) {
-			smi_prepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_prepare_clk(smi_dev->ven_mtcmos, "ven_mtcmos");
-		}
-		smi_common_clk_operation(SMI_PREPARE_CLK);
-		smi_prepare_clk(smi_dev->smi_larb7_venc0_clk, "smi_larb7_venc0_clk");
-		smi_prepare_clk(smi_dev->smi_larb7_venc1_clk, "smi_larb7_venc1_clk");
-		smi_prepare_clk(smi_dev->smi_larb7_venc2_clk, "smi_larb7_venc2_clk");
-		smi_prepare_clk(smi_dev->smi_larb7_mm_clk, "smi_larb7_mm_clk");
-		break;
-	case 8:
-		if (enable_mtcmos) {
-			smi_prepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-			smi_prepare_clk(smi_dev->mjc_mtcmos, "mjc_mtcmos");
-		}
-		smi_common_clk_operation(SMI_PREPARE_CLK);
-		smi_prepare_clk(smi_dev->smi_larb8_mjc0_clk, "smi_larb8_mjc0_clk");
-		smi_prepare_clk(smi_dev->smi_larb8_mjc1_clk, "smi_larb8_mjc1_clk");
-		smi_prepare_clk(smi_dev->smi_larb8_mm_clk, "smi_larb8_mm_clk");
-		break;
-	default:
-		break;
+	if (IS_ERR(clk_ptr)) {
+		SMIMSG("Can't get clk_name %s: smi_clk_get_by_name(%d, %s)\n", clk_name, reg_indx, clk_name);
+		clk_ptr = NULL;
 	}
-#else
-	SMIMSG("larb_clock_prepare is not available\n");
-#endif
-	return 0;
+	return clk_ptr;
 }
 
-static int larb_clock_disable(int larb_id, int enable_mtcmos)
+static int smi_clk_prepare_enable(const unsigned int clk_indx,
+	const unsigned int reg_indx, const char *user_name)
 {
-#if !defined(CONFIG_MTK_FPGA) && !defined(CONFIG_FPGA_EARLY_PORTING) && !defined(SMI_DUMMY)
-	char name[30];
+	struct clk *smi_clk = NULL;
+	int ret = 0;
 
-	sprintf(name, "larb%d", larb_id);
-
-	switch (larb_id) {
-	case 0:
-		smi_disable_clk(smi_dev->smi_larb0_clk, "smi_larb0_clk");
-		smi_common_clk_operation(SMI_DISABLE_CLK);
-		if (enable_mtcmos)
-			smi_disable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		break;
-	case 1:
-		smi_disable_clk(smi_dev->smi_larb1_clk, "smi_larb1_clk");
-		smi_common_clk_operation(SMI_DISABLE_CLK);
-		if (enable_mtcmos)
-			smi_disable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		break;
-	case 2:
-		smi_disable_clk(smi_dev->smi_larb2_clk, "smi_larb2_clk");
-		smi_common_clk_operation(SMI_DISABLE_CLK);
-		if (enable_mtcmos) {
-			smi_disable_clk(smi_dev->img_mtcmos, "img_mtcmos");
-			smi_disable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	case 3:
-		smi_disable_clk(smi_dev->smi_larb3_clk, "smi_larb3_clk");
-		smi_common_clk_operation(SMI_DISABLE_CLK);
-		if (enable_mtcmos) {
-			smi_disable_clk(smi_dev->cam_mtcmos, "cam_mtcmos");
-			smi_disable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	case 4:
-		smi_disable_clk(smi_dev->smi_larb4_mm_clk, "smi_larb4_mm_clk");
-		smi_disable_clk(smi_dev->smi_larb4_vdec_clk, "smi_larb4_vdec_clk");
-		smi_common_clk_operation(SMI_DISABLE_CLK);
-		if (enable_mtcmos) {
-			smi_disable_clk(smi_dev->vde_mtcmos, "vde_mtcmos");
-			smi_disable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	case 5:
-		smi_disable_clk(smi_dev->smi_larb5_mm_clk, "smi_larb5_mm_clk");
-		smi_disable_clk(smi_dev->smi_larb5_img_clk, "smi_larb5_img_clk");
-		smi_common_clk_operation(SMI_DISABLE_CLK);
-		if (enable_mtcmos) {
-			smi_disable_clk(smi_dev->img_mtcmos, "img_mtcmos");
-			smi_disable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	case 6:
-		smi_disable_clk(smi_dev->smi_larb6_mm_clk, "smi_larb6_mm_clk");
-		smi_disable_clk(smi_dev->smi_larb6_cam_clk, "smi_larb6_cam_clk");
-		smi_common_clk_operation(SMI_DISABLE_CLK);
-		if (enable_mtcmos) {
-			smi_disable_clk(smi_dev->cam_mtcmos, "cam_mtcmos");
-			smi_disable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	case 7:
-		smi_disable_clk(smi_dev->smi_larb7_mm_clk, "smi_larb7_mm_clk");
-		smi_disable_clk(smi_dev->smi_larb7_venc2_clk, "smi_larb7_venc2_clk");
-		smi_disable_clk(smi_dev->smi_larb7_venc1_clk, "smi_larb7_venc1_clk");
-		smi_disable_clk(smi_dev->smi_larb7_venc0_clk, "smi_larb7_venc0_clk");
-		smi_common_clk_operation(SMI_DISABLE_CLK);
-		if (enable_mtcmos) {
-			smi_disable_clk(smi_dev->ven_mtcmos, "ven_mtcmos");
-			smi_disable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	case 8:
-		smi_disable_clk(smi_dev->smi_larb8_mm_clk, "smi_larb8_mm_clk");
-		smi_disable_clk(smi_dev->smi_larb8_mjc1_clk, "smi_larb8_mjc1_clk");
-		smi_disable_clk(smi_dev->smi_larb8_mjc0_clk, "smi_larb8_mjc0_clk");
-		smi_common_clk_operation(SMI_DISABLE_CLK);
-		if (enable_mtcmos) {
-			smi_disable_clk(smi_dev->mjc_mtcmos, "mjc_mtcmos");
-			smi_disable_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	default:
-		break;
+	if (reg_indx >= SMI_REG_REGION_MAX) {
+		SMIMSG("Invalid reg_indx %d: smi_clk_prepare_enable(%d, %d, %s)\n",
+			reg_indx, clk_indx, reg_indx, user_name);
+		return -EINVAL;
 	}
-#else
-	SMIMSG("larb_clock_disable is not available\n");
-#endif
-	return 0;
-}
-
-static int larb_clock_unprepare(int larb_id, int enable_mtcmos)
-{
-#if !defined(CONFIG_MTK_FPGA) && !defined(CONFIG_FPGA_EARLY_PORTING) && defined(SMI_INTERNAL_CCF_SUPPORT)
-	char name[30];
-
-	sprintf(name, "larb%d", larb_id);
-
-	switch (larb_id) {
-	case 0:
-		smi_unprepare_clk(smi_dev->smi_larb0_clk, "smi_larb0_clk");
-		smi_common_clk_operation(SMI_UNPREPARE_CLK);
-		if (enable_mtcmos)
-			smi_unprepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		break;
-	case 1:
-		smi_unprepare_clk(smi_dev->smi_larb1_clk, "smi_larb1_clk");
-		smi_common_clk_operation(SMI_UNPREPARE_CLK);
-		if (enable_mtcmos)
-			smi_unprepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		break;
-	case 2:
-		smi_unprepare_clk(smi_dev->smi_larb2_clk, "smi_larb2_clk");
-		smi_common_clk_operation(SMI_UNPREPARE_CLK);
-		if (enable_mtcmos) {
-			smi_unprepare_clk(smi_dev->img_mtcmos, "img_mtcmos");
-			smi_unprepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	case 3:
-		smi_unprepare_clk(smi_dev->smi_larb3_clk, "smi_larb3_clk");
-		smi_common_clk_operation(SMI_UNPREPARE_CLK);
-		if (enable_mtcmos) {
-			smi_unprepare_clk(smi_dev->cam_mtcmos, "cam_mtcmos");
-			smi_unprepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	case 4:
-		smi_unprepare_clk(smi_dev->smi_larb4_mm_clk, "smi_larb4_mm_clk");
-		smi_unprepare_clk(smi_dev->smi_larb4_vdec_clk, "smi_larb4_vdec_clk");
-		smi_common_clk_operation(SMI_UNPREPARE_CLK);
-		if (enable_mtcmos) {
-			smi_unprepare_clk(smi_dev->vde_mtcmos, "vde_mtcmos");
-			smi_unprepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	case 5:
-		smi_unprepare_clk(smi_dev->smi_larb5_mm_clk, "smi_larb5_mm_clk");
-		smi_unprepare_clk(smi_dev->smi_larb5_img_clk, "smi_larb5_img_clk");
-		smi_common_clk_operation(SMI_UNPREPARE_CLK);
-		if (enable_mtcmos) {
-			smi_unprepare_clk(smi_dev->img_mtcmos, "img_mtcmos");
-			smi_unprepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	case 6:
-		smi_unprepare_clk(smi_dev->smi_larb6_mm_clk, "smi_larb6_mm_clk");
-		smi_unprepare_clk(smi_dev->smi_larb6_cam_clk, "smi_larb6_cam_clk");
-		smi_common_clk_operation(SMI_UNPREPARE_CLK);
-		if (enable_mtcmos) {
-			smi_unprepare_clk(smi_dev->cam_mtcmos, "cam_mtcmos");
-			smi_unprepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	case 7:
-		smi_unprepare_clk(smi_dev->smi_larb7_mm_clk, "smi_larb7_mm_clk");
-		smi_unprepare_clk(smi_dev->smi_larb7_venc2_clk, "smi_larb7_venc2_clk");
-		smi_unprepare_clk(smi_dev->smi_larb7_venc1_clk, "smi_larb7_venc1_clk");
-		smi_unprepare_clk(smi_dev->smi_larb7_venc0_clk, "smi_larb7_venc0_clk");
-		smi_common_clk_operation(SMI_UNPREPARE_CLK);
-		if (enable_mtcmos) {
-			smi_unprepare_clk(smi_dev->ven_mtcmos, "ven_mtcmos");
-			smi_unprepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	case 8:
-		smi_unprepare_clk(smi_dev->smi_larb8_mm_clk, "smi_larb8_mm_clk");
-		smi_unprepare_clk(smi_dev->smi_larb8_mjc1_clk, "smi_larb8_mjc1_clk");
-		smi_unprepare_clk(smi_dev->smi_larb8_mjc0_clk, "smi_larb8_mjc0_clk");
-		smi_common_clk_operation(SMI_UNPREPARE_CLK);
-		if (enable_mtcmos) {
-			smi_unprepare_clk(smi_dev->mjc_mtcmos, "mjc_mtcmos");
-			smi_unprepare_clk(smi_dev->mm_mtcmos, "mm_mtcmos");
-		}
-		break;
-	default:
-		break;
+	if (clk_indx >= nr_mtcmos_clks[reg_indx]) {
+		SMIMSG("Invalid clk_indx %d: smi_clk_prepare_enable(%d, %d, %s)\n",
+			clk_indx, clk_indx, reg_indx, user_name);
+		return -EINVAL;
 	}
-#else
-	SMIMSG("larb_clock_unprepare is not available\n");
-#endif
+
+	if (reg_indx == SMI_COMMON_REG_INDX)
+		smi_clk = smi_dev->clocks[clk_indx];
+	else
+		smi_clk = smi_larb_dev[reg_indx]->clocks[clk_indx];
+	if (smi_clk == NULL) {
+		SMIMSG("Invalid clock %s: smi_clk_prepare_enable(%d, %d, %s)\n",
+			smi_clk_name[reg_indx][clk_indx], clk_indx, reg_indx, user_name);
+		return -ENXIO;
+	}
+
+	ret = clk_prepare_enable(smi_clk);
+	if (ret) {
+		SMIMSG("clk_prepare_enable return error %d: smi_clk_prepare_enable(%d, %d, %s)\n",
+			ret, clk_indx, reg_indx, user_name);
+		return ret;
+	}
+
+	smi_prepare_count += 1;
+	smi_enable_count += 1;
+	SMIDBG(3, "smi_clk_prepare_enable(%d, %d, %s): prepare=%d, enable=%d\n",
+		clk_indx, reg_indx, user_name, smi_prepare_count, smi_enable_count);
 	return 0;
 }
-int smi_bus_enable(enum SMI_LARB_ID larb_id, char *user_name)
+
+static int smi_clk_disable_unprepare(const unsigned int clk_indx,
+	const unsigned int reg_indx, const char *user_name)
 {
-	smi_clk_prepare(larb_id, user_name, 1);
-	smi_clk_enable(larb_id, user_name, 1);
+	struct clk *smi_clk = NULL;
+
+	if (reg_indx >= SMI_REG_REGION_MAX) {
+		SMIMSG("Invalid reg_indx %d: smi_clk_disable_unprepare(%d, %d, %s)\n",
+			reg_indx, clk_indx, reg_indx, user_name);
+		return -EINVAL;
+	}
+	if (clk_indx >= nr_mtcmos_clks[reg_indx]) {
+		SMIMSG("Invalid clk_indx %d: smi_clk_disable_unprepare(%d, %d, %s)\n",
+			clk_indx, clk_indx, reg_indx, user_name);
+		return -EINVAL;
+	}
+
+	if (reg_indx == SMI_COMMON_REG_INDX)
+		smi_clk = smi_dev->clocks[clk_indx];
+	else
+		smi_clk = smi_larb_dev[reg_indx]->clocks[clk_indx];
+	if (smi_clk == NULL) {
+		SMIMSG("Invalid clock %s: smi_clk_disable_unprepare(%d, %d, %s)\n",
+			smi_clk_name[reg_indx][clk_indx], clk_indx, reg_indx, user_name);
+		return -ENXIO;
+	}
+
+	clk_disable_unprepare(smi_clk);
+	smi_prepare_count -= 1;
+	smi_enable_count -= 1;
+	SMIDBG(3, "smi_clk_disable_unprepare(%d, %d, %s): prepare=%d, enable=%d\n",
+		clk_indx, reg_indx, user_name, smi_prepare_count, smi_enable_count);
 	return 0;
 }
-int smi_bus_disable(enum SMI_LARB_ID larb_id, char *user_name)
+
+static int smi_bus_prepare_enable(const unsigned int reg_indx,
+	const char *user_name, const bool enable_mtcmos)
 {
-	smi_clk_disable(larb_id, user_name, 1);
-	smi_clk_unprepare(larb_id, user_name, 1);
+	int i;
+
+	if (reg_indx >= SMI_REG_REGION_MAX) {
+		SMIMSG("Invalid reg_indx %d: smi_bus_prepare_enable(%d, %s, %d)\n",
+			reg_indx, reg_indx, user_name, enable_mtcmos);
+		return -EINVAL;
+	}
+	/* turn on common mtcmos and clocks & larb mtcmos and clocks */
+	for (i = 0; i < nr_mtcmos_clks[SMI_COMMON_REG_INDX]; i++) { /* common */
+		if (i == 0 && enable_mtcmos == false)
+			continue;
+		smi_clk_prepare_enable(i, SMI_COMMON_REG_INDX, user_name);
+	}
+	atomic_inc(&(larbs_clock_count[SMI_COMMON_REG_INDX]));
+
+	if (reg_indx < SMI_COMMON_REG_INDX) { /* larb */
+		for (i = 0; i < nr_mtcmos_clks[reg_indx]; i++) {
+			if (i == 0 && enable_mtcmos == false)
+				continue;
+			smi_clk_prepare_enable(i, reg_indx, user_name);
+		}
+		atomic_inc(&(larbs_clock_count[reg_indx]));
+	}
+	SMIDBG(1, "smi_bus_prepare_enable(%d, %s, %d): prepare=%d, enable=%d\n",
+		reg_indx, user_name, enable_mtcmos, smi_prepare_count, smi_enable_count);
 	return 0;
 }
-int smi_clk_prepare(enum SMI_LARB_ID larb_id, char *user_name, int enable_mtcmos)
+
+static int smi_bus_disable_unprepare(const unsigned int reg_indx,
+	const char *user_name, const bool enable_mtcmos)
 {
-	SMIDBG(1, "%s is calling smi_clk_prepare", user_name);
-	return larb_clock_prepare(larb_id, enable_mtcmos);
+	int i;
+
+	if (reg_indx >= SMI_REG_REGION_MAX) {
+		SMIMSG("Invalid reg_indx %d: smi_bus_disable_unprepare(%d, %s, %d)\n",
+			reg_indx, reg_indx, user_name, enable_mtcmos);
+		return -EINVAL;
+	}
+	/* turn off larb clocks and mtcmos & common clocks and mtcmos */
+	if (reg_indx < SMI_COMMON_REG_INDX) { /* larb */
+		for (i = nr_mtcmos_clks[reg_indx] - 1; i >= 0; i--) {
+			if (i == 0 && enable_mtcmos == false)
+				continue;
+			smi_clk_disable_unprepare(i, reg_indx, user_name);
+		}
+		atomic_dec(&(larbs_clock_count[reg_indx]));
+	}
+	for (i = nr_mtcmos_clks[SMI_COMMON_REG_INDX] - 1; i >= 0; i--) { /* common */
+		if (i == 0 && enable_mtcmos == false)
+			continue;
+		smi_clk_disable_unprepare(i, SMI_COMMON_REG_INDX, user_name);
+	}
+	atomic_dec(&(larbs_clock_count[SMI_COMMON_REG_INDX]));
+
+	SMIDBG(1, "smi_bus_disable_unprepare(%d, %s, %d): prepare=%d, enable=%d\n",
+		reg_indx, user_name, enable_mtcmos, smi_prepare_count, smi_enable_count);
+	return 0;
+}
+#endif /* defined(SMI_INTERNAL_CCF_SUPPORT) */
+
+/*
+ * prepare and enable CG/MTCMOS of specific LARB and COMMON
+ * larb_id: used for select specific larb
+ * user_name: caller's module name, used for debug
+ */
+int smi_bus_enable(enum SMI_MASTER_ID master_id, char *user_name)
+{
+	smi_bus_prepare_enable(master_id, user_name, true);
+	return 0;
 }
 
-int smi_clk_enable(enum SMI_LARB_ID larb_id, char *user_name, int enable_mtcmos)
+/*
+ * disable and unprepare CG/MTCMOS of specific LARB and COMMON
+ * larb_id: used for select specific larb
+ * user_name: caller's module name, used for debug
+ */
+int smi_bus_disable(enum SMI_MASTER_ID master_id, char *user_name)
 {
-	SMIDBG(1, "%s is calling smi_clk_enable", user_name);
-	return larb_clock_enable(larb_id, enable_mtcmos);
+	smi_bus_disable_unprepare(master_id, user_name, true);
+	return 0;
 }
 
-int smi_clk_unprepare(enum SMI_LARB_ID larb_id, char *user_name, int enable_mtcmos)
+/*
+ * prepare CG/MTCMOS of specific LARB and COMMON
+ * larb_id: used for select specific larb
+ * user_name: caller's module name, used for debug
+ * enable_mtcmos: wish to manipulate mtcmos = 1, else = 0
+ */
+int smi_clk_prepare(enum SMI_MASTER_ID master_id, char *user_name, int enable_mtcmos)
 {
-	SMIDBG(1, "%s is calling smi_clk_unprepare", user_name);
-	return larb_clock_unprepare(larb_id, enable_mtcmos);
+	SMIMSG("Not support smi_clk_prepare(%d, %s, %d)\n",
+		master_id, user_name, enable_mtcmos);
+	return 0;
 }
 
-int smi_clk_disable(enum SMI_LARB_ID larb_id, char *user_name, int enable_mtcmos)
+/*
+ * enable CG/MTCMOS of specific LARB and COMMON
+ * larb_id: used for select specific larb
+ * user_name: caller's module name, used for debug
+ * enable_mtcmos: wish to manipulate mtcmos = 1, else = 0
+ */
+int smi_clk_enable(enum SMI_MASTER_ID master_id, char *user_name, int enable_mtcmos)
 {
-	SMIDBG(1, "%s is calling smi_clk_disable", user_name);
-	return larb_clock_disable(larb_id, enable_mtcmos);
+	SMIMSG("Not support smi_clk_enable(%d, %s, %d)\n",
+		master_id, user_name, enable_mtcmos);
+	smi_bus_prepare_enable(master_id, user_name, enable_mtcmos);
+	return 0;
+}
+
+/*
+ * unprepare CG/MTCMOS of specific LARB and COMMON
+ * larb_id: used for select specific larb
+ * user_name: caller's module name, used for debug
+ * enable_mtcmos: wish to manipulate mtcmos = 1, else = 0
+ */
+int smi_clk_unprepare(enum SMI_MASTER_ID master_id, char *user_name, int enable_mtcmos)
+{
+	SMIMSG("Not support smi_clk_unprepare(%d, %s, %d)\n",
+		master_id, user_name, enable_mtcmos);
+	return 0;
+}
+
+/*
+ * disable CG/MTCMOS of specific LARB and COMMON
+ * master_id: used for select specific larb
+ * user_name: caller's module name, used for debug
+ * enable_mtcmos: wish to manipulate mtcmos = 1, else = 0
+ */
+int smi_clk_disable(enum SMI_MASTER_ID master_id, char *user_name, int enable_mtcmos)
+{
+	SMIMSG("Not support smi_clk_disable(%d, %s, %d)\n",
+		master_id, user_name, enable_mtcmos);
+	smi_bus_disable_unprepare(master_id, user_name, enable_mtcmos);
+	return 0;
 }
 
 int larb_reg_restore(int larb)
@@ -827,20 +593,147 @@ void on_larb_power_on_with_ccf(int larb_idx)
 		return;
 	}
 
-	larb_clock_prepare(larb_idx, 0);
-	larb_clock_enable(larb_idx, 0);
+	smi_bus_prepare_enable(larb_idx, "SMI_CCF", false);
 	larb_reg_restore(larb_idx);
-	larb_clock_disable(larb_idx, 0);
-	larb_clock_unprepare(larb_idx, 0);
+	smi_bus_disable_unprepare(larb_idx, "SMI_CCF", false);
 }
 
-#endif				/* defined(SMI_INTERNAL_CCF_SUPPORT) */
+static unsigned int smiclk_subsys_2_larb(enum subsys_id sys)
+{
+	unsigned int i4larbid = 0;
+#if defined(SMI_WHI)
+	switch (sys) {
+	case SYS_MM0:
+		i4larbid = 0x3;    /* larb0/1 */
+		break;
+	case SYS_VDE:
+		i4larbid = 0x10;   /* larb4 */
+		break;
+	case SYS_ISP:
+		i4larbid = 0x24;   /* larb2/5 */
+		break;
+	case SYS_VEN:
+		i4larbid = 0x80;   /* larb7 */
+	break;
+	case SYS_MJC:
+		i4larbid = 0x100;  /* larb8 */
+		break;
+	case SYS_CAM:
+		i4larbid = 0x48;   /* larb3/6 */
+		break;
+	default:
+		break;
+	}
+#elif defined(SMI_ALA) || defined(SMI_VIN) || defined(SMI_CAN)
+	switch (sys) {
+	case SYS_MM0:
+		i4larbid = 0x3;    /* larb0/1 */
+		break;
+	case SYS_VDE:
+		i4larbid = 0x10;   /* larb4 */
+		break;
+	case SYS_ISP:
+		i4larbid = 0x24;   /* larb2/5 */
+		break;
+	case SYS_VEN:
+		i4larbid = 0x80;   /* larb7 */
+	break;
+	case SYS_CAM:
+		i4larbid = 0x48;   /* larb3/6 */
+		break;
+	default:
+		break;
+	}
+#elif defined(SMI_BIA)
+	switch (sys) {
+	case SYS_DIS:
+		i4larbid = 0x1;    /* larb0 */
+		break;
+	case SYS_ISP:
+		i4larbid = 0x2;   /* larb1 */
+		break;
+	case SYS_VEN:
+		i4larbid = 0x8;   /* larb3 */
+	break;
+	case SYS_CAM:
+		i4larbid = 0x4;   /* larb2 */
+		break;
+	default:
+		break;
+	}
+#elif defined(SMI_ZIO)
+	switch (sys) {
+	case SYS_MM0:
+		i4larbid = 0x1;   /* larb0 */
+		break;
+	case SYS_VEN:
+		i4larbid = 0x2;   /* larb1 */
+		break;
+	case SYS_ISP:
+		i4larbid = 0x4;   /* larb2 */
+		break;
+	default:
+		break;
+	}
+#elif defined(SMI_SYL)
+	switch (sys) {
+	case SYS_DIS:
+		i4larbid = 0x1;    /* larb0 */
+		break;
+	case SYS_VDE:
+		i4larbid = 0x2;   /* larb1 */
+		break;
+	case SYS_ISP:
+		i4larbid = 0x24;   /* larb2/5 */
+		break;
+	case SYS_VEN:
+		i4larbid = 0x10;   /* larb4 */
+	break;
+	case SYS_CAM:
+		i4larbid = 0x48;   /* larb3/6 */
+		break;
+	default:
+		break;
+	}
+#endif
+	return i4larbid;
+}
 
+static void smiclk_subsys_after_on(enum subsys_id sys)
+{
+	unsigned int i4larbid = smiclk_subsys_2_larb(sys);
+	int i = 0;
 
+	if (!fglarbcallback) {
+		SMIDBG(1, "don't need restore incb\n");
+		return;
+	}
 
+	do {
+		if ((i4larbid & 1) && (1 << i & bus_optimization)) {
+			if (i < SMI_LARB_NUM) {
+				SMIDBG(1, "ready to call restore with larb%d.\n", i);
+				on_larb_power_on_with_ccf(i);
+				}
+		}
+		i4larbid = i4larbid >> 1;
+		i++;
+	} while (i4larbid != 0);
+}
+
+struct pg_callbacks smi_clk_subsys_handle = {
+	.after_on = smiclk_subsys_after_on
+};
+#else /* #elif !defined(SMI_INTERNAL_CCF_SUPPORT) */
+struct larb_monitor larb_monitor_handler = {
+	.level = LARB_MONITOR_LEVEL_HIGH,
+	.backup = on_larb_power_off,
+	.restore = on_larb_power_on
+};
+#endif
 
 /* Fake mode check, e.g. WFD */
-static int fake_mode_handling(MTK_SMI_BWC_CONFIG *p_conf, unsigned int *pu4LocalCnt)
+static int fake_mode_handling(struct MTK_SMI_BWC_CONFIG *p_conf, unsigned int *pu4LocalCnt)
 {
 	if (p_conf->scenario == SMI_BWC_SCEN_WFD) {
 		if (p_conf->b_on_off) {
@@ -882,138 +775,29 @@ static int ovl_limit_uevent(int bwc_scenario, int ovl_pixel_limit)
 	return err;
 }
 
-#if defined(SMI_INTERNAL_CCF_SUPPORT)
-static unsigned int smiclk_subsys_2_larb(enum subsys_id sys)
-{
-	unsigned int i4larbid = 0;
-
-	switch (sys) {
-	case SYS_MM0:
-		i4larbid = 0x3;    /* larb0/1 */
-		break;
-	case SYS_VDE:
-		i4larbid = 0x10;   /* larb4 */
-		break;
-	case SYS_ISP:
-		i4larbid = 0x24;   /* larb2/5 */
-		break;
-	case SYS_VEN:
-		i4larbid = 0x80;   /* larb7 */
-	break;
-	case SYS_MJC:
-		i4larbid = 0x100;  /* larb8 */
-		break;
-	case SYS_CAM:
-		i4larbid = 0x48;   /* larb3/6 */
-		break;
-	default:
-		break;
-	}
-	return i4larbid;
-
-}
-
-static void smiclk_subsys_after_on(enum subsys_id sys)
-{
-	unsigned int i4larbid = smiclk_subsys_2_larb(sys);
-	int i = 0;
-
-	if (!fglarbcallback) {
-		SMIDBG(1, "don't need restore incb\n");
-		return;
-	}
-
-	do {
-		if ((i4larbid & 1) && (1 << i & bus_optimization)) {
-			if (i < SMI_LARB_NUM) {
-				SMIDBG(1, "ready to call restore with larb%d.\n", i);
-				on_larb_power_on_with_ccf(i);
-				}
-		}
-		i4larbid = i4larbid >> 1;
-		i++;
-	} while (i4larbid != 0);
-}
-
-struct pg_callbacks smi_clk_subsys_handle = {
-	.after_on = smiclk_subsys_after_on
-};
-
-#endif /* SMI_INTERNAL_CCF_SUPPORT */
-
-/* prepare larb clk because prepare cannot in spinlock */
-static void smi_bus_optimization_prepare(int optimization_larbs)
-{
-	int i = 0;
-
-	for (i = 0; i < SMI_LARB_NUM; i++) {
-		int larb_mask = 1 << i;
-
-		if (optimization_larbs & larb_mask) {
-			SMIDBG(1, "prepare clock%d\n", i);
-			smi_clk_prepare(i, "SMI", 1);
-		}
-	}
-}
-
-/* unprepare larb clk because prepare cannot in spinlock */
-static void smi_bus_optimization_unprepare(int optimization_larbs)
-{
-	int i = 0;
-
-	for (i = 0; i < SMI_LARB_NUM; i++) {
-		int larb_mask = 1 << i;
-
-		if (optimization_larbs & larb_mask) {
-			SMIDBG(1, "unprepare clock%d\n", i);
-			smi_clk_unprepare(i, "SMI", 1);
-		}
-	}
-}
-static void smi_bus_optimization_enable(int optimization_larbs)
-{
-	int i = 0;
-
-	for (i = 0; i < SMI_LARB_NUM; i++) {
-		int larb_mask = 1 << i;
-
-		if (optimization_larbs & larb_mask) {
-			SMIDBG(1, "enable clock%d\n", i);
-			smi_clk_enable(i, "SMI", 1);
-		}
-	}
-}
-static void smi_bus_optimization_disable(int optimization_larbs)
-{
-	int i = 0;
-
-	for (i = 0; i < SMI_LARB_NUM; i++) {
-		int larb_mask = 1 << i;
-
-		if (optimization_larbs & larb_mask) {
-			SMIDBG(1, "disable clock%d\n", i);
-			smi_clk_disable(i, "SMI", 1);
-		}
-	}
-}
+/* prepare / unprepare larb clk because prepare cannot in spinlock */
 /* used to control clock/MTCMOS */
 static void smi_bus_optimization_clock_control(int optimization_larbs, enum smi_clk_operation oper)
 {
-	switch (oper) {
-	case SMI_PREPARE_CLK:
-		smi_bus_optimization_prepare(optimization_larbs);
-		break;
-	case SMI_ENABLE_CLK:
-		smi_bus_optimization_enable(optimization_larbs);
-		break;
-	case SMI_DISABLE_CLK:
-		smi_bus_optimization_disable(optimization_larbs);
-		break;
-	case SMI_UNPREPARE_CLK:
-		smi_bus_optimization_unprepare(optimization_larbs);
-		break;
-	default:
-		break;
+	int i;
+
+	for (i = 0; i < SMI_LARB_NUM; i++) {
+		int larb_mask = 1 << i;
+
+		if (optimization_larbs & larb_mask) {
+			switch (oper) {
+			case BUS_ENABLE:
+				smi_bus_prepare_enable(i, "SMI_BUS_OPT", 1);
+				break;
+			case BUS_DISABLE:
+				smi_bus_disable_unprepare(i, "SMI_BUS_OPT", 1);
+				break;
+			default:
+				SMIMSG("Unknown oper %d for larb %d: smi_bus_optimization_clock_control(%d, %d)\n",
+					oper, i, optimization_larbs, oper);
+				break;
+			}
+		}
 	}
 }
 
@@ -1033,7 +817,8 @@ static void smi_bus_optimization(int optimization_larbs, int smi_profile)
 
 	}
 }
-static char *smi_get_scenario_name(MTK_SMI_BWC_SCEN scen)
+
+static char *smi_get_scenario_name(enum MTK_SMI_BWC_SCEN scen)
 {
 	switch (scen) {
 	case SMI_BWC_SCEN_NORMAL:
@@ -1072,22 +857,27 @@ static char *smi_get_scenario_name(MTK_SMI_BWC_SCEN scen)
 		return "SMI_BWC_SCEN_VPMJC";
 	case SMI_BWC_SCEN_N3D:
 		return "SMI_BWC_SCEN_N3D";
+	case SMI_BWC_SCEN_CAM_PV:
+		return "SMI_BWC_SCEN_CAM_PV";
+	case SMI_BWC_SCEN_CAM_CP:
+		return "SMI_BWC_SCEN_CAM_CP";
 	default:
 		return "unknown scenario";
 	}
 	return "";
 }
-static int smi_bwc_config(MTK_SMI_BWC_CONFIG *p_conf, unsigned int *pu4LocalCnt)
+
+static int smi_bwc_config(struct MTK_SMI_BWC_CONFIG *p_conf, unsigned int *pu4LocalCnt)
 {
 	int i;
 	int result = 0;
 	unsigned int u4Concurrency = 0;
 	int bus_optimization_sync = bus_optimization;
-	MTK_SMI_BWC_SCEN eFinalScen;
-	static MTK_SMI_BWC_SCEN ePreviousFinalScen = SMI_BWC_SCEN_CNT;
+	enum MTK_SMI_BWC_SCEN eFinalScen;
+	static enum MTK_SMI_BWC_SCEN ePreviousFinalScen = SMI_BWC_SCEN_CNT;
 
 	if ((p_conf->scenario >= SMI_BWC_SCEN_CNT) || (p_conf->scenario < 0)) {
-		SMIERR("Incorrect SMI BWC config : 0x%x, how could this be...\n", p_conf->scenario);
+		SMIMSG("Incorrect SMI BWC config : 0x%x, how could this be...\n", p_conf->scenario);
 		return -1;
 	}
 
@@ -1117,10 +907,12 @@ static int smi_bwc_config(MTK_SMI_BWC_CONFIG *p_conf, unsigned int *pu4LocalCnt)
 	spin_unlock(&g_SMIInfo.SMI_lock);
 
 	/* Fake mode is not a real SMI profile, so we need to return here */
+#if !defined(SMI_ZIO)
 	if (result == 1)
 		return 0;
+#endif
 
-	smi_bus_optimization_clock_control(bus_optimization_sync, SMI_PREPARE_CLK);
+	smi_bus_optimization_clock_control(bus_optimization_sync, BUS_ENABLE);
 
 	spin_lock(&g_SMIInfo.SMI_lock);
 
@@ -1174,6 +966,10 @@ static int smi_bwc_config(MTK_SMI_BWC_CONFIG *p_conf, unsigned int *pu4LocalCnt)
 		eFinalScen = SMI_BWC_SCEN_VR_SLOW;
 	else if ((1 << SMI_BWC_SCEN_VR) & u4Concurrency)
 		eFinalScen = SMI_BWC_SCEN_VR;
+	else if ((1 << SMI_BWC_SCEN_CAM_PV) & u4Concurrency)
+		eFinalScen = SMI_BWC_SCEN_CAM_PV;
+	else if ((1 << SMI_BWC_SCEN_CAM_CP) & u4Concurrency)
+		eFinalScen = SMI_BWC_SCEN_CAM_CP;
 	else if ((1 << SMI_BWC_SCEN_VP_HIGH_RESOLUTION) & u4Concurrency)
 		eFinalScen = SMI_BWC_SCEN_VP_HIGH_RESOLUTION;
 	else if ((1 << SMI_BWC_SCEN_VP_HIGH_FPS) & u4Concurrency)
@@ -1182,6 +978,8 @@ static int smi_bwc_config(MTK_SMI_BWC_CONFIG *p_conf, unsigned int *pu4LocalCnt)
 		eFinalScen = SMI_BWC_SCEN_VP;
 	else if ((1 << SMI_BWC_SCEN_SWDEC_VP) & u4Concurrency)
 		eFinalScen = SMI_BWC_SCEN_SWDEC_VP;
+	else if ((1 << SMI_BWC_SCEN_WFD) & u4Concurrency)
+		eFinalScen = SMI_BWC_SCEN_WFD;
 	else if ((1 << SMI_BWC_SCEN_VENC) & u4Concurrency)
 		eFinalScen = SMI_BWC_SCEN_VENC;
 	else
@@ -1192,63 +990,27 @@ static int smi_bwc_config(MTK_SMI_BWC_CONFIG *p_conf, unsigned int *pu4LocalCnt)
 	} else {
 		SMIMSG("Scen equal to %s, no need to change\n", smi_get_scenario_name(eFinalScen));
 		spin_unlock(&g_SMIInfo.SMI_lock);
-		smi_bus_optimization_clock_control(bus_optimization_sync, SMI_UNPREPARE_CLK);
+		smi_bus_optimization_clock_control(bus_optimization_sync, BUS_DISABLE);
 		return 0;
 	}
 
 	smi_profile = eFinalScen;
-	smi_bus_optimization_clock_control(bus_optimization_sync, SMI_ENABLE_CLK);
 	smi_bus_optimization(bus_optimization_sync, eFinalScen);
-	smi_bus_optimization_clock_control(bus_optimization_sync, SMI_DISABLE_CLK);
 	SMIMSG("[SMI_PROFILE]=%s\n", smi_get_scenario_name(eFinalScen));
 
-
 	spin_unlock(&g_SMIInfo.SMI_lock);
-	smi_bus_optimization_clock_control(bus_optimization_sync, SMI_UNPREPARE_CLK);
+	smi_bus_optimization_clock_control(bus_optimization_sync, BUS_DISABLE);
 	ovl_limit_uevent(smi_profile, g_smi_bwc_mm_info.hw_ovl_limit);
 
-	/*
-	 * force 30 fps in VR slow motion, because disp driver set fps apis got mutex,
-	 * call these APIs only when necessary
-	 */
-	{
-		static unsigned int current_fps;
-
-		if ((eFinalScen == SMI_BWC_SCEN_VR_SLOW) && (current_fps != 30)) {
-			/* force 30 fps in VR slow motion profile */
-			primary_display_force_set_vsync_fps(30);
-			current_fps = 30;
-			SMIMSG("[SMI_PROFILE] set 30 fps\n");
-		} else if ((eFinalScen != SMI_BWC_SCEN_VR_SLOW) && (current_fps == 30)) {
-			/* back to normal fps */
-			current_fps = primary_display_get_fps();
-			primary_display_force_set_vsync_fps(current_fps);
-			SMIMSG("[SMI_PROFILE] back to %u fps\n", current_fps);
-		}
-	}
 	return 0;
 }
-
-#if !defined(SMI_INTERNAL_CCF_SUPPORT)
-struct larb_monitor larb_monitor_handler = {
-	.level = LARB_MONITOR_LEVEL_HIGH,
-	.backup = on_larb_power_off,
-	.restore = on_larb_power_on
-};
-#endif				/* !defined(SMI_INTERNAL_CCF_SUPPORT) */
 
 int smi_common_init(void)
 {
 	int i;
-#if defined(DEBUG_TEST)
-	int cur_bus_optimization;
-#endif
-#if defined(SMI_INTERNAL_CCF_SUPPORT)
 	struct pg_callbacks *pold = 0;
-#endif
 
 	SMIMSG("Enter smi_common_init\n");
-
 	if (!enable_bw_optimization) {
 		SMIMSG("SMI enable_bw_optimization off\n");
 		return 0;
@@ -1260,58 +1022,29 @@ int smi_common_init(void)
 			SMIERR("pLarbRegBackUp kmalloc fail %d\n", i);
 	}
 
-#if defined(DEBUG_TEST)
-	SMIMSG("before test, bus_optimization=0x%x\n", bus_optimization);
-	cur_bus_optimization = bus_optimization;
-	for (i = 0; i < SMI_LARB_NUM; i++) {
-		SMIMSG("test larb%d enable clock\n", i);
-		bus_optimization = 1 << i;
-		smi_bus_optimization_clock_control(bus_optimization, SMI_PREPARE_CLK);
-		smi_bus_optimization_clock_control(bus_optimization, SMI_ENABLE_CLK);
 
-		smi_apply_mmu_setting();
-		smi_apply_basic_setting();
-		smi_bus_optimization(bus_optimization, SMI_BWC_SCEN_NORMAL);
-
-		smi_bus_optimization_clock_control(bus_optimization, SMI_DISABLE_CLK);
-		smi_bus_optimization_clock_control(bus_optimization, SMI_UNPREPARE_CLK);
-		bus_optimization = 0;
-	}
-	bus_optimization = cur_bus_optimization;
-	SMIMSG("after test, bus_optimization=0x%x\n", bus_optimization);
-#endif
-	/* apply init setting after kernel boot */
-	smi_bus_optimization_clock_control(bus_optimization, SMI_PREPARE_CLK);
-	smi_bus_optimization_clock_control(bus_optimization, SMI_ENABLE_CLK);
-
+	smi_bus_optimization_clock_control(bus_optimization, BUS_ENABLE);
 	/* apply mmu setting -- enable bit1 */
 	smi_apply_mmu_setting();
 	smi_apply_basic_setting();
 
 	smi_bus_optimization(bus_optimization, SMI_BWC_SCEN_NORMAL);
+	smi_bus_optimization_clock_control(bus_optimization, BUS_DISABLE);
 
-	smi_bus_optimization_clock_control(bus_optimization, SMI_DISABLE_CLK);
-	smi_bus_optimization_clock_control(bus_optimization, SMI_UNPREPARE_CLK);
-
-#if defined(SMI_INTERNAL_CCF_SUPPORT)
 	fglarbcallback = true;
-
+#if defined(SMI_INTERNAL_CCF_SUPPORT)
 	pold = register_pg_callback(&smi_clk_subsys_handle);
 	if (pold)
 		SMIERR("smi reg clk cb call fail\n");
 	else
 		SMIMSG("smi reg clk cb call success\n");
-
-#elif !defined(SMI_DUMMY)				/* !defined(SMI_INTERNAL_CCF_SUPPORT) */
+#else
 	register_larb_monitor(&larb_monitor_handler);
-#endif				/* defined(SMI_INTERNAL_CCF_SUPPORT) */
-
+#endif
 	/*
 	 * make sure all larb power is on before we register callback func.
 	 * then, when larb power is first off, default register value will be backed up.
 	 */
-
-
 	/* After clock callback registration, it will restore incorrect value because backup is not called. */
 	smi_first_restore = 0;
 	return 0;
@@ -1339,7 +1072,7 @@ static int smi_release(struct inode *inode, struct file *file)
 	unsigned long u4Index = 0;
 	unsigned long u4AssignCnt = 0;
 	unsigned long *pu4Cnt = (unsigned long *)file->private_data;
-	MTK_SMI_BWC_CONFIG config;
+	struct MTK_SMI_BWC_CONFIG config;
 
 	for (; u4Index < SMI_BWC_SCEN_CNT; u4Index += 1) {
 		if (pu4Cnt[u4Index]) {
@@ -1347,7 +1080,7 @@ static int smi_release(struct inode *inode, struct file *file)
 			       current->comm, u4Index);
 			u4AssignCnt = pu4Cnt[u4Index];
 			config.b_on_off = 0;
-			config.scenario = (MTK_SMI_BWC_SCEN) u4Index;
+			config.scenario = (enum MTK_SMI_BWC_SCEN) u4Index;
 			do {
 				smi_bwc_config(&config, pu4Cnt);
 			} while (u4AssignCnt > 0);
@@ -1377,9 +1110,9 @@ static long smi_ioctl(struct file *pFile, unsigned int cmd, unsigned long param)
 		/* disable reg access ioctl by default for possible security holes */
 		/* TBD: check valid SMI register range */
 	case MTK_IOC_SMI_BWC_CONFIG:{
-			MTK_SMI_BWC_CONFIG cfg;
+			struct MTK_SMI_BWC_CONFIG cfg;
 
-			ret = copy_from_user(&cfg, (void *)param, sizeof(MTK_SMI_BWC_CONFIG));
+			ret = copy_from_user(&cfg, (void *)param, sizeof(struct MTK_SMI_BWC_CONFIG));
 			if (ret) {
 				SMIMSG(" SMI_BWC_CONFIG, copy_from_user failed: %d\n", ret);
 				return -EFAULT;
@@ -1437,19 +1170,19 @@ static long smi_ioctl(struct file *pFile, unsigned int cmd, unsigned long param)
 	case MTK_IOC_MMDVFS_CMD:
 		{
 
-			MTK_MMDVFS_CMD mmdvfs_cmd;
+			struct MTK_MMDVFS_CMD mmdvfs_cmd;
 
 			if (disable_mmdvfs)
 				return -EFAULT;
 
-			if (copy_from_user(&mmdvfs_cmd, (void *)param, sizeof(MTK_MMDVFS_CMD)))
+			if (copy_from_user(&mmdvfs_cmd, (void *)param, sizeof(struct MTK_MMDVFS_CMD)))
 				return -EFAULT;
 
 
 			mmdvfs_handle_cmd(&mmdvfs_cmd);
 
 			if (copy_to_user
-			    ((void *)param, (void *)&mmdvfs_cmd, sizeof(MTK_MMDVFS_CMD))) {
+			    ((void *)param, (void *)&mmdvfs_cmd, sizeof(struct MTK_MMDVFS_CMD))) {
 				return -EFAULT;
 			}
 		}
@@ -1525,8 +1258,10 @@ static struct class *pSmiClass;
 /* MMDVFS related clk initialization */
 static int smi_mmdvfs_clks_init(void)
 {
+#ifdef MMDVFS_HOOK
 		int i = 0;
 
+		SMIMSG("start smi_mmdvfs_clks_init\n");
 		/* const int mmdvfs_disable_setting = disable_mmdvfs; */
 		/* init clk mux of each MM clks*/
 		for (i = 0; i < g_mmdvfs_adaptor->mmdvfs_clk_hw_maps_num; i++) {
@@ -1535,65 +1270,89 @@ static int smi_mmdvfs_clks_init(void)
 
 			if (hw_map_ptr->config_method != MMDVFS_CLK_CONFIG_NONE) {
 				SMIMSG("Init CLK %s\n", hw_map_ptr->clk_mux.ccf_name);
-				hw_map_ptr->clk_mux.ccf_handle = get_smi_clk(hw_map_ptr->clk_mux.ccf_name);
+				hw_map_ptr->clk_mux.ccf_handle = smi_clk_get_by_name(
+					SMI_COMMON_REG_INDX, hw_map_ptr->clk_mux.ccf_name);
 			}
 		}
 
 		for (i = 0; i < g_mmdvfs_adaptor->mmdvfs_clk_sources_num; i++) {
 			SMIMSG("Init CLK %s\n", g_mmdvfs_adaptor->mmdvfs_clk_sources[i].ccf_name);
 			g_mmdvfs_adaptor->mmdvfs_clk_sources[i].ccf_handle =
-			get_smi_clk(g_mmdvfs_adaptor->mmdvfs_clk_sources[i].ccf_name);
-			}
+			smi_clk_get_by_name(SMI_COMMON_REG_INDX, g_mmdvfs_adaptor->mmdvfs_clk_sources[i].ccf_name);
+		}
 
 		/* Enanle the MASK for CLK change */
 		clk_mux_mask = 0xFFFF;
 
-		SMIMSG("Finishe smi_mmdvfs_clks_init\n");
+		SMIMSG("Finish smi_mmdvfs_clks_init\n");
 
 		/* Set default high berfore MMDVFS feature is enabled, */
 		/* Onlye work when force_max_mmsys_clk is enabled */
 		mmdvfs_default_start_delayed_setting();
-
+#endif
 		return 0;
 }
 
 static int smi_probe(struct platform_device *pdev)
 {
-
 	int i;
-
+	int j;
 	static unsigned int smi_probe_cnt;
 	struct device *smiDevice = NULL;
 	int prev_smi_debug_level = smi_debug_level;
 
 	smi_debug_level = 1;
-	SMIMSG("Enter smi_probe\n");
+	if (!pdev) {
+		SMIERR("platform data missed\n");
+		return -ENXIO;
+	}
 	/* Debug only */
 	if (smi_probe_cnt != 0) {
 		SMIERR("Only support 1 SMI driver probed\n");
 		return 0;
 	}
 	smi_probe_cnt++;
-	SMIMSG("Allocate smi_dev space\n");
-	smi_dev = kmalloc(sizeof(struct smi_device), GFP_KERNEL);
 
+	SMIMSG("Enter SMI probe: Allocate smi_dev and smi_larb_dev space\n");
+	smi_dev = kmalloc(sizeof(struct smi_device), GFP_KERNEL);
 	if (!smi_dev) {
 		SMIERR("Unable to allocate memory for smi driver\n");
 		return -ENOMEM;
 	}
-	if (!pdev) {
-		SMIERR("platform data missed\n");
-		return -ENXIO;
-	}
 	/* Keep the device structure */
 	smi_dev->dev = &pdev->dev;
 
-	if (enable_bw_optimization) {
-		/* Map registers */
-		for (i = 0; i < SMI_REG_REGION_MAX; i++) {
-			SMIMSG("Save region: %d\n", i);
-			smi_dev->regs[i] = (void *)of_iomap(pdev->dev.of_node, i);
+	smi_dev->clocks = kmalloc_array(nr_mtcmos_clks[SMI_COMMON_REG_INDX], sizeof(struct clk *), GFP_KERNEL);
+	if (smi_dev->clocks == NULL) {
+		SMIMSG("Unable to allocate memory for smi driver clocks\n");
+		return -ENOMEM;
+	}
+	for (i = 0; i < SMI_LARB_NUM; i++) {
+		smi_larb_dev[i] = kmalloc(sizeof(struct smi_larb_device), GFP_KERNEL);
+		if (smi_larb_dev[i] == NULL) {
+			SMIMSG("Unable to allocate memory for smi larb %d driver\n", i);
+			return -ENOMEM;
+		}
+		smi_larb_dev[i]->clocks = kmalloc_array(nr_mtcmos_clks[i], sizeof(struct clk *), GFP_KERNEL);
+		if (smi_larb_dev[i]->clocks == NULL) {
+			SMIMSG("Unable to allocate memory for smi larb %d driver clocks\n", i);
+			return -ENOMEM;
+		}
+	}
 
+	if (enable_bw_optimization) {
+		struct device_node *of_node = NULL;
+
+		for (i = 0; i < SMI_REG_REGION_MAX; i++) {
+			if (i == SMI_COMMON_REG_INDX)
+				smi_dev->regs[i] = (void *)of_iomap(pdev->dev.of_node, 0);
+			else { /* larb */
+				of_node = of_parse_phandle(pdev->dev.of_node, "larbs", i);
+				smi_dev->regs[i] = (void *)of_iomap(of_node, 0);
+				smi_larb_dev[i]->of_node = of_node;
+				smi_larb_dev[i]->reg = (void *)of_iomap(of_node, 0);
+				of_node_put(of_node);
+			}
 			if (!smi_dev->regs[i]) {
 				SMIERR("Unable to ioremap registers, of_iomap fail, i=%d\n", i);
 				return -ENOMEM;
@@ -1602,55 +1361,40 @@ static int smi_probe(struct platform_device *pdev)
 			gSMIBaseAddrs[i] = (unsigned long)(smi_dev->regs[i]);
 			SMIMSG("DT, i=%d, region=%s, map_addr=0x%p, reg_pa=0x%lx\n", i,
 			       smi_get_region_name(i), smi_dev->regs[i], get_register_base(i));
+			/* get mtcmos and clock from dts */
+			for (j = 0; j < nr_mtcmos_clks[i]; j++) { /* get mtcmos and clock from dts */
+				SMIMSG("smi_clk_name[%d][%d] = %s\n", i, j, smi_clk_name[i][j]);
+				if (i == SMI_COMMON_REG_INDX)
+					smi_dev->clocks[j] = smi_clk_get_by_name(i, smi_clk_name[i][j]);
+				else
+					smi_larb_dev[i]->clocks[j] = smi_clk_get_by_name(i, smi_clk_name[i][j]);
+			}
+			if (i == SMI_COMMON_REG_INDX || i == SMI_LARB0_REG_INDX)
+				atomic_set(&(larbs_clock_count[i]), 1);
+#if defined(SMI_WHI) || defined(SMI_ALA) || defined(SMI_VIN)
+			else if (i == SMI_LARB1_REG_INDX)
+				atomic_set(&(larbs_clock_count[i]), 1);
+#endif
+			else
+				atomic_set(&(larbs_clock_count[i]), 0);
 		}
 #if defined(SMI_WHI)
-		smi_dev->mmsys = (void *)of_iomap(pdev->dev.of_node, SMI_MMSYS_REG_INDX);
+		of_node = of_parse_phandle(pdev->dev.of_node, "mmsys_config", 0);
+		smi_dev->mmsys = (void *)of_iomap(of_node, 0);
+		of_node_put(of_node);
 		if (!smi_dev->mmsys) {
 			SMIERR("Unable to ioremap mmsys registers, of_iomap fail");
 			return -ENOMEM;
+		} else {
+			mmsys_reg = (unsigned long) smi_dev->mmsys;
+			SMIMSG("DT, mmsys_config, map_addr=0x%p, mmsys_reg=0x%llx\n", smi_dev->mmsys, mmsys_reg);
 		}
-		mmsys_reg = (unsigned long) smi_dev->mmsys;
 #endif
-#if defined(SMI_INTERNAL_CCF_SUPPORT)
-		smi_dev->smi_common_fifo0_clk = get_smi_clk("smi-common-FIFO0");
-		smi_dev->smi_common_fifo1_clk = get_smi_clk("smi-common-FIFO1");
-		smi_dev->smi_common_upsz0_clk = get_smi_clk("smi-common-UPSZ0");
-		smi_dev->smi_common_upsz1_clk = get_smi_clk("smi-common-UPSZ1");
-		smi_dev->smi_common_gals0_clk = get_smi_clk("smi-common-GALS0");
-		smi_dev->smi_common_gals1_clk = get_smi_clk("smi-common-GALS1");
-		smi_dev->smi_common_clk = get_smi_clk("smi-common");
-		smi_dev->smi_common_2x_clk = get_smi_clk("smi-common-2X");
-		smi_dev->smi_larb0_clk = get_smi_clk("smi-larb0");
-		smi_dev->smi_larb1_clk = get_smi_clk("smi-larb1");
-		smi_dev->smi_larb2_clk = get_smi_clk("smi-larb2");
-		smi_dev->smi_larb3_clk = get_smi_clk("smi-larb3");
-		smi_dev->smi_larb4_vdec_clk = get_smi_clk("smi-larb4-vdec");
-		smi_dev->smi_larb4_mm_clk = get_smi_clk("smi-larb4-mm");
-		smi_dev->smi_larb5_img_clk = get_smi_clk("smi-larb5-img");
-		smi_dev->smi_larb5_mm_clk = get_smi_clk("smi-larb5-mm");
-		smi_dev->smi_larb6_cam_clk = get_smi_clk("smi-larb6-cam");
-		smi_dev->smi_larb6_mm_clk = get_smi_clk("smi-larb6-mm");
-		smi_dev->smi_larb7_venc0_clk = get_smi_clk("smi-larb7-venc-0");
-		smi_dev->smi_larb7_venc1_clk = get_smi_clk("smi-larb7-venc-1");
-		smi_dev->smi_larb7_venc2_clk = get_smi_clk("smi-larb7-venc-2");
-		smi_dev->smi_larb7_mm_clk = get_smi_clk("smi-larb7-mm");
-		smi_dev->smi_larb8_mjc0_clk = get_smi_clk("smi-larb8-mjc-0");
-		smi_dev->smi_larb8_mjc1_clk = get_smi_clk("smi-larb8-mjc-1");
-		smi_dev->smi_larb8_mm_clk = get_smi_clk("smi-larb8-mm");
-		/* MTCMOS */
-		smi_dev->mm_mtcmos = get_smi_clk("mtcmos-mm");
-		smi_dev->img_mtcmos = get_smi_clk("mtcmos-img");
-		smi_dev->cam_mtcmos = get_smi_clk("mtcmos-cam");
-		smi_dev->vde_mtcmos = get_smi_clk("mtcmos-vde");
-		smi_dev->ven_mtcmos = get_smi_clk("mtcmos-ven");
-		smi_dev->mjc_mtcmos = get_smi_clk("mtcmos-mjc");
 		smi_mmdvfs_clks_init();
-#endif
-	} else {
+	} else
 		SMIDBG(1, "enable_bw_optimization is disabled\n");
-	}
 
-	SMIMSG("Execute smi_register\n");
+	SMIMSG("Execute smi_register and create device\n");
 	if (smi_register()) {
 		dev_err(&pdev->dev, "register char failed\n");
 		return -EAGAIN;
@@ -1663,22 +1407,17 @@ static int smi_probe(struct platform_device *pdev)
 		SMIERR("Unable to create class, err = %d", ret);
 		return ret;
 	}
-	SMIMSG("Create device\n");
 	smiDevice = device_create(pSmiClass, NULL, smiDevNo, NULL, "MTK_SMI");
 	smiDeviceUevent = smiDevice;
 
-	SMIMSG("SMI probe done.\n");
-
-	gLarbBaseAddr[0] = gSMIBaseAddrs[SMI_LARB0_REG_INDX];
-	gLarbBaseAddr[1] = gSMIBaseAddrs[SMI_LARB1_REG_INDX];
-	gLarbBaseAddr[2] = gSMIBaseAddrs[SMI_LARB2_REG_INDX];
-	gLarbBaseAddr[3] = gSMIBaseAddrs[SMI_LARB3_REG_INDX];
-	gLarbBaseAddr[4] = gSMIBaseAddrs[SMI_LARB4_REG_INDX];
-	gLarbBaseAddr[5] = gSMIBaseAddrs[SMI_LARB5_REG_INDX];
-	gLarbBaseAddr[6] = gSMIBaseAddrs[SMI_LARB6_REG_INDX];
-	gLarbBaseAddr[7] = gSMIBaseAddrs[SMI_LARB7_REG_INDX];
-	gLarbBaseAddr[8] = gSMIBaseAddrs[SMI_LARB8_REG_INDX];
-
+	if (SMI_MMIT_PORTING) {
+		/* for MMIT, we only write warb setting and return */
+		SMIMSG("before setting, 0x100=0x%x\n", M4U_ReadReg32(get_common_base_addr(), 0x100));
+		M4U_WriteReg32(get_common_base_addr(), 0x100, 0xb);
+		SMIMSG("after setting, 0x100=0x%x\n", M4U_ReadReg32(get_common_base_addr(), 0x100));
+		smi_debug_level = prev_smi_debug_level;
+		return 0;
+	}
 
 	SMIMSG("Execute smi_common_init\n");
 	SMIDBG(1, "before smi_common_init, smi_prepare_count=%d, smi_enable_count=%d\n",
@@ -1696,14 +1435,14 @@ static int smi_probe(struct platform_device *pdev)
 
 	smi_debug_level = prev_smi_debug_level;
 	return 0;
-
 }
 
 char *smi_get_region_name(unsigned int region_indx)
 {
-	switch (region_indx) {
-	case SMI_COMMON_REG_INDX:
+	if (region_indx == SMI_COMMON_REG_INDX)
 		return "smi_common";
+
+	switch (region_indx) {
 	case SMI_LARB0_REG_INDX:
 		return "larb0";
 	case SMI_LARB1_REG_INDX:
@@ -1814,9 +1553,9 @@ void smi_client_status_change_notify(int module, int mode)
 
 }
 
-MTK_SMI_BWC_SCEN smi_get_current_profile(void)
+enum MTK_SMI_BWC_SCEN smi_get_current_profile(void)
 {
-	return (MTK_SMI_BWC_SCEN) smi_profile;
+	return (enum MTK_SMI_BWC_SCEN) smi_profile;
 }
 EXPORT_SYMBOL(smi_get_current_profile);
 #if IS_ENABLED(CONFIG_COMPAT)
@@ -1853,7 +1592,7 @@ struct MTK_SMI_COMPAT_BWC_MM_INFO {
 #define COMPAT_MTK_IOC_SMI_BWC_INFO_GET    MTK_IOWR(29, struct MTK_SMI_COMPAT_BWC_MM_INFO)
 
 static int compat_get_smi_bwc_config_struct(struct MTK_SMI_COMPAT_BWC_CONFIG __user *data32,
-					    MTK_SMI_BWC_CONFIG __user *data)
+					    struct MTK_SMI_BWC_CONFIG __user *data)
 {
 
 	compat_int_t i;
@@ -1869,7 +1608,7 @@ static int compat_get_smi_bwc_config_struct(struct MTK_SMI_COMPAT_BWC_CONFIG __u
 }
 
 static int compat_get_smi_bwc_mm_info_set_struct(struct MTK_SMI_COMPAT_BWC_INFO_SET __user *data32,
-						 MTK_SMI_BWC_INFO_SET __user *data)
+						 struct MTK_SMI_BWC_INFO_SET __user *data)
 {
 
 	compat_int_t i;
@@ -1887,7 +1626,7 @@ static int compat_get_smi_bwc_mm_info_set_struct(struct MTK_SMI_COMPAT_BWC_INFO_
 }
 
 static int compat_get_smi_bwc_mm_info_struct(struct MTK_SMI_COMPAT_BWC_MM_INFO __user *data32,
-					     MTK_SMI_BWC_MM_INFO __user *data)
+					     struct MTK_SMI_BWC_MM_INFO __user *data)
 {
 	compat_uint_t u;
 	compat_int_t i;
@@ -1920,7 +1659,7 @@ static int compat_get_smi_bwc_mm_info_struct(struct MTK_SMI_COMPAT_BWC_MM_INFO _
 }
 
 static int compat_put_smi_bwc_mm_info_struct(struct MTK_SMI_COMPAT_BWC_MM_INFO __user *data32,
-					     MTK_SMI_BWC_MM_INFO __user *data)
+					     struct MTK_SMI_BWC_MM_INFO __user *data)
 {
 
 	compat_uint_t u;
@@ -1968,11 +1707,11 @@ static long MTK_SMI_COMPAT_ioctl(struct file *filp, unsigned int cmd, unsigned l
 			} else {
 
 				struct MTK_SMI_COMPAT_BWC_CONFIG __user *data32;
-				MTK_SMI_BWC_CONFIG __user *data;
+				struct MTK_SMI_BWC_CONFIG __user *data;
 				int err;
 
 				data32 = compat_ptr(arg);
-				data = compat_alloc_user_space(sizeof(MTK_SMI_BWC_CONFIG));
+				data = compat_alloc_user_space(sizeof(struct MTK_SMI_BWC_CONFIG));
 
 				if (!data)
 					return -EFAULT;
@@ -1996,11 +1735,11 @@ static long MTK_SMI_COMPAT_ioctl(struct file *filp, unsigned int cmd, unsigned l
 			} else {
 
 				struct MTK_SMI_COMPAT_BWC_INFO_SET __user *data32;
-				MTK_SMI_BWC_INFO_SET __user *data;
+				struct MTK_SMI_BWC_INFO_SET __user *data;
 				int err;
 
 				data32 = compat_ptr(arg);
-				data = compat_alloc_user_space(sizeof(MTK_SMI_BWC_INFO_SET));
+				data = compat_alloc_user_space(sizeof(struct MTK_SMI_BWC_INFO_SET));
 				if (!data)
 					return -EFAULT;
 
@@ -2021,11 +1760,11 @@ static long MTK_SMI_COMPAT_ioctl(struct file *filp, unsigned int cmd, unsigned l
 								  (unsigned long)compat_ptr(arg));
 			} else {
 				struct MTK_SMI_COMPAT_BWC_MM_INFO __user *data32;
-				MTK_SMI_BWC_MM_INFO __user *data;
+				struct MTK_SMI_BWC_MM_INFO __user *data;
 				int err;
 
 				data32 = compat_ptr(arg);
-				data = compat_alloc_user_space(sizeof(MTK_SMI_BWC_MM_INFO));
+				data = compat_alloc_user_space(sizeof(struct MTK_SMI_BWC_MM_INFO));
 
 				if (!data)
 					return -EFAULT;
@@ -2095,7 +1834,7 @@ int force_always_on_mm_clks(void)
 	return force_always_on_mm_clks_mask;
 }
 
-subsys_initcall(smi_init);
+arch_initcall_sync(smi_init);
 
 static void smi_driver_setting(void)
 {
@@ -2140,13 +1879,10 @@ static void smi_driver_setting(void)
 static void smi_apply_common_basic_setting(void)
 {
 #if defined(SMI_WHI)
-	/* disable DCM for prevent memory transaction fail */
-	unsigned int DCM_val = M4U_ReadReg32(mmsys_reg, 0x130);
-
-	SMIMSG("before setting, DCM_val = 0x%x\n", DCM_val);
-	DCM_val |= 0x3fc0;
-	M4U_WriteReg32(mmsys_reg, 0x130, DCM_val);
-	SMIMSG("after setting, DCM_val = 0x%x\n", M4U_ReadReg32(mmsys_reg, 0x130));
+	/* disable mmsys DCM for prevent memory transaction fail */
+	SMIDBG(1, "before setting, DCM_val = 0x%x\n", M4U_ReadReg32(mmsys_reg, 0x130));
+	M4U_WriteReg32(mmsys_reg, 0x134, 0x3fc0);
+	SMIDBG(1, "after setting, DCM_val = 0x%x\n", M4U_ReadReg32(mmsys_reg, 0x130));
 #endif
 	SMIDBG(1, "start to apply common basic setting.\n");
 	smi_common_setting(&smi_basic_setting_config);
@@ -2219,6 +1955,40 @@ static void smi_apply_mmu_setting(void)
 	SMIDBG(1, "apply mmu setting done.\n");
 }
 
+void smi_common_ostd_setting(int enable)
+{
+	unsigned int val = 0;
+	unsigned int tmp_val = 0;
+
+	SMIDBG(1, "before setting, 0x118=0x%x, 0x11c=0x%x, 0x120=0x%x\n",
+	M4U_ReadReg32(get_common_base_addr(), 0x118),
+	M4U_ReadReg32(get_common_base_addr(), 0x11c),
+	M4U_ReadReg32(get_common_base_addr(), 0x120));
+	/* workaround for disable IPU/VENC/MJC write cmd via set write ostd = 0 */
+	if (enable == 0) {
+		val = 0xffcfbfff;
+		tmp_val = M4U_ReadReg32(get_common_base_addr(), 0x118) & val;
+		M4U_WriteReg32(get_common_base_addr(), 0x118, tmp_val);
+		tmp_val = M4U_ReadReg32(get_common_base_addr(), 0x11c) & val;
+		M4U_WriteReg32(get_common_base_addr(), 0x11c, tmp_val);
+		tmp_val = M4U_ReadReg32(get_common_base_addr(), 0x120) & val;
+		M4U_WriteReg32(get_common_base_addr(), 0x120, tmp_val);
+	} else {
+		val = 0x304000;
+		tmp_val = M4U_ReadReg32(get_common_base_addr(), 0x118) | val;
+		M4U_WriteReg32(get_common_base_addr(), 0x118, tmp_val);
+		tmp_val = M4U_ReadReg32(get_common_base_addr(), 0x11c) | val;
+		M4U_WriteReg32(get_common_base_addr(), 0x11c, tmp_val);
+		tmp_val = M4U_ReadReg32(get_common_base_addr(), 0x120) | val;
+		M4U_WriteReg32(get_common_base_addr(), 0x120, tmp_val);
+	}
+	SMIDBG(1, "after setting, 0x118=0x%x, 0x11c=0x%x, 0x120=0x%x\n",
+	M4U_ReadReg32(get_common_base_addr(), 0x118),
+	M4U_ReadReg32(get_common_base_addr(), 0x11c),
+	M4U_ReadReg32(get_common_base_addr(), 0x120));
+}
+
+module_param_named(mmdvfs_scen_log_mask, mmdvfs_scen_log_mask, uint, S_IRUGO | S_IWUSR);
 module_param_named(disable_mmdvfs, disable_mmdvfs, uint, S_IRUGO | S_IWUSR);
 module_param_named(disable_freq_hopping, disable_freq_hopping, uint, S_IRUGO | S_IWUSR);
 module_param_named(disable_freq_mux, disable_freq_mux, uint, S_IRUGO | S_IWUSR);

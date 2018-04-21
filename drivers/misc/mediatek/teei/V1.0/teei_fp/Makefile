@@ -1,4 +1,4 @@
-# Copyright (c) 2015-2016 MICROTRUST Incorporated
+# Copyright (c) 2015-2017 MICROTRUST Incorporated
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or
@@ -11,4 +11,5 @@
 # GNU General Public License for more details.
 
 obj-$(CONFIG_MICROTRUST_TZ_DRIVER) += fp_func.o
-EXTRA_CFLAGS += -D DEBUG_DO -fno-pic
+ccflags-y += -DDEBUG_DO -fno-pic -DIMSG_TAG='"[teei_fp]"'
+ccflags-y += -Wall -Werror

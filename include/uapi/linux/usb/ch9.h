@@ -136,6 +136,12 @@
 #define	TEST_PACKET	4
 #define	TEST_FORCE_EN	5
 
+/* OTG test mode feature bits
+ * See ECN OTG2.0 spec Table 6-8
+ */
+#define TEST_OTG_SRP_REQD	6
+#define TEST_OTG_HNP_REQD	7
+
 /*
  * New Feature Selectors as added by USB 3.0
  * See USB 3.0 spec Table 9-7
@@ -159,6 +165,11 @@
 #define USB_INTRF_STAT_FUNC_RW         2
 
 #define USB_ENDPOINT_HALT		0	/* IN/OUT will STALL */
+
+#define OTG_STATUS_SELECTOR		0xF000
+#define HOST_REQUEST_FLAG		0
+#define THOST_REQ_POLL			1500 /* msec (1000 - 2000) */
+#define OTG_TTST_SUSP			70   /* msec (0 - 100) */
 
 /* Bit array elements as returned by the USB_REQ_GET_STATUS request. */
 #define USB_DEV_STAT_U1_ENABLED		2	/* transition into U1 state */
@@ -690,6 +701,7 @@ struct usb_otg20_descriptor {
 #define USB_OTG_HNP		(1 << 1)	/* swap host/device roles */
 #define USB_OTG_ADP		(1 << 2)	/* support ADP */
 
+#define OTG_STS_SELECTOR	0xF000		/* OTG status selector */
 /*-------------------------------------------------------------------------*/
 
 /* USB_DT_DEBUG:  for special highspeed devices, replacing serial console */
@@ -717,6 +729,7 @@ struct usb_interface_assoc_descriptor {
 	__u8  iFunction;
 } __attribute__ ((packed));
 
+#define USB_DT_INTERFACE_ASSOCIATION_SIZE	8
 
 /*-------------------------------------------------------------------------*/
 

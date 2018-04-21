@@ -34,10 +34,10 @@
 #define TPD_DEBUG
 #define TPD_DEBUG_CODE
 /* #define TPD_DEBUG_TRACK */
-#define TPD_DMESG(a, arg...) pr_err(TPD_DEVICE ": " a, ##arg)
+#define TPD_DMESG(a, arg...) pr_info(TPD_DEVICE ": " a, ##arg)
 #if defined(TPD_DEBUG)
 #undef TPD_DEBUG
-#define TPD_DEBUG(a, arg...) pr_err(TPD_DEVICE ": " a, ##arg)
+#define TPD_DEBUG(a, arg...) pr_info(TPD_DEVICE ": " a, ##arg)
 #else
 #define TPD_DEBUG(arg...)
 #endif
@@ -121,6 +121,8 @@ struct tpd_dts_info {
 	int use_tpd_button;
 	int tpd_key_num;
 	int tpd_key_local[4];
+	bool tpd_use_ext_gpio;
+	int rst_ext_gpio_num;
 	struct tpd_key_dim_local tpd_key_dim_local[4];
 	struct tpd_filter_t touch_filter;
 };

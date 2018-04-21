@@ -34,6 +34,7 @@
 #include <linux/of_fdt.h>
 #include <linux/ioport.h>
 #include <linux/io.h>
+#include <linux/types.h>
 #include <mt-plat/sync_write.h>
 #include "sspm_define.h"
 #include "sspm_helper.h"
@@ -62,8 +63,9 @@ static int __init sspm_reserve_mem_of_init(struct reserved_mem *rmem)
 	sspm_mem_base_phys = (phys_addr_t) rmem->base;
 	sspm_mem_size = (phys_addr_t) rmem->size;
 
-	pr_debug("[SSPM] phys:0x%llx - 0x%llx (0x%llx)\n", (phys_addr_t)rmem->base,
-			(phys_addr_t)rmem->base + (phys_addr_t)rmem->size, (phys_addr_t)rmem->size);
+	pr_debug("[SSPM] phys:0x%llx - 0x%llx (0x%llx)\n", (unsigned long long)rmem->base,
+			(unsigned long long)rmem->base + (unsigned long long)rmem->size,
+			(unsigned long long)rmem->size);
 	accumlate_memory_size = 0;
 	for (id = 0; id < NUMS_MEM_ID; id++) {
 		sspm_reserve_mblock[id].start_phys = sspm_mem_base_phys + accumlate_memory_size;
@@ -128,9 +130,11 @@ int sspm_reserve_memory_init(void)
 		return -1;
 
 	accumlate_memory_size = 0;
-	sspm_mem_base_virt = (phys_addr_t)ioremap_nocache(sspm_mem_base_phys, sspm_mem_size);
-	pr_debug("[SSPM]reserve mem: virt:0x%llx - 0x%llx (0x%llx)\n", (phys_addr_t)sspm_mem_base_virt,
-			(phys_addr_t)sspm_mem_base_virt + (phys_addr_t)sspm_mem_size, sspm_mem_size);
+	sspm_mem_base_virt = (phys_addr_t)(uintptr_t)ioremap_nocache(sspm_mem_base_phys, sspm_mem_size);
+	pr_debug("[SSPM]reserve mem: virt:0x%llx - 0x%llx (0x%llx)\n",
+			(unsigned long long)sspm_mem_base_virt,
+			(unsigned long long)sspm_mem_base_virt + (unsigned long long)sspm_mem_size,
+			(unsigned long long)sspm_mem_size);
 	for (id = 0; id < NUMS_MEM_ID; id++) {
 		if (sspm_reserve_mblock[id].start_phys == 0)
 			break;
@@ -146,8 +150,9 @@ int sspm_reserve_memory_init(void)
 #ifdef DEBUG
 	for (id = 0; id < NUMS_MEM_ID; id++) {
 		pr_debug("[SSPM][mem_reserve-%d] phys:0x%llx,virt:0x%llx,size:0x%llx\n",
-				id, sspm_reserve_mem_get_phys(id),
-				sspm_reserve_mem_get_virt(id), sspm_reserve_mem_get_size(id));
+				id, (unsigned long long)sspm_reserve_mem_get_phys(id),
+				(unsigned long long)sspm_reserve_mem_get_virt(id),
+				(unsigned long long)sspm_reserve_mem_get_size(id));
 	}
 #endif
 

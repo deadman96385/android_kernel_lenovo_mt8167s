@@ -52,6 +52,7 @@
 #include <linux/kobject.h>
 #include <linux/miscdevice.h>
 #include <linux/debugfs.h>
+#include <linux/wakelock.h>
 
 
 #include "mtk-test.h"
@@ -326,12 +327,12 @@ static int t_dev_lpm(int argc, char **argv);
 
 /**************************************************************************/
 
-typedef struct {
+struct CMD_TBL_T {
 	char name[256];
 	int (*cb_func)(int argc, char **argv);
-} CMD_TBL_T;
+};
 
-CMD_TBL_T _arPCmdTbl_host[] = {
+struct CMD_TBL_T _arPCmdTbl_host[] = {
 	{"hcd.init", &t_hcd_init},
 	{"hcd.cleanup", &t_hcd_cleanup},
 	{"hcd.drvvbus", &t_drv_vbus},
@@ -470,18 +471,15 @@ int call_function_host(char *buf)
 	if (!argv)
 		return -ENOMEM;
 
-	for (i = 0; i < argc; i++)
-		mtk_test_dbg("[%d] %s\r\n", i, argv[i]);
-
-	for (i = 0; i < sizeof(_arPCmdTbl_host) / sizeof(CMD_TBL_T); i++) {
+	for (i = 0; i < sizeof(_arPCmdTbl_host) / sizeof(struct CMD_TBL_T); i++) {
 		if ((!strcmp(_arPCmdTbl_host[i].name, argv[0])) && (_arPCmdTbl_host[i].cb_func != NULL)) {
 			ret = _arPCmdTbl_host[i].cb_func(argc, argv);
-			pr_notice("===========================\n");
+			pr_alert("==========argc %d==========\n", argc);
 			for (j = 0; j < argc; j++)
-				pr_notice("[%d] %s\r\n", j, argv[j]);
+				pr_alert("[%d] %s\r\n", j, argv[j]);
 
-			pr_notice("This test case result = %d\n", ret);
-			pr_notice("===========================\n");
+			pr_alert("This test case result = %d\n", ret);
+			pr_alert("===========================\n");
 		}
 	}
 
@@ -573,9 +571,10 @@ static ssize_t xhci_mtk_test_write(struct file *file, const char *buf, size_t co
 {
 	int len = BUF_SIZE;
 
-	if (len > count) {
+	if (len > count + 1) {
 		if (copy_from_user(w_buf_host, (char *) buf, count))
 			return -EFAULT;
+		w_buf_host[count] = 0;
 		mtk_test_dbg("xhci_mtk_test_write: %s\r\n", w_buf_host);
 			/*invoke function*/
 		call_function_host(w_buf_host);
@@ -635,9 +634,10 @@ static ssize_t xhci_test_mode_write(struct file *file,
 {
 	int len = BUF_SIZE;
 
-	if (len > count) {
+	if (len > count + 1) {
 		if (copy_from_user(w_buf_host, (char *) ubuf, count))
 			return -EFAULT;
+		w_buf_host[count] = 0;
 		mtk_test_dbg("xhci_mtk_test_write: %s\r\n", w_buf_host);
 			/*invoke function*/
 		call_function_host(w_buf_host);
@@ -719,7 +719,7 @@ int u3auto_hcd_reset(void)
 
 	if (f_address_slot(false, NULL) != RET_SUCCESS)
 		return RET_FAIL;
-#if 1
+#if 0
 	if (chk_frmcnt_clk(my_hcd) != RET_SUCCESS)
 		return RET_FAIL;
 #endif
@@ -772,6 +772,8 @@ static int t_slot_evaluate_context(int argc, char **argv)
 	maxp0 = 64;
 	preping_mode = 0;
 	preping = 0;
+	besld = 0;
+	besl = 0;
 
 	if (my_hcd == NULL) {
 		mtk_test_dbg("[ERROR]host controller driver not initiated\n");
@@ -1331,7 +1333,7 @@ static int t_u3auto_ctrl_loopback(int argc, char **argv)
 
 	if (num == 0) {
 		for (length = 1; length <= max_length;) {
-			mtk_test_dbg("Do CTRL loopback, length %d\n", length);
+			mtk_test_crit("Do CTRL loopback, length %d\n", length);
 			ret = dev_ctrl_loopback(length, NULL);
 
 
@@ -1350,7 +1352,7 @@ static int t_u3auto_ctrl_loopback(int argc, char **argv)
 			if (!length)
 				length = 2048;
 
-			mtk_test_dbg("Do CTRL loopback, length %d\n", length);
+			mtk_test_crit("Do CTRL loopback, length %d\n", length);
 			ret = dev_ctrl_loopback(length, NULL);
 
 			if (ret) {
@@ -1773,6 +1775,9 @@ static int t_u3auto_loopback_scan_sg(int argc, char **argv)
 			ep_out_num = *(arr_ep_out + ep_out_index);
 			for (interval_index = 0; interval_index < interval_arr_size; interval_index++) {
 				bInterval = *(arr_interval + interval_index);
+				mtk_test_crit("      OUT_EP: %d***************************\n", ep_out_num);
+				mtk_test_crit("      IN_EP: %d ***************************\n", ep_in_num);
+				mtk_test_crit("      INTERVAL: %d  ***************************\n", bInterval);
 				for (maxp_index = 0; maxp_index < maxp_arr_size; maxp_index++) {
 					maxp = *(arr_maxp + maxp_index);
 					for (mult_index = 0; mult_index < mult_arr_size; mult_index++) {
@@ -1791,31 +1796,31 @@ static int t_u3auto_loopback_scan_sg(int argc, char **argv)
 					start_port_reenabled(0, speed);
 					ret = dev_reset(speed, NULL);
 					if (ret) {
-						mtk_test_dbg("device reset failed!!!!!!!!!!\n");
+						mtk_test_crit("device reset failed!!!!!!!!!!\n");
 						return ret;
 					}
 
 					ret = f_disable_slot();
 					if (ret) {
-						mtk_test_dbg("disable slot failed!!!!!!!!!!\n");
+						mtk_test_crit("disable slot failed!!!!!!!!!!\n");
 						return ret;
 					}
 
 					ret = f_reenable_port(0);
 					if (ret != RET_SUCCESS) {
-						mtk_test_dbg("device reenable failed!!!!!!!!!!\n");
+						mtk_test_crit("device reenable failed!!!!!!!!!!\n");
 						return ret;
 					}
 
 					ret = f_enable_slot(NULL);
 					if (ret) {
-						mtk_test_dbg("enable slot failed!!!!!!!!!!\n");
+						mtk_test_crit("enable slot failed!!!!!!!!!!\n");
 						return ret;
 					}
 
 					ret = f_address_slot(false, NULL);
 					if (ret) {
-						mtk_test_dbg("address slot failed!!!!!!!!!!\n");
+						mtk_test_crit("address slot failed!!!!!!!!!!\n");
 						return ret;
 					}
 					mtktest_mtk_xhci_scheduler_init();
@@ -1823,28 +1828,28 @@ static int t_u3auto_loopback_scan_sg(int argc, char **argv)
 					ret = dev_config_ep(ep_out_num, USB_RX, transfer_type, maxp,
 						bInterval, mult_dev, burst, mult, NULL);
 					if (ret) {
-						mtk_test_dbg("config dev EP fail!!\n");
+						mtk_test_crit("config dev EP fail!!\n");
 						return ret;
 					}
 
 					ret = dev_config_ep(ep_in_num, USB_TX, transfer_type, maxp,
 						bInterval, mult_dev, burst, mult, NULL);
 					if (ret) {
-						mtk_test_dbg("config dev EP fail!!\n");
+						mtk_test_crit("config dev EP fail!!\n");
 						return ret;
 					}
 
 					ret = f_config_ep(ep_out_num, EPADD_OUT, transfer_type, maxp,
 						bInterval, burst, mult, NULL, 0);
 					if (ret) {
-						mtk_test_dbg("config EP fail!!\n");
+						mtk_test_crit("config EP fail!!\n");
 						return ret;
 					}
 
 					ret = f_config_ep(ep_in_num, EPADD_IN, transfer_type, maxp,
 						bInterval, burst, mult, NULL, 1);
 					if (ret) {
-						mtk_test_dbg("config EP fail!!\n");
+						mtk_test_crit("config EP fail!!\n");
 						return ret;
 					}
 
@@ -1915,7 +1920,7 @@ static int t_u3auto_loopback_scan_sg(int argc, char **argv)
 				ret = dev_loopback(bdp, length, gpd_buf_size, bd_buf_size,
 					dram_offset, extension, NULL);
 				if (ret) {
-					mtk_test_dbg("loopback request fail!!\n");
+					mtk_test_crit("loopback request fail!!\n");
 					f_power_suspend();
 					return ret;
 				}
@@ -1925,8 +1930,8 @@ static int t_u3auto_loopback_scan_sg(int argc, char **argv)
 				ret = f_loopback_sg_loop_gpd(ep_out_num, ep_in_num, length,
 					start_add, sg_len, gpd_buf_size, NULL);
 				if (ret) {
-					mtk_test_dbg("loopback fail!!\n");
-					mtk_test_dbg("length : %d\n", length);
+					mtk_test_crit("loopback fail!!\n");
+					mtk_test_crit("length : %d\n", length);
 					return ret;
 				}
 
@@ -1934,7 +1939,7 @@ static int t_u3auto_loopback_scan_sg(int argc, char **argv)
 				ret = dev_polling_status(NULL);
 				if (ret) {
 					f_power_suspend();
-					mtk_test_dbg("query request fail!!\n");
+					mtk_test_crit("query request fail!!\n");
 					return ret;
 				}
 			}  /* sg_num  */
@@ -2519,6 +2524,9 @@ for (ep_in_index = 0; ep_in_index < in_ep_arr_size; ep_in_index++) {
 		ep_out_num = *(arr_ep_out + ep_out_index);
 		for (maxp_index = 0; maxp_index < maxp_arr_size; maxp_index++) {
 			maxp = *(arr_maxp + maxp_index);
+			mtk_test_crit("      OUT_EP: %d*********\n", ep_out_num);
+			mtk_test_crit("      IN_EP: %d *********\n", ep_in_num);
+			mtk_test_crit("      MAXP: %d  *********\n", maxp);
 			for (interval_index = 0; interval_index < interval_arr_size; interval_index++) {
 				bInterval = *(arr_interval + interval_index);
 				for (mult_index = 0; mult_index < mult_arr_size; mult_index++) {
@@ -2842,56 +2850,56 @@ static int t_u3auto_loopback(int argc, char **argv)
 	start_port_reenabled(0, speed);
 	ret = dev_reset(speed, NULL);
 	if (ret) {
-		mtk_test_dbg("device reset failed!!!!!!!!!!\n");
+		mtk_test_crit("device reset failed!!!!!!!!!!\n");
 		return ret;
 	}
 
 	ret = f_disable_slot();
 	if (ret) {
-		mtk_test_dbg("disable slot failed!!!!!!!!!!\n");
+		mtk_test_crit("disable slot failed!!!!!!!!!!\n");
 		return ret;
 	}
 
 	ret = f_reenable_port(0);
 	if (ret != RET_SUCCESS) {
-		mtk_test_dbg("device reenable failed!!!!!!!!!!\n");
+		mtk_test_crit("device reenable failed!!!!!!!!!!\n");
 		return ret;
 	}
 
 	ret = f_enable_slot(NULL);
 	if (ret) {
-		mtk_test_dbg("enable slot failed!!!!!!!!!!\n");
+		mtk_test_crit("enable slot failed!!!!!!!!!!\n");
 		return ret;
 	}
 
 	ret = f_address_slot(false, NULL);
 	if (ret) {
-		mtk_test_dbg("address slot failed!!!!!!!!!!\n");
+		mtk_test_crit("address slot failed!!!!!!!!!!\n");
 		return ret;
 	}
 
 	/* ==phase 1 : config EP==*/
 	ret = dev_config_ep(ep_out_num, USB_RX, transfer_type, maxp, bInterval, dev_mult, burst, mult, NULL);
 	if (ret) {
-		mtk_test_dbg("config dev EP fail!!\n");
+		mtk_test_crit("config dev EP fail!!\n");
 		return ret;
 	}
 
 	ret = dev_config_ep(ep_in_num, USB_TX, transfer_type, maxp, bInterval, dev_mult, burst, mult, NULL);
 	if (ret) {
-		mtk_test_dbg("config dev EP fail!!\n");
+		mtk_test_crit("config dev EP fail!!\n");
 		return ret;
 	}
 
 	ret = f_config_ep(ep_out_num, EPADD_OUT, transfer_type, maxp, bInterval, burst, mult,  NULL, 0);
 	if (ret) {
-		mtk_test_dbg("config EP fail!!\n");
+		mtk_test_crit("config EP fail!!\n");
 		return ret;
 	}
 
 	ret = f_config_ep(ep_in_num, EPADD_IN, transfer_type, maxp, bInterval, burst, mult,  NULL, 1);
 	if (ret) {
-		mtk_test_dbg("config EP fail!!\n");
+		mtk_test_crit("config EP fail!!\n");
 		return ret;
 	}
 
@@ -2907,21 +2915,21 @@ static int t_u3auto_loopback(int argc, char **argv)
 #endif
 	ret = dev_loopback(bdp, length, gpd_buf_size, bd_buf_size, dram_offset, extension, NULL);
 	if (ret) {
-		mtk_test_dbg("loopback request fail!!\n");
+		mtk_test_crit("loopback request fail!!\n");
 		return ret;
 	}
 
 	ret = f_loopback_loop_gpd(ep_out_num, ep_in_num, length, start_add, gpd_buf_size, NULL);
 	if (ret) {
-		mtk_test_dbg("loopback fail!!\n");
-		mtk_test_dbg("length : %d\n", length);
+		mtk_test_crit("loopback fail!!\n");
+		mtk_test_crit("length : %d\n", length);
 		return ret;
 	}
 
 	/* ==phase 3: get device status==*/
 	ret = dev_polling_status(NULL);
 	if (ret) {
-		mtk_test_dbg("query request fail!!\n");
+		mtk_test_crit("query request fail!!\n");
 		return ret;
 	}
 #if 0
@@ -3049,54 +3057,54 @@ static int t_u3auto_loopback_sg(int argc, char **argv)
 	start_port_reenabled(0, speed);
 	ret = dev_reset(speed, NULL);
 	if (ret) {
-		mtk_test_dbg("device reset failed!!!!!!!!!!\n");
+		mtk_test_crit("device reset failed!!!!!!!!!!\n");
 		return ret;
 	}
 	ret = f_disable_slot();
 	if (ret) {
-		mtk_test_dbg("disable slot failed!!!!!!!!!!\n");
+		mtk_test_crit("disable slot failed!!!!!!!!!!\n");
 		return ret;
 	}
 	ret = f_reenable_port(0);
 	if (ret != RET_SUCCESS) {
-		mtk_test_dbg("device reenable failed!!!!!!!!!!\n");
+		mtk_test_crit("device reenable failed!!!!!!!!!!\n");
 		return ret;
 	}
 
 	ret = f_enable_slot(NULL);
 	if (ret) {
-		mtk_test_dbg("enable slot failed!!!!!!!!!!\n");
+		mtk_test_crit("enable slot failed!!!!!!!!!!\n");
 		return ret;
 	}
 
 	ret = f_address_slot(false, NULL);
 	if (ret) {
-		mtk_test_dbg("address slot failed!!!!!!!!!!\n");
+		mtk_test_crit("address slot failed!!!!!!!!!!\n");
 		return ret;
 	}
 
 	/* ==phase 1 : config EP==*/
 	ret = dev_config_ep(ep_out_num, USB_RX, transfer_type, maxp, bInterval, dev_mult, burst, mult, NULL);
 	if (ret) {
-		mtk_test_dbg("config dev EP fail!!\n");
+		mtk_test_crit("config dev EP fail!!\n");
 		return ret;
 	}
 
 	ret = dev_config_ep(ep_in_num, USB_TX, transfer_type, maxp, bInterval, dev_mult, burst, mult, NULL);
 	if (ret) {
-		mtk_test_dbg("config dev EP fail!!\n");
+		mtk_test_crit("config dev EP fail!!\n");
 		return ret;
 	}
 
 	ret = f_config_ep(ep_out_num, EPADD_OUT, transfer_type, maxp, bInterval, burst, mult, NULL, 0);
 	if (ret) {
-		mtk_test_dbg("config EP fail!!\n");
+		mtk_test_crit("config EP fail!!\n");
 		return ret;
 	}
 
 	ret = f_config_ep(ep_in_num, EPADD_IN, transfer_type, maxp, bInterval, burst, mult,  NULL, 1);
 	if (ret) {
-		mtk_test_dbg("config EP fail!!\n");
+		mtk_test_crit("config EP fail!!\n");
 		return ret;
 	}
 
@@ -3111,21 +3119,21 @@ static int t_u3auto_loopback_sg(int argc, char **argv)
 #endif
 	ret = dev_loopback(bdp, length, gpd_buf_size, bd_buf_size, dram_offset, extension, NULL);
 	if (ret) {
-		mtk_test_dbg("loopback request fail!!\n");
+		mtk_test_crit("loopback request fail!!\n");
 		return ret;
 	}
 
 	ret = f_loopback_sg_loop(ep_out_num, ep_in_num, length, start_add, sg_len, NULL);
 	if (ret) {
-		mtk_test_dbg("loopback fail!!\n");
-		mtk_test_dbg("length : %d\n", length);
+		mtk_test_crit("loopback fail!!\n");
+		mtk_test_crit("length : %d\n", length);
 		return ret;
 	}
 
 	/* ==phase 3: get device status==*/
 	ret = dev_polling_status(NULL);
 	if (ret) {
-		mtk_test_dbg("query request fail!!\n");
+		mtk_test_crit("query request fail!!\n");
 		return ret;
 	}
 	return ret;
@@ -3238,6 +3246,8 @@ static int t_u3auto_hw_lpm1(int argc, char **argv)
 			maxp = 1024;
 	}
 	pr_err("    maxp = %d\n", maxp);
+
+	usb_phy_swpllmode_lpm();
 
 for (hirdm = 1; hirdm < 2; hirdm++) {
 	for (rwe = 0; rwe < 2; rwe++) {
@@ -3410,7 +3420,7 @@ for (hirdm = 1; hirdm < 2; hirdm++) {
 #endif
 					/* ==phase 3 : loopback==*/
 					if (transfer_type != EPATT_CTRL) {
-						pr_err("Do loopback, length %d\n", length);
+						mtk_test_crit("Do loopback, length %d\n", length);
 
 						bdp = 1;
 						gpd_buf_size = length;
@@ -3432,7 +3442,7 @@ for (hirdm = 1; hirdm < 2; hirdm++) {
 						return ret;
 					}
 					} else {
-						pr_err("Do CTRL loopback, length %d\n", length);
+						mtk_test_crit("Do CTRL loopback, length %d\n", length);
 						ret = dev_ctrl_loopback(length, NULL);
 
 					if (ret) {
@@ -3570,6 +3580,8 @@ static int t_u3auto_hw_lpm(int argc, char **argv)
 			maxp = 1024;
 	}
 	pr_err("    maxp = %d\n", maxp);
+
+	usb_phy_swpllmode_lpm();
 
 for (hirdm = 0; hirdm < 2; hirdm++) {
 	for (rwe = 0; rwe < 2; rwe++) {
@@ -3739,7 +3751,7 @@ for (hirdm = 0; hirdm < 2; hirdm++) {
 #endif
 					/* ==phase 3 : loopback==*/
 					if (transfer_type != EPATT_CTRL) {
-						pr_err("Do loopback, length %d\n", length);
+						mtk_test_crit("Do loopback, length %d\n", length);
 
 						bdp = 1;
 						gpd_buf_size = length;
@@ -3760,7 +3772,7 @@ for (hirdm = 0; hirdm < 2; hirdm++) {
 						return ret;
 					}
 					} else {
-						pr_err("Do CTRL loopback, length %d\n", length);
+						mtk_test_crit("Do CTRL loopback, length %d\n", length);
 						ret = dev_ctrl_loopback(length, NULL);
 
 					if (ret) {
@@ -4238,6 +4250,7 @@ static int t_u3auto_stress(int argc, char **argv)
 	int dev_slot;
 	struct usb_device *udev;
 	int cur_index;
+	int stop_sec;
 
 	isCompare = true;
 	isEP0 = false;
@@ -4245,6 +4258,7 @@ static int t_u3auto_stress(int argc, char **argv)
 	dev_slot = 3;
 	ret = 0;
 	speed = 0;
+	stop_sec = 0;
 
 	if (argc > 1) {
 		if (!strcmp(argv[1], "ss")) {
@@ -4257,8 +4271,18 @@ static int t_u3auto_stress(int argc, char **argv)
 			mtk_test_dbg("Test full speed\n");
 			speed = DEV_SPEED_FULL;
 		} else if (!strcmp(argv[1], "stop")) {
+			if (argc > 2) {
+				if (kstrtoint(argv[2], 0, &stop_sec))
+					return RET_FAIL;
+			}
+			while (stop_sec) {
+				msleep(1000);
+				stop_sec--;
+			}
 			mtk_test_dbg("STOP!!\n");
-			g_correct = false;
+			g_stress_start = false;
+			g_test_random_stop_ep = false;
+			msleep(20000);
 			return RET_SUCCESS;
 		}
 	}
@@ -4453,7 +4477,7 @@ static int t_u3auto_stress(int argc, char **argv)
 		}
 	}
 
-
+	g_stress_start = true;
 	g_correct = true;
 	ret = dev_stress(0, GPD_LENGTH_RDN, GPD_LENGTH_RDN, 0, num_ep, udev);
 	msleep(2000);
@@ -5303,11 +5327,11 @@ static int t_loopback_loop(int argc, char **argv)
 			length = (get_random_int() % 65535) + 1;
 			start_add = get_random_int() % 64;
 			gpd_buf_size = length;
-			mtk_test_dbg("ROUND[%d] length[%d] start_add[%d]\n", i, length, start_add);
+			mtk_test_crit("ROUND[%d] length[%d] start_add[%d]\n", i, length, start_add);
 		}
 		ret = dev_loopback(bdp, length, gpd_buf_size, bd_buf_size, dram_offset, extension, NULL);
 		if (ret) {
-			mtk_test_dbg("loopback request fail!!\n");
+			mtk_test_crit("loopback request fail!!\n");
 			return ret;
 		}
 		if (sg_len == 0)
@@ -5316,15 +5340,15 @@ static int t_loopback_loop(int argc, char **argv)
 			ret = f_loopback_sg_loop(ep_out_num, ep_in_num, length, start_add, sg_len, NULL);
 
 		if (ret) {
-			mtk_test_dbg("loopback fail!!\n");
-			mtk_test_dbg("length : %d\n", length);
+			mtk_test_crit("loopback fail!!\n");
+			mtk_test_crit("length : %d\n", length);
 			return ret;
 		}
 
 		/* ==phase 3: get device status==*/
 		ret = dev_polling_status(NULL);
 		if (ret) {
-			mtk_test_dbg("query request fail!!\n");
+			mtk_test_crit("query request fail!!\n");
 			return ret;
 		}
 	}
@@ -5530,6 +5554,8 @@ static int t_power_u2_lpm(int argc, char **argv)
 			return RET_FAIL;
 	}
 
+	usb_phy_swpllmode_lpm();
+
 	/*program hle, rwe*/
 	f_power_config_lpm(g_slot_id, hirdm, L1_timeout, rwe, besl, besld, hle, int_nak_active, bulk_nyet_active);
 
@@ -5570,6 +5596,9 @@ static int t_power_u2_swlpm(int argc, char **argv)
 		mtk_test_dbg("L1 exit counter = %d\n", f_power_get_L1_counter(2));
 		return RET_SUCCESS;
 	}
+
+	usb_phy_swpllmode_lpm();
+
 	g_port_plc = 0;
 	xhci = hcd_to_xhci(my_hcd);
 
@@ -6057,6 +6086,7 @@ static int t_ring_er_full(int argc, char **argv)
 			xhci_dbg(xhci, "SW own current event\n");
 			if (GET_COMP_CODE(event_trb->field[2]) == COMP_ER_FULL) {
 				xhci_dbg(xhci, "Got event ring full\n");
+				mtk_test_dbg("Got event ring full!!!!!!!!!!\n");
 				return RET_SUCCESS;
 			}
 			xhci_dbg(xhci, "Increase command ring dequeue pointer\n");
@@ -6415,7 +6445,7 @@ static int t_ring_bei(int argc, char **argv)
 	/* queue a no-op */
 	mtktest_mtk_xhci_setup_one_noop(xhci);
 	msleep(20);
-	if (urb_tx->status != 0) {
+	if (urb_rx->status != 0) {
 		xhci_err(xhci, "URB_RX status doesn't become 0 after interrupt\n");
 		return RET_FAIL;
 	}
@@ -6781,8 +6811,13 @@ static int t_hub_configurehub(int argc, char **argv)
 	int i;
 	int port_index;
 	struct xhci_port *port;
+	enum USB_DEV_SPEED speed;
+	u32 temp;
+	u32 __iomem *addr;
+	int port_id;
 
 	port_index = 0;
+	speed = DEV_SPEED_INACTIVE;
 
 	if (my_hcd == NULL) {
 		mtk_test_dbg("my_hcd is NULL\n");
@@ -6794,7 +6829,42 @@ static int t_hub_configurehub(int argc, char **argv)
 			return RET_FAIL;
 		xhci_dbg(xhci, "port_index set to %d\n", port_index);
 	}
+	if (argc > 2) {
+		if (!strcmp(argv[2], "ss")) {
+			pr_emerg("U3Hub only configure super speed\n");
+			speed = DEV_SPEED_SUPER;
+		}
+		if (!strcmp(argv[2], "hs")) {
+			pr_emerg("U3Hub only configure high speed\n");
+			speed = DEV_SPEED_HIGH;
+		}
+	}
 	xhci = hcd_to_xhci(my_hcd);
+#if 1
+	if (speed == DEV_SPEED_SUPER) {
+		pr_emerg("Disable xhci U2 port Power\n");
+
+		for (i = 1; i <= g_num_u2_port; i++) {
+			port_id = i + g_num_u3_port;
+			addr = &xhci->op_regs->port_status_base + NUM_PORT_REGS*((port_id-1) & 0xff);
+			temp = xhci_readl(xhci, addr);
+			temp = mtktest_xhci_port_state_to_neutral(temp);
+			temp &= ~PORT_POWER;
+			xhci_writel(xhci, temp, addr);
+		}
+
+	} else if (speed == DEV_SPEED_HIGH) {
+		pr_emerg("Disable xhci U3 port Power\n");
+		for (i = 1; i <= g_num_u3_port; i++) {
+			port_id = i;
+			addr = &xhci->op_regs->port_status_base + NUM_PORT_REGS*((port_id-1) & 0xff);
+			temp = xhci_readl(xhci, addr);
+			temp = mtktest_xhci_port_state_to_neutral(temp);
+			temp &= ~PORT_POWER;
+			xhci_writel(xhci, temp, addr);
+		}
+	}
+#endif
 	ret = f_enable_port(port_index);
 	if (ret != RET_SUCCESS) {
 		xhci_err(xhci, "[ERROR] enable port failed\n");
@@ -7225,7 +7295,7 @@ static int t_hub_reset_dev(int argc, char **argv)
 	int hub_num, port_num, dev_num;
 	/*int transfer_type, bInterval, maxp;*/
 	struct usb_device *udev;
-	USB_DEV_SPEED speed = 0;
+	enum USB_DEV_SPEED speed = 0;
 	int ret;
 
 	hub_num = 1;
@@ -7317,7 +7387,7 @@ static int t_hub_remotewakeup_dev(int argc, char **argv)
 	int hub_num, port_num, dev_num;
 	/*int transfer_type, bInterval, maxp;*/
 	struct usb_device *udev;
-	/*USB_DEV_SPEED speed;*/
+	/*enum USB_DEV_SPEED speed;*/
 	int ret;
 	int length;
 	int bdp, gpd_buf_size, bd_buf_size;
@@ -7611,7 +7681,7 @@ static int t_dev_lpm(int argc, char **argv)
 
 static int t_dev_reset(int argc, char **argv)
 {
-	USB_DEV_SPEED speed;
+	enum USB_DEV_SPEED speed;
 	int ret;
 
 	ret = 0;
@@ -9519,6 +9589,7 @@ static int u2ct_disconnect_detect(void)
 	/* let SW doesn't do reset after get discon/conn events */
 	/* g_hs_block_reset = true; */
 	g_port_connect = false;
+	/* ensure  the PORT_PWER is set*/
 	mb();
 	mtk_test_dbg("[OTG_H] u2ct_disconnect_detect, g_port_connect is %d\n", g_port_connect);
 
@@ -10558,6 +10629,8 @@ static int dbg_u3PHY_init(int argc, char **argv)
 	u3phy_ops->init(u3phy);
 #ifndef CONFIG_MTK_FPGA
 	usb_phy_recover(0);
+	usb20_pll_settings(true, true);
+
 	if (u3phy_ops->u2_slew_rate_calibration)
 		u3phy_ops->u2_slew_rate_calibration(u3phy);
 #endif
@@ -10764,6 +10837,14 @@ static int dbg_dump_regs(int argc, char **argv)
 }
 
 
+void __weak usb_phy_swpllmode_lpm(void)
+{
+#if 0
+	U3PhyWriteField32((phys_addr_t) (uintptr_t) U3D_U2PHYDCR1, E60802_RG_USB20_SW_PLLMODE_OFST,
+		E60802_RG_USB20_SW_PLLMODE, 0x1);
+#endif
+}
+
 static const struct file_operations xhci_mtk_test_fops_host = {
 	.owner = THIS_MODULE,
 	.read = xhci_mtk_test_read,
@@ -10821,7 +10902,7 @@ static int __init mtk_test_init(void)
 	g_cmd_status = CMD_DONE;
 	g_exec_done = true;
 	g_stopped = true;
-	mb();
+
 
 	pr_err("[OTG_H] mtk_test_init, g_port_connect is %d\n", g_port_connect);
 	if (!misc_register(&mu3h_test_uevent_device))
@@ -10845,6 +10926,7 @@ static void __exit mtk_test_cleanup(void)
 
 }
 module_exit(mtk_test_cleanup);
+static struct wake_lock mtk_xhci_wakelock;
 
 static int xhci_dbg_probe(struct platform_device *pdev)
 {
@@ -10861,14 +10943,13 @@ static int xhci_dbg_probe(struct platform_device *pdev)
 	g_cmd_status = CMD_DONE;
 	g_exec_done = true;
 	g_stopped = true;
-	mb();
+
 	mtk_test_dbg("xhci_dbg_probe\n");
 	root = debugfs_create_dir("xhci_dbg", NULL);
 	if (!root) {
 		ret = -ENOMEM;
 		goto err0;
 	}
-
 
 	file = debugfs_create_file("testmode", S_IRUGO | S_IWUSR, root, NULL, &xhci_test_mode_fops);
 
@@ -10878,6 +10959,8 @@ static int xhci_dbg_probe(struct platform_device *pdev)
 	}
 
 	xhci_debugfs_root = root;
+	wake_lock_init(&mtk_xhci_wakelock, WAKE_LOCK_SUSPEND, "xhcitest.wakelock");
+	wake_lock(&mtk_xhci_wakelock);
 
 	return 0;
 err0:

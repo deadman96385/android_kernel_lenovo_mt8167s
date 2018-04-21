@@ -22,6 +22,8 @@
 /* #include <mach/mtk_spm_mtcmos_internal.h> */
 #include <asm/setup.h>
 #include "mtk_spm_internal.h"
+#include "mtk_spm_resource_req.h"
+#include "mtk_spm_resource_req_internal.h"
 #include "mtk_vcorefs_governor.h"
 #include "mtk_spm_vcore_dvfs.h"
 #include "mtk_spm_misc.h"
@@ -278,6 +280,20 @@ int can_spm_pmic_set_vcore_voltage(void)
 }
 #endif
 
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+static bool is_dfd_wakeup_src_enable;
+void spm_set_dfd_wakeup_src(bool enable)
+{
+	is_dfd_wakeup_src_enable = !!enable;
+	spm_crit("DFD_WAKEUP_SRC ENABLE: %d\n", is_dfd_wakeup_src_enable);
+}
+
+bool spm_get_dfd_wakeup_src(void)
+{
+	return is_dfd_wakeup_src_enable;
+}
+#endif
+
 void __spm_kick_im_to_fetch(const struct pcm_desc *pcmdesc)
 {
 	u32 ptr, len, con0;
@@ -342,6 +358,25 @@ void __spm_init_event_vector(const struct pcm_desc *pcmdesc)
 }
 
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+
+#define RES_REQ(r) ((spm_get_resource_usage() & r) ? 1 : 0)
+
+void __spm_src_req_update(const struct pwr_ctrl *pwrctrl)
+{
+	/* SPM_SRC_REQ */
+	spm_write(SPM_SRC_REQ,
+		(((pwrctrl->spm_apsrc_req & 0x1) | RES_REQ(SPM_RESOURCE_DRAM)) << 0) |
+		(((pwrctrl->spm_f26m_req & 0x1) | RES_REQ(SPM_RESOURCE_CK_26M)) << 1) |
+		((pwrctrl->spm_lte_req & 0x1) << 2) |
+		((pwrctrl->spm_infra_req & 0x1) << 3) |
+		(((pwrctrl->spm_vrf18_req & 0x1) | RES_REQ(SPM_RESOURCE_MAINPLL)) << 4) |
+		((pwrctrl->spm_dvfs_req & 0x1) << 5) |
+		((pwrctrl->spm_dvfs_force_down & 0x1) << 6) |
+		(((pwrctrl->spm_ddren_req & 0x1) | RES_REQ(SPM_RESOURCE_DRAM)) << 7) |
+		((pwrctrl->spm_rsv_src_req & 0x7) << 8) |
+		((pwrctrl->cpu_md_dvfs_sop_force_on & 0x1) << 16));
+}
+
 void __spm_set_power_control(const struct pwr_ctrl *pwrctrl)
 {
 	/* SPM_AP_STANDBY_CON */
@@ -363,14 +398,14 @@ void __spm_set_power_control(const struct pwr_ctrl *pwrctrl)
 
 	/* SPM_SRC_REQ */
 	spm_write(SPM_SRC_REQ,
-		((pwrctrl->spm_apsrc_req & 0x1) << 0) |
-		((pwrctrl->spm_f26m_req & 0x1) << 1) |
+		(((pwrctrl->spm_apsrc_req & 0x1)) << 0) |
+		(((pwrctrl->spm_f26m_req & 0x1)) << 1) |
 		((pwrctrl->spm_lte_req & 0x1) << 2) |
 		((pwrctrl->spm_infra_req & 0x1) << 3) |
-		((pwrctrl->spm_vrf18_req & 0x1) << 4) |
+		(((pwrctrl->spm_vrf18_req & 0x1)) << 4) |
 		((pwrctrl->spm_dvfs_req & 0x1) << 5) |
 		((pwrctrl->spm_dvfs_force_down & 0x1) << 6) |
-		((pwrctrl->spm_ddren_req & 0x1) << 7) |
+		(((pwrctrl->spm_ddren_req & 0x1)) << 7) |
 		((pwrctrl->spm_rsv_src_req & 0x7) << 8) |
 		((pwrctrl->cpu_md_dvfs_sop_force_on & 0x1) << 16));
 
@@ -431,10 +466,14 @@ void __spm_set_power_control(const struct pwr_ctrl *pwrctrl)
 		((pwrctrl->sdio_on_dvfs_req_mask_b & 0x1) << 24) |
 		((pwrctrl->emi_boost_dvfs_req_mask_b & 0x1) << 25) |
 		((pwrctrl->cpu_md_emi_dvfs_req_prot_dis & 0x1) << 26) |
-		((pwrctrl->dramc_spcmd_apsrc_req_mask_b & 0x1) << 27));
-
+		((pwrctrl->dramc_spcmd_apsrc_req_mask_b & 0x1) << 27) |
+		((pwrctrl->emi_boost_dvfs_req_2_mask_b & 0x1) << 28) |
+		((pwrctrl->emi_bw_dvfs_req_2_mask & 0x1) << 29));
 	/* SW_CRTL_EVENT */
 	spm_write(SW_CRTL_EVENT, (pwrctrl->sw_ctrl_event_on & 0x1) << 0);
+
+	/* SW_CRTL_EVENT_2 */
+	spm_write(SW_CRTL_EVENT_2, (pwrctrl->sw_ctrl_event_on_2 & 0x1) << 0);
 
 	/* SPM_SW_RSV_6 */
 	if (pwrctrl->rsv6_legacy_version == 1)
@@ -443,14 +482,16 @@ void __spm_set_power_control(const struct pwr_ctrl *pwrctrl)
 			((pwrctrl->md_srcclkena_1_2d_dvfs_req_mask_b & 0x1) << 1) |
 			((pwrctrl->dvfs_up_2d_dvfs_req_mask_b & 0x1) << 2) |
 			((pwrctrl->disable_off_load_lpm & 0x1) << 3) |
-			((pwrctrl->en_sdio_dvfs_setting & 0x1) << 4));
+			((pwrctrl->en_sdio_dvfs_setting & 0x1) << 4) |
+			((pwrctrl->en_emi_grouping & 0x1) << 18));
 	else
 		spm_write(SPM_SW_RSV_6,
 			((pwrctrl->md_srcclkena_0_2d_dvfs_req_mask_b & 0x1) << 0) |
 			((pwrctrl->md_srcclkena_1_2d_dvfs_req_mask_b & 0x1) << 1) |
 			((pwrctrl->dvfs_up_2d_dvfs_req_mask_b & 0x1) << 2) |
 			((pwrctrl->disable_off_load_lpm & 0x1) << 16) |
-			((pwrctrl->en_sdio_dvfs_setting & 0x1) << 17));
+			((pwrctrl->en_sdio_dvfs_setting & 0x1) << 17) |
+			((pwrctrl->en_emi_grouping & 0x1) << 18));
 
 #if 0
 	/* SPM_WAKEUP_EVENT_MASK */
@@ -613,6 +654,14 @@ void __spm_set_wakeup_event(const struct pwr_ctrl *pwrctrl)
 	if (pwrctrl->syspwreq_mask)
 #endif
 		mask &= ~WAKE_SRC_R12_CSYSPWREQ_B;
+
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+	if (is_dfd_wakeup_src_enable)
+		mask |= WAKE_SRC_R12_APWDT_EVENT_B;
+	else
+		mask &= ~WAKE_SRC_R12_APWDT_EVENT_B;
+#endif
+
 	spm_write(SPM_WAKEUP_EVENT_MASK, ~mask);
 
 #if 0
@@ -683,6 +732,9 @@ void __spm_get_wakeup_status(struct wake_status *wakesta)
 
 void __spm_clean_after_wakeup(void)
 {
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+	u32 mask = 0;
+#endif
 	/* [Vcorefs] can not switch back to POWER_ON_VAL0 here,
 	 * the FW stays in VCORE DVFS which use r0 to Ctrl MEM
 	 */
@@ -697,10 +749,18 @@ void __spm_clean_after_wakeup(void)
 	 */
 	/* clean PCM timer event */
 	/* spm_write(PCM_CON1, SPM_REGWR_CFG_KEY | (spm_read(PCM_CON1) & ~PCM_TIMER_EN_LSB)); */
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+	if (is_dfd_wakeup_src_enable)
+		mask |= WAKE_SRC_R12_APWDT_EVENT_B;
+	else
+		mask &= ~WAKE_SRC_R12_APWDT_EVENT_B;
 
 	/* clean wakeup event raw status (for edge trigger event) */
+	spm_write(SPM_WAKEUP_EVENT_MASK, ~mask);
+#else
+	/* clean wakeup event raw status (for edge trigger event) */
 	spm_write(SPM_WAKEUP_EVENT_MASK, ~0);
-
+#endif
 	/* clean ISR status (except TWAM) */
 	spm_write(SPM_IRQ_MASK, spm_read(SPM_IRQ_MASK) | ISRM_ALL_EXC_TWAM);
 	spm_write(SPM_IRQ_STA, ISRC_ALL_EXC_TWAM);
@@ -719,12 +779,12 @@ do {						\
 		spm_crit2(fmt, ##args);		\
 } while (0)
 
-wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
+unsigned int __spm_output_wake_reason(const struct wake_status *wakesta,
 				       const struct pcm_desc *pcmdesc, bool suspend)
 {
 	int i;
 	char buf[LOG_BUF_SIZE] = { 0 };
-	wake_reason_t wr = WR_UNKNOWN;
+	unsigned int wr = WR_UNKNOWN;
 
 	if (wakesta->assert_pc != 0) {
 		/* add size check for vcoredvfs */
@@ -735,19 +795,19 @@ wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
 	}
 
 	if (wakesta->r12 == 0)
-		strcat(buf, " Unknown_Reason");
+		strncat(buf, " Unknown_Reason", strlen(" Unknown_Reason"));
 
 	if (wakesta->r12 & WAKE_SRC_R12_PCM_TIMER) {
 		if (wakesta->wake_misc & WAKE_MISC_PCM_TIMER) {
-			strcat(buf, " PCM_TIMER");
+			strncat(buf, " PCM_TIMER", strlen(" PCM_TIMER"));
 			wr = WR_PCM_TIMER;
 		}
 		if (wakesta->wake_misc & WAKE_MISC_TWAM) {
-			strcat(buf, " TWAM");
+			strncat(buf, " TWAM", strlen(" TWAM"));
 			wr = WR_WAKE_SRC;
 		}
 		if (wakesta->wake_misc & WAKE_MISC_CPU_WAKE) {
-			strcat(buf, " CPU");
+			strncat(buf, " CPU", strlen(" CPU"));
 			wr = WR_WAKE_SRC;
 		}
 	}
@@ -843,6 +903,10 @@ void __spm_sync_vcore_dvfs_power_control(struct pwr_ctrl *dest_pwr_ctrl, const s
 	dest_pwr_ctrl->disable_off_load_lpm		= src_pwr_ctrl->disable_off_load_lpm;
 	dest_pwr_ctrl->en_sdio_dvfs_setting		= src_pwr_ctrl->en_sdio_dvfs_setting;
 	dest_pwr_ctrl->rsv6_legacy_version		= src_pwr_ctrl->rsv6_legacy_version;
+	dest_pwr_ctrl->en_emi_grouping			= src_pwr_ctrl->en_emi_grouping;
+	dest_pwr_ctrl->sw_ctrl_event_on_2		= src_pwr_ctrl->sw_ctrl_event_on_2;
+	dest_pwr_ctrl->emi_bw_dvfs_req_2_mask		= src_pwr_ctrl->emi_bw_dvfs_req_2_mask;
+	dest_pwr_ctrl->emi_boost_dvfs_req_2_mask_b	= src_pwr_ctrl->emi_boost_dvfs_req_2_mask_b;
 #else
 	dest_pwr_ctrl->cpu_md_dvfs_erq_merge_mask_b	= src_pwr_ctrl->cpu_md_dvfs_erq_merge_mask_b;
 	dest_pwr_ctrl->md1_ddr_en_dvfs_halt_mask_b	= src_pwr_ctrl->md1_ddr_en_dvfs_halt_mask_b;
@@ -1077,22 +1141,23 @@ bool is_md_c2k_conn_power_off(void)
 }
 
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
-static u32 pmic_rg_auxadc_ck_pdn_hwen;
 static u32 pmic_rg_efuse_ck_pdn;
 #endif
 
 void __spm_backup_pmic_ck_pdn(void)
 {
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+	pmic_read_interface_nolock(PMIC_RG_EFUSE_CK_PDN_ADDR,
+				   &pmic_rg_efuse_ck_pdn,
+				   PMIC_RG_EFUSE_CK_PDN_MASK,
+				   PMIC_RG_EFUSE_CK_PDN_SHIFT);
+	pmic_config_interface_nolock(PMIC_RG_EFUSE_CK_PDN_ADDR,
+				     1,
+				     PMIC_RG_EFUSE_CK_PDN_MASK,
+				     PMIC_RG_EFUSE_CK_PDN_SHIFT);
+#else
 	/* PMIC setting 2015/07/31 by Chia-Lin/Kev */
-	pmic_read_interface_nolock(MT6351_PMIC_RG_AUXADC_CK_PDN_HWEN_ADDR,
-				   &pmic_rg_auxadc_ck_pdn_hwen,
-				   MT6351_PMIC_RG_AUXADC_CK_PDN_HWEN_MASK,
-				   MT6351_PMIC_RG_AUXADC_CK_PDN_HWEN_SHIFT);
-	pmic_config_interface_nolock(MT6351_PMIC_RG_AUXADC_CK_PDN_HWEN_ADDR,
-				     0,
-				     MT6351_PMIC_RG_AUXADC_CK_PDN_HWEN_MASK,
-				     MT6351_PMIC_RG_AUXADC_CK_PDN_HWEN_SHIFT);
 
 	pmic_read_interface_nolock(MT6351_PMIC_RG_EFUSE_CK_PDN_ADDR,
 				   &pmic_rg_efuse_ck_pdn,
@@ -1103,21 +1168,24 @@ void __spm_backup_pmic_ck_pdn(void)
 				     MT6351_PMIC_RG_EFUSE_CK_PDN_MASK,
 				     MT6351_PMIC_RG_EFUSE_CK_PDN_SHIFT);
 #endif
+#endif
 }
 
 void __spm_restore_pmic_ck_pdn(void)
 {
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+	pmic_config_interface_nolock(PMIC_RG_EFUSE_CK_PDN_ADDR,
+				     pmic_rg_efuse_ck_pdn,
+				     PMIC_RG_EFUSE_CK_PDN_MASK,
+				     PMIC_RG_EFUSE_CK_PDN_SHIFT);
+#else
 	/* PMIC setting 2015/07/31 by Chia-Lin/Kev */
-	pmic_config_interface_nolock(MT6351_PMIC_RG_AUXADC_CK_PDN_HWEN_ADDR,
-				     pmic_rg_auxadc_ck_pdn_hwen,
-				     MT6351_PMIC_RG_AUXADC_CK_PDN_HWEN_MASK,
-				     MT6351_PMIC_RG_AUXADC_CK_PDN_HWEN_SHIFT);
-
 	pmic_config_interface_nolock(MT6351_PMIC_RG_EFUSE_CK_PDN_ADDR,
 				     pmic_rg_efuse_ck_pdn,
 				     MT6351_PMIC_RG_EFUSE_CK_PDN_MASK,
 				     MT6351_PMIC_RG_EFUSE_CK_PDN_SHIFT);
+#endif
 #endif
 }
 
@@ -1142,6 +1210,18 @@ void __spm_bsi_top_init_setting(void)
 void __spm_pmic_pg_force_on(void)
 {
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+#if 0 /* for backup, do not set STRUP_DIG_IO_PG_FORCE and RG_STRUP_VIO18_PG_ENB in MT6355 */
+	pmic_config_interface_nolock(PMIC_STRUP_DIG_IO_PG_FORCE_ADDR,
+			0x1,
+			PMIC_STRUP_DIG_IO_PG_FORCE_MASK,
+			PMIC_STRUP_DIG_IO_PG_FORCE_SHIFT);
+	pmic_config_interface_nolock(PMIC_RG_STRUP_VIO18_PG_ENB_ADDR,
+			0x1,
+			PMIC_RG_STRUP_VIO18_PG_ENB_MASK,
+			PMIC_RG_STRUP_VIO18_PG_ENB_SHIFT);
+#endif
+#else
 	pmic_config_interface_nolock(MT6351_PMIC_STRUP_DIG_IO_PG_FORCE_ADDR,
 			0x1,
 			MT6351_PMIC_STRUP_DIG_IO_PG_FORCE_MASK,
@@ -1151,11 +1231,24 @@ void __spm_pmic_pg_force_on(void)
 			MT6351_PMIC_RG_STRUP_VIO18_PG_ENB_MASK,
 			MT6351_PMIC_RG_STRUP_VIO18_PG_ENB_SHIFT);
 #endif
+#endif
 }
 
 void __spm_pmic_pg_force_off(void)
 {
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+#if 0/* for backup, do not set STRUP_DIG_IO_PG_FORCE and RG_STRUP_VIO18_PG_ENB in MT6355 */
+	pmic_config_interface_nolock(PMIC_STRUP_DIG_IO_PG_FORCE_ADDR,
+			0x0,
+			PMIC_STRUP_DIG_IO_PG_FORCE_MASK,
+			PMIC_STRUP_DIG_IO_PG_FORCE_SHIFT);
+	pmic_config_interface_nolock(PMIC_RG_STRUP_VIO18_PG_ENB_ADDR,
+			0x0,
+			PMIC_RG_STRUP_VIO18_PG_ENB_MASK,
+			PMIC_RG_STRUP_VIO18_PG_ENB_SHIFT);
+#endif
+#else
 	pmic_config_interface_nolock(MT6351_PMIC_STRUP_DIG_IO_PG_FORCE_ADDR,
 			0x0,
 			MT6351_PMIC_STRUP_DIG_IO_PG_FORCE_MASK,
@@ -1164,6 +1257,7 @@ void __spm_pmic_pg_force_off(void)
 			0x0,
 			MT6351_PMIC_RG_STRUP_VIO18_PG_ENB_MASK,
 			MT6351_PMIC_RG_STRUP_VIO18_PG_ENB_SHIFT);
+#endif
 #endif
 }
 
@@ -1171,6 +1265,9 @@ void __spm_pmic_low_iq_mode(int en)
 {
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+	/* TODO: needs to add support of MT6355 */
+#else
 	if (en) {
 		pmic_config_interface_nolock(MT6351_PMIC_RG_VGPU_VDIFF_ENLOWIQ_ADDR,
 					     0x1,
@@ -1190,6 +1287,7 @@ void __spm_pmic_low_iq_mode(int en)
 					     MT6351_PMIC_RG_VCORE_VDIFF_ENLOWIQ_MASK,
 					     MT6351_PMIC_RG_VCORE_VDIFF_ENLOWIQ_SHIFT);
 	}
+#endif
 #endif
 #endif
 }
@@ -1218,10 +1316,10 @@ void __spm_set_pcm_wdt(int en)
 int __attribute__ ((weak)) get_dynamic_period(int first_use, int first_wakeup_time,
 					      int battery_capacity_level)
 {
-	return 60;
+	return 5401;
 }
 
-u32 _spm_get_wake_period(int pwake_time, wake_reason_t last_wr)
+u32 _spm_get_wake_period(int pwake_time, unsigned int last_wr)
 {
 	int period = SPM_WAKE_PERIOD;
 

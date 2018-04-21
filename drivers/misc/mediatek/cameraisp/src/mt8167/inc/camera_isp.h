@@ -360,11 +360,6 @@ typedef struct {
 	signed int *data_ptr;
 } ISP_REF_CNT_CTRL_STRUCT;
 
-typedef struct {
-	char logbuf[1024];  /* pointer to log buf */
-	int logsize;
-} ISP_DEBUG_PRINT_STRUCT;
-
 
 /********************************************************************************************
  pass1 real time buffer control use cq0c
@@ -376,14 +371,14 @@ typedef struct {
 /*  */
 typedef volatile union _CQ_RTBC_FBC_ {
 	volatile struct {
-		unsigned long FBC_CNT:4;
+		unsigned long fbc_cnt:4;
 		unsigned long DROP_INT_EN:1;
 		unsigned long rsv_5:6;
 		unsigned long RCNT_INC:1;
 		unsigned long rsv_12:2;
 		unsigned long FBC_EN:1;
 		unsigned long LOCK_EN:1;
-		unsigned long FB_NUM:4;
+		unsigned long fb_num:4;
 		unsigned long RCNT:4;
 		unsigned long WCNT:4;
 		unsigned long DROP_CNT:4;
@@ -446,12 +441,6 @@ typedef struct {
 	compat_uptr_t data_ptr;
 } compat_ISP_REF_CNT_CTRL_STRUCT;
 
-
-typedef struct {
-	char logbuf[1024];  /* pointer to log buf */
-	int logsize;
-} compat_ISP_DEBUG_PRINT_STRUCT;
-
 #endif
 /*  */
 /********************************************************************************************
@@ -479,7 +468,6 @@ typedef enum {
 	ISP_CMD_DEBUG_FLAG,      /* Dump message level */
 	ISP_CMD_WAKELOCK_CTRL,   /* isp wakelock control */
 	ISP_CMD_SENSOR_FREQ_CTRL,  /* sensor frequence control */
-	ISP_CMD_USER_PRINT      /* for imem user log */
 } ISP_CMD_ENUM;
 /*  */
 #define ISP_RESET           _IO(ISP_MAGIC, ISP_CMD_RESET)
@@ -498,7 +486,6 @@ typedef enum {
 #define ISP_DEBUG_FLAG      _IOW(ISP_MAGIC, ISP_CMD_DEBUG_FLAG,    unsigned long)
 #define ISP_WAKELOCK_CTRL   _IOWR(ISP_MAGIC, ISP_CMD_WAKELOCK_CTRL, unsigned long)
 #define ISP_SENSOR_FREQ_CTRL  _IOW(ISP_MAGIC, ISP_CMD_SENSOR_FREQ_CTRL, unsigned long)
-#define ISP_USER_PRINT_CTRL _IOWR(ISP_MAGIC, ISP_CMD_USER_PRINT, ISP_DEBUG_PRINT_STRUCT)
 
 #ifdef CONFIG_COMPAT
 #define COMPAT_ISP_READ_REGISTER    _IOWR(ISP_MAGIC, ISP_CMD_READ_REG,      compat_ISP_REG_IO_STRUCT)
@@ -509,8 +496,7 @@ typedef enum {
 #define COMPAT_ISP_DEBUG_FLAG       _IOW(ISP_MAGIC, ISP_CMD_DEBUG_FLAG,    compat_uptr_t)
 #define COMPAT_ISP_WAKELOCK_CTRL    _IOWR(ISP_MAGIC, ISP_CMD_WAKELOCK_CTRL, compat_uptr_t)
 #define COMPAT_ISP_SENSOR_FREQ_CTRL  _IOW(ISP_MAGIC, ISP_CMD_SENSOR_FREQ_CTRL, compat_uptr_t)
-#define COMPAT_ISP_USER_PRINT_CTRL _IOWR(ISP_MAGIC, ISP_CMD_USER_PRINT, compat_ISP_DEBUG_PRINT_STRUCT)
-#endif
+ #endif
 
 /*  */
 bool ISP_RegCallback(ISP_CALLBACK_STRUCT *pCallback);

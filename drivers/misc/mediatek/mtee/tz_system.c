@@ -32,9 +32,7 @@
 #include <linux/trusty/trusty_ipc.h>
 #endif
 
-#ifdef CONFIG_ARM64
 #define ARM_SMC_CALLING_CONVENTION
-#endif
 
 #ifndef CONFIG_TRUSTY
 static TZ_RESULT KREE_ServPuts(u32 op, u8 param[REE_SERVICE_BUFFER_SIZE]);
@@ -171,7 +169,7 @@ static u32 tz_service_call(struct smc_args_s *smc_arg)
 
 TZ_RESULT KREE_TeeServiceCallNoCheck(KREE_SESSION_HANDLE handle,
 					uint32_t command, uint32_t paramTypes,
-					MTEEC_PARAM param[4])
+					union MTEEC_PARAM param[4])
 {
 	struct smc_args_s smc_arg = {	.param = param,
 					.handle = handle,
@@ -181,7 +179,8 @@ TZ_RESULT KREE_TeeServiceCallNoCheck(KREE_SESSION_HANDLE handle,
 	return (TZ_RESULT) tz_service_call(&smc_arg);
 }
 #else /* ~CONFIG_TRUSTY */
-#define SMC_MTEE_SERVICE_CALL (0x32000008)
+#define SMC_MTEE_SERVICE_CALL (0x72000008)
+#define SMC_MTEE32_SERVICE_CALL (0x32000008)
 static u32 tz_service_call(u32 handle, u32 op, u32 arg1, unsigned long arg2)
 {
 #ifdef CONFIG_ARM64
@@ -236,12 +235,76 @@ static u32 tz_service_call(u32 handle, u32 op, u32 arg1, unsigned long arg2)
 #else
 	u32 param[REE_SERVICE_BUFFER_SIZE / sizeof(u32)];
 
-	register u32 r0 asm("x0") = SMC_MTEE_SERVICE_CALL;
-	register u32 r1 asm("x1") = handle;
-	register u32 r2 asm("x2") = op;
-	register u32 r3 asm("x3") = arg1;
-	register u32 r4 asm("x4") = arg2;
-	register u32 r5 asm("x5") = (unsigned long)param;
+	register u32 r0 asm("r0") = SMC_MTEE32_SERVICE_CALL;
+	register u32 r1 asm("r1") = handle;
+	register u32 r2 asm("r2") = op;
+	register u32 r3 asm("r3") = arg1;
+	register u32 r4 asm("r4") = arg2;
+	register u32 r5 asm("r5") = (unsigned long)param;
+
+	asm volatile (".arch_extension sec\n"
+		      __asmeq("%0", "r0")
+		      __asmeq("%1", "r1")
+		      __asmeq("%2", "r2")
+		      __asmeq("%3", "r3")
+		      __asmeq("%4", "r0")
+		      __asmeq("%5", "r1")
+		      __asmeq("%6", "r2")
+		      __asmeq("%7", "r3")
+		      __asmeq("%8", "r4")
+		      __asmeq("%9", "r5")
+		      "smc    #0\n" :
+		      "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3) :
+		      "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4), "r"(r5) :
+		      "memory");
+
+	while (r1 != 0) {
+		/* Need REE service */
+		/* r2 is the command, parameter in param buffer */
+		r1 = tz_ree_service(r2, (u8 *) param);
+
+		/* Work complete. Going Back to TZ again */
+		r0 = SMC_MTEE32_SERVICE_CALL;
+		asm volatile (".arch_extension sec\n"
+			      __asmeq("%0", "r0")
+			      __asmeq("%1", "r1")
+			      __asmeq("%2", "r2")
+			      __asmeq("%3", "r3")
+			      __asmeq("%4", "r0")
+			      __asmeq("%5", "r1")
+			      __asmeq("%6", "r2")
+			      "smc    #0\n" :
+			      "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3) :
+			      "r"(r0), "r"(r1), "r"(r2) :
+			      "memory");
+	}
+
+	return r3;
+#endif
+
+}
+
+TZ_RESULT KREE_TeeServiceCallNoCheck(KREE_SESSION_HANDLE handle,
+					uint32_t command, uint32_t paramTypes,
+					union MTEEC_PARAM param[4])
+{
+	return (TZ_RESULT) tz_service_call(handle, command, paramTypes,
+						(unsigned long) param);
+}
+#endif /* CONFIG_TRUSTY */
+
+#else
+static u32 tz_service_call(u32 handle, u32 op, u32 arg1, u32 arg2)
+{
+	/* Reserve buffer for REE service call parameters */
+	u32 param[REE_SERVICE_BUFFER_SIZE / sizeof(u32)];
+
+	register u32 r0 asm("r0") = SMC_MTEE_SERVICE_CALL;
+	register u32 r1 asm("r1") = handle;
+	register u32 r2 asm("r2") = op;
+	register u32 r3 asm("r3") = arg1;
+	register u32 r4 asm("r4") = arg2;
+	register u32 r5 asm("r5") = (u32) param;
 
 	asm volatile (".arch_extension sec\n"
 		      __asmeq("%0", "r0")
@@ -264,7 +327,7 @@ static u32 tz_service_call(u32 handle, u32 op, u32 arg1, unsigned long arg2)
 		r1 = tz_ree_service(r0, (u8 *) param);
 
 		/* Work complete. Going Back to TZ again */
-		r0 = 0x32003000;
+		r0 = 0xffffffff;
 		asm volatile (".arch_extension sec\n"
 			      __asmeq("%0", "r0")
 			      __asmeq("%1", "r1")
@@ -278,70 +341,12 @@ static u32 tz_service_call(u32 handle, u32 op, u32 arg1, unsigned long arg2)
 			      "memory");
 	}
 
-	return r2;
-#endif
-
-}
-
-TZ_RESULT KREE_TeeServiceCallNoCheck(KREE_SESSION_HANDLE handle,
-					uint32_t command, uint32_t paramTypes,
-					MTEEC_PARAM param[4])
-{
-	return (TZ_RESULT) tz_service_call(handle, command, paramTypes,
-						(unsigned long) param);
-}
-#endif /* CONFIG_TRUSTY */
-
-#else
-static u32 tz_service_call(u32 handle, u32 op, u32 arg1, u32 arg2)
-{
-	/* Reserve buffer for REE service call parameters */
-	u32 param[REE_SERVICE_BUFFER_SIZE / sizeof(u32)];
-
-	register u32 r0 asm("r0") = handle;
-	register u32 r1 asm("r1") = op;
-	register u32 r2 asm("r2") = arg1;
-	register u32 r3 asm("r3") = arg2;
-	register u32 r4 asm("r4") = (u32) param;
-
-	asm volatile (".arch_extension sec\n"
-		      __asmeq("%0", "r0")
-		      __asmeq("%1", "r1")
-		      __asmeq("%2", "r0")
-		      __asmeq("%3", "r1")
-		      __asmeq("%4", "r2")
-		      __asmeq("%5", "r3")
-		      __asmeq("%6", "r4")
-		      "smc    #0\n" :
-		      "=r"(r0), "=r"(r1) :
-		      "r"(r0), "r"(r1), "r"(r2), "r"(r3), "r"(r4) :
-		      "memory");
-
-	while (r1 != 0) {
-		/* Need REE service */
-		/* r0 is the command, parameter in param buffer */
-		r1 = tz_ree_service(r0, (u8 *) param);
-
-		/* Work complete. Going Back to TZ again */
-		r0 = 0xffffffff;
-		asm volatile (".arch_extension sec\n"
-			      __asmeq("%0", "r0")
-			      __asmeq("%1", "r1")
-			      __asmeq("%2", "r0")
-			      __asmeq("%3", "r1")
-			      __asmeq("%4", "r4")
-			      "smc    #0\n" :
-			      "=r"(r0), "=r"(r1) :
-			      "r"(r0), "r"(r1), "r"(r4) :
-			      "memory");
-	}
-
 	return r0;
 }
 
 TZ_RESULT KREE_TeeServiceCallNoCheck(KREE_SESSION_HANDLE handle,
 					uint32_t command, uint32_t paramTypes,
-					MTEEC_PARAM param[4])
+					union MTEEC_PARAM param[4])
 {
 	return (TZ_RESULT) tz_service_call(handle, command, paramTypes,
 						(u32) param);
@@ -350,12 +355,12 @@ TZ_RESULT KREE_TeeServiceCallNoCheck(KREE_SESSION_HANDLE handle,
 #endif
 
 TZ_RESULT KREE_TeeServiceCall(KREE_SESSION_HANDLE handle, uint32_t command,
-			      uint32_t paramTypes, MTEEC_PARAM oparam[4])
+			      uint32_t paramTypes, union MTEEC_PARAM oparam[4])
 {
 	int i, do_copy = 0;
 	TZ_RESULT ret;
 	uint32_t tmpTypes;
-	MTEEC_PARAM param[4];
+	union MTEEC_PARAM param[4];
 
 	/* Parameter processing. */
 	memset(param, 0, sizeof(param));
@@ -481,7 +486,7 @@ static TZ_RESULT KREE_ServUSleep(u32 op, u8 uparam[REE_SERVICE_BUFFER_SIZE])
 */
 static int kree_thread_function(void *arg)
 {
-	MTEEC_PARAM param[4];
+	union MTEEC_PARAM param[4];
 	uint32_t paramTypes;
 	int ret;
 	struct REE_THREAD_INFO *info = (struct REE_THREAD_INFO *)arg;
@@ -542,7 +547,7 @@ static TZ_RESULT tz_ree_service(u32 op, u8 param[REE_SERVICE_BUFFER_SIZE])
 TZ_RESULT KREE_InitTZ(void)
 {
 	uint32_t paramTypes;
-	MTEEC_PARAM param[4];
+	union MTEEC_PARAM param[4];
 	TZ_RESULT ret;
 
 	paramTypes = TZPT_NONE;
@@ -557,7 +562,7 @@ TZ_RESULT KREE_InitTZ(void)
 TZ_RESULT KREE_CreateSession(const char *ta_uuid, KREE_SESSION_HANDLE *pHandle)
 {
 	uint32_t paramTypes;
-	MTEEC_PARAM param[4];
+	union MTEEC_PARAM param[4];
 	TZ_RESULT ret;
 
 	if (!ta_uuid || !pHandle)
@@ -583,7 +588,7 @@ TZ_RESULT KREE_CreateSessionWithTag(const char *ta_uuid,
 					const char *tag)
 {
 	uint32_t paramTypes;
-	MTEEC_PARAM param[4];
+	union MTEEC_PARAM param[4];
 	TZ_RESULT ret;
 
 	if (!ta_uuid || !pHandle)
@@ -614,7 +619,7 @@ EXPORT_SYMBOL(KREE_CreateSessionWithTag);
 TZ_RESULT KREE_CloseSession(KREE_SESSION_HANDLE handle)
 {
 	uint32_t paramTypes;
-	MTEEC_PARAM param[4];
+	union MTEEC_PARAM param[4];
 	TZ_RESULT ret;
 
 	param[0].value.a = (uint32_t) handle;

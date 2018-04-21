@@ -142,6 +142,12 @@ struct mmc_request {
 	struct list_head	link;
 	struct list_head	hlist;
 #endif
+
+#if defined(CONFIG_MTK_HW_FDE) || defined(CONFIG_HIE)
+	unsigned int            bi_hw_fde;
+	unsigned int            bi_key_idx;
+	bool			is_mmc_req; /* request is from mmc layer */
+#endif
 	ktime_t			io_start;
 #ifdef CONFIG_BLOCK
 	int			lat_hist_enabled;

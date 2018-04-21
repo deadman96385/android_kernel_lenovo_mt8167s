@@ -91,14 +91,14 @@
 #define SODI_TAG     "[SODI] "
 #define SODI3_TAG    "[SODI3] "
 
-#define sodi_err(fmt, args...)     pr_err(SODI_TAG fmt, ##args)
-#define sodi_warn(fmt, args...)    pr_warn(SODI_TAG fmt, ##args)
-#define sodi_debug(fmt, args...)   pr_debug(SODI_TAG fmt, ##args)
-#define sodi3_err(fmt, args...)	   pr_err(SODI3_TAG fmt, ##args)
-#define sodi3_warn(fmt, args...)   pr_warn(SODI3_TAG fmt, ##args)
-#define sodi3_debug(fmt, args...)  pr_debug(SODI3_TAG fmt, ##args)
-#define so_err(fg, fmt, args...)   ((fg&SODI_FLAG_3P0)?pr_err(SODI3_TAG fmt, ##args):pr_err(SODI_TAG fmt, ##args))
-#define so_warn(fg, fmt, args...)  ((fg&SODI_FLAG_3P0)?pr_warn(SODI3_TAG fmt, ##args):pr_warn(SODI_TAG fmt, ##args))
+#define sodi_err(fmt, args...)     pr_info(SODI_TAG fmt, ##args)
+#define sodi_warn(fmt, args...)    pr_info(SODI_TAG fmt, ##args)
+#define sodi_debug(fmt, args...)   pr_info(SODI_TAG fmt, ##args)
+#define sodi3_err(fmt, args...)	   pr_info(SODI3_TAG fmt, ##args)
+#define sodi3_warn(fmt, args...)   pr_info(SODI3_TAG fmt, ##args)
+#define sodi3_debug(fmt, args...)  pr_info(SODI3_TAG fmt, ##args)
+#define so_err(fg, fmt, args...)   ((fg&SODI_FLAG_3P0)?pr_info(SODI3_TAG fmt, ##args):pr_info(SODI_TAG fmt, ##args))
+#define so_warn(fg, fmt, args...)  ((fg&SODI_FLAG_3P0)?pr_info(SODI3_TAG fmt, ##args):pr_info(SODI_TAG fmt, ##args))
 #define so_debug(fg, fmt, args...)				\
 	do {										\
 		if (fg&SODI_FLAG_3P0)					\
@@ -108,9 +108,14 @@
 	} while (0)
 
 
-#define SPM_BYPASS_SYSPWREQ	0
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+#define SPM_BYPASS_SYSPWREQ     1
+#else
+#define SPM_BYPASS_SYSPWREQ     0
+#endif
 
 #define ALL_TOP_CON_MASK	0x037F
+#define PMIC_VAL_SIZE_MASK	0xFFFF
 #define MEMPLL_PD_MODE		false
 #define MEMPLL_CG_MODE		true
 
@@ -201,7 +206,9 @@ static inline void spm_sodi_aee_init(void)
 void spm_trigger_wfi_for_sodi(struct pwr_ctrl *pwrctrl);
 void spm_enable_mmu_smi_async(void);
 void spm_disable_mmu_smi_async(void);
-wake_reason_t
+void spm_sodi_pmic_before_wfi(void);
+void spm_sodi_pmic_after_wfi(void);
+unsigned int
 spm_sodi_output_log(struct wake_status *wakesta, struct pcm_desc *pcmdesc, int vcore_status, u32 sodi_flags);
 void spm_sodi_get_vcore_opp(u32 *flags);
 

@@ -17,7 +17,7 @@
 #include <linux/console.h>
 #include <linux/pstore.h>
 
-typedef enum {
+enum AEE_FIQ_STEP_NUM {
 	AEE_FIQ_STEP_FIQ_ISR_BASE = 1,
 	AEE_FIQ_STEP_WDT_FIQ_INFO = 4,
 	AEE_FIQ_STEP_WDT_FIQ_STACK,
@@ -50,7 +50,7 @@ typedef enum {
 	AEE_FIQ_STEP_KE_IPANIC_HEADER,
 	AEE_FIQ_STEP_KE_IPANIC_DONE,
 	AEE_FIQ_STEP_KE_NESTED_PANIC = 64,
-} AEE_FIQ_STEP_NUM;
+};
 
 #ifdef CONFIG_MTK_RAM_CONSOLE
 extern int aee_rr_curr_fiq_step(void);
@@ -68,6 +68,10 @@ extern void aee_rr_rec_hotplug_cpu_event(u8 val);
 extern void aee_rr_rec_hotplug_cb_index(u8 val);
 extern void aee_rr_rec_hotplug_cb_fp(unsigned long val);
 extern void aee_rr_rec_hotplug_cb_times(unsigned long val);
+extern void aee_rr_rec_hps_cb_enter_times(unsigned long long val);
+extern void aee_rr_rec_hps_cb_cpu_bitmask(unsigned int val);
+extern void aee_rr_rec_hps_cb_footprint(unsigned int val);
+extern void aee_rr_rec_hps_cb_fp_times(unsigned long long val);
 extern void aee_rr_rec_last_init_func(unsigned long val);
 #ifdef CONFIG_MTK_EMMC_SUPPORT
 extern void last_kmsg_store_to_emmc(void);
@@ -87,6 +91,18 @@ static inline void aee_rr_rec_hotplug_cb_fp(unsigned long val)
 {
 }
 static inline void aee_rr_rec_hotplug_cb_times(unsigned long val)
+{
+}
+static inline void aee_rr_rec_hps_cb_enter_times(unsigned long long val)
+{
+}
+static inline void aee_rr_rec_hps_cb_cpu_bitmask(unsigned int val)
+{
+}
+static inline void aee_rr_rec_hps_cb_footprint(unsigned int val)
+{
+}
+static inline void aee_rr_rec_hps_cb_fp_times(unsigned long long val)
 {
 }
 static inline int aee_rr_curr_fiq_step(void)

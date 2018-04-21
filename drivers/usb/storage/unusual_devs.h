@@ -1379,6 +1379,13 @@ UNUSUAL_DEV( 0x0bc2, 0x3010, 0x0000, 0x0000,
 		USB_SC_DEVICE, USB_PR_DEVICE, NULL,
 		US_FL_SANE_SENSE ),
 
+/* Reported by Kris Lindgren <kris.lindgren@gmail.com> */
+UNUSUAL_DEV( 0x0bc2, 0x3332, 0x0000, 0x9999,
+		"Seagate",
+		"External",
+		USB_SC_DEVICE, USB_PR_DEVICE, NULL,
+		US_FL_NO_WP_DETECT ),
+
 UNUSUAL_DEV(  0x0d49, 0x7310, 0x0000, 0x9999,
 		"Maxtor",
 		"USB to SATA",
@@ -1957,7 +1964,16 @@ UNUSUAL_DEV(  0x12d1, 0x143F, 0x0000, 0x0000,
 		"Mass Storage",
 		USB_SC_DEVICE, USB_PR_DEVICE, usb_stor_huawei_e220_init,
 		0),
-
+#if 1
+HW_UNUSUAL_DEV(0x12d1, 0x08, 0x06, 0x50,
+	       "HUAWEI",
+	       "HUAWEI MOBILE Mass Storage",
+	       USB_SC_DEVICE, USB_PR_DEVICE, usb_stor_huawei_init,
+	       0),
+HW_UNUSUAL_DEV(0x19d2, 0x08, 0x06, 0x50,
+	       "ZTE",
+	       "ZTE MOBILE Mass Storage", USB_SC_DEVICE, USB_PR_DEVICE, usb_stor_zte_init, 0),
+#endif
 /* Reported by Vilius Bilinkevicius <vilisas AT xxx DOT lt) */
 UNUSUAL_DEV(  0x132b, 0x000b, 0x0001, 0x0001,
 		"Minolta",
@@ -2134,6 +2150,13 @@ UNUSUAL_DEV(  0x22b8, 0x3010, 0x0001, 0x0001,
 		"RAZR V3x",
 		USB_SC_DEVICE, USB_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY | US_FL_IGNORE_RESIDUE ),
+
+/* Reported-by George Cherian <george.cherian@cavium.com> */
+UNUSUAL_DEV(0x152d, 0x9561, 0x0000, 0x9999,
+		"JMicron",
+		"JMS56x",
+		USB_SC_DEVICE, USB_PR_DEVICE, NULL,
+		US_FL_NO_REPORT_OPCODES),
 
 /*
  * Patch by Constantin Baranov <const@tltsu.ru>

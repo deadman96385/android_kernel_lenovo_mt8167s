@@ -81,11 +81,11 @@ enum ipi_msg_type {
 	IPI_CPU_STOP,
 	IPI_IRQ_WORK,
 	IPI_COMPLETION,
+	IPI_CPU_BACKTRACE,
 #ifdef CONFIG_TRUSTY
 	IPI_CUSTOM_FIRST,
-	IPI_CUSTOM_LAST,
+	IPI_CUSTOM_LAST = 15,
 #endif
-	IPI_CPU_BACKTRACE = 15,
 };
 
 #ifdef CONFIG_TRUSTY
@@ -205,7 +205,7 @@ int platform_can_hotplug_cpu(unsigned int cpu)
 	if (smp_ops.cpu_can_disable)
 		return smp_ops.cpu_can_disable(cpu);
 
-#ifdef CONFIG_MACH_MT6757
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_MT6763)
 	return 1;
 #else
 	/*
@@ -652,8 +652,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	switch (ipinr) {
 	case IPI_WAKEUP:
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_start(ipinr);
-		mt_trace_ISR_end(ipinr);
+		mt_trace_IPI_start(ipinr);
+		mt_trace_IPI_end(ipinr);
 #endif
 		break;
 
@@ -661,11 +661,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_TIMER:
 		irq_enter();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_start(ipinr);
+		mt_trace_IPI_start(ipinr);
 #endif
 		tick_receive_broadcast();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_end(ipinr);
+		mt_trace_IPI_end(ipinr);
 #endif
 		irq_exit();
 		break;
@@ -678,11 +678,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_CALL_FUNC:
 		irq_enter();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_start(ipinr);
+		mt_trace_IPI_start(ipinr);
 #endif
 		generic_smp_call_function_interrupt();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_end(ipinr);
+		mt_trace_IPI_end(ipinr);
 #endif
 		irq_exit();
 		break;
@@ -690,11 +690,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_CALL_FUNC_SINGLE:
 		irq_enter();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_start(ipinr);
+		mt_trace_IPI_start(ipinr);
 #endif
 		generic_smp_call_function_single_interrupt();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_end(ipinr);
+		mt_trace_IPI_end(ipinr);
 #endif
 		irq_exit();
 		break;
@@ -702,11 +702,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_CPU_STOP:
 		irq_enter();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_start(ipinr);
+		mt_trace_IPI_start(ipinr);
 #endif
 		ipi_cpu_stop(cpu);
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_end(ipinr);
+		mt_trace_IPI_end(ipinr);
 #endif
 		irq_exit();
 		break;
@@ -715,11 +715,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_IRQ_WORK:
 		irq_enter();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_start(ipinr);
+		mt_trace_IPI_start(ipinr);
 #endif
 		irq_work_run();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_end(ipinr);
+		mt_trace_IPI_end(ipinr);
 #endif
 		irq_exit();
 		break;
@@ -728,11 +728,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_COMPLETION:
 		irq_enter();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_start(ipinr);
+		mt_trace_IPI_start(ipinr);
 #endif
 		ipi_complete(cpu);
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_end(ipinr);
+		mt_trace_IPI_end(ipinr);
 #endif
 		irq_exit();
 		break;
@@ -740,11 +740,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 	case IPI_CPU_BACKTRACE:
 		irq_enter();
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_start(ipinr);
+		mt_trace_IPI_start(ipinr);
 #endif
 		nmi_cpu_backtrace(regs);
 #ifdef CONFIG_MTK_SCHED_MONITOR
-		mt_trace_ISR_end(ipinr);
+		mt_trace_IPI_end(ipinr);
 #endif
 		irq_exit();
 		break;
@@ -790,8 +790,10 @@ static void handle_custom_ipi_irq(struct irq_desc *desc)
 	unsigned int irq = irq_desc_get_irq(desc);
 
 	if (!desc->action) {
+/*
 		pr_crit("CPU%u: Unknown IPI message 0x%x, no custom handler\n",
 			smp_processor_id(), irq);
+*/
 		return;
 	}
 

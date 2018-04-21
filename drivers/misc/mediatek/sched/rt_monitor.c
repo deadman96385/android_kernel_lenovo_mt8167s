@@ -53,6 +53,7 @@ DEFINE_PER_CPU(unsigned long long, rt_dur_ts);
 
 static DEFINE_SPINLOCK(mt_rt_mon_lock);
 static struct mt_rt_mon_struct buffer[MAX_THROTTLE_COUNT];
+static int rt_mon_cpu_buffer;
 static int rt_mon_count_buffer;
 static unsigned long long rt_start_ts_buffer, rt_end_ts_buffer, rt_dur_ts_buffer;
 char rt_monitor_print_at_AEE_buffer[124];
@@ -226,13 +227,14 @@ void mt_rt_mon_print_task(int cpu)
 	struct mt_rt_mon_struct *tmp;
 	struct list_head *list_head;
 
+	rt_mon_cpu_buffer = cpu;
 	rt_mon_count_buffer = __raw_get_cpu_var(rt_mon_count);
 	rt_start_ts_buffer = __raw_get_cpu_var(rt_start_ts);
 	rt_end_ts_buffer =  __raw_get_cpu_var(rt_end_ts);
 	rt_dur_ts_buffer = __raw_get_cpu_var(rt_dur_ts);
 
-	pr_err(
-		"sched: mon_count = %d monitor start[%lld.%06lu ms] end[%lld.%06lu ms] dur[%lld.%06lu ms]\n",
+	printk_deferred(
+		"[name:rt_monitor&]sched: mon_count = %d monitor start[%lld.%06lu ms] end[%lld.%06lu ms] dur[%lld.%06lu ms]\n",
 		per_cpu(rt_mon_count, cpu),
 		SPLIT_NS_H(per_cpu(rt_start_ts, cpu)), SPLIT_NS_L(per_cpu(rt_start_ts, cpu)),
 		SPLIT_NS_H(per_cpu(rt_end_ts, cpu)), SPLIT_NS_L(per_cpu(rt_end_ts, cpu)),
@@ -245,7 +247,8 @@ void mt_rt_mon_print_task(int cpu)
 	list_for_each_entry(tmp, list_head, list) {
 		memcpy(&buffer[count], tmp, sizeof(struct mt_rt_mon_struct));
 		count++;
-		pr_err("sched:[%s] pid:%d prio:%d old:%d exec_time[%lld.%06lu ms] percen[%d.%04d%%] isr_time[%lld.%06lu ms]\n",
+		printk_deferred(
+			"[name:rt_monitor&]sched:[%s] pid:%d prio:%d old:%d exec[%lld.%06lu ms] per[%d.%04d%%] isr[%lld.%06lu ms]\n",
 			tmp->comm, tmp->pid, tmp->prio, tmp->old_prio,
 			SPLIT_NS_H(tmp->cost_cputime), SPLIT_NS_L(tmp->cost_cputime),
 			tmp->cputime_percen_6 / 10000, tmp->cputime_percen_6 % 10000,
@@ -267,8 +270,9 @@ void mt_rt_mon_print_task_from_buffer(void)
 	int i;
 
 	printf_at_AEE("last throttle information start\n");
-	printf_at_AEE("sched: mon_count = %d monitor start[%lld.%06lu] end[%lld.%06lu] dur[%lld.%06lu]\n",
-			rt_mon_count_buffer, SPLIT_NS_H(rt_start_ts_buffer), SPLIT_NS_L(rt_start_ts_buffer),
+	printf_at_AEE("sched: cpu=%d mon_count=%d start[%lld.%06lu] end[%lld.%06lu] dur[%lld.%06lu]\n",
+			rt_mon_cpu_buffer, rt_mon_count_buffer,
+			SPLIT_NS_H(rt_start_ts_buffer), SPLIT_NS_L(rt_start_ts_buffer),
 			SPLIT_NS_H(rt_end_ts_buffer), SPLIT_NS_L(rt_end_ts_buffer),
 			SPLIT_NS_H((rt_end_ts_buffer - rt_start_ts_buffer)),
 			SPLIT_NS_L((rt_end_ts_buffer - rt_start_ts_buffer)));

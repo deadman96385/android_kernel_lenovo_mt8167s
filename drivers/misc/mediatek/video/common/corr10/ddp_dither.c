@@ -17,7 +17,10 @@
 #else
 #if defined(CONFIG_MACH_MT6755) || defined(CONFIG_MACH_MT6797) || \
 	defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS) || \
-	defined(CONFIG_MACH_ELBRUS) || defined(CONFIG_MACH_MT6799)
+	defined(CONFIG_MACH_ELBRUS) || defined(CONFIG_MACH_MT6799) || \
+	defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6763) || \
+	defined(CONFIG_MACH_MT6758) || defined(CONFIG_MACH_MT6775) || \
+	defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6771)
 #include <ddp_clkmgr.h>
 #endif
 #endif
@@ -29,13 +32,14 @@
 #include <disp_drv_platform.h>
 #if defined(CONFIG_MACH_MT6755) || defined(CONFIG_MACH_MT6797) || \
 	defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS) || \
-	defined(CONFIG_MACH_MT6799)
+	defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6739)
 #include <disp_helper.h>
 #endif
 #include <primary_display.h>
 
 #if defined(CONFIG_MACH_ELBRUS) || defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS) || \
-	defined(CONFIG_MACH_MT6799)
+	defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758) || \
+	defined(CONFIG_MACH_MT6775) || defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6771)
 #define DITHER0_BASE_NAMING (DISPSYS_DITHER0_BASE)
 #define DITHER0_MODULE_NAMING (DISP_MODULE_DITHER0)
 #else
@@ -43,14 +47,16 @@
 #define DITHER0_MODULE_NAMING (DISP_MODULE_DITHER)
 #endif
 
-#if defined(CONFIG_MACH_MT6799)
+#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758) || \
+	defined(CONFIG_MACH_MT6775) || defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6771)
 #define DITHER0_CLK_NAMING (DISP0_DISP_DITHER0)
 #else
 #define DITHER0_CLK_NAMING (DISP0_DISP_DITHER)
 #endif
 
 #if defined(CONFIG_MACH_MT6797) || defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS) || \
-	defined(CONFIG_MACH_MT6799)
+	defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758) || \
+	defined(CONFIG_MACH_MT6775) || defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6771)
 #define DITHER_SUPPORT_PARTIAL_UPDATE
 #endif
 
@@ -60,10 +66,12 @@
 #define DITHER1_OFFSET (DISPSYS_DITHER1_BASE - DISPSYS_DITHER0_BASE)
 
 #define dither_get_offset(module) ((module == DITHER0_MODULE_NAMING) ? DITHER0_OFFSET : DITHER1_OFFSET)
+#define index_of_dither(module) ((module == DITHER0_MODULE_NAMING) ? 0 : 1)
 #else
 #define DITHER_TOTAL_MODULE_NUM (1)
 
 #define dither_get_offset(module) (DITHER0_OFFSET)
+#define index_of_dither(module) (0)
 #endif
 
 int dither_dbg_en;
@@ -73,7 +81,7 @@ int dither_dbg_en;
 
 #define DITHER_REG(reg_base, index) ((reg_base) + 0x100 + (index) * 4)
 
-static unsigned int g_dither_relay_value;
+static unsigned int g_dither_relay_value[DITHER_TOTAL_MODULE_NUM];
 
 void disp_dither_init(enum DISP_MODULE_ENUM module, int width, int height,
 			     unsigned int dither_bpp, void *cmdq)
@@ -118,7 +126,7 @@ void disp_dither_init(enum DISP_MODULE_ENUM module, int width, int height,
 	}
 
 	DISP_REG_MASK(cmdq, DISP_REG_DITHER_EN + offset, enable, 0x1);
-	cfg_val = (enable << 1) | g_dither_relay_value;
+	cfg_val = (enable << 1) | g_dither_relay_value[index_of_dither(module)];
 	DISP_REG_MASK(cmdq, DISP_REG_DITHER_CFG + offset, cfg_val, 0x3);
 	/* Disable dither MODULE_STALL / SUB_MODULE_STALL  */
 #if defined(CONFIG_MACH_MT6755) || defined(CONFIG_MACH_MT6797) || \
@@ -165,9 +173,9 @@ static int disp_dither_bypass(enum DISP_MODULE_ENUM module, int bypass)
 
 	if (bypass) {
 		relay = 1;
-		g_dither_relay_value = 0x1;
+		g_dither_relay_value[index_of_dither(module)] = 0x1;
 	} else {
-		g_dither_relay_value = 0x0;
+		g_dither_relay_value[index_of_dither(module)] = 0x0;
 	}
 
 	DISP_REG_MASK(NULL, DISP_REG_DITHER_CFG + dither_get_offset(module), relay, 0x1);
@@ -182,6 +190,9 @@ static int disp_dither_power_on(enum DISP_MODULE_ENUM module, void *handle)
 {
 #if defined(CONFIG_MACH_MT6755)
 	/* dither is DCM , do nothing */
+#elif defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758) || defined(CONFIG_MACH_MT6775) || \
+	defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6771)
+	ddp_clk_prepare_enable(ddp_get_module_clk_id(module));
 #else
 #ifdef ENABLE_CLK_MGR
 	if (module == DITHER0_MODULE_NAMING) {
@@ -207,6 +218,9 @@ static int disp_dither_power_off(enum DISP_MODULE_ENUM module, void *handle)
 {
 #if defined(CONFIG_MACH_MT6755)
 	/* dither is DCM , do nothing */
+#elif defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758) || defined(CONFIG_MACH_MT6775) || \
+	defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6771)
+	ddp_clk_disable_unprepare(ddp_get_module_clk_id(module));
 #else
 #ifdef ENABLE_CLK_MGR
 	if (module == DITHER0_MODULE_NAMING) {
@@ -255,8 +269,10 @@ static int dither_ioctl(enum DISP_MODULE_ENUM module, void *handle,
 struct DDP_MODULE_DRIVER ddp_driver_dither = {
 	.config = disp_dither_config,
 	.bypass = disp_dither_bypass,
+#if !defined(CONFIG_MACH_MT6759) && !defined(CONFIG_MACH_MT6739)
 	.init = disp_dither_power_on,
 	.deinit = disp_dither_power_off,
+#endif
 	.power_on = disp_dither_power_on,
 	.power_off = disp_dither_power_off,
 #ifdef DITHER_SUPPORT_PARTIAL_UPDATE

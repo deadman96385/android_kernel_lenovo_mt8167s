@@ -15,12 +15,6 @@
 #define AEE_COMMON_H
 #include <linux/console.h>
 
-#define LOGD(fmt, msg...)	pr_notice(fmt, ##msg)
-#define LOGV(fmt, msg...)
-#define LOGI	LOGD
-#define LOGE(fmt, msg...)	pr_err(fmt, ##msg)
-#define LOGW	LOGE
-
 int get_memory_size(void);
 
 int in_fiq_handler(void);
@@ -35,12 +29,12 @@ extern void aee_dumpnative(void);
 #endif
 #ifdef CONFIG_SCHED_DEBUG
 extern void sysrq_sched_debug_show(void);
-extern int sysrq_sched_debug_show_at_AEE(void);
+extern void sysrq_sched_debug_show_at_AEE(void);
 #endif
 extern int aee_rr_reboot_reason_show(struct seq_file *m, void *v);
 extern int aee_rr_last_fiq_step(void);
 extern void aee_rr_rec_exp_type(unsigned int type);
-extern void mrdump_mini_per_cpu_regs(int cpu, struct pt_regs *regs);
+extern void mrdump_mini_per_cpu_regs(int cpu, struct pt_regs *regs, struct task_struct *tsk);
 extern int debug_locks;
 #ifdef WDT_DEBUG_VERBOSE
 extern int dump_localtimer_info(char *buffer, int size);
@@ -53,5 +47,8 @@ extern void irq_raise_softirq(const struct cpumask *mask, unsigned int irq);
 
 /* for test case only */
 extern int no_zap_locks;
+
+/* dedicated reboot flow for exception */
+extern void aee_exception_reboot(void);
 
 #endif				/* AEE_COMMON_H */

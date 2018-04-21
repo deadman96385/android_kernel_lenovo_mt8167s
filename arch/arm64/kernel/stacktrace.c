@@ -21,6 +21,7 @@
 #include <linux/stacktrace.h>
 
 #include <asm/irq.h>
+#include <asm/stack_pointer.h>
 #include <asm/stacktrace.h>
 
 /*
@@ -36,21 +37,23 @@
  *	ldp	x29, x30, [sp]
  *	add	sp, sp, #0x10
  */
-int notrace unwind_frame(struct stackframe *frame)
+int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 {
 	unsigned long high, low;
 	unsigned long fp = frame->fp;
 	unsigned long irq_stack_ptr;
 
+	if (!tsk)
+		tsk = current;
+
 	/*
-	 * Use raw_smp_processor_id() to avoid false-positives from
-	 * CONFIG_DEBUG_PREEMPT. get_wchan() calls unwind_frame() on sleeping
-	 * task stacks, we can be pre-empted in this case, so
-	 * {raw_,}smp_processor_id() may give us the wrong value. Sleeping
-	 * tasks can't ever be on an interrupt stack, so regardless of cpu,
-	 * the checks will always fail.
+	 * Switching between stacks is valid when tracing current and in
+	 * non-preemptible context.
 	 */
-	irq_stack_ptr = IRQ_STACK_PTR(raw_smp_processor_id());
+	if (tsk == current && !preemptible())
+		irq_stack_ptr = IRQ_STACK_PTR(smp_processor_id());
+	else
+		irq_stack_ptr = 0;
 
 	low  = frame->sp;
 	/* irq stacks are not THREAD_SIZE aligned */
@@ -99,7 +102,7 @@ int notrace unwind_frame(struct stackframe *frame)
 	return 0;
 }
 
-void notrace walk_stackframe(struct stackframe *frame,
+void notrace walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
 		     int (*fn)(struct stackframe *, void *), void *data)
 {
 	while (1) {
@@ -107,12 +110,11 @@ void notrace walk_stackframe(struct stackframe *frame,
 
 		if (fn(frame, data))
 			break;
-		ret = unwind_frame(frame);
+		ret = unwind_frame(tsk, frame);
 		if (ret < 0)
 			break;
 	}
 }
-EXPORT_SYMBOL(walk_stackframe);
 
 #ifdef CONFIG_STACKTRACE
 struct stack_trace_data {
@@ -144,6 +146,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
 	struct stack_trace_data data;
 	struct stackframe frame;
 
+	if (!try_get_task_stack(tsk))
+		return;
+
 	data.trace = trace;
 	data.skip = trace->skip;
 
@@ -159,9 +164,11 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
 		frame.pc = (unsigned long)save_stack_trace_tsk;
 	}
 
-	walk_stackframe(&frame, save_trace, &data);
+	walk_stackframe(tsk, &frame, save_trace, &data);
 	if (trace->nr_entries < trace->max_entries)
 		trace->entries[trace->nr_entries++] = ULONG_MAX;
+
+	put_task_stack(tsk);
 }
 
 void save_stack_trace(struct stack_trace *trace)

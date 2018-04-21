@@ -39,7 +39,7 @@ static unsigned char _bIsrc1Data[16] = { 0 };
 static unsigned int _u4NValue;
 
 static const unsigned char HDMI_VIDEO_ID_CODE[HDMI_VIDEO_RESOLUTION_NUM] = {
-2, 17, 4, 19, 5, 20, 34, 33, 32, 32, 34, 16, 31 };
+6, 21, 2, 17, 4, 19, 5, 20, 34, 33, 32, 32, 34, 16, 31 };
 
 static const char *szHdmiResStr[HDMI_VIDEO_RESOLUTION_NUM] = {
 	"RES_480P",
@@ -369,13 +369,15 @@ unsigned int hdmi_pll_read(unsigned short u2Reg)
 	unsigned int u4Data;
 
 	internal_hdmi_read(hdmi_ref_reg[AP_CCIF0] + u2Reg, &u4Data);
-	/*HDMI_PLL_LOG("[R]addr = 0x%04x, data = 0x%08x\n", u2Reg, u4Data); */
+	HDMI_PLL_LOG("[R]addr = 0x%04x, data = 0x%08x\n", u2Reg, u4Data);
+	udelay(10);
 	return u4Data;
 }
 
 void hdmi_pll_write(unsigned short u2Reg, unsigned int u4Data)
 {
-	/*HDMI_PLL_LOG("[W]addr= 0x%04x, data = 0x%08x\n", u2Reg, u4Data); */
+	HDMI_PLL_LOG("[W]addr= 0x%04x, data = 0x%08x\n", u2Reg, u4Data);
+	udelay(10);
 	internal_hdmi_write(hdmi_ref_reg[AP_CCIF0] + u2Reg, u4Data);
 }
 

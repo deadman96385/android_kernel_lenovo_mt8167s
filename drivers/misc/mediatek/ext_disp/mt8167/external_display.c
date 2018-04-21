@@ -507,6 +507,7 @@ static int _build_path_ovl_to_wdma(void)
 	ext_init_decouple_buffers();
 
 	if (is_path_exist) {
+		dpmgr_path_update_mutexid_by_scenario(ovl2mem_path_handle);
 		pgc->ovl2mem_path_handle = ovl2mem_path_handle;
 		goto build_end;
 	}
@@ -584,6 +585,7 @@ static int _build_path_decouple(void)
 	}
 
 	dpmgr_set_lcm_utils(pgc->dpmgr_handle, NULL);
+	dpmgr_map_event_to_irq(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC, DDP_IRQ_RDMA1_DONE);
 	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC);
 	dpmgr_enable_event(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_DONE);
 
@@ -1129,6 +1131,13 @@ int ext_disp_deinit(unsigned int session)
 
 	pgc->state = EXTD_DEINIT;
 
+	usleep_range(16000, 17000);
+	if (dpmgr_path_is_busy(pgc->dpmgr_handle))
+		dpmgr_wait_event_timeout(pgc->dpmgr_handle, DISP_PATH_EVENT_FRAME_DONE, HZ);
+
+	if (ext_disp_use_cmdq == CMDQ_ENABLE && DISP_SESSION_DEV(session) != DEV_EINK + 1)
+		_cmdq_stop_trigger_loop();
+
 	dpmgr_path_deinit(pgc->dpmgr_handle, CMDQ_DISABLE);
 	dpmgr_destroy_path(pgc->dpmgr_handle, NULL);
 	cmdqRecDestroy(pgc->cmdq_handle_config);
@@ -1158,7 +1167,7 @@ int ext_disp_wait_for_vsync(void *config, unsigned int session)
 	_ext_disp_path_unlock();
 
 	_ext_disp_vsync_lock(session);
-	ret = dpmgr_wait_event(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC);
+	ret = dpmgr_wait_event_timeout(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC, 60);
 
 	if (ret == -2) {
 		EXT_DISP_LOG("vsync for ext display path not enabled yet\n");
@@ -1170,7 +1179,7 @@ int ext_disp_wait_for_vsync(void *config, unsigned int session)
 	c->vsync_cnt++;
 
 	_ext_disp_vsync_unlock(session);
-	return ret;
+	return 0;
 }
 
 int ext_disp_suspend(unsigned int session)
@@ -1283,6 +1292,7 @@ static int _ovl_fence_release_callback(uint32_t block)
 {
 	int secure = 0;
 	unsigned int addr = 0;
+	int i, fence_idx;
 
 	if (!block)
 		_ext_disp_path_lock();
@@ -1314,7 +1324,15 @@ static int _ovl_fence_release_callback(uint32_t block)
 	pgc->dc_buf_id++;
 	pgc->dc_buf_id %= DISP_INTERNAL_BUFFER_COUNT;
 
+#if 1
+	for (i = 0; i < 4; i++) {
+		cmdqBackupReadSlot(pgc->ovl_address, i, &fence_idx);
+		mtkfb_release_fence(pgc->session, i, fence_idx);
+	}
+#else
 	mtkfb_release_session_fence(pgc->session);
+#endif
+
 	if (!block)
 		_ext_disp_path_unlock();
 
@@ -1530,6 +1548,7 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 	if (pgc->state != EXTD_INIT && pgc->state != EXTD_RESUME && pgc->suspend_config != 1) {
 		EXT_DISP_LOG("config ext disp is already slept, state:%d\n", pgc->state);
 		mmprofile_log_ex(ddp_mmp_get_events()->Extd_ErrorInfo, MMPROFILE_FLAG_PULSE, Config, idx);
+		mtkfb_release_session_fence(pgc->session);
 		_ext_disp_path_unlock();
 		return -2;
 	}
@@ -1567,8 +1586,7 @@ int ext_disp_config_input_multiple(struct disp_session_input_config *input, int 
 			data_config->ovl_dirty = 1;
 			pgc->need_trigger_overlay = 1;
 
-			cmdqRecBackupUpdateSlot(cmdq_handle, pgc->ovl_address,
-					config_layer_id, data_config->ovl_config[config_layer_id].addr);
+			cmdqRecBackupUpdateSlot(cmdq_handle, pgc->ovl_address, i, idx);
 		}
 		EXT_DISP_LOG("set dest w:%d, h:%d\n",
 						extd_lcm_params.dpi.width, extd_lcm_params.dpi.height);

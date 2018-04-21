@@ -83,10 +83,11 @@
 #define slp_debug(fmt, args...)     pr_debug("[SLP] " fmt, ##args)
 static DEFINE_SPINLOCK(slp_lock);
 
-static wake_reason_t slp_wake_reason = WR_NONE;
+static unsigned int slp_wake_reason = WR_NONE;
 
 static bool slp_ck26m_on;
 bool slp_dump_gpio;
+bool slp_dump_golden_setting;
 static bool slp_dump_regs = 1;
 static bool slp_check_mtcmos_pll = 1;
 
@@ -432,7 +433,7 @@ int slp_set_wakesrc(u32 wakesrc, bool enable, bool ck26m_on)
 	return r;
 }
 
-wake_reason_t slp_get_wake_reason(void)
+unsigned int slp_get_wake_reason(void)
 {
 	return slp_wake_reason;
 }
@@ -441,6 +442,31 @@ bool slp_will_infra_pdn(void)
 {
 	return is_infra_pdn(slp_spm_flags);
 }
+
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+void slp_set_infra_on(bool infra_on)
+{
+	if (infra_on) {
+		slp_spm_flags |= SPM_FLAG_DIS_INFRA_PDN;
+#if SLP_SLEEP_DPIDLE_EN
+		slp_spm_deepidle_flags |= SPM_FLAG_DIS_INFRA_PDN;
+#endif
+	} else {
+		slp_spm_flags &= ~SPM_FLAG_DIS_INFRA_PDN;
+#if SLP_SLEEP_DPIDLE_EN
+		slp_spm_deepidle_flags &= ~SPM_FLAG_DIS_INFRA_PDN;
+#endif
+	}
+	slp_notice("slp_set_infra_on (%d): 0x%x, 0x%x\n", infra_on, slp_spm_flags, slp_spm_deepidle_flags);
+}
+#else
+void slp_set_infra_on(bool infra_on)
+{
+	slp_notice("Not implement\n");
+}
+#endif
+#endif
 
 void slp_module_init(void)
 {
@@ -473,6 +499,7 @@ module_param(slp_ck26m_on, bool, 0644);
 module_param(slp_spm_flags, uint, 0644);
 
 module_param(slp_dump_gpio, bool, 0644);
+module_param(slp_dump_golden_setting, bool, 0644);
 module_param(slp_dump_regs, bool, 0644);
 module_param(slp_check_mtcmos_pll, bool, 0644);
 

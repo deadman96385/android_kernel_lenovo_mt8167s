@@ -13,7 +13,9 @@
 
 #ifndef __HDMI_DRV_H__
 #define __HDMI_DRV_H__
-
+#ifndef CONFIG_MTK_INTERNAL_HDMI_SUPPORT
+#include "lcm_drv.h"
+#endif
 #ifdef HDMI_MT8193_SUPPORT
 #include "mt8193hdmictrl.h"
 #include "mt8193edid.h"
@@ -108,37 +110,44 @@ struct HDMI_EDID_INFO_T {
 
 #ifdef CONFIG_MTK_INTERNAL_HDMI_SUPPORT
 enum HDMI_VIDEO_RESOLUTION {
-	HDMI_VIDEO_720x480p_60Hz = 0,	/* 0 */
-	HDMI_VIDEO_720x576p_50Hz,	/* 1 */
-	HDMI_VIDEO_1280x720p_60Hz,	/* 2 */
-	HDMI_VIDEO_1280x720p_50Hz,	/* 3 */
-	HDMI_VIDEO_1920x1080i_60Hz,	/* 4 */
-	HDMI_VIDEO_1920x1080i_50Hz,	/* 5 */
-	HDMI_VIDEO_1920x1080p_30Hz,	/* 6 */
-	HDMI_VIDEO_1920x1080p_25Hz,	/* 7 */
-	HDMI_VIDEO_1920x1080p_24Hz,	/* 8 */
-	HDMI_VIDEO_1920x1080p_23Hz,	/* 9 */
-	HDMI_VIDEO_1920x1080p_29Hz,	/* a */
-	HDMI_VIDEO_1920x1080p_60Hz,	/* b */
-	HDMI_VIDEO_1920x1080p_50Hz,	/* c */
+	HDMI_VIDEO_720x480i_60Hz = 0,/* 0 */
+	HDMI_VIDEO_720x576i_50Hz,	/* 1 */
+	HDMI_VIDEO_720x480p_60Hz,	/* 2 */
+	HDMI_VIDEO_720x576p_50Hz,	/* 3 */
+	HDMI_VIDEO_1280x720p_60Hz,	/* 4 */
+	HDMI_VIDEO_1280x720p_50Hz,	/* 5 */
+	HDMI_VIDEO_1920x1080i_60Hz,	/* 6 */
+	HDMI_VIDEO_1920x1080i_50Hz,	/* 7 */
+	HDMI_VIDEO_1920x1080p_30Hz,	/* 8 */
+	HDMI_VIDEO_1920x1080p_25Hz,	/* 9 */
+	HDMI_VIDEO_1920x1080p_24Hz,	/* 10 */
+	HDMI_VIDEO_1920x1080p_23Hz,	/* 11 */
+	HDMI_VIDEO_1920x1080p_29Hz,	/* 12 */
+	HDMI_VIDEO_1920x1080p_60Hz,	/* 13 */
+	HDMI_VIDEO_1920x1080p_50Hz,	/* 14 */
 
-	HDMI_VIDEO_1280x720p3d_60Hz,	/* d */
-	HDMI_VIDEO_1280x720p3d_50Hz,	/* e */
-	HDMI_VIDEO_1920x1080i3d_60Hz,	/* f */
-	HDMI_VIDEO_1920x1080i3d_50Hz,	/* 10 */
-	HDMI_VIDEO_1920x1080p3d_24Hz,	/* 11 */
-	HDMI_VIDEO_1920x1080p3d_23Hz,	/* 12 */
+	HDMI_VIDEO_1280x720p3d_60Hz,	/* 15 */
+	HDMI_VIDEO_1280x720p3d_50Hz,	/* 16 */
+	HDMI_VIDEO_1920x1080i3d_60Hz,	/* 17 */
+	HDMI_VIDEO_1920x1080i3d_50Hz,	/* 18 */
+	HDMI_VIDEO_1920x1080p3d_24Hz,	/* 19 */
+	HDMI_VIDEO_1920x1080p3d_23Hz,	/* 20 */
 
 	/*the 2160 mean 3840x2160 */
-	HDMI_VIDEO_2160P_23_976HZ,	/* 13 */
-	HDMI_VIDEO_2160P_24HZ,	/* 14 */
-	HDMI_VIDEO_2160P_25HZ,	/* 15 */
-	HDMI_VIDEO_2160P_29_97HZ,	/* 16 */
-	HDMI_VIDEO_2160P_30HZ,	/* 17 */
+	HDMI_VIDEO_2160P_23_976HZ,	/* 21 */
+	HDMI_VIDEO_2160P_24HZ,	/* 22 */
+	HDMI_VIDEO_2160P_25HZ,	/* 23 */
+	HDMI_VIDEO_2160P_29_97HZ,	/* 24 */
+	HDMI_VIDEO_2160P_30HZ,	/* 25 */
 	/*the 2161 mean 4096x2160 */
-	HDMI_VIDEO_2161P_24HZ,	/* 18 */
-	HDMI_VIDEO_2160p_DSC_30Hz,
-	HDMI_VIDEO_2160p_DSC_24Hz,
+	HDMI_VIDEO_2161P_24HZ,	/* 26 */
+	HDMI_VIDEO_2160p_DSC_30Hz,/* 27 */
+	HDMI_VIDEO_2160p_DSC_24Hz,/* 28 */
+
+	RESOLUTION_3840X2160P_60HZ, /* 29 */
+	RESOLUTION_3840X2160P_50HZ, /* 30 */
+	RESOLUTION_4096X2161P_60HZ, /* 31 */
+	RESOLUTION_4096X2161P_50HZ, /* 32 */
 
 	HDMI_VIDEO_RESOLUTION_NUM
 };
@@ -154,7 +163,6 @@ enum HDMI_VIDEO_RESOLUTION {
 	HDMI_VIDEO_1920x1080p_60Hz = 0x0b,
 	HDMI_VIDEO_2160p_DSC_30Hz = 0x13,
 	HDMI_VIDEO_2160p_DSC_24Hz = 0x14,
-
 	HDMI_VIDEO_RESOLUTION_NUM
 };
 #endif
@@ -271,6 +279,9 @@ struct HDMI_PARAMS {
 	unsigned int HDCPSupported;
 	int is_3d_support;
 	unsigned int input_clock;
+#ifndef CONFIG_MTK_INTERNAL_HDMI_SUPPORT
+	LCM_DSI_PARAMS dsi_params;
+#endif
 };
 
 enum HDMI_STATE {
@@ -486,7 +497,7 @@ struct HDMI_DRIVER {
 	void (*setcecrxmode)(u8 u1cecrxmode);
 	void (*hdmistatus)(void);
 	void (*hdcpkey)(u8 *pbhdcpkey);
-	void (*getedid)(HDMI_EDID_T *pv_get_info);
+	void (*getedid)(struct _HDMI_EDID_T *pv_get_info);
 	void (*setcecla)(struct CEC_DRV_ADDR_CFG_T *prAddr);
 	void (*sendsltdata)(u8 *pu1Data);
 	void (*getceccmd)(struct CEC_FRAME_DESCRIPTION_IO *frame);
@@ -509,7 +520,7 @@ struct HDMI_DRIVER {
 /* --------------------------------------------------------------------------- */
 /* HDMI Driver Functions */
 /* --------------------------------------------------------------------------- */
-
+extern unsigned int dst_is_dsi;
 extern struct semaphore hdmi_update_mutex;
 const struct HDMI_DRIVER *HDMI_GetDriver(void);
 void Notify_AP_MHL_TX_Event(unsigned int event, unsigned int event_param, void *param);

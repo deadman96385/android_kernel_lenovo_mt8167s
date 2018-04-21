@@ -16,85 +16,151 @@
 #include <mt-plat/sync_write.h>
 #include "scp_ipi.h"
 #include "scp_helper.h"
-
 #include "scp_excep.h"
+
 #define PRINT_THRESHOLD 10000
-ipi_id scp_ipi_id_record;
-ipi_id scp_ipi_mutex_owner;
+enum ipi_id scp_ipi_id_record;
+enum ipi_id scp_ipi_mutex_owner[SCP_CORE_TOTAL];
+enum ipi_id scp_ipi_owner[SCP_CORE_TOTAL];
+
 unsigned int scp_ipi_id_record_count;
+unsigned int scp_to_ap_ipi_count;
+unsigned int ap_to_scp_ipi_count;
 
 struct scp_ipi_desc scp_ipi_desc[SCP_NR_IPI];
-struct share_obj *scp_send_obj, *scp_rcv_obj;
-struct mutex scp_ipi_mutex;
-
-static inline void ipi_host2scp(void)
-{
-	HOST_TO_SCP_REG = 0x1;
-}
-
+struct share_obj *scp_send_obj[SCP_CORE_TOTAL];
+struct share_obj *scp_rcv_obj[SCP_CORE_TOTAL];
+struct mutex scp_ipi_mutex[SCP_CORE_TOTAL];
 /*
  * find an ipi handler and invoke it
  */
-void scp_ipi_handler(void)
+void scp_A_ipi_handler(void)
 {
-	pr_debug("scp_ipi_handler %d\n", scp_rcv_obj->id);
+#if SCP_IPI_STAMP_SUPPORT
+	unsigned int flag = 0;
+#endif
+	enum ipi_id scp_id;
 
-	if (scp_ipi_desc[scp_rcv_obj->id].handler && scp_rcv_obj->id < SCP_NR_IPI) {
-		memcpy_from_scp(scp_recv_buff, (void *)scp_rcv_obj->share_buf, scp_rcv_obj->len);
-		scp_ipi_desc[scp_rcv_obj->id].handler(scp_rcv_obj->id, scp_recv_buff, scp_rcv_obj->len);
+	scp_id = scp_rcv_obj[SCP_A_ID]->id;
+	/*pr_debug("scp A ipi handler %d\n", scp_id);*/
+	if (scp_id >= SCP_NR_IPI || scp_id <= 0) {
+		/* ipi id abnormal*/
+		pr_debug("[SCP] A ipi handler id abnormal, id=%d\n", scp_id);
+	} else if (scp_ipi_desc[scp_id].handler) {
+		memcpy_from_scp(scp_recv_buff[SCP_A_ID], (void *)scp_rcv_obj[SCP_A_ID]->share_buf,
+			scp_rcv_obj[SCP_A_ID]->len);
+
+		scp_ipi_desc[scp_id].recv_count++;
+		scp_to_ap_ipi_count++;
+#if SCP_IPI_STAMP_SUPPORT
+		flag = scp_ipi_desc[scp_id].recv_count % SCP_IPI_ID_STAMP_SIZE;
+		if (flag < SCP_IPI_ID_STAMP_SIZE) {
+			scp_ipi_desc[scp_id].recv_flag[flag] = scp_ipi_desc[scp_id].recv_count;
+			scp_ipi_desc[scp_id].handler_timestamp[flag] = 0;
+			scp_ipi_desc[scp_id].recv_timestamp[flag] = arch_counter_get_cntvct();
+		}
+#endif
+		scp_ipi_desc[scp_id].handler(scp_id, scp_recv_buff[SCP_A_ID],
+			scp_rcv_obj[SCP_A_ID]->len);
+#if SCP_IPI_STAMP_SUPPORT
+		if (flag < SCP_IPI_ID_STAMP_SIZE)
+			scp_ipi_desc[scp_id].handler_timestamp[flag] = arch_counter_get_cntvct();
+#endif
+		/* After SCP IPI handler,
+		 * send a awake ipi to avoid
+		 * SCP keeping in ipi busy idle state
+		 */
+		/* set a direct IPI to awake SCP */
+		writel((1 << SCP_A_IPI_AWAKE_NUM), SCP_GIPC_IN_REG);
 	} else {
 		/* scp_ipi_handler is null or ipi id abnormal */
-		pr_err("[SCP] scp_ipi_handler is null or id abnormal, id = %d\n", scp_rcv_obj->id);
+		pr_debug("[SCP] A ipi handler is null or abnormal, id=%d\n", scp_id);
 	}
-#if SPM_REG_ENABLE
-	/*pr_debug("spm_sw_rsv_3:0x%x\n", *(volatile unsigned int*)SPM_SW_RSV_3);*/
-	if ((*(volatile unsigned int*)SPM_SW_RSV_3 & 0xBABE0000) == 0xBABE0000) {
-		/* clear mailbox when it's a wakeup event from scp ipi
-		 * SPM_SW_RSV_3[31:16] is 0xBABE -> scp wakeup event
-		 */
-		*(volatile unsigned int*)SPM_SW_RSV_3 &= 0x0000FFFF;
-#endif
-		SCP_TO_SPM_REG = 0x0;
-#if SPM_REG_ENABLE
-	}
-#endif
+	/* AP side write 1 to clear SCP to SPM reg.
+	 * scp side write 1 to set SCP to SPM reg.
+	 * scp set	  bit[0]
+	 */
+	writel(0x1, SCP_TO_SPM_REG);
+
 	/*pr_debug("scp_ipi_handler done\n");*/
 }
 
 /*
  * ipi initialize
  */
-void scp_ipi_init(void)
+void scp_A_ipi_init(void)
 {
-	mutex_init(&scp_ipi_mutex);
-	scp_rcv_obj = SCP_SHARE_BUFFER;
-	scp_send_obj = scp_rcv_obj + 1;
-	pr_debug("scp_rcv_obj = 0x%p\n", scp_rcv_obj);
-	pr_debug("scp_send_obj = 0x%p\n", scp_send_obj);
-	memset(scp_send_obj, 0, SHARE_BUF_SIZE);
+	int i = 0;
+#if SCP_IPI_STAMP_SUPPORT
+	int j = 0;
+#endif
+
+	mutex_init(&scp_ipi_mutex[SCP_A_ID]);
+	scp_rcv_obj[SCP_A_ID] = SCP_A_SHARE_BUFFER;
+	scp_send_obj[SCP_A_ID] = scp_rcv_obj[SCP_A_ID] + 1;
+	pr_debug("scp_rcv_obj[SCP_A_ID] = 0x%p\n", scp_rcv_obj[SCP_A_ID]);
+	pr_debug("scp_send_obj[SCP_A_ID] = 0x%p\n", scp_send_obj[SCP_A_ID]);
+	memset_io(scp_send_obj[SCP_A_ID], 0, SHARE_BUF_SIZE);
+	scp_to_ap_ipi_count = 0;
+	ap_to_scp_ipi_count = 0;
+
+	for (i = 0; i < SCP_NR_IPI; i++) {
+		scp_ipi_desc[i].recv_count	 = 0;
+		scp_ipi_desc[i].success_count  = 0;
+		scp_ipi_desc[i].busy_count	 = 0;
+		scp_ipi_desc[i].error_count	= 0;
+#if SCP_IPI_STAMP_SUPPORT
+		for (j = 0; j < SCP_IPI_ID_STAMP_SIZE; j++) {
+			scp_ipi_desc[i].recv_timestamp[j] = 0;
+			scp_ipi_desc[i].send_timestamp[j] = 0;
+			scp_ipi_desc[i].recv_flag[j] = 0;
+			scp_ipi_desc[i].send_flag[j] = 0;
+			scp_ipi_desc[i].handler_timestamp[j] = 0;
+		}
+#endif
+	}
 }
+
 
 /*
  * API let apps can register an ipi handler to receive IPI
- * @param id:       IPI ID
+ * @param id:	   IPI ID
  * @param handler:  IPI handler
- * @param name:     IPI name
+ * @param name:	 IPI name
  */
-ipi_status scp_ipi_registration(ipi_id id, ipi_handler_t handler, const char *name)
+enum scp_ipi_status scp_ipi_registration(enum ipi_id id,
+	void (*ipi_handler)(int id, void *data, unsigned int len),
+	const char *name)
 {
 	if (id < SCP_NR_IPI) {
 		scp_ipi_desc[id].name = name;
 
-		if (handler == NULL)
-			return ERROR;
+		if (ipi_handler == NULL)
+			return SCP_IPI_ERROR;
 
-		scp_ipi_desc[id].handler = handler;
-		return DONE;
+		scp_ipi_desc[id].handler = ipi_handler;
+		return SCP_IPI_DONE;
 	} else {
-		return ERROR;
+		return SCP_IPI_ERROR;
 	}
 }
 EXPORT_SYMBOL_GPL(scp_ipi_registration);
+
+/*
+ * API let apps unregister an ipi handler
+ * @param id:	   IPI ID
+ */
+enum scp_ipi_status scp_ipi_unregistration(enum ipi_id id)
+{
+	if (id < SCP_NR_IPI) {
+		scp_ipi_desc[id].name = "";
+		scp_ipi_desc[id].handler = NULL;
+		return SCP_IPI_DONE;
+	} else {
+		return SCP_IPI_ERROR;
+	}
+}
+EXPORT_SYMBOL_GPL(scp_ipi_unregistration);
 
 /*
  * API for apps to send an IPI to scp
@@ -102,9 +168,16 @@ EXPORT_SYMBOL_GPL(scp_ipi_registration);
  * @param buf:  the pointer of data
  * @param len:  data length
  * @param wait: If true, wait (atomically) until data have been gotten by Host
+ * @param len:  data length
  */
-ipi_status scp_ipi_send(ipi_id id, void *buf, unsigned int  len, unsigned int wait)
+enum scp_ipi_status scp_ipi_send(enum ipi_id id, void *buf,
+	unsigned int  len, unsigned int wait, enum scp_core_id scp_id)
 {
+
+#if SCP_IPI_STAMP_SUPPORT
+	unsigned long flag = 0;
+#endif
+
 	/*avoid scp log print too much*/
 	if (scp_ipi_id_record == id)
 		scp_ipi_id_record_count++;
@@ -113,79 +186,155 @@ ipi_status scp_ipi_send(ipi_id id, void *buf, unsigned int  len, unsigned int wa
 
 	scp_ipi_id_record = id;
 
-	if (is_scp_ready() == 0) {
-		pr_err("scp_ipi_send: SCP not enabled\n");
-		return ERROR;
-	}
-
 	if (in_interrupt()) {
 		if (wait) {
-			pr_err("scp_ipi_send: cannot wait in isr context\n");
-			return ERROR;
+			pr_err("scp_ipi_send: cannot use in isr\n");
+			scp_ipi_desc[id].error_count++;
+			return SCP_IPI_ERROR;
 		}
 	}
 
-	/* SRAM protection need to bypass ADB wake up cmd */
-	if (SCP_SLEEP_DEBUG_REG & 0xE && id != IPI_DVFS_WAKE) {
-		/* bit:
-		 * [4]IN_ACTIVE
-		 * [3]ENTERING_ACTIVE
-		 * [2]IN_SLEEP
-		 * [1]ENTERING_SLEEP
-		 * [0]IN_DEBUG_IDLE
-		 */
-		pr_err("scp_ipi_send: scp state = %x\n", SCP_SLEEP_DEBUG_REG);
-		pr_err("scp_ipi_send: scp is not in [4]IN_ACTIVE or [0]IN_DEBUG_IDLE, it should not access scp\n");
-		return ERROR;
+	if (is_scp_ready(scp_id) == 0) {
+		/* pr_err("scp_ipi_send: %s not enabled, id=%d\n", core_ids[scp_id], id); */
+		scp_ipi_desc[id].error_count++;
+		return SCP_IPI_ERROR;
+	}
+	if (len > sizeof(scp_send_obj[scp_id]->share_buf) || buf == NULL) {
+		pr_err("scp_ipi_send: %s buffer error\n", core_ids[scp_id]);
+		scp_ipi_desc[id].error_count++;
+		return SCP_IPI_ERROR;
 	}
 
-	if (id < SCP_NR_IPI) {
-		pr_debug("scp_ipi_send: id = %d\n", id);
-		if (len > sizeof(scp_send_obj->share_buf) || buf == NULL) {
-			pr_err("scp_ipi_send: buffer is error\n");
-			return ERROR;
+	if (mutex_trylock(&scp_ipi_mutex[scp_id]) == 0) {
+		/*avoid scp ipi send log print too much*/
+		if ((scp_ipi_id_record_count % PRINT_THRESHOLD == 0) ||
+			(scp_ipi_id_record_count % PRINT_THRESHOLD == 1)) {
+			pr_err("scp_ipi_send:%s %d mutex_trylock busy, owner=%d\n",
+				core_ids[scp_id], id, scp_ipi_mutex_owner[scp_id]);
 		}
-
-		if (mutex_trylock(&scp_ipi_mutex) == 0) {
-			/*avoid scp log print too much*/
-			if ((scp_ipi_id_record_count % PRINT_THRESHOLD == 0) ||
-				(scp_ipi_id_record_count % PRINT_THRESHOLD == 1)) {
-				pr_err("scp_ipi_send: mutex_trylock busy, mutex owner = %d\n", scp_ipi_mutex_owner);
-				scp_dump_regs();
-			}
-			return BUSY;
-		}
-		/*get scp ipi mutex owner*/
-		scp_ipi_mutex_owner = id;
-
-		if (HOST_TO_SCP_REG) {
-			mutex_unlock(&scp_ipi_mutex);
-			pr_debug("scp_ipi_send: host to scp busy with mutex_unlock\n");
-			return BUSY;
-		}
-
-		memcpy(scp_send_buff, buf, len);
-
-		pr_debug("scp_ipi_send: memory copy to scp sram\n");
-		memcpy_to_scp((void *)scp_send_obj->share_buf, scp_send_buff, len);
-		scp_send_obj->len = len;
-		scp_send_obj->id = id;
-		dsb(SY);
-
-		pr_debug("scp_ipi_send: send host to scp ipi\n");
-		ipi_host2scp();
-
-		if (wait)
-			while (HOST_TO_SCP_REG)
-				;
-
-		mutex_unlock(&scp_ipi_mutex);
-	} else {
-		pr_err("scp_ipi_send: id is incorrect\n");
-		return ERROR;
+		scp_ipi_desc[id].busy_count++;
+		return SCP_IPI_BUSY;
 	}
 
-	pr_debug("scp_ipi_send: id = %d done\n", id);
-	return DONE;
+	/* keep scp awake for sram copy*/
+	if (scp_awake_lock(scp_id) == -1) {
+		mutex_unlock(&scp_ipi_mutex[scp_id]);
+		pr_err("scp_ipi_send: %s ipi error, awake scp fail\n", core_ids[scp_id]);
+		scp_ipi_desc[id].error_count++;
+		return SCP_IPI_ERROR;
+	}
+
+	/*get scp ipi mutex owner*/
+	scp_ipi_mutex_owner[scp_id] = id;
+
+	if ((readl(SCP_GIPC_IN_REG) & (1<<scp_id)) > 0) {
+		/*avoid scp ipi send log print too much*/
+		if ((scp_ipi_id_record_count % PRINT_THRESHOLD == 0) ||
+			(scp_ipi_id_record_count % PRINT_THRESHOLD == 1)) {
+			pr_err("scp_ipi_send: %s %d host to scp busy, ipi last time = %d\n", core_ids[scp_id], id,
+				scp_ipi_owner[scp_id]);
+			scp_A_dump_regs();
+
+		}
+		if (scp_awake_unlock(scp_id) == -1)
+			pr_debug("scp_ipi_send: host to scp busy awake unlock fail\n");
+
+		scp_ipi_desc[id].busy_count++;
+		mutex_unlock(&scp_ipi_mutex[scp_id]);
+		return SCP_IPI_BUSY;
+	}
+	/*get scp ipi send owner*/
+	scp_ipi_owner[scp_id] = id;
+
+	memcpy(scp_send_buff[scp_id], buf, len);
+	memcpy_to_scp((void *)scp_send_obj[scp_id]->share_buf, scp_send_buff[scp_id], len);
+	scp_send_obj[scp_id]->len = len;
+	scp_send_obj[scp_id]->id = id;
+	dsb(SY);
+	/*record timestamp*/
+	scp_ipi_desc[id].success_count++;
+	ap_to_scp_ipi_count++;
+
+#if SCP_IPI_STAMP_SUPPORT
+	flag = scp_ipi_desc[id].success_count % SCP_IPI_ID_STAMP_SIZE;
+	if (flag < SCP_IPI_ID_STAMP_SIZE) {
+		scp_ipi_desc[id].send_flag[flag] = scp_ipi_desc[id].success_count;
+		scp_ipi_desc[id].send_timestamp[flag] = arch_counter_get_cntvct();
+	}
+#endif
+	/*send host to scp ipi*/
+	/*pr_debug("scp_ipi_send: SCP A send host to scp ipi\n");*/
+	writel((1<<scp_id), SCP_GIPC_IN_REG);
+
+	if (wait)
+		while ((readl(SCP_GIPC_IN_REG) & (1<<scp_id)) > 0)
+			;
+	/*send host to scp ipi cpmplete, unlock mutex*/
+	if (scp_awake_unlock(scp_id) == -1)
+		pr_debug("scp_ipi_send: awake unlock fail\n");
+
+	mutex_unlock(&scp_ipi_mutex[scp_id]);
+
+	return SCP_IPI_DONE;
 }
 EXPORT_SYMBOL_GPL(scp_ipi_send);
+
+void scp_ipi_info_dump(enum ipi_id id)
+{
+	pr_debug("%u\t%u\t%u\t%u\t%u\t%s\n\r",
+				id,
+				scp_ipi_desc[id].recv_count,
+				scp_ipi_desc[id].success_count,
+				scp_ipi_desc[id].busy_count,
+				scp_ipi_desc[id].error_count,
+				scp_ipi_desc[id].name);
+#if SCP_IPI_STAMP_SUPPORT
+	/*time stamp*/
+	for (i = 0; i < SCP_IPI_ID_STAMP_SIZE; i++) {
+		if (scp_ipi_desc[id].recv_timestamp[i] != 0) {
+			pr_debug("scp->ap recv count:%u, recv time:%llu handler finish time:%llu\n",
+					scp_ipi_desc[id].recv_flag[i],
+					scp_ipi_desc[id].recv_timestamp[i],
+					scp_ipi_desc[id].handler_timestamp[i]);
+		}
+	}
+	for (i = 0; i < SCP_IPI_ID_STAMP_SIZE; i++) {
+		if (scp_ipi_desc[id].send_timestamp[i] != 0) {
+			pr_debug("ap->scp send count:%u send time:%llu\n",
+					scp_ipi_desc[id].send_flag[i],
+					scp_ipi_desc[id].send_timestamp[i]);
+		}
+	}
+#endif
+
+}
+
+void scp_ipi_status_dump_id(enum ipi_id id)
+{
+#if SCP_IPI_STAMP_SUPPORT
+	/*time stamp*/
+	unsigned int i;
+#endif
+
+	pr_debug("[SCP]id\trecv\tsuccess\tbusy\terror\tname\n\r");
+	scp_ipi_info_dump(id);
+
+}
+
+
+void scp_ipi_status_dump(void)
+{
+	enum ipi_id id;
+#if SCP_IPI_STAMP_SUPPORT
+	/*time stamp*/
+	unsigned int i;
+#endif
+
+	pr_debug("[SCP]id\trecv\tsuccess\tbusy\terror\tname\n\r");
+	for (id = 0; id < SCP_NR_IPI; id++) {
+		if (scp_ipi_desc[id].recv_count > 0 || scp_ipi_desc[id].success_count > 0
+			|| scp_ipi_desc[id].busy_count > 0 || scp_ipi_desc[id].error_count > 0)
+			scp_ipi_info_dump(id);
+	}
+	pr_debug("ap->scp total=%u scp->ap total=%u\n\r", ap_to_scp_ipi_count, scp_to_ap_ipi_count);
+}

@@ -167,7 +167,7 @@ int snd_usb_endpoint_next_packet_size(struct snd_usb_endpoint *ep)
 static void retire_outbound_urb(struct snd_usb_endpoint *ep,
 				struct snd_urb_ctx *urb_ctx)
 {
-	if (ep->retire_data_urb)
+	if (ep->retire_data_urb && ep->data_subs)
 		ep->retire_data_urb(ep->data_subs, urb_ctx->urb);
 }
 
@@ -397,6 +397,9 @@ static void snd_complete_urb(struct urb *urb)
 	if (unlikely(atomic_read(&ep->chip->shutdown)))
 		goto exit_clear;
 
+	if (unlikely(!test_bit(EP_FLAG_RUNNING, &ep->flags)))
+		goto exit_clear;
+
 	if (usb_pipeout(ep->pipe)) {
 		retire_outbound_urb(ep, ctx);
 		/* can be stopped during retire callback */
@@ -519,6 +522,9 @@ struct snd_usb_endpoint *snd_usb_add_endpoint(struct snd_usb_audio *chip,
 		if (chip->usb_id == USB_ID(0x0644, 0x8038) /* TEAC UD-H01 */ &&
 		    ep->syncmaxsize == 4)
 			ep->udh01_fb_quirk = 1;
+
+		/* let controller driver to know endpoint type */
+		get_endpoint(alts, 1)->bmAttributes |= USB_ENDPOINT_USAGE_FEEDBACK;
 	}
 
 	list_add_tail(&ep->list, &chip->ep_list);
@@ -550,6 +556,11 @@ static int wait_clear_urbs(struct snd_usb_endpoint *ep)
 			"timeout: still %d active urbs on EP #%x\n",
 			alive, ep->ep_num);
 	clear_bit(EP_FLAG_STOPPING, &ep->flags);
+
+	ep->data_subs = NULL;
+	ep->sync_slave = NULL;
+	ep->retire_data_urb = NULL;
+	ep->prepare_data_urb = NULL;
 
 	return 0;
 }
@@ -705,7 +716,7 @@ static int data_ep_set_params(struct snd_usb_endpoint *ep,
 	if (snd_usb_get_speed(ep->chip->dev) != USB_SPEED_FULL) {
 		packs_per_ms = 8 >> ep->datainterval;
 		max_packs_per_urb = MAX_PACKS_HS;
-		max_queue = MAX_QUEUE;
+		max_queue = MAX_QUEUE_HS;
 	} else {
 		packs_per_ms = 1;
 		max_packs_per_urb = MAX_PACKS;
@@ -864,9 +875,11 @@ static int sync_ep_set_params(struct snd_usb_endpoint *ep)
 {
 	int i;
 
+	/* FIXME feedback ep force use dram */
+	#if 0
 	ep->syncbuf = mtk_usb_alloc_sram(USB_AUDIO_DATA_SYNC,
 					SYNC_URBS * 4, &ep->sync_dma);
-
+	#endif
 	if (ep->syncbuf) {
 		ep->syncbuf_sram = 1;
 	} else {
@@ -982,9 +995,7 @@ int snd_usb_endpoint_set_params(struct snd_usb_endpoint *ep,
 /**
  * snd_usb_endpoint_start: start an snd_usb_endpoint
  *
- * @ep:		the endpoint to start
- * @can_sleep:	flag indicating whether the operation is executed in
- * 		non-atomic context
+ * @ep: the endpoint to start
  *
  * A call to this function will increment the use count of the endpoint.
  * In case it is not already running, the URBs for this endpoint will be
@@ -994,7 +1005,7 @@ int snd_usb_endpoint_set_params(struct snd_usb_endpoint *ep,
  *
  * Returns an error if the URB submission failed, 0 in all other cases.
  */
-int snd_usb_endpoint_start(struct snd_usb_endpoint *ep, bool can_sleep)
+int snd_usb_endpoint_start(struct snd_usb_endpoint *ep)
 {
 	int err;
 	unsigned int i;
@@ -1008,8 +1019,6 @@ int snd_usb_endpoint_start(struct snd_usb_endpoint *ep, bool can_sleep)
 
 	/* just to be sure */
 	deactivate_urbs(ep, false);
-	if (can_sleep)
-		wait_clear_urbs(ep);
 
 	ep->active_mask = 0;
 	ep->unlink_mask = 0;
@@ -1090,10 +1099,6 @@ void snd_usb_endpoint_stop(struct snd_usb_endpoint *ep)
 
 	if (--ep->use_count == 0) {
 		deactivate_urbs(ep, false);
-		ep->data_subs = NULL;
-		ep->sync_slave = NULL;
-		ep->retire_data_urb = NULL;
-		ep->prepare_data_urb = NULL;
 		set_bit(EP_FLAG_STOPPING, &ep->flags);
 	}
 }

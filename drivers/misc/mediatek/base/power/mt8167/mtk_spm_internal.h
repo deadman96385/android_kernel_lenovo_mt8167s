@@ -278,7 +278,7 @@ extern void __spm_kick_pcm_to_run(const struct pwr_ctrl *pwrctrl);
 
 extern void __spm_get_wakeup_status(struct wake_status *wakesta);
 extern void __spm_clean_after_wakeup(void);
-extern wake_reason_t __spm_output_wake_reason(const struct wake_status *wakesta,
+extern unsigned int __spm_output_wake_reason(const struct wake_status *wakesta,
 						   const struct pcm_desc *pcmdesc, bool suspend);
 
 #if CONFIG_SUPPORT_PCM_ALLINONE
@@ -355,6 +355,9 @@ static inline void set_pwrctrl_pcm_flags(struct pwr_ctrl *pwrctrl, u32 flags)
 		pwrctrl->pcm_flags = flags;
 	else
 		pwrctrl->pcm_flags = pwrctrl->pcm_flags_cust;
+
+	if (mt_get_chip_sw_ver() == CHIP_SW_VER_01) /* E1 */
+		pwrctrl->pcm_flags |= SPM_MCU_PDN_DIS;
 
 #if !CONFIG_SUPPORT_PCM_ALLINONE
 	pwrctrl->pcm_flags |= SPM_ALL_IN_ONE_DIS;

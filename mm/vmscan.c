@@ -321,6 +321,7 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
 	int nid = shrinkctl->nid;
 	long batch_size = shrinker->batch ? shrinker->batch
 					  : SHRINK_BATCH;
+	long scanned = 0, next_deferred;
 
 	freeable = shrinker->count_objects(shrinker, shrinkctl);
 	if (freeable == 0)
@@ -342,7 +343,9 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
 		pr_err("shrink_slab: %pF negative objects to delete nr=%ld\n",
 		       shrinker->scan_objects, total_scan);
 		total_scan = freeable;
-	}
+		next_deferred = nr;
+	} else
+		next_deferred = total_scan;
 
 	/*
 	 * We need to avoid excessive windup on filesystem shrinkers
@@ -399,17 +402,22 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
 
 		count_vm_events(SLABS_SCANNED, nr_to_scan);
 		total_scan -= nr_to_scan;
+		scanned += nr_to_scan;
 
 		cond_resched();
 	}
 
+	if (next_deferred >= scanned)
+		next_deferred -= scanned;
+	else
+		next_deferred = 0;
 	/*
 	 * move the unused scan count back into the shrinker in a
 	 * manner that handles concurrent updates. If we exhausted the
 	 * scan, there is no need to do an update.
 	 */
-	if (total_scan > 0)
-		new_nr = atomic_long_add_return(total_scan,
+	if (next_deferred > 0)
+		new_nr = atomic_long_add_return(next_deferred,
 						&shrinker->nr_deferred[nid]);
 	else
 		new_nr = atomic_long_read(&shrinker->nr_deferred[nid]);
@@ -1489,30 +1497,17 @@ int isolate_lru_page(struct page *page)
 	return ret;
 }
 
-/*
- * A direct reclaimer may isolate SWAP_CLUSTER_MAX pages from the LRU list and
- * then get resheduled. When there are massive number of tasks doing page
- * allocation, such sleeping direct reclaimers may keep piling up on each CPU,
- * the LRU list will go small and be scanned faster than necessary, leading to
- * unnecessary swapping, thrashing and OOM.
- */
-static int too_many_isolated(struct zone *zone, int file,
-		struct scan_control *sc)
+static int __too_many_isolated(struct zone *zone, int file,
+		struct scan_control *sc, int safe)
 {
 	unsigned long inactive, isolated;
 
-	if (current_is_kswapd())
-		return 0;
-
-	if (!sane_reclaim(sc))
-		return 0;
-
-	if (file) {
-		inactive = zone_page_state(zone, NR_INACTIVE_FILE);
-		isolated = zone_page_state(zone, NR_ISOLATED_FILE);
+	if (safe) {
+		inactive = zone_page_state_snapshot(zone, NR_INACTIVE_ANON + 2 * file);
+		isolated = zone_page_state_snapshot(zone, NR_ISOLATED_ANON + file);
 	} else {
-		inactive = zone_page_state(zone, NR_INACTIVE_ANON);
-		isolated = zone_page_state(zone, NR_ISOLATED_ANON);
+		inactive = zone_page_state(zone, NR_INACTIVE_ANON + 2 * file);
+		isolated = zone_page_state(zone, NR_ISOLATED_ANON + file);
 	}
 
 	/*
@@ -1524,6 +1519,32 @@ static int too_many_isolated(struct zone *zone, int file,
 		inactive >>= 3;
 
 	return isolated > inactive;
+}
+
+/*
+ * A direct reclaimer may isolate SWAP_CLUSTER_MAX pages from the LRU list and
+ * then get resheduled. When there are massive number of tasks doing page
+ * allocation, such sleeping direct reclaimers may keep piling up on each CPU,
+ * the LRU list will go small and be scanned faster than necessary, leading to
+ * unnecessary swapping, thrashing and OOM.
+ */
+static int too_many_isolated(struct zone *zone, int file,
+		struct scan_control *sc, int safe)
+{
+	if (current_is_kswapd())
+		return 0;
+
+	if (!sane_reclaim(sc))
+		return 0;
+
+	if (unlikely(__too_many_isolated(zone, file, sc, 0))) {
+		if (safe)
+			return __too_many_isolated(zone, file, sc, safe);
+		else
+			return 1;
+	}
+
+	return 0;
 }
 
 static noinline_for_stack void
@@ -1613,15 +1634,18 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	unsigned long nr_immediate = 0;
 	isolate_mode_t isolate_mode = 0;
 	int file = is_file_lru(lru);
+	int safe = 0;
 	struct zone *zone = lruvec_zone(lruvec);
 	struct zone_reclaim_stat *reclaim_stat = &lruvec->reclaim_stat;
 
-	while (unlikely(too_many_isolated(zone, file, sc))) {
+	while (unlikely(too_many_isolated(zone, file, sc, safe))) {
 		congestion_wait(BLK_RW_ASYNC, HZ/10);
 
 		/* We are about to die and free our memory. Return now. */
 		if (fatal_signal_pending(current))
 			return SWAP_CLUSTER_MAX;
+
+		safe = 1;
 	}
 
 	lru_add_drain();
@@ -2213,9 +2237,9 @@ static struct page *alloc_movable_target(struct page *page, unsigned long privat
 {
 	struct page *newpage;
 
-	newpage = alloc_page(__GFP_HIGHMEM | __GFP_CMA | __GFP_NORETRY);
+	newpage = alloc_page(__GFP_HIGHMEM | __GFP_MOVABLE | __GFP_NORETRY | __GFP_NOWARN);
 
-	if (newpage != NULL && zone_idx(page_zone(newpage)) != ZONE_MOVABLE) {
+	if (newpage != NULL && zone_idx(page_zone(newpage)) < OPT_ZONE_MOVABLE_CMA) {
 		if (put_page_testzero(newpage))
 			free_hot_cold_page(newpage, true);
 		else
@@ -2236,32 +2260,32 @@ static unsigned long migrate_lru_pages(unsigned long *nr, enum lru_list lru,
 {
 #ifdef CONFIG_ZONE_MOVABLE_CMA
 	LIST_HEAD(page_list);
-	struct zone *src_zone, *dst_zone;
-	unsigned long nr_to_scan = min(nr[lru], SWAP_CLUSTER_MAX);
+	struct zone *src_zone;
+	unsigned long nr_to_scan = SWAP_CLUSTER_MAX;
 	unsigned long nr_scanned, nr_taken;
 	int err;
 	unsigned long flags;
+
+	/* Check whether ZONE_MOVABLE_CMA zone is empty */
+	if (global_page_state(NR_FREE_CMA_PAGES) == 0)
+		return 0;
+
+	/* Determine src zone */
+	src_zone = lruvec_zone(lruvec);
+
+	/* Migrate active anon LRU when inactive < active */
+	if (zone_page_state(src_zone, NR_INACTIVE_ANON) <
+			zone_page_state(src_zone, NR_ACTIVE_ANON))
+		lru = LRU_ACTIVE_ANON;
 
 	/* If no available swap space, double the number of page migration */
 	if (get_nr_swap_pages() == 0)
 		nr_to_scan = SWAP_CLUSTER_MAX << 1;
 
+	nr_to_scan = min(zone_page_state(src_zone, NR_LRU_BASE + lru), nr_to_scan);
+
 	/* No pages for scanning */
 	if (nr_to_scan == 0)
-		return 0;
-
-	src_zone = lruvec_zone(lruvec);
-	dst_zone = src_zone + (ZONE_MOVABLE - zone_idx(src_zone));
-
-	/* Migrate active anon LRU when no swap space & inactive < active */
-	if (!total_swap_pages &&
-			zone_page_state(src_zone, NR_INACTIVE_ANON) <
-			zone_page_state(src_zone, NR_ACTIVE_ANON))
-		lru = LRU_ACTIVE_ANON;
-
-	/* Check dst_zone's watermark */
-	if (!zone_watermark_ok_safe(dst_zone, 0, high_wmark_pages(dst_zone) +
-				    low_wmark_pages(dst_zone), ZONE_MOVABLE))
 		return 0;
 
 	/* Update nr[lru] to avoid needless shrinking */
@@ -2345,6 +2369,10 @@ static void shrink_lruvec(struct lruvec *lruvec, int swappiness,
 	/* Record the original scan target for proportional adjustments later */
 	memcpy(targets, nr, sizeof(nr));
 
+	/* Give a chance to migrate anon pages */
+	if (IS_ENABLED(CONFIG_ZONE_MOVABLE_CMA) && nr[LRU_INACTIVE_ANON] == 0)
+		nr[LRU_INACTIVE_ANON] = SWAP_CLUSTER_MAX;
+
 	/*
 	 * Global reclaiming within direct reclaim at DEF_PRIORITY is a normal
 	 * event that can occur when there is little memory pressure e.g.
@@ -2359,8 +2387,6 @@ static void shrink_lruvec(struct lruvec *lruvec, int swappiness,
 	scan_adjusted = (global_reclaim(sc) && !current_is_kswapd() &&
 			 sc->priority == DEF_PRIORITY);
 
-	init_tlb_ubc();
-
 	blk_start_plug(&plug);
 	while (nr[LRU_INACTIVE_ANON] || nr[LRU_ACTIVE_FILE] ||
 					nr[LRU_INACTIVE_FILE]) {
@@ -2368,9 +2394,12 @@ static void shrink_lruvec(struct lruvec *lruvec, int swappiness,
 		unsigned long nr_scanned;
 
 		/* Before shrinking inactive anon lru, let us try to do migration */
-		if (IS_ENABLED(CONFIG_ZONE_MOVABLE_CMA) &&
-				zone_idx(lruvec_zone(lruvec)) != ZONE_MOVABLE)
+		if (zone_idx(lruvec_zone(lruvec)) < OPT_ZONE_MOVABLE_CMA)
 			nr_reclaimed += migrate_lru_pages(nr, LRU_INACTIVE_ANON, lruvec, sc);
+
+		/* Clear the number of anon lru for scanning to 0 earlier */
+		if (IS_ENABLED(CONFIG_ZONE_MOVABLE_CMA) && get_nr_swap_pages() == 0)
+			nr[LRU_INACTIVE_ANON] = nr[LRU_ACTIVE_ANON] = 0;
 
 		for_each_evictable_lru(lru) {
 			if (nr[lru]) {
@@ -2695,11 +2724,11 @@ static bool shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 			continue;
 
 		/* If no reclaimable pages, just skip ZONE_MOVABLE. */
-		if (IS_ENABLED(CONFIG_ZONE_MOVABLE_CMA) && zone_idx(zone) == ZONE_MOVABLE)
+		if (IS_ZONE_MOVABLE_CMA_ZONE(zone))
 			if (zone_reclaimable_pages(zone) == 0)
 				continue;
 
-		classzone_idx = requested_highidx;
+		classzone_idx = gfp_zone(sc->gfp_mask);
 		while (!populated_zone(zone->zone_pgdat->node_zones +
 							classzone_idx))
 			classzone_idx--;
@@ -3088,7 +3117,9 @@ unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *memcg,
 					    sc.may_writepage,
 					    sc.gfp_mask);
 
+	current->flags |= PF_MEMALLOC;
 	nr_reclaimed = do_try_to_free_pages(zonelist, &sc);
+	current->flags &= ~PF_MEMALLOC;
 
 	trace_mm_vmscan_memcg_reclaim_end(nr_reclaimed);
 
@@ -3118,20 +3149,20 @@ static void age_active_anon(struct zone *zone, struct scan_control *sc)
 static bool zone_balanced(struct zone *zone, int order,
 			  unsigned long balance_gap, int classzone_idx)
 {
-	if (IS_ENABLED(CONFIG_ZONE_MOVABLE_CMA) && zone_idx(zone) == ZONE_MOVABLE) {
+	if (IS_ZONE_MOVABLE_CMA_ZONE(zone)) {
 		unsigned long reclaimable = zone_reclaimable_pages(zone);
-		unsigned long min = min_wmark_pages(zone);
+		unsigned long min = high_wmark_pages(zone);
 
 		/* If no reclaimable pages, view ZONE_MOVABLE as balanced */
 		if (reclaimable == 0)
 			return true;
 
 		/*
-		 * If "the number of free pages is less than min_wmark_pages" and
-		 * "the number of reclaimable pages is less than min_wmark_pages",
-		 * view ZONE_MOVABLE as balanced.
+		 * If the number of reclaimable pages is less than high_wmark_pages,
+		 * view ZONE_MOVABLE as balanced, and terminate it earlier to let
+		 * system kill processes for rescue if needed.
 		 */
-		if (zone_page_state(zone, NR_FREE_PAGES) <= min && reclaimable <= min)
+		if (reclaimable <= min)
 			return true;
 	}
 
@@ -3258,17 +3289,17 @@ static bool kswapd_shrink_zone(struct zone *zone,
 	sc->nr_to_reclaim = max(SWAP_CLUSTER_MAX, high_wmark_pages(zone));
 
 	/*
-	 * Reclaim the number of pages in ZONE_MOVABLE to be up to zone_reclaimable_pages(zone)
-	 * if there is fewer reclaimable pages.
+	 * Reclaim the number of pages in ZONE_MOVABLE/ZONE_NORMAL to be
+	 * up to zone_reclaimable_pages(zone) if there is fewer reclaimable pages.
 	 */
-	if (IS_ENABLED(CONFIG_ZONE_MOVABLE_CMA) && zone_idx(zone) == ZONE_MOVABLE) {
+	if (IS_ZONE_MOVABLE_CMA_ZONE(zone)) {
 		unsigned long nr_to_reclaim = zone_reclaimable_pages(zone);
 
 		if (nr_to_reclaim == 0)
 			return true;
 
 		if (nr_to_reclaim < sc->nr_to_reclaim)
-			sc->nr_to_reclaim = max(SWAP_CLUSTER_MAX, nr_to_reclaim);
+			sc->nr_to_reclaim = min(SWAP_CLUSTER_MAX, nr_to_reclaim);
 	}
 
 	/*

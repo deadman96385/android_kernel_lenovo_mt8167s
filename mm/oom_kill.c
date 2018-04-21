@@ -35,9 +35,13 @@
 #include <linux/freezer.h>
 #include <linux/ftrace.h>
 #include <linux/ratelimit.h>
+#include <linux/stacktrace.h>
+#include <linux/spinlock.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/oom.h>
+
+#include "internal.h"
 
 int sysctl_panic_on_oom;
 int sysctl_oom_kill_allocating_task;
@@ -398,6 +402,14 @@ static void dump_header(struct oom_control *oc, struct task_struct *p,
 		show_mem(SHOW_MEM_FILTER_NODES);
 	if (sysctl_oom_dump_tasks)
 		dump_tasks(memcg, oc->nodemask);
+
+#ifdef CONFIG_MTK_ION
+	ion_mm_heap_memory_detail();
+#endif
+#ifdef CONFIG_MTK_GPU_SUPPORT
+	if (mtk_dump_gpu_memory_usage() == false)
+		pr_warn("mtk_dump_gpu_memory_usage not support\n");
+#endif
 }
 
 /*
@@ -618,6 +630,17 @@ void oom_kill_process(struct oom_control *oc, struct task_struct *p,
 	rcu_read_unlock();
 
 	mmdrop(mm);
+#ifdef CONFIG_MTK_ENG_BUILD
+	if (atomic_read(&victim->usage) == 1) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&victim->stack_trace_lock, flags);
+		pr_err("oom_kill_process put task with tsk->usage == 1, tsk previous bt:\n");
+		print_stack_trace(&victim->stack_trace, 0);
+		spin_unlock_irqrestore(&victim->stack_trace_lock, flags);
+		BUG();
+	}
+#endif
 	put_task_struct(victim);
 }
 #undef K

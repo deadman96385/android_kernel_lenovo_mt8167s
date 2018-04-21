@@ -37,6 +37,7 @@ enum DFRC_DRV_MODE {
 	DFRC_DRV_MODE_DEFAULT = 0,
 	DFRC_DRV_MODE_FRR,
 	DFRC_DRV_MODE_ARR,
+	DFRC_DRV_MODE_INTERNAL_SW,
 	DFRC_DRV_MODE_MAXIMUM,
 };
 
@@ -51,6 +52,11 @@ enum DFRC_DRV_HW_MODE {
 	DFRC_DRV_HW_MODE_ARR,
 };
 
+enum DFRC_DRV_POLICY_FLAG {
+	DFRC_DRV_POLICY_FLAG_NONE = 0x00,
+	DFRC_DRV_POLICY_FLAG_USE_VIDEO_MODE = 0x01,
+};
+
 struct DFRC_DRV_POLICY {
 	unsigned long long sequence;
 	int api;
@@ -59,6 +65,7 @@ struct DFRC_DRV_POLICY {
 	int mode;
 	int target_pid;
 	unsigned long long gl_context_id;
+	int flag;
 };
 
 struct DFRC_DRV_HWC_INFO {
@@ -78,6 +85,7 @@ struct DFRC_DRV_VSYNC_REQUEST {
 	bool valid_info;
 	bool transient_state;
 	int num_policy;
+	bool forbid_vsync;
 };
 
 struct DFRC_DRC_REQUEST_SET {
@@ -119,5 +127,6 @@ struct DFRC_DRV_FOREGROUND_WINDOW_INFO {
 #define DFRC_IOCTL_CMD_GET_REFRESH_RANGE _IOWR(DFRC_IOCTL_MAGIC, 1009, struct DFRC_DRV_REFRESH_RANGE)
 #define DFRC_IOCTL_CMD_SET_WINDOW_STATE _IOWR(DFRC_IOCTL_MAGIC, 1010, struct DFRC_DRV_WINDOW_STATE)
 #define DFRC_IOCTL_CMD_SET_FOREGROUND_WINDOW _IOWR(DFRC_IOCTL_MAGIC, 1011, struct DFRC_DRV_FOREGROUND_WINDOW_INFO)
+#define DFRC_IOCTL_CMD_FORBID_ADJUSTING_VSYNC _IOWR(DFRC_IOCTL_MAGIC, 1012, int32_t)
 
 #endif

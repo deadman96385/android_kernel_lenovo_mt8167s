@@ -37,6 +37,7 @@
 #include <linux/ioport.h>
 #include <linux/io.h>
 #include <linux/atomic.h>
+#include <linux/types.h>
 #include <mt-plat/sync_write.h>
 #include <mt-plat/aee.h>
 #include "sspm_define.h"
@@ -110,8 +111,8 @@ static ssize_t sspm_alive_show(struct device *kobj, struct device_attribute *att
 
 	ipi_data.cmd = 0xDEAD;
 
-	sspm_ipi_send_sync(IPI_ID_PLATFORM, IPI_OPT_DEFAUT,
-		&ipi_data, sizeof(ipi_data) / MBOX_SLOT_SIZE, &ackdata);
+	sspm_ipi_send_sync(IPI_ID_PLATFORM, IPI_OPT_WAIT,
+		&ipi_data, sizeof(ipi_data) / MBOX_SLOT_SIZE, &ackdata, 1);
 
 	return snprintf(buf, PAGE_SIZE, "%s\n", ackdata ? "Alive" : "Dead");
 }
@@ -127,7 +128,10 @@ int __init sspm_plt_init(void)
 	struct task_struct *sspm_task;
 #endif
 	int ret, ackdata;
-	unsigned int last_ofs, last_sz;
+	unsigned int last_ofs;
+#if (SSPM_COREDUMP_SUPPORT || SSPM_LOGGER_SUPPORT || SSPM_TIMESYNC_SUPPORT)
+	unsigned int last_sz;
+#endif
 	unsigned int *mark;
 	unsigned char *b;
 
@@ -158,16 +162,16 @@ int __init sspm_plt_init(void)
 #if (SSPM_COREDUMP_SUPPORT || SSPM_LASTK_SUPPORT)
 	sspm_task = kthread_run(sspm_recv_thread, NULL, "sspm_recv");
 #endif
-	b = (unsigned char *) virt_addr;
+	b = (unsigned char *) (uintptr_t)virt_addr;
 	for (last_ofs = 0; last_ofs < sizeof(*plt_ctl); last_ofs++)
 		b[last_ofs] = 0x0;
 
-	mark = (unsigned int *) virt_addr;
+	mark = (unsigned int *) (uintptr_t)virt_addr;
 	*mark = PLT_INIT;
-	mark = (unsigned int *) ((unsigned char *) virt_addr + mem_sz - 4);
+	mark = (unsigned int *) ((unsigned char *) (uintptr_t)virt_addr + mem_sz - 4);
 	*mark = PLT_INIT;
 
-	plt_ctl = (struct plt_ctrl_s *) virt_addr;
+	plt_ctl = (struct plt_ctrl_s *) (uintptr_t)virt_addr;
 	plt_ctl->magic = PLT_INIT;
 	plt_ctl->size = sizeof(*plt_ctl);
 	plt_ctl->mem_sz = mem_sz;
@@ -220,8 +224,8 @@ int __init sspm_plt_init(void)
 	ipi_data.u.ctrl.phys = phys_addr;
 	ipi_data.u.ctrl.size = mem_sz;
 
-	ret = sspm_ipi_send_sync(IPI_ID_PLATFORM, IPI_OPT_LOCK_BUSY, &ipi_data,
-			sizeof(ipi_data) / MBOX_SLOT_SIZE, &ackdata);
+	ret = sspm_ipi_send_sync(IPI_ID_PLATFORM, IPI_OPT_POLLING, &ipi_data,
+			sizeof(ipi_data) / MBOX_SLOT_SIZE, &ackdata, 1);
 	if (ret != 0) {
 		pr_err("SSPM: logger IPI fail ret=%d\n", ret);
 		goto error;
@@ -235,7 +239,9 @@ int __init sspm_plt_init(void)
 #if SSPM_TIMESYNC_SUPPORT
 	sspm_timesync_init_done();
 #endif
+#if SSPM_COREDUMP_SUPPORT
 	sspm_coredump_init_done();
+#endif
 #if SSPM_LOGGER_SUPPORT
 	sspm_logger_init_done();
 #endif

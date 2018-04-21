@@ -14,9 +14,6 @@
 #ifndef __MTK_UART_H__
 #define __MTK_UART_H__
 
-#ifndef CONFIG_OF
-#include <mach/mt_reg_base.h>
-#endif
 #include <mt-plat/sync_write.h>
 #include "platform_uart.h"
 
@@ -55,19 +52,19 @@ do { \
 /******************************************************************************
  * ENUM & STRUCT
 ******************************************************************************/
-typedef enum {
+enum {
 	UART_NON_DMA,
 	UART_TX_DMA,
 	UART_TX_VFIFO_DMA,
 	UART_RX_VFIFO_DMA,
-} UART_DMA_TYPE;
+};
 /*---------------------------------------------------------------------------*/
-typedef enum {
+enum {
 	UART_TX_VFIFO,
 	UART_RX_VFIFO,
 
 	UART_VFIFO_NUM
-} UART_VFF_TYPE;
+};
 /*---------------------------------------------------------------------------*/
 /* uart dma mode */
 enum {
@@ -91,11 +88,9 @@ struct mtk_uart_setting {
 	int tx_trig;
 	int rx_trig;
 	unsigned long uart_base;
-#ifdef CONFIG_OF
-	unsigned long uart_phys_base;
 
+	unsigned long uart_phys_base;
 	unsigned long irq_flags;
-#endif
 
 #if !defined(CONFIG_MTK_LEGACY)
 	struct clk *clk_uart_main;
@@ -232,14 +227,14 @@ struct fiq_dbg_event {
 /* #define UART_READ8(REG)             __raw_readb(REG) */
 /* #define UART_READ16(REG)            __raw_readw(REG) */
 /* #define UART_READ32(REG)            __raw_readl(REG) */
-#define UART_READ8(REG)             (*(volatile unsigned char *)(REG))
-#define UART_READ16(REG)            (*(volatile unsigned short *)(REG))
-#define UART_READ32(REG)            (*(volatile unsigned int *)(REG))
+#define UART_READ8(REG)             (*(unsigned char *)(REG))
+#define UART_READ16(REG)            (*(unsigned short *)(REG))
+#define UART_READ32(REG)            (*(unsigned int *)(REG))
 #define reg_sync_writeb(v, a)			mt_reg_sync_writeb(v, a)
 #define reg_sync_writel(v, a)			mt_reg_sync_writel(v, a)
 /*---------------------------------------------------------------------------*/
-#define UART_SET_BITS(BS, REG)       ((*(volatile u32 *)(REG)) |= (u32)(BS))
-#define UART_CLR_BITS(BS, REG)       ((*(volatile u32 *)(REG)) &= ~((u32)(BS)))
+#define UART_SET_BITS(BS, REG)       ((*(u32 *)(REG)) |= (u32)(BS))
+#define UART_CLR_BITS(BS, REG)       ((*(u32 *)(REG)) &= ~((u32)(BS)))
 /*---------------------------------------------------------------------------*/
 extern spinlock_t mtk_console_lock;
 extern struct mtk_uart *console_port;
@@ -247,6 +242,7 @@ unsigned int mtk_uart_pdn_enable(char *port, int enable);
 extern void update_history_byte(char is_tx, int nport, unsigned char byte);
 extern void update_history_time(char is_tx, int nport);
 extern void update_history_bulk(char is_tx, int nport, unsigned char *chars, int count);
+extern struct mtk_uart mtk_uarts[UART_NR];
 
 #ifdef CONFIG_FIQ_DEBUGGER
 extern struct resource fiq_resource[];

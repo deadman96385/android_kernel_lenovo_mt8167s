@@ -68,19 +68,16 @@
 /*
  * LOG
  */
-#define hps_emerg(fmt, args...)             pr_emerg("[HPS] " fmt, ##args)
-#define hps_alert(fmt, args...)             pr_alert("[HPS] " fmt, ##args)
-#define hps_crit(fmt, args...)              pr_crit("[HPS] " fmt, ##args)
-#define hps_error(fmt, args...)             pr_err("[HPS] " fmt, ##args)
-#define hps_warn(fmt, args...)              pr_warn("[HPS] " fmt, ##args)
-#define hps_notice(fmt, args...)            pr_notice("[HPS] " fmt, ##args)
-#define hps_info(fmt, args...)              pr_info("[HPS] " fmt, ##args)
-#define hps_debug(fmt, args...)             pr_debug("[HPS] " fmt, ##args)
+#define TAG	"[HPS] "
+#define tag_pr_err(fmt, args...)	pr_err(TAG fmt, ##args)
+#define tag_pr_notice(fmt, args...)	pr_notice(TAG fmt, ##args)
+#define tag_pr_info(fmt, args...)	pr_info(TAG fmt, ##args)
+#define tag_pr_debug(fmt, args...)	pr_debug(TAG fmt, ##args)
 
 #if EN_ISR_LOG
-#define hps_isr_info(fmt, args...)          hps_notice(fmt, ##args)
+#define hps_isr_info(fmt, args...)          tag_pr_info(fmt, ##args)
 #else
-#define hps_isr_info(fmt, args...)          hps_debug(fmt, ##args)
+#define hps_isr_info(fmt, args...)          tag_pr_debug(fmt, ##args)
 #endif
 
 /*
@@ -100,23 +97,23 @@
  */
 /*
  * #define STEP_BY_STEP_DEBUG
- *	hps_debug("@@@### file:%s, func:%s, line:%d ###@@@\n", __FILE__, __func__, __LINE__)
+ *	tag_pr_debug("@@@### file:%s, func:%s, line:%d ###@@@\n", __FILE__, __func__, __LINE__)
  */
 
-typedef enum {
+enum hps_init_state_e {
 	INIT_STATE_NOT_READY = 0,
 	INIT_STATE_DONE
-} hps_init_state_e;
+};
 
-typedef enum {
+enum hps_ctxt_state_e {
 	STATE_LATE_RESUME = 0,
 	STATE_EARLY_SUSPEND,
 	STATE_SUSPEND,
 	STATE_COUNT
-} hps_ctxt_state_e;
+};
 
 /* TODO: verify do you need action? no use now */
-typedef enum {
+enum hps_ctxt_action_e {
 	ACTION_NONE = 0,
 	ACTION_BASE_LITTLE,	/* bit  1, 0x0002 */
 	ACTION_BASE_BIG,	/* bit  2, 0x0004 */
@@ -133,9 +130,9 @@ typedef enum {
 	ACTION_ROOT_2_LITTLE,	/*bit 13, 0x2000 */
 	ACTION_ROOT_2_BIG,	/*bit 14, 0x4000 */
 	ACTION_COUNT
-} hps_ctxt_action_e;
+};
 
-typedef enum {
+enum hps_ctxt_func_ctrl_e {
 	HPS_FUNC_CTRL_HPS,	/* bit  0, 0x0001 */
 	HPS_FUNC_CTRL_RUSH,	/* bit  1, 0x0002 */
 	HPS_FUNC_CTRL_HVY_TSK,	/* bit  2, 0x0004 */
@@ -143,7 +140,7 @@ typedef enum {
 	HPS_FUNC_CTRL_EFUSE,	/* big  4, 0x0010 */
 	HPS_FUNC_CTRL_SMART,	/* bit  5, 0x0020 */
 	HPS_FUNC_CTRL_COUNT
-} hps_ctxt_func_ctrl_e;
+};
 
 #define HPS_SYS_CHANGE_ROOT	(0x001)
 struct hps_sys_ops {
@@ -168,7 +165,7 @@ struct hps_cluster_info {
 	unsigned int target_core_num;
 };
 
-typedef struct hps_sys_struct {
+struct hps_sys_struct {
 	unsigned int cluster_num;
 	struct hps_cluster_info *cluster_info;
 	unsigned int func_num;
@@ -185,9 +182,9 @@ typedef struct hps_sys_struct {
 	unsigned int up_load_avg;
 	unsigned int down_load_avg;
 	unsigned int action_id;
-} hps_sys_t;
+};
 
-typedef struct hps_ctxt_struct {
+struct hps_ctxt_struct {
 	/* state */
 	unsigned int init_state;
 	unsigned int state;
@@ -289,18 +286,18 @@ typedef struct hps_ctxt_struct {
 	/* misc */
 	unsigned int test0;
 	unsigned int test1;
-} hps_ctxt_t;
+};
 
-typedef struct hps_cpu_ctxt_struct {
+struct hps_cpu_ctxt_struct {
 	unsigned int load;
-} hps_cpu_ctxt_t;
+};
 
 /*=============================================================*/
 /* Global variable declaration */
 /*=============================================================*/
-extern hps_ctxt_t hps_ctxt;
-extern hps_sys_t hps_sys;
-DECLARE_PER_CPU(hps_cpu_ctxt_t, hps_percpu_ctxt);
+extern struct hps_ctxt_struct hps_ctxt;
+extern struct hps_sys_struct hps_sys;
+DECLARE_PER_CPU(struct hps_cpu_ctxt_struct, hps_percpu_ctxt);
 /* forward references */
 extern struct cpumask cpu_domain_big_mask;	/* definition in kernel-3.10/arch/arm/kernel/topology.c */
 extern struct cpumask cpu_domain_little_mask;	/* definition in kernel-3.10/arch/arm/kernel/topology.c */

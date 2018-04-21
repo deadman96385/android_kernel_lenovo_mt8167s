@@ -164,13 +164,8 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
 	u32 fn;
 
 	fn = psci_function_id[PSCI_FN_CPU_ON];
-#ifdef CONFIG_MTK_FIQ_CACHE
-	do {
-		err = invoke_psci_fn(fn, cpuid, entry_point, 0);
-	} while (err);
-#else
 	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
-#endif
+
 	return psci_to_linux_errno(err);
 }
 
@@ -560,7 +555,7 @@ out_put_node:
 	return err;
 }
 
-static const struct of_device_id const psci_of_match[] __initconst = {
+static const struct of_device_id psci_of_match[] __initconst = {
 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
 	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},

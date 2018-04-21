@@ -64,23 +64,18 @@
  *****************************************************************************/
 static char const *const kAudioNXPSpkName = "/dev/nxpspk";
 
-
-typedef struct {
+struct {
 	unsigned char data0;
 	unsigned char data1;
 	unsigned char data2;
 	unsigned char data3;
 } Aud_Buffer_Control;
 
-extern int mt_set_gpio_mode(int pin, int mode);
-extern int mt_set_gpio_dir(int pin, int mode);
-extern int mt_set_gpio_out(int pin, int mode);
-
 /*below is control message*/
 #define AUD_NXP_IOC_MAGIC 'C'
 
-#define SET_NXP_REG         _IOWR(AUD_NXP_IOC_MAGIC, 0x00, Aud_Buffer_Control*)
-#define GET_NXP_REG         _IOWR(AUD_NXP_IOC_MAGIC, 0x01, Aud_Buffer_Control*)
+#define SET_NXP_REG         _IOWR(AUD_NXP_IOC_MAGIC, 0x00, struct Aud_Buffer_Control*)
+#define GET_NXP_REG         _IOWR(AUD_NXP_IOC_MAGIC, 0x01, struct Aud_Buffer_Control*)
 
 /* Pre-defined definition */
 #define NXP_DEBUG_ON

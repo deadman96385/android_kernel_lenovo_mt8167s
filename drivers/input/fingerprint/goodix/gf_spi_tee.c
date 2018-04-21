@@ -14,6 +14,7 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/slab.h>
 #include <linux/device.h>
 #include <linux/input.h>
 #include <linux/mutex.h>
@@ -48,13 +49,19 @@
 #include <linux/spi/spidev.h>
 
 /* MTK header */
+#ifndef CONFIG_SPI_MT65XX
 #include "mtk_spi.h"
 #include "mtk_spi_hal.h"
+#endif
 #include "mtk_gpio.h"
+
+/* there is no this file on standardized GPIO platform */
+#ifdef CONFIG_MTK_GPIO
 #include "mach/gpio_const.h"
+#endif
 
 #include "gf_spi_tee.h"
-
+#include "gf_fw.h"
 
 /**************************defination******************************/
 #define GF_DEV_NAME "goodix_fp"
@@ -80,6 +87,15 @@ u8 g_debug_level = DEBUG_LOG;
 #define ROUND_UP(x, align)		((x+(align-1))&~(align-1))
 u8	id_buf[11];
 
+#ifdef CONFIG_MTK_MT6306_GPIO_SUPPORT
+u32 gf_rst_mt6306_support;
+int gf_rst_mt6306_gpionum = -1;
+#endif
+
+/* for Upstream SPI ,just tell SPI about the clock */
+#ifdef CONFIG_SPI_MT65XX
+u32 gf_spi_speed = 1*1000000;
+#endif
 
 /*************************************************************/
 static LIST_HEAD(device_list);
@@ -121,8 +137,8 @@ static const struct attribute_group gf_debug_attr_group = {
 	.attrs = gf_debug_attrs,
 	.name = "debug"
 };
-
-const struct mt_chip_conf spi_ctrdata = {
+#ifndef CONFIG_SPI_MT65XX
+const struct mt_chip_conf spi_ctrldata = {
 	.setuptime = 10,
 	.holdtime = 10,
 	.high_time = 50, /* 1MHz */
@@ -148,7 +164,7 @@ const struct mt_chip_conf spi_ctrdata = {
 	.ulthigh = 0,
 	.tckdly = 0,
 };
-
+#endif
 /* -------------------------------------------------------------------- */
 /* timer function								*/
 /* -------------------------------------------------------------------- */
@@ -178,14 +194,33 @@ static int gf_get_gpio_dts_info(struct gf_device *gf_dev)
 {
 #ifdef CONFIG_OF
 	int ret;
+	int virq;
 
 	struct device_node *node = NULL;
 	struct platform_device *pdev = NULL;
+
+#ifdef CONFIG_MTK_MT6306_GPIO_SUPPORT
+	node = of_find_compatible_node(NULL, NULL, "goodix,goodix-fp");
+	of_property_read_u32(node, "mt6306-rst-support", &gf_rst_mt6306_support);
+	gf_debug(INFO_LOG, "%s line:%d mt6306-fpRst-support:%d.\n", __func__, __LINE__, gf_rst_mt6306_support);
+
+	if (gf_rst_mt6306_support == 1) {
+		of_property_read_u32(node, "mt6306-rst-gpionum", &gf_rst_mt6306_gpionum);
+		gf_debug(INFO_LOG, "%s line:%d mt6306-gpionum:%d as fingerprint reset.\n",
+		__func__, __LINE__, gf_rst_mt6306_gpionum);
+	}
+#endif
 
 	gf_debug(DEBUG_LOG, "%s, from dts pinctrl\n", __func__);
 
 	node = of_find_compatible_node(NULL, NULL, "mediatek,goodix-fp");
 	if (node) {
+		virq = irq_of_parse_and_map(node, 0);
+#ifndef CONFIG_MTK_EIC
+		irq_set_irq_wake(virq, 1);
+#else
+		enable_irq_wake(virq);
+#endif
 		pdev = of_find_device_by_node(node);
 		if (pdev) {
 			gf_dev->pinctrl_gpios = devm_pinctrl_get(&pdev->dev);
@@ -208,6 +243,8 @@ static int gf_get_gpio_dts_info(struct gf_device *gf_dev)
 		gf_debug(ERR_LOG, "%s can't find fingerprint pinctrl default\n", __func__);
 		/* return ret; */
 	}
+
+#ifdef SUPPORT_REE_OSWEGO
 	gf_dev->pins_miso_spi = pinctrl_lookup_state(gf_dev->pinctrl_gpios, "miso_spi");
 	if (IS_ERR(gf_dev->pins_miso_spi)) {
 		ret = PTR_ERR(gf_dev->pins_miso_spi);
@@ -226,18 +263,27 @@ static int gf_get_gpio_dts_info(struct gf_device *gf_dev)
 		gf_debug(ERR_LOG, "%s can't find fingerprint pinctrl miso_pulllow\n", __func__);
 		return ret;
 	}
-	gf_dev->pins_reset_high = pinctrl_lookup_state(gf_dev->pinctrl_gpios, "reset_high");
-	if (IS_ERR(gf_dev->pins_reset_high)) {
-		ret = PTR_ERR(gf_dev->pins_reset_high);
-		gf_debug(ERR_LOG, "%s can't find fingerprint pinctrl reset_high\n", __func__);
-		return ret;
+#endif
+
+#ifdef CONFIG_MTK_MT6306_GPIO_SUPPORT
+	if (gf_rst_mt6306_support != 1) {
+#endif
+		gf_dev->pins_reset_high = pinctrl_lookup_state(gf_dev->pinctrl_gpios, "reset_high");
+		if (IS_ERR(gf_dev->pins_reset_high)) {
+			ret = PTR_ERR(gf_dev->pins_reset_high);
+			gf_debug(ERR_LOG, "%s can't find fingerprint pinctrl reset_high\n", __func__);
+			return ret;
+		}
+		gf_dev->pins_reset_low = pinctrl_lookup_state(gf_dev->pinctrl_gpios, "reset_low");
+		if (IS_ERR(gf_dev->pins_reset_low)) {
+			ret = PTR_ERR(gf_dev->pins_reset_low);
+			gf_debug(ERR_LOG, "%s can't find fingerprint pinctrl reset_low\n", __func__);
+			return ret;
+		}
+#ifdef CONFIG_MTK_MT6306_GPIO_SUPPORT
 	}
-	gf_dev->pins_reset_low = pinctrl_lookup_state(gf_dev->pinctrl_gpios, "reset_low");
-	if (IS_ERR(gf_dev->pins_reset_low)) {
-		ret = PTR_ERR(gf_dev->pins_reset_low);
-		gf_debug(ERR_LOG, "%s can't find fingerprint pinctrl reset_low\n", __func__);
-		return ret;
-	}
+#endif
+
 	gf_debug(DEBUG_LOG, "%s, get pinctrl success!\n", __func__);
 
 #endif
@@ -270,6 +316,18 @@ static void gf_hw_power_enable(struct gf_device *gf_dev, u8 onoff)
 		/* TODO:  set power  according to actual situation  */
 		/* hwPowerOn(MT6331_POWER_LDO_VIBR, VOL_2800, "fingerprint"); */
 		enable = 0;
+
+#ifdef CONFIG_MTK_MT6306_GPIO_SUPPORT
+	gf_debug(INFO_LOG, "%s line:%d\n", __func__, __LINE__);
+
+	if (gf_rst_mt6306_support == 1) {
+		mt6306_set_gpio_out(gf_rst_mt6306_gpionum, MT6306_GPIO_OUT_LOW);
+		mdelay(15);
+		mt6306_set_gpio_out(gf_rst_mt6306_gpionum, MT6306_GPIO_OUT_HIGH);
+		return;
+	}
+#endif
+
 		#ifdef CONFIG_OF
 		pinctrl_select_state(gf_dev->pinctrl_gpios, gf_dev->pins_reset_low);
 		mdelay(15);
@@ -326,6 +384,13 @@ static void gf_irq_gpio_cfg(struct gf_device *gf_dev)
 
 static void gf_reset_gpio_cfg(struct gf_device *gf_dev)
 {
+#ifdef CONFIG_MTK_MT6306_GPIO_SUPPORT
+	if (gf_rst_mt6306_support == 1) {
+		mt6306_set_gpio_out(gf_rst_mt6306_gpionum, MT6306_GPIO_OUT_HIGH);
+		return;
+	}
+#endif
+
 #ifdef CONFIG_OF
 	pinctrl_select_state(gf_dev->pinctrl_gpios, gf_dev->pins_reset_high);
 #endif
@@ -335,6 +400,20 @@ static void gf_reset_gpio_cfg(struct gf_device *gf_dev)
 /* delay ms after reset */
 static void gf_hw_reset(struct gf_device *gf_dev, u8 delay)
 {
+#ifdef CONFIG_MTK_MT6306_GPIO_SUPPORT
+	if (gf_rst_mt6306_support == 1) {
+		mt6306_set_gpio_out(gf_rst_mt6306_gpionum, MT6306_GPIO_OUT_LOW);
+		mdelay(5);
+		mt6306_set_gpio_out(gf_rst_mt6306_gpionum, MT6306_GPIO_OUT_HIGH);
+
+		if (delay) {
+			/* delay is configurable */
+			mdelay(delay);
+		}
+		return;
+	}
+#endif
+
 #ifdef CONFIG_OF
 	pinctrl_select_state(gf_dev->pinctrl_gpios, gf_dev->pins_reset_low);
 	mdelay(5);
@@ -571,7 +650,11 @@ static ssize_t gf_read(struct file *filp, char __user *buf, size_t count, loff_t
 		return -EMSGSIZE;
 
 	/* set spi to high speed */
+#ifndef CONFIG_SPI_MT65XX
 	gf_spi_setup_conf_ree(gf_dev, HIGH_SPEED, DMA_TRANSFER);
+#else
+	gf_spi_speed = 6*1000000;
+#endif
 
 	gf_spi_read_bytes_ree(gf_dev, 0x8140, count + 10, transfer_buf);
 
@@ -595,7 +678,11 @@ static ssize_t gf_read(struct file *filp, char __user *buf, size_t count, loff_t
 	}
 
 	/* restore to low speed */
+#ifndef CONFIG_SPI_MT65XX
 	gf_spi_setup_conf_ree(gf_dev, LOW_SPEED, FIFO_TRANSFER);
+#else
+	gf_spi_speed = 1*1000000;
+#endif
 
 	kfree(transfer_buf);
 #endif
@@ -988,7 +1075,9 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	case GF_IOC_SPI_INIT_CFG_CMD:
+#ifndef CONFIG_SPI_MT65XX
 		retval = gf_ioctl_spi_init_cfg_cmd(&gf_dev->spi_mcc, arg);
+#endif
 		break;
 
 #endif /* SUPPORT_REE_SPI */
@@ -1037,7 +1126,18 @@ static ssize_t gf_debug_store(struct device *dev,
 {
 	struct gf_device *gf_dev =  dev_get_drvdata(dev);
 	int retval = 0;
+#ifdef SUPPORT_REE_OSWEGO
 	u8 flag = 0;
+#endif
+
+#ifdef SUPPORT_REE_SPI
+#ifdef SUPPORT_REE_MILAN_A
+	u8 id_buf[2] = {0};
+#ifndef CONFIG_TRUSTONIC_TEE_SUPPORT
+	u16 chip_id;
+#endif
+#endif
+#endif
 
 	if (!strncmp(buf, "-8", 2)) {
 		gf_debug(INFO_LOG, "%s: parameter is -8, enable spi clock test===============\n", __func__);
@@ -1086,6 +1186,7 @@ static ssize_t gf_debug_store(struct device *dev,
 		gf_reset_gpio_cfg(gf_dev);
 
 #ifdef CONFIG_OF
+#ifdef SUPPORT_REE_OSWEGO
 		if (flag == 0) {
 			pinctrl_select_state(gf_dev->pinctrl_gpios, gf_dev->pins_miso_pulllow);
 			gf_debug(INFO_LOG, "%s: set miso PIN to low\n", __func__);
@@ -1096,9 +1197,32 @@ static ssize_t gf_debug_store(struct device *dev,
 			flag = 0;
 		}
 #endif
+#endif
 
 	} else if (!strncmp(buf, "-13", 3)) {
 		gf_debug(INFO_LOG, "%s: parameter is -13, Vendor ID test --> 0x%x\n", __func__, g_vendor_id);
+	} else if (!strncmp(buf, "-15", 3)) {
+#ifdef SUPPORT_REE_SPI
+#ifdef SUPPORT_REE_MILAN_A
+		gf_spi_read_bytes_ree(gf_dev, 0x0142, 2, id_buf);
+		gf_debug(INFO_LOG, "%s line:%d ChipID:0x%x  0x%x\n", __func__, __LINE__, id_buf[0], id_buf[1]);
+
+		/* make fingerprint to lower power mode for nonTEE project */
+#ifndef CONFIG_TRUSTONIC_TEE_SUPPORT
+		gf_spi_read_bytes_ree_new(gf_dev, 0x0142, 2, id_buf);
+		chip_id = (u16)id_buf[0];
+		chip_id += ((u16)id_buf[1]) << 8;
+		gf_debug(INFO_LOG, "[%s], id_buf[0]0x%x id_buf[1]=0x%x chip_id:0x%x.\n",
+			__func__, id_buf[0], id_buf[1], chip_id);
+
+		if (0x12A4 == chip_id || 0x12A1 == chip_id) {
+			gf_debug(INFO_LOG, "[%s], line:%d, no TEE support so make the sensor sleep.\n",
+				__func__, __LINE__);
+			gf_milan_a_series_init_process(gf_dev);
+		}
+#endif
+#endif
+#endif
 	} else {
 		gf_debug(ERR_LOG, "%s: wrong parameter!===============\n", __func__);
 	}
@@ -1176,16 +1300,23 @@ int gf_spi_read_bytes_ree(struct gf_device *gf_dev, u16 addr, u32 data_len, u8 *
 	tmp_buf = gf_dev->spi_buffer;
 
 	/* switch to DMA mode if transfer length larger than 32 bytes */
+
+#ifndef CONFIG_SPI_MT65XX
 	if ((data_len + 1) > 32) {
 		gf_dev->spi_mcc.com_mod = DMA_TRANSFER;
 		spi_setup(gf_dev->spi);
 	}
+#endif
 	spi_message_init(&msg);
 	*tmp_buf = 0xF0;
 	*(tmp_buf + 1) = (u8)((addr >> 8) & 0xFF);
 	*(tmp_buf + 2) = (u8)(addr & 0xFF);
 	xfer[0].tx_buf = tmp_buf;
 	xfer[0].len = 3;
+#ifdef CONFIG_SPI_MT65XX
+	xfer[0].speed_hz = gf_spi_speed;
+	gf_debug(INFO_LOG, "%s %d, now spi-clock:%d\n", __func__, __LINE__, xfer[0].speed_hz);
+#endif
 	xfer[0].delay_usecs = 5;
 	spi_message_add_tail(&xfer[0], &msg);
 	spi_sync(gf_dev->spi, &msg);
@@ -1201,7 +1332,9 @@ int gf_spi_read_bytes_ree(struct gf_device *gf_dev, u16 addr, u32 data_len, u8 *
 		xfer[1].len = package * 1024;
 	else
 		xfer[1].len = data_len + 1;
-
+#ifdef CONFIG_SPI_MT65XX
+	xfer[1].speed_hz = gf_spi_speed;
+#endif
 	xfer[1].delay_usecs = 5;
 	spi_message_add_tail(&xfer[1], &msg);
 	spi_sync(gf_dev->spi, &msg);
@@ -1222,6 +1355,9 @@ int gf_spi_read_bytes_ree(struct gf_device *gf_dev, u16 addr, u32 data_len, u8 *
 		*(tmp_buf + 2) = (u8)(addr & 0xFF);
 		xfer[2].tx_buf = tmp_buf;
 		xfer[2].len = 3;
+#ifdef CONFIG_SPI_MT65XX
+		xfer[2].speed_hz = gf_spi_speed;
+#endif
 		xfer[2].delay_usecs = 5;
 		spi_message_add_tail(&xfer[2], &msg);
 		spi_sync(gf_dev->spi, &msg);
@@ -1231,6 +1367,9 @@ int gf_spi_read_bytes_ree(struct gf_device *gf_dev, u16 addr, u32 data_len, u8 *
 		xfer[3].tx_buf = tmp_buf + 4;
 		xfer[3].rx_buf = tmp_buf + 4;
 		xfer[3].len = reminder + 1;
+#ifdef CONFIG_SPI_MT65XX
+		xfer[3].speed_hz = gf_spi_speed;
+#endif
 		xfer[3].delay_usecs = 5;
 		spi_message_add_tail(&xfer[3], &msg);
 		spi_sync(gf_dev->spi, &msg);
@@ -1239,10 +1378,13 @@ int gf_spi_read_bytes_ree(struct gf_device *gf_dev, u16 addr, u32 data_len, u8 *
 	}
 
 	/* restore to FIFO mode if has used DMA */
+#ifndef CONFIG_SPI_MT65XX
 	if ((data_len + 1) > 32) {
 		gf_dev->spi_mcc.com_mod = FIFO_TRANSFER;
 		spi_setup(gf_dev->spi);
 	}
+#endif
+
 	kfree(xfer);
 	if (xfer != NULL)
 		xfer = NULL;
@@ -1283,6 +1425,7 @@ static void gf_miso_gpio_cfg(struct gf_device *gf_dev, u8 pullhigh)
   * speed: 1, 4, 6, 8 unit:MHz
   * mode: DMA mode or FIFO mode
   */
+ #ifndef CONFIG_SPI_MT65XX
 void gf_spi_setup_conf_ree(struct gf_device *gf_dev, u32 speed, enum spi_transfer_mode mode)
 {
 	struct mt_chip_conf *mcc = &gf_dev->spi_mcc;
@@ -1325,105 +1468,7 @@ void gf_spi_setup_conf_ree(struct gf_device *gf_dev, u32 speed, enum spi_transfe
 		gf_debug(ERR_LOG, "%s, failed to setup spi conf\n", __func__);
 
 }
-
-int gf_spi_read_bytes_ree(struct gf_device *gf_dev, u16 addr, u32 data_len, u8 *rx_buf)
-{
-	struct spi_message msg;
-	struct spi_transfer *xfer = NULL;
-	u8 *tmp_buf = NULL;
-	u32 package, reminder, retry;
-
-	package = (data_len + 2) / 1024;
-	reminder = (data_len + 2) % 1024;
-
-	if ((package > 0) && (reminder != 0)) {
-		xfer = kzalloc(sizeof(*xfer) * 4, GFP_KERNEL);
-		retry = 1;
-	} else {
-		xfer = kzalloc(sizeof(*xfer) * 2, GFP_KERNEL);
-		retry = 0;
-	}
-	if (xfer == NULL) {
-		gf_debug(ERR_LOG, "%s, no memory for SPI transfer\n", __func__);
-		return -ENOMEM;
-	}
-
-	tmp_buf = gf_dev->spi_buffer;
-
-	/* switch to DMA mode if transfer length larger than 32 bytes */
-	if ((data_len + 1) > 32) {
-		gf_dev->spi_mcc.com_mod = DMA_TRANSFER;
-		spi_setup(gf_dev->spi);
-	}
-	spi_message_init(&msg);
-	*tmp_buf = 0xF0;
-	*(tmp_buf + 1) = (u8)((addr >> 8) & 0xFF);
-	*(tmp_buf + 2) = (u8)(addr & 0xFF);
-	xfer[0].tx_buf = tmp_buf;
-	xfer[0].len = 3;
-	xfer[0].delay_usecs = 5;
-	spi_message_add_tail(&xfer[0], &msg);
-	spi_sync(gf_dev->spi, &msg);
-
-	spi_message_init(&msg);
-	/* memset((tmp_buf + 4), 0x00, data_len + 1); */
-	/* 4 bytes align */
-	*(tmp_buf + 4) = 0xF1;
-	xfer[1].tx_buf = tmp_buf + 4;
-	xfer[1].rx_buf = tmp_buf + 4;
-
-	if (retry)
-		xfer[1].len = package * 1024;
-	else
-		xfer[1].len = data_len + 1;
-
-	xfer[1].delay_usecs = 5;
-	spi_message_add_tail(&xfer[1], &msg);
-	spi_sync(gf_dev->spi, &msg);
-
-	/* copy received data */
-	if (retry)
-		memcpy(rx_buf, (tmp_buf + 5), (package * 1024 - 1));
-	else
-		memcpy(rx_buf, (tmp_buf + 5), data_len);
-
-	/* send reminder SPI data */
-	if (retry) {
-		addr = addr + package * 1024 - 2;
-		spi_message_init(&msg);
-
-		*tmp_buf = 0xF0;
-		*(tmp_buf + 1) = (u8)((addr >> 8) & 0xFF);
-		*(tmp_buf + 2) = (u8)(addr & 0xFF);
-		xfer[2].tx_buf = tmp_buf;
-		xfer[2].len = 3;
-		xfer[2].delay_usecs = 5;
-		spi_message_add_tail(&xfer[2], &msg);
-		spi_sync(gf_dev->spi, &msg);
-
-		spi_message_init(&msg);
-		*(tmp_buf + 4) = 0xF1;
-		xfer[3].tx_buf = tmp_buf + 4;
-		xfer[3].rx_buf = tmp_buf + 4;
-		xfer[3].len = reminder + 1;
-		xfer[3].delay_usecs = 5;
-		spi_message_add_tail(&xfer[3], &msg);
-		spi_sync(gf_dev->spi, &msg);
-
-		memcpy((rx_buf + package * 1024 - 1), (tmp_buf + 6), (reminder - 1));
-	}
-
-	/* restore to FIFO mode if has used DMA */
-	if ((data_len + 1) > 32) {
-		gf_dev->spi_mcc.com_mod = FIFO_TRANSFER;
-		spi_setup(gf_dev->spi);
-	}
-	kfree(xfer);
-	if (xfer != NULL)
-		xfer = NULL;
-
-	return 0;
-}
+#endif
 
 int gf_spi_write_bytes_ree(struct gf_device *gf_dev, u16 addr, u32 data_len, u8 *tx_buf)
 {
@@ -1449,10 +1494,13 @@ int gf_spi_write_bytes_ree(struct gf_device *gf_dev, u16 addr, u32 data_len, u8 
 	tmp_buf = gf_dev->spi_buffer;
 
 	/* switch to DMA mode if transfer length larger than 32 bytes */
+#ifndef CONFIG_SPI_MT65XX
 	if ((data_len + 3) > 32) {
 		gf_dev->spi_mcc.com_mod = DMA_TRANSFER;
 		spi_setup(gf_dev->spi);
 	}
+#endif
+
 	spi_message_init(&msg);
 	*tmp_buf = 0xF0;
 	*(tmp_buf + 1) = (u8)((addr >> 8) & 0xFF);
@@ -1465,6 +1513,9 @@ int gf_spi_write_bytes_ree(struct gf_device *gf_dev, u16 addr, u32 data_len, u8 
 		xfer[0].len = data_len + 3;
 	}
 	xfer[0].tx_buf = tmp_buf;
+#ifdef CONFIG_SPI_MT65XX
+	xfer[0].speed_hz = gf_spi_speed;
+#endif
 	xfer[0].delay_usecs = 5;
 	spi_message_add_tail(&xfer[0], &msg);
 	spi_sync(gf_dev->spi, &msg);
@@ -1479,15 +1530,21 @@ int gf_spi_write_bytes_ree(struct gf_device *gf_dev, u16 addr, u32 data_len, u8 
 		xfer[1].tx_buf = tmp_buf;
 		xfer[1].len = reminder + 3;
 		xfer[1].delay_usecs = 5;
+#ifdef CONFIG_SPI_MT65XX
+		xfer[1].speed_hz = gf_spi_speed;
+#endif
 		spi_message_add_tail(&xfer[1], &msg);
 		spi_sync(gf_dev->spi, &msg);
 	}
 
 	/* restore to FIFO mode if has used DMA */
+#ifndef CONFIG_SPI_MT65XX
 	if ((data_len + 3) > 32) {
 		gf_dev->spi_mcc.com_mod = FIFO_TRANSFER;
 		spi_setup(gf_dev->spi);
 	}
+#endif
+
 	kfree(xfer);
 	if (xfer != NULL)
 		xfer = NULL;
@@ -1511,6 +1568,9 @@ int gf_spi_read_byte_ree(struct gf_device *gf_dev, u16 addr, u8 *value)
 
 	xfer[0].tx_buf = gf_dev->spi_buffer;
 	xfer[0].len = 3;
+#ifdef CONFIG_SPI_MT65XX
+	xfer[0].speed_hz = gf_spi_speed;
+#endif
 	xfer[0].delay_usecs = 5;
 	spi_message_add_tail(&xfer[0], &msg);
 	spi_sync(gf_dev->spi, &msg);
@@ -1521,6 +1581,9 @@ int gf_spi_read_byte_ree(struct gf_device *gf_dev, u16 addr, u8 *value)
 	xfer[1].tx_buf = gf_dev->spi_buffer + 4;
 	xfer[1].rx_buf = gf_dev->spi_buffer + 4;
 	xfer[1].len = 2;
+#ifdef CONFIG_SPI_MT65XX
+	xfer[1].speed_hz = gf_spi_speed;
+#endif
 	xfer[1].delay_usecs = 5;
 	spi_message_add_tail(&xfer[1], &msg);
 	spi_sync(gf_dev->spi, &msg);
@@ -1552,6 +1615,9 @@ int gf_spi_write_byte_ree(struct gf_device *gf_dev, u16 addr, u8 value)
 
 	xfer[0].tx_buf = gf_dev->spi_buffer;
 	xfer[0].len = 3 + 1;
+#ifdef CONFIG_SPI_MT65XX
+	xfer[0].speed_hz = gf_spi_speed;
+#endif
 	xfer[0].delay_usecs = 5;
 	spi_message_add_tail(&xfer[0], &msg);
 	spi_sync(gf_dev->spi, &msg);
@@ -1618,7 +1684,11 @@ static int gf_init_flash_fw(struct gf_device *gf_dev)
 	u8  tmp_buf[11];
 	int status = -EINVAL;
 
+#ifndef CPNFIG_SPI_MT65XX
 	gf_spi_setup_conf_ree(gf_dev, LOW_SPEED, FIFO_TRANSFER);
+#else
+	gf_spi_speed = 1*1000000;
+#endif
 
 	/*check sensor is goodix, or not*/
 	status = gf_check_9p_chip(gf_dev);
@@ -1667,6 +1737,250 @@ static int gf_init_flash_fw(struct gf_device *gf_dev)
 #endif
 #endif /* SUPPORT_REE_SPI */
 
+#ifdef SUPPORT_REE_SPI
+#ifdef SUPPORT_REE_MILAN_A
+#ifndef CONFIG_TRUSTONIC_TEE_SUPPORT
+struct gf_tx_buf_t {
+	uint8_t cmd;
+	uint8_t addr_h;
+	uint8_t addr_l;
+	uint8_t len_h;
+	uint8_t len_l;
+	uint8_t buf[10000];
+};
+
+struct gf_rx_buf_t {
+	uint8_t cmd;
+	uint8_t buf[10000];
+};
+
+/* -------------------------------------------------------------------- */
+/* normal world SPI read/write function                 */
+/* -------------------------------------------------------------------- */
+void endian_exchange(u8 *buf, u32 len)
+{
+	u32 i;
+	u8 buf_tmp;
+	u32 size = len / 2;
+
+	for (i = 0; i < size; i++) {
+		buf_tmp = buf[2 * i + 1];
+		buf[2 * i + 1] = buf[2 * i];
+		buf[2 * i] = buf_tmp;
+	}
+}
+
+int gf_spi_read_bytes_ree_new(struct gf_device *gf_dev, u16 addr, u32 data_len, u8 *buf)
+{
+	struct spi_message msg;
+	struct spi_transfer xfer;
+
+	struct gf_tx_buf_t *g_tx_buf;
+	struct gf_rx_buf_t *g_rx_buf;
+
+	g_tx_buf = kzalloc(10000 + 5, GFP_KERNEL);
+	g_rx_buf = kzalloc(10000 + 5, GFP_KERNEL);
+
+	/* gf_debug(INFO_LOG,%s %d g_tx_buf:%p g_rx_buf:%p\n", __func__, __LINE__, g_tx_buf, g_rx_buf); */
+
+	g_tx_buf->cmd = 0xF0;
+	g_tx_buf->addr_h = (uint8_t) ((addr >> 8) & 0xFF);
+	g_tx_buf->addr_l = (uint8_t) (addr & 0xFF);
+
+	spi_message_init(&msg);
+	memset(&xfer, 0, sizeof(struct spi_transfer));
+	xfer.tx_buf = g_tx_buf;
+	xfer.rx_buf = g_rx_buf;
+	xfer.len = 3;
+#ifdef CONFIG_SPI_MT65XX
+	xfer.speed_hz = gf_spi_speed;
+#endif
+
+	spi_message_add_tail(&xfer, &msg);
+	spi_sync(gf_dev->spi, &msg);
+
+	/* switch to DMA mode if transfer length larger than 32 bytes */
+#ifndef CONFIG_SPI_MT65XX
+	if ((data_len + 1) > 32) {
+		gf_dev->spi_mcc.com_mod = DMA_TRANSFER;
+		spi_setup(gf_dev->spi);
+	}
+#endif
+
+	spi_message_init(&msg);
+	memset(&xfer, 0, sizeof(struct spi_transfer));
+	g_tx_buf->cmd = 0xF1;
+
+	xfer.tx_buf = g_tx_buf;
+	xfer.rx_buf = g_rx_buf;
+
+	xfer.len = data_len + 1;
+#ifdef CONFIG_SPI_MT65XX
+	xfer.speed_hz = gf_spi_speed;
+#endif
+
+	spi_message_add_tail(&xfer, &msg);
+	spi_sync(gf_dev->spi, &msg);
+
+	memcpy(buf, g_rx_buf->buf, data_len);
+
+#ifdef SUPPORT_REE_MILAN_A
+	/*change the read data to little endian. */
+	endian_exchange(buf, data_len);
+#endif
+	/* restore to FIFO mode if has used DMA */
+#ifndef CONFIG_SPI_MT65XX
+	if ((data_len + 1) > 32) {
+		gf_dev->spi_mcc.com_mod = FIFO_TRANSFER;
+		spi_setup(gf_dev->spi);
+	}
+#endif
+
+	kfree(g_tx_buf);
+	kfree(g_rx_buf);
+
+	return 0;
+}
+
+int gf_spi_write_bytes_ree_new(struct gf_device *gf_dev, u16 addr, u32 data_len, u8 *buf)
+{
+	struct spi_message msg;
+	struct spi_transfer xfer;
+
+	struct gf_tx_buf_t *g_tx_buf;
+	struct gf_rx_buf_t *g_rx_buf;
+
+	g_tx_buf = kzalloc(10000 + 5, GFP_KERNEL);
+	g_rx_buf = kzalloc(10000 + 5, GFP_KERNEL);
+
+	/* gf_log(GF_INFO, "%s %d g_tx_buf:%p g_rx_buf:%p\n", __func__, __LINE__, g_tx_buf, g_rx_buf); */
+
+	g_tx_buf->cmd = 0xF0;
+	g_tx_buf->addr_h = (uint8_t) ((addr >> 8) & 0xFF);
+	g_tx_buf->addr_l = (uint8_t) (addr & 0xFF);
+
+#ifdef SUPPORT_REE_MILAN_A
+	g_tx_buf->len_h = (uint8_t) (((data_len / 2) >> 8) & 0xFF);
+	g_tx_buf->len_l = (uint8_t) ((data_len / 2) & 0xFF);
+#endif
+
+	if (buf != NULL) {
+		memcpy(g_tx_buf->buf, buf, data_len);
+#ifdef SUPPORT_REE_MILAN_A
+		/* change the read data to little endian. */
+		endian_exchange(g_tx_buf->buf, data_len);
+#endif
+	}
+
+	/* switch to DMA mode if transfer length larger than 32 bytes */
+#ifndef CONFIG_SPI_MT65XX
+	if ((data_len + 5) > 32) {
+		gf_dev->spi_mcc.com_mod = DMA_TRANSFER;
+		spi_setup(gf_dev->spi);
+	}
+#endif
+
+	spi_message_init(&msg);
+	memset(&xfer, 0, sizeof(struct spi_transfer));
+	xfer.tx_buf = g_tx_buf;
+	xfer.rx_buf = g_rx_buf;
+	xfer.len = data_len + 5;
+#ifdef CONFIG_SPI_MT65XX
+	xfer.speed_hz = gf_spi_speed;
+#endif
+
+	spi_message_add_tail(&xfer, &msg);
+	spi_sync(gf_dev->spi, &msg);
+#ifndef CONFIG_SPI_MT65XX
+	/* restore to FIFO mode if has used DMA */
+	if ((data_len + 3) > 32) {
+		gf_dev->spi_mcc.com_mod = FIFO_TRANSFER;
+		spi_setup(gf_dev->spi);
+	}
+#endif
+
+	kfree(g_tx_buf);
+	kfree(g_rx_buf);
+
+	return 0;
+}
+
+int gf_milan_a_series_init_process(struct gf_device *gf_dev)
+{
+	u32 fw_len = 5120;
+	u32 loop_time = 0;
+	u32 i = 0;
+	u16 value;
+	u8 cmp_buf[1024];
+
+	FUNC_ENTRY();
+
+	/* gf_hw_reset(gf_dev, 0); */
+	memset(cmp_buf, 0, 1024);
+
+	value = 0x0200;
+	gf_spi_write_bytes_ree_new(gf_dev, 0x014E, 2, (u8 *) &value);
+	value = 0x0003;
+	gf_spi_write_bytes_ree_new(gf_dev, 0x0146, 2, (u8 *) &value);
+
+	gf_spi_write_bytes_ree_new(gf_dev, 0x0842, sizeof(gf_cfg)/sizeof(u8), gf_cfg);
+
+	gf_spi_read_bytes_ree_new(gf_dev, 0x0842, sizeof(gf_cfg)/sizeof(u8), cmp_buf);
+
+	if (strncmp(cmp_buf, gf_cfg, sizeof(gf_cfg)/sizeof(u8)) != 0)
+		gf_debug(INFO_LOG, "[%s],download cfg failed.\n", __func__);
+	else
+		gf_debug(INFO_LOG, "[%s],%d download cfg success.\n", __func__, __LINE__);
+
+	loop_time = fw_len/1000;
+
+	for (i = 0; i < loop_time; i++)
+		gf_spi_write_bytes_ree_new(gf_dev, 0x2000 + i * 1000, 1000, gf_fw + i * 1000);
+
+	gf_spi_write_bytes_ree_new(gf_dev, 0x2000 + loop_time * 1000,
+			fw_len%1000, gf_fw + loop_time * 1000);
+
+	for (i = 0; i < loop_time; i++) {
+		gf_spi_read_bytes_ree_new(gf_dev, 0x2000 + i * 1000, 1000, cmp_buf);
+		if (strncmp(cmp_buf, gf_fw + i * 1000, 1000) != 0)
+			gf_debug(INFO_LOG, "[%s],download fw failed i=%d.\n", __func__, i);
+		else
+			gf_debug(INFO_LOG, "[%s],%d download fw success i=%d.\n", __func__, __LINE__, i);
+	}
+
+	gf_spi_read_bytes_ree_new(gf_dev, 0x2000 + loop_time * 1000, fw_len%1000, cmp_buf);
+
+	if (strncmp(cmp_buf, gf_fw + loop_time * 1000, fw_len%1000) != 0)
+		gf_debug(INFO_LOG, "[%s],download fw failed.\n", __func__);
+	else
+		gf_debug(INFO_LOG, "[%s],%d download fw success.\n", __func__, __LINE__);
+
+	value = 0x0000;
+	gf_spi_write_bytes_ree_new(gf_dev, 0x0146, 2, (u8 *) &value);
+	value = 0x0000;
+	gf_spi_write_bytes_ree_new(gf_dev, 0x014E, 2, (u8 *) &value);
+
+	mdelay(10);
+
+	gf_spi_read_bytes_ree_new(gf_dev, 0x0836, 2, (u8 *) &value);
+	gf_debug(INFO_LOG, "[%s], fw irq read == 0x%X.\n", __func__, value);
+
+	value = 0x0000;
+	gf_spi_write_bytes_ree_new(gf_dev, 0x0836, 2, (u8 *) &value);
+
+	value = 0x0002;
+	gf_spi_write_bytes_ree_new(gf_dev, 0x0834, 2, (u8 *) &value);
+
+	gf_spi_read_bytes_ree_new(gf_dev, 0x0834, 2, (u8 *) &value);
+	gf_debug(INFO_LOG, "[%s], set mode read == 0x%X.\n", __func__, value);
+	FUNC_EXIT();
+
+	return 0;
+}
+
+#endif  /* CONFIG_TRUSTONIC_TEE_SUPPORT */
+#endif /* SUPPORT_REE_MILAN_A */
+#endif /* SUPPORT_REE_SPI */
 
 static const struct file_operations gf_fops = {
 	.owner =	THIS_MODULE,
@@ -1691,7 +2005,9 @@ static int gf_probe(struct spi_device *spi)
 {
 	struct gf_device *gf_dev = NULL;
 	int status = -EINVAL;
+#ifdef SUPPORT_REE_MILAN_A
 	u8 tmp_buf[2] = {0};
+#endif
 
 	FUNC_ENTRY();
 
@@ -1724,10 +2040,12 @@ static int gf_probe(struct spi_device *spi)
 	gf_dev->spi->mode            = SPI_MODE_0;
 	gf_dev->spi->bits_per_word   = 8;
 	gf_dev->spi->max_speed_hz    = 1 * 1000 * 1000;
-	memcpy(&gf_dev->spi_mcc, &spi_ctrdata, sizeof(struct mt_chip_conf));
+#ifndef CONFIG_SPI_MT65XX
+	memcpy(&gf_dev->spi_mcc, &spi_ctrldata, sizeof(struct mt_chip_conf));
 	gf_dev->spi->controller_data = (void *)&gf_dev->spi_mcc;
-
+	gf_debug(INFO_LOG, "%s %d,Old SPI,need to spi_setup()\n", __func__, __LINE__);
 	spi_setup(gf_dev->spi);
+#endif
 	gf_dev->irq = 0;
 	spi_set_drvdata(spi, gf_dev);
 
@@ -1741,6 +2059,14 @@ static int gf_probe(struct spi_device *spi)
 	/* get gpio info from dts or defination */
 	gf_get_gpio_dts_info(gf_dev);
 	gf_get_sensor_dts_info();
+
+#ifdef CONFIG_MTK_MT6306_GPIO_SUPPORT
+	if (gf_rst_mt6306_support == 1 && gf_rst_mt6306_gpionum != -1)
+		mt6306_set_gpio_dir(gf_rst_mt6306_gpionum, MT6306_GPIO_DIR_OUT);
+
+	if (gf_rst_mt6306_support == 1 && gf_rst_mt6306_gpionum == -1)
+		goto err_class;
+#endif
 
 	/*enable the power*/
 	gf_hw_power_enable(gf_dev, 1);
@@ -1778,6 +2104,29 @@ static int gf_probe(struct spi_device *spi)
 #endif
 #endif /* SUPPORT_REE_SPI */
 
+/* make fingerprint to lower power mode for nonTEE project */
+#ifdef SUPPORT_REE_SPI
+#ifdef SUPPORT_REE_MILAN_A
+#ifndef CONFIG_TRUSTONIC_TEE_SUPPORT
+	{
+	u8 id_buf[2] = {0};
+	u16 chip_id;
+
+	gf_spi_read_bytes_ree_new(gf_dev, 0x0142, 2, id_buf);
+	chip_id = (u16)id_buf[0];
+	chip_id += ((u16)id_buf[1]) << 8;
+	gf_debug(INFO_LOG, "[%s], id_buf[0]0x%x id_buf[1]=0x%x chip_id:0x%x.\n",
+	__func__, id_buf[0], id_buf[1], chip_id);
+
+	if (0x12A4 == chip_id || 0x12A1 == chip_id) {
+		gf_debug(INFO_LOG, "[%s], line:%d, no TEE support so make the sensor sleep.\n", __func__, __LINE__);
+		gf_milan_a_series_init_process(gf_dev);
+	}
+
+	}
+#endif
+#endif
+#endif /* SUPPORT_REE_SPI */
 	/* create class */
 	gf_dev->class = class_create(THIS_MODULE, GF_CLASS_NAME);
 	if (IS_ERR(gf_dev->class)) {
@@ -1877,12 +2226,13 @@ static int gf_probe(struct spi_device *spi)
 	gf_dev->probe_finish = 1;
 	gf_dev->is_sleep_mode = 0;
 	gf_debug(INFO_LOG, "%s probe finished\n", __func__);
-	gf_spi_clk_enable(gf_dev, 0);
 
-
+#ifdef SUPPORT_REE_MILAN_A
 	gf_spi_read_bytes_ree(gf_dev, 0x0142, 2, tmp_buf);
 	gf_debug(INFO_LOG, "%s line:%d ChipID:0x%x  0x%x\n", __func__, __LINE__, tmp_buf[0], tmp_buf[1]);
-
+	memcpy(id_buf, tmp_buf, 2);
+#endif
+	gf_spi_clk_enable(gf_dev, 0);
 
 	FUNC_EXIT();
 	return 0;
@@ -1953,8 +2303,8 @@ static int gf_remove(struct spi_device *spi)
 
 	mutex_lock(&gf_dev->release_lock);
 	if (gf_dev->input == NULL) {
-		kfree(gf_dev);
 		mutex_unlock(&gf_dev->release_lock);
+		kfree(gf_dev);
 		FUNC_EXIT();
 		return 0;
 	}
@@ -2022,7 +2372,8 @@ static int __init gf_init(void)
 	FUNC_EXIT();
 	return status;
 }
-module_init(gf_init);
+/* module_init(gf_init); */
+late_initcall(gf_init);
 
 static void __exit gf_exit(void)
 {

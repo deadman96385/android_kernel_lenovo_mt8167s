@@ -372,26 +372,27 @@ dev_t dm_get_dev_t(const char *path)
 {
 	dev_t uninitialized_var(dev);
 	struct block_device *bdev;
+	char *dev_path = kstrdup(path, GFP_KERNEL);
 
-	bdev = lookup_bdev(path);
-	if (IS_ERR(bdev)) {
-		const unsigned int timeout_ms = DM_VERITY_WAIT_DEV_TIMEOUT_MS;
-		unsigned int wait_time_ms = 0;
+	if (!dev_path)
+		return -ENOMEM;
 
-		while (driver_probe_done() || !(dev = name_to_dev_t(path))) {
-			DMERR("dm_get_dev_t: wait 100ms and retry...\n");
-			msleep(100);
-			wait_time_ms += 100;
-			if (wait_time_ms > timeout_ms) {
-				DMERR("dm_get_dev_t: retry timeout\n");
-				DMERR("no dev found for %s\n", path);
-				break;
-			}
+	if (strncmp(dev_path, "PARTUUID=", 9) == 0) {
+		dev = name_to_dev_t(dev_path);
+		if (!dev) {
+			DMWARN("no dev found for %s", dev_path);
+			kfree(dev_path);
+			return -EINVAL;
 		}
-	}
-	else {
-		dev = bdev->bd_dev;
-		bdput(bdev);
+		kfree(dev_path);
+	} else {
+		bdev = lookup_bdev(path);
+		if (IS_ERR(bdev))
+			dev = name_to_dev_t(path);
+		else {
+			dev = bdev->bd_dev;
+			bdput(bdev);
+		}
 	}
 
 	return dev;

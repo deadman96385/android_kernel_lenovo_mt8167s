@@ -27,16 +27,51 @@
 #include <linux/spinlock.h>
 #include <mt-plat/mtk_battery.h>
 
+/* PD */
+#include <tcpm.h>
+
+
 struct charger_manager;
+#include "mtk_pe_intf.h"
 #include "mtk_pe20_intf.h"
 #include "mtk_pe30_intf.h"
+#include "mtk_pdc_intf.h"
 
-extern int charger_get_debug_level(void);
-extern void charger_log(const char *fmt, ...);
-extern void charger_log_flash(const char *fmt, ...);
+#define CHARGING_INTERVAL 10
+#define CHARGING_FULL_INTERVAL 20
+
+#define MAX_CHARGING_TIME (12 * 60 * 60) /* 12 hours */
+
 #define CHRLOG_ERROR_LEVEL   1
 #define CHRLOG_DEBUG_LEVEL   2
 
+extern int chr_get_debug_level(void);
+
+#define chr_err(fmt, args...)   \
+do {									\
+	if (chr_get_debug_level() >= CHRLOG_ERROR_LEVEL) {			\
+		pr_notice(fmt, ##args); \
+	}								   \
+} while (0)
+
+#define chr_info(fmt, args...)   \
+do {									\
+	if (chr_get_debug_level() >= CHRLOG_ERROR_LEVEL) {		\
+		pr_notice_ratelimited(fmt, ##args); \
+	}								   \
+} while (0)
+
+#define chr_debug(fmt, args...)   \
+do {									\
+	if (chr_get_debug_level() >= CHRLOG_DEBUG_LEVEL) {		\
+		pr_notice(fmt, ##args); \
+	}								   \
+} while (0)
+
+#ifdef MTK_CHARGER_EXP
+extern int charger_get_debug_level(void);
+extern void charger_log(const char *fmt, ...);
+extern void charger_log_flash(const char *fmt, ...);
 
 #define chr_err(fmt, args...)   \
 		do {									\
@@ -65,7 +100,7 @@ extern void charger_log_flash(const char *fmt, ...);
 				charger_log(fmt, ##args); \
 			}								   \
 		} while (0)
-
+#endif
 
 /* charger_algorithm notify charger_dev */
 enum {
@@ -83,6 +118,7 @@ enum {
 	CHARGER_DEV_NOTIFY_SAFETY_TIMEOUT,
 };
 
+
 /*
 *Software Jeita
 *T0:-10
@@ -91,28 +127,29 @@ enum {
 *T3:45
 *T4:50
 */
-typedef enum {
+enum sw_jeita_state_enum {
 	TEMP_BELOW_T0 = 0,
 	TEMP_T0_TO_T1,
 	TEMP_T1_TO_T2,
 	TEMP_T2_TO_T3,
 	TEMP_T3_TO_T4,
 	TEMP_ABOVE_T4
-} sw_jeita_state_enum;
+};
 
 struct sw_jeita_data {
 	int sm;
+	int pre_sm;
 	int cv;
 	bool charging;
 	bool error_recovery_flag;
 };
 
 /* battery thermal protection */
-typedef enum {
+enum bat_temp_state_enum {
 	BAT_TEMP_LOW = 0,
 	BAT_TEMP_NORMAL,
 	BAT_TEMP_HIGH
-} bat_temp_state_enum;
+};
 
 struct battery_thermal_protection_data {
 	int sm;
@@ -135,7 +172,10 @@ struct charger_custom_data {
 	int ac_charger_input_current;
 	int non_std_ac_charger_current;
 	int charging_host_charger_current;
+	int apple_1_0a_charger_current;
+	int apple_2_1a_charger_current;
 	int ta_ac_charger_current;
+	int pd_charger_current;
 
 	/* sw jeita */
 	int jeita_temp_above_t4_cv_voltage;
@@ -162,6 +202,14 @@ struct charger_custom_data {
 	int max_charge_temperature_minus_x_degree;
 	int min_charge_temperature;
 	int min_charge_temperature_plus_x_degree;
+
+	/* pe */
+	int pe_ichg_level_threshold;	/* ma */
+	int ta_ac_12v_input_current;
+	int ta_ac_9v_input_current;
+	int ta_ac_7v_input_current;
+	bool ta_12v_support;
+	bool ta_9v_support;
 
 	/* pe2.0 */
 	int pe20_ichg_level_threshold;	/* ma */
@@ -217,6 +265,10 @@ struct charger_custom_data {
 	int bif_threshold2;	/* uv */
 	int bif_cv_under_threshold2;	/* uv */
 
+	/* power path */
+	bool power_path_support;
+
+	int max_charging_time; /* second */
 };
 
 struct charger_data {
@@ -226,6 +278,7 @@ struct charger_data {
 	int input_current_limit;
 	int charging_current_limit;
 	int disable_charging_count;
+	int input_current_limit_by_aicl;
 };
 
 struct charger_manager {
@@ -235,6 +288,7 @@ struct charger_manager {
 	void	*algorithm_data;
 	int usb_state;
 	bool usb_unlimited;
+	bool disable_charger;
 
 	struct charger_device *chg1_dev;
 	struct notifier_block chg1_nb;
@@ -272,6 +326,7 @@ struct charger_manager {
 
 	bool cmd_discharging;
 	bool safety_timeout;
+	bool vbusov_stat;
 
 	/* battery warning */
 	unsigned int notify_code;
@@ -284,7 +339,13 @@ struct charger_manager {
 	struct charger_custom_data data;
 
 	bool enable_sw_safety_timer;
+
+	/* High voltage charging */
+	bool enable_hv_charging;
+
+	/* pe */
 	bool enable_pe_plus;
+	struct mtk_pe pe;
 
 	/* pe 2.0 */
 	bool enable_pe_2;
@@ -295,9 +356,13 @@ struct charger_manager {
 	struct mtk_pe30 pe3;
 	struct charger_device *dc_chg;
 
+	/* pd */
+	struct mtk_pdc pdc;
+
+
 	/* thread related */
 	struct hrtimer charger_kthread_timer;
-	struct fgtimer charger_kthread_fgtimer;
+	struct gtimer charger_kthread_fgtimer;
 
 	struct wake_lock charger_wakelock;
 	struct mutex charger_lock;
@@ -306,12 +371,16 @@ struct charger_manager {
 	bool charger_thread_timeout;
 	wait_queue_head_t  wait_que;
 	bool charger_thread_polling;
+
+	/* kpoc */
+	atomic_t enable_kpoc_shdn;
 };
 
 /* charger related module interface */
 extern int charger_manager_notifier(struct charger_manager *info, int event);
 extern int mtk_switch_charging_init(struct charger_manager *);
 extern int mtk_dual_switch_charging_init(struct charger_manager *);
+extern int mtk_linear_charging_init(struct charger_manager *);
 extern void _wake_up_charger(struct charger_manager *);
 extern int mtk_get_dynamic_cv(struct charger_manager *info, unsigned int *cv);
 

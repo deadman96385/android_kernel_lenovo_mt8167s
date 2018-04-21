@@ -17,9 +17,6 @@
 #include "mach/mtk_ppm_api.h"
 #include "mtk_ppm_platform.h"
 
-#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
-#define PPM_SSPM_SUPPORT	(1)
-#endif
 
 #define PPM_D_LEN	(7) /* # of cmd + arg0 + arg1 + ... */
 
@@ -35,7 +32,9 @@ enum {
 
 /* IPI Msg data structure */
 struct ppm_ipi_data {
+	/* 1 int for opcode */
 	unsigned int cmd;
+	/* 6 int for ipi data */
 	union {
 		struct {
 			unsigned int efuse_val;
@@ -56,6 +55,10 @@ struct ppm_ipi_data {
 		struct {
 			unsigned int activate;
 		} ptpod_test;
+		/* padding to 6 int */
+		struct {
+			unsigned int ppm_data[6];
+		};
 	} u;
 };
 

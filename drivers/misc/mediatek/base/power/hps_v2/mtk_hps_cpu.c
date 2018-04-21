@@ -138,7 +138,7 @@ int hps_cpu_init(void)
 	/* char str1[32]; */
 	struct cpumask cpu_mask;
 
-	hps_warn("hps_cpu_init\n");
+	tag_pr_info("hps_cpu_init\n");
 
 	for (i = setup_max_cpus; i < num_possible_cpus(); i++) {
 #ifdef CONFIG_ARM64
@@ -152,13 +152,13 @@ int hps_cpu_init(void)
 
 	/* =======================================New algo. definition ========================================== */
 	hps_sys.cluster_num = (unsigned int)arch_get_nr_clusters();
-	hps_warn("[New algo.] hps_sys.cluster_num %d\n", hps_sys.cluster_num);
+	tag_pr_info("[New algo.] hps_sys.cluster_num %d\n", hps_sys.cluster_num);
 
 	/* init cluster info of hps_sys */
 	hps_sys.cluster_info =
 	    kzalloc(hps_sys.cluster_num * sizeof(*hps_sys.cluster_info), GFP_KERNEL);
 	if (!hps_sys.cluster_info) {
-		hps_warn("@%s: fail to allocate memory for cluster_info!\n", __func__);
+		tag_pr_notice("@%s: fail to allocate memory for cluster_info!\n", __func__);
 		return -ENOMEM;
 	}
 
@@ -187,21 +187,17 @@ int hps_cpu_init(void)
 	/*========================================================================================================*/
 
 #if TURBO_CORE_SUPPORT
-#ifdef CONFIG_MACH_MT6757
-	switch ((get_devinfo_with_index(30) & 0x000000E0) >> 5) {
-	case 3:
-	case 7:
+#if defined(CONFIG_MACH_MT6757)
+	{
 #ifdef CONFIG_MTK_PMIC_CHIP_MT6355
-		hps_sys.turbo_core_supp = 1;
-#else
-		hps_sys.turbo_core_supp = 0;
+		unsigned int segment_inner = (get_devinfo_with_index(30) & 0xE0) >> 5;
+		unsigned int bining = get_devinfo_with_index(30) & 0x7;
+
+		if (segment_inner == 7 || bining == 3)
+			hps_sys.turbo_core_supp = 1;
+		else
 #endif
-		break;
-	case 0:
-	case 1:
-	default:
-		hps_sys.turbo_core_supp = 0;
-		break;
+			hps_sys.turbo_core_supp = 0;
 	}
 #endif
 #endif	/* TURBO_CORE_SUPPORT */
@@ -216,7 +212,7 @@ int hps_cpu_deinit(void)
 {
 	int r = 0;
 
-	hps_warn("hps_cpu_deinit\n");
+	tag_pr_info("hps_cpu_deinit\n");
 
 	return r;
 }

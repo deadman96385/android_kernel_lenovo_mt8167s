@@ -142,35 +142,37 @@
 		};
 	};
 
-	reserved-memory {
+	reserved_memory: reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
 
-		atf-reserved-memory@43000000 {
+		atf_reserved_memory: atf-reserved-memory {
 			compatible = "mediatek,mt8167-atf-reserved-memory";
 			no-map;
 			reg = <0 0x43000000 0 0x30000>;
 		};
 
-		ram_console-reserved-memory@44400000{
+		ram_console-reserved-memory {
 			compatible = "mediatek,ram_console";
 			reg = <0 0x44400000 0 0x10000>;
 		};
 
-		pstore-reserved-memory@44410000 {
+		pstore-reserved-memory {
 			compatible = "mediatek,pstore";
 			reg = <0 0x44410000 0 0xe0000>;
 		};
 
-		minirdump-reserved-memory@444f0000{
+		minirdump-reserved-memory {
 			compatible = "mediatek,minirdump";
 			reg = <0 0x444f0000 0 0x10000>;
 		};
+
 	};
 
 	pmu {
-		compatible = "arm,armv8-pmuv3";
+		compatible = "arm,armv8-pmuv3",
+			     "arm,cortex-a7-pmu";
 		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_LOW>,
 			     <GIC_SPI 5 IRQ_TYPE_LEVEL_LOW>,
 			     <GIC_SPI 6 IRQ_TYPE_LEVEL_LOW>,
@@ -202,12 +204,6 @@
 			compatible = "fixed-clock";
 			#clock-cells = <0>;
 			clock-frequency = <32000>;
-		};
-
-		uart_clk: dummy26m {
-			compatible = "fixed-clock";
-			clock-frequency = <26000000>;
-			#clock-cells = <0>;
 		};
 	};
 
@@ -309,10 +305,20 @@
 			/* UART GPIO Settings - Start */
 			/* UART0: rx set, rx clear, tx clear, tx clear*/
 			uart0_gpio_def_cfg:uart0gpiodefault {
+				pins_rx {
+					pinmux = <MT8167_PIN_62_URXD0__FUNC_URXD0>;
+					input-enable;
+					bias-pull-up;
+				};
+				pins_tx {
+					pinmux = <MT8167_PIN_63_UTXD0__FUNC_UTXD0>;
+				};
 			};
 			uart0_rx_set_cfg:uart0_rx_set {
 				pins_cmd_dat {
 					pinmux = <MT8167_PIN_62_URXD0__FUNC_URXD0>;
+					input-enable;
+					bias-pull-up;
 				};
 			};
 			uart0_rx_clr_cfg:uart0_rx_clear  {
@@ -380,7 +386,7 @@
 			};
 			uart2_tx_set_cfg:uart2_tx_set {
 				pins_cmd_dat {
-					pins = <MT8167_PIN_35_UTXD2__FUNC_UTXD2>;
+					pinmux = <MT8167_PIN_35_UTXD2__FUNC_UTXD2>;
 				};
 			};
 			uart2_tx_clr_cfg:uart2_tx_clear {
@@ -663,18 +669,6 @@
 				     (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
 		};
 
-		btif_tx: btif_tx@11000380 {
-			compatible = "mediatek,btif_tx";
-			reg = <0 0x11000380 0 0x80>;
-			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_LOW>;
-		};
-
-		btif_rx: btif_rx@11000400 {
-			compatible = "mediatek,btif_rx";
-			reg = <0 0x11000400 0 0x80>;
-			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_LOW>;
-		};
-
 		nfi: nfi@11001000 {
 			compatible = "mediatek,mt8167-nfi";
 			reg = <0 0x11001000 0 0x1000>;
@@ -734,24 +728,21 @@
 			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
 				     <GIC_SPI 96 IRQ_TYPE_LEVEL_LOW>, /* DMA Tx IRQ */
 				     <GIC_SPI 97 IRQ_TYPE_LEVEL_LOW>; /* DMA Rx IRQ */
-
 			clock-frequency = <26000000>;
 			clock-div = <1>;
 			clocks = <&topckgen CLK_TOP_UART0>, <&topckgen CLK_TOP_APDMA>;
 			clock-names = "uart0-main", "uart-apdma";
-			pinctrl-names = "uart0_gpio_default",
+			pinctrl-names = "default",
 					"uart0_rx_set",
 					"uart0_rx_clear",
 					"uart0_tx_set",
 					"uart0_tx_clear";
-
 			pinctrl-0 = <&uart0_gpio_def_cfg>;
 			pinctrl-1 = <&uart0_rx_set_cfg>;
 			pinctrl-2 = <&uart0_rx_clr_cfg>;
 			pinctrl-3 = <&uart0_tx_set_cfg>;
 			pinctrl-4 = <&uart0_tx_clr_cfg>;
-
-			status = "disable";
+			status = "disabled";
 		};
 
 		uart1: uart1@11006000 {
@@ -764,24 +755,21 @@
 			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
 				     <GIC_SPI 98 IRQ_TYPE_LEVEL_LOW>, /* DMA Tx IRQ */
 				     <GIC_SPI 99 IRQ_TYPE_LEVEL_LOW>; /* DMA Rx IRQ */
-
 			clock-frequency = <26000000>;
 			clock-div = <1>;
 			clocks = <&topckgen CLK_TOP_UART1>;
 			clock-names = "uart1-main";
-			pinctrl-names = "uart1_gpio_default",
+			pinctrl-names = "default",
 					"uart1_rx_set",
 					"uart1_rx_clear",
 					"uart1_tx_set",
 					"uart1_tx_clear";
-
 			pinctrl-0 = <&uart1_gpio_def_cfg>;
 			pinctrl-1 = <&uart1_rx_set_cfg>;
 			pinctrl-2 = <&uart1_rx_clr_cfg>;
 			pinctrl-3 = <&uart1_tx_set_cfg>;
 			pinctrl-4 = <&uart1_tx_clr_cfg>;
-
-			status = "disable";
+			status = "disabled";
 		};
 
 		uart2: uart2@11007000 {
@@ -790,43 +778,43 @@
 			reg = <0 0x11007000 0 0x1000>, /* UART base */
 			      <0 0x11000980 0 0x80>, /* DMA Tx base */
 			      <0 0x11000a00 0 0x80>; /* DMA Rx base */
-			interrupts = <GIC_SPI 212 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
+			interrupts = <GIC_SPI 211 IRQ_TYPE_LEVEL_LOW>, /* UART IRQ */
 				     <GIC_SPI 100 IRQ_TYPE_LEVEL_LOW>, /* DMA Tx IRQ */
 				     <GIC_SPI 101 IRQ_TYPE_LEVEL_LOW>; /* DMA Rx IRQ */
-
 			clock-frequency = <26000000>;
 			clock-div = <1>;
 			clocks = <&topckgen CLK_TOP_UART2>;
 			clock-names = "uart2-main";
-			pinctrl-names = "uart2_gpio_default",
+			pinctrl-names = "default",
 					"uart2_rx_set",
 					"uart2_rx_clear",
 					"uart2_tx_set",
 					"uart2_tx_clear";
-
 			pinctrl-0 = <&uart2_gpio_def_cfg>;
 			pinctrl-1 = <&uart2_rx_set_cfg>;
 			pinctrl-2 = <&uart2_rx_clr_cfg>;
 			pinctrl-3 = <&uart2_tx_set_cfg>;
 			pinctrl-4 = <&uart2_tx_clr_cfg>;
-
-			status = "disable";
+			status = "disabled";
 		};
 
 		pwm: pwm@11008000 {
 			compatible = "mediatek,mt8167-pwm";
 			reg = <0 0x11008000 0 0x1000>;
-			#pwm-cells = <2>;
-			clocks = <&topckgen CLK_TOP_PWM1_FB>,
+			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_LOW>;
+			clocks = <&topckgen CLK_TOP_PWM_B>,
+				 <&topckgen CLK_TOP_PWM1_FB>,
 				 <&topckgen CLK_TOP_PWM2_FB>,
 				 <&topckgen CLK_TOP_PWM3_FB>,
-				 <&topckgen CLK_TOP_PWM_B>,
-				 <&topckgen CLK_TOP_PWM>;
-			clock-names = "pwm1",
-				      "pwm2",
-				      "pwm3",
-				      "main",
-				      "top";
+				 <&topckgen CLK_TOP_PWM4_FB>,
+				 <&topckgen CLK_TOP_PWM5_FB>;
+
+			clock-names = "PWM-main",
+				      "PWM1-main",
+				      "PWM2-main",
+				      "PWM3-main",
+				      "PWM4-main",
+				      "PWM5-main";
 		};
 
 		i2c0: i2c@11009000 {
@@ -915,9 +903,14 @@
 
 		btif: btif@1100e000 {
 			compatible = "mediatek,btif";
-			reg = <0 0x1100e000 0 0x1000>;
-			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_LOW>;
-			clocks = <&topckgen CLK_TOP_BTIF>, <&topckgen CLK_TOP_APDMA>;
+			reg = <0 0x1100e000 0 0x1000>,	/*btif base*/
+			    <0 0x11000380 0 0x80>,	/*btif tx dma base*/
+			    <0 0x11000400 0 0x80>;	/*btif rx dma base*/
+			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_LOW>,	/*btif irq*/
+				   <GIC_SPI 94 IRQ_TYPE_LEVEL_LOW>,	/*btif tx dma irq*/
+				   <GIC_SPI 95 IRQ_TYPE_LEVEL_LOW>;	/*btif rx dma irq*/
+			clocks = <&topckgen CLK_TOP_BTIF>,	/*btif clock*/
+			       <&topckgen CLK_TOP_APDMA>;	/*ap dma clock*/
 			clock-names = "btifc", "apdmac";
 		};/* End of btif */
 
@@ -1047,7 +1040,7 @@
 			clocks = <&topckgen CLK_TOP_MSDC0>,
 					<&topckgen CLK_TOP_AHB_INFRA_SEL>,
 					<&topckgen CLK_TOP_MSDC0_INFRA>;
-			clock-names = "source", "hclk", "src_clk_cg";
+			clock-names = "source", "hclk", "source_cg";
 			status = "disabled";
 		};
 
@@ -1058,7 +1051,7 @@
 			clocks = <&topckgen CLK_TOP_MSDC1>,
 					<&topckgen CLK_TOP_AHB_INFRA_SEL>,
 					<&topckgen CLK_TOP_MSDC1_INFRA>;
-			clock-names = "source", "hclk", "src_clk_cg";
+			clock-names = "source", "hclk", "source_cg";
 			status = "disabled";
 		};
 
@@ -1075,7 +1068,7 @@
 			/* power domain always on */
 			clocks = <&topckgen CLK_TOP_MSDC2>,
 				 <&topckgen CLK_TOP_MSDC2_INFRA>;
-			clock-names = "sdio-bus", "sdio-src";
+			clock-names = "source", "hclk";
 			status = "disabled";
 		};
 
@@ -1570,50 +1563,50 @@
 		/* led part */
 		led0:led@0 {
 			compatible = "mediatek,red";
-			led_mode = <0>;
-			data = < >;
+			led_mode = <6>;
+			data = <0>;
 			pwm_config = <0 0 0 0 0>;
 		};
 
 		led1:led@1 {
 			compatible = "mediatek,green";
-			led_mode = <0>;
-			data = < >;
+			led_mode = <6>;
+			data = <1>;
 			pwm_config = <0 0 0 0 0>;
 		};
 
 		led2:led@2 {
 			compatible = "mediatek,blue";
-			led_mode = <0>;
-			data = < >;
+			led_mode = <6>;
+			data = <2>;
 			pwm_config = <0 0 0 0 0>;
 		};
 
 		led3:led@3 {
 			compatible = "mediatek,jogball-backlight";
 			led_mode = <0>;
-			data = < >;
+			data = <0>;
 			pwm_config = <0 0 0 0 0>;
 		};
 
 		led4:led@4 {
 			compatible = "mediatek,keyboard-backlight";
 			led_mode = <0>;
-			data = < >;
+			data = <0>;
 			pwm_config = <0 0 0 0 0>;
 		};
 
 		led5:led@5 {
 			compatible = "mediatek,button-backlight";
 			led_mode = <0>;
-			data = < >;
+			data = <0>;
 			pwm_config = <0 0 0 0 0>;
 		};
 
 		led6:led@6 {
 			compatible = "mediatek,lcd-backlight";
 			led_mode = <5>;
-			data = < >;
+			data = <>;
 			pwm_config = <0 0 0 0 0>;
 			gpios = <&pio 43 0>;
 		};
@@ -1645,8 +1638,11 @@
 		};
 
 		/* flashlight  */
-		flashlight: flashlight@ {
-			compatible = "mediatek,camera_flashlight";
+		flashlight_core: flashlight_core {
+			compatible = "mediatek,flashlight_core";
+		};
+		flashlights_lm3642: flashlights_lm3642 {
+			compatible = "mediatek,flashlights_lm3642";
 		};
 
 		ice: ice_debug {
@@ -1680,13 +1676,17 @@
 			clocks = <&topckgen CLK_TOP_GCPU_B>,
 				 <&topckgen CLK_TOP_TRNG>,
 				 <&imgsys CLK_IMG_VENC>,
+				 <&mmsys CLK_MM_SMI_COMMON>,
 				 <&imgsys CLK_IMG_LARB1_SMI>;
 			clock-names = "GCPU",
 				      "TRNG",
 				      "IMG_CLK",
+				      "SMI_COMMON",
 				      "IMG_SMI";
-			pm-devs = <&larb1>;
-			pm-names = "isp";
+			pm-devs = <&larb1>,
+				  <&smi_common>;
+			pm-names = "isp",
+				   "disp";
 		};
 
 		mtgpufreq {

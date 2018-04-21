@@ -63,8 +63,7 @@ static struct sd_state cl_sd_state[MAX_NUM_INSTANCE_MTK_COOLER_SHUTDOWN];
 static unsigned int tm_pid;
 static unsigned int tm_input_pid;
 static unsigned int mtk_cl_sd_rst;
-static struct task_struct g_task;
-static struct task_struct *pg_task = &g_task;
+static struct task_struct *pg_task;
 
 static int sd_debouncet = 1;
 /* static int sd_cnt = 0; */
@@ -225,6 +224,9 @@ static int _mtk_cl_sd_send_signal(void)
 
 	if (ret == 0 && tm_input_pid != tm_pid) {
 		tm_pid = tm_input_pid;
+
+		if (pg_task != NULL)
+			put_task_struct(pg_task);
 		pg_task = get_pid_task(find_vpid(tm_pid), PIDTYPE_PID);
 	}
 
@@ -268,7 +270,7 @@ static int mtk_cl_shutdown_set_cur_state(struct thermal_cooling_device *cdev, un
 {
 	struct sd_state *cl_state = (struct sd_state *) cdev->devdata;
 #if defined(MTK_COOLER_SHUTDOWN_SIGNAL)
-	volatile unsigned long original_state;
+	unsigned long original_state;
 #endif
 	/* mtk_cooler_shutdown_dprintk("mtk_cl_shutdown_set_cur_state() %s %d\n", cdev->type, state); */
 	if (!cl_state)

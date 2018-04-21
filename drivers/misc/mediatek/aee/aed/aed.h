@@ -21,10 +21,10 @@
 #include <linux/kallsyms.h>
 #include <linux/ptrace.h>
 
-#define LOGD(fmt, msg...)	pr_notice(fmt, ##msg)
-#define LOGV(fmt, msg...)
+#define LOGD(fmt, msg...)	no_printk(fmt, ##msg)
+#define LOGV(fmt, msg...)    no_printk(fmt, ##msg)
 #define LOGI	LOGD
-#define LOGE(fmt, msg...)	pr_err(fmt, ##msg)
+#define LOGE(fmt, msg...)	no_printk(fmt, ##msg)
 #define LOGW	LOGE
 
 #define IPANIC_MODULE_TAG "KERNEL-PANIC"
@@ -102,6 +102,7 @@ enum AE_CMD_ID {
 	AE_REQ_USERSPACEBACKTRACE = 40,
 	AE_REQ_USER_REG,
 	AE_REQ_USER_MAPS,
+	AE_REQ_TRIGGER_TIME,	/* get db trigger time */
 	AE_CMD_ID_END
 };
 
@@ -114,7 +115,7 @@ struct AE_Msg {
 	};
 	union {
 		unsigned int arg;	/* simple argument */
-		AE_EXP_CLASS cls;	/* exception/error/defect class */
+		enum AE_EXP_CLASS cls;	/* exception/error/defect class */
 	};
 	union {
 		unsigned int len;	/* dynamic length argument */
@@ -202,8 +203,6 @@ struct proc_dir_entry;
 int aed_proc_debug_init(struct proc_dir_entry *aed_proc_dir);
 int aed_proc_debug_done(struct proc_dir_entry *aed_proc_dir);
 
-int aed_get_process_bt(struct aee_process_bt *bt);
-
 void aee_rr_proc_init(struct proc_dir_entry *aed_proc_dir);
 void aee_rr_proc_done(struct proc_dir_entry *aed_proc_dir);
 
@@ -219,4 +218,8 @@ extern int aee_dump_ccci_debug_info(int md_id, void **addr, int *size);
 extern void show_stack(struct task_struct *tsk, unsigned long *sp);
 extern int aee_mode;
 extern void aee_kernel_RT_Monitor_api(int lParam);
+extern void mlog_get_buffer(char **ptr, int *size)__attribute__((weak));
+extern void get_msdc_aee_buffer(unsigned long *buff,
+	unsigned long *size)__attribute__((weak));
+extern void show_task_mem(void)__attribute__((weak));
 #endif

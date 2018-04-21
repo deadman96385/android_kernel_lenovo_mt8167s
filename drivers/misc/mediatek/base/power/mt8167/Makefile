@@ -31,6 +31,6 @@ obj-$(CONFIG_MACH_MT8167) += mtk_dcm.o
 obj-$(CONFIG_MTK_GPU_SUPPORT) += mtk_gpufreq.o
 
 obj-y += mtk_cpuidle.o
-
-obj-y += cpu_dormant.o
+obj-$(CONFIG_ARM) += cpu_dormant-v7.o
+obj-$(CONFIG_ARM64) += cpu_dormant.o
 obj-y += mtk_idle.o

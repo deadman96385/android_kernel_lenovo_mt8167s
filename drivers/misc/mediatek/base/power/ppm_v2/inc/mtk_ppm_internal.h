@@ -112,12 +112,10 @@ static const struct file_operations ppm_ ## name ## _proc_fops = {		\
 #undef TAG
 #define TAG     "[Power/PPM] "
 
-#define ppm_err(fmt, args...)		\
-	pr_err(TAG"[ERROR]"fmt, ##args)
-#define ppm_warn(fmt, args...)		\
-	pr_warn(TAG"[WARNING]"fmt, ##args)
+#define ppm_err		ppm_info
+#define ppm_warn	ppm_info
 #define ppm_info(fmt, args...)		\
-	pr_warn(TAG""fmt, ##args)
+	pr_notice(TAG""fmt, ##args)
 #define ppm_dbg(type, fmt, args...)				\
 	do {							\
 		if (ppm_debug & ALL || ppm_debug & type)	\
@@ -249,12 +247,16 @@ struct ppm_data {
 	int fixed_root_cluster;
 	unsigned int min_power_budget;
 	unsigned int min_freq_1LL;
+	unsigned int smart_detect_boost;
 
 #ifdef PPM_VPROC_5A_LIMIT_CHECK
 	/* enable = 0: skip 5A limit check */
 	/* on/off is controlled by thermal */
 	bool is_5A_limit_enable;
 	bool is_5A_limit_on;
+#endif
+#ifdef PPM_TURBO_CORE_SUPPORT
+	bool is_turbo_core;
 #endif
 
 	/* platform settings */

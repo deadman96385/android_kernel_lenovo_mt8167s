@@ -17,7 +17,9 @@
 #define _MT8167_AFE_CONTROLS_H_
 
 struct snd_soc_platform;
+struct mtk_afe;
 
 int mt8167_afe_add_controls(struct snd_soc_platform *platform);
+void mt8167_afe_set_hw_digital_gain(struct mtk_afe *afe, unsigned int gain, int gain_type);
 
 #endif

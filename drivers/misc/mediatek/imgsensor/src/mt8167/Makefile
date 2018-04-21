@@ -16,6 +16,7 @@
 
 MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
 ARCH_MTK_PROJECT := $(subst ",,$(CONFIG_ARCH_MTK_PROJECT))
+IMGSENSOR_DRIVER_PATH  := $(srctree)/drivers/misc/mediatek/imgsensor/src
 
 define FILTER_PROJECT_DRV
 ifeq ($(wildcard $(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)/$(ARCH_MTK_PROJECT)/imgsensor/$(1)),)
@@ -33,13 +34,14 @@ else
 	# 8167 evb
 	ifneq (,$(findstring tb8167m,$(ARCH_MTK_PROJECT)))
 		ccflags-y += -DDEMO_BOARD_SUPPORT=0
-	# customer projects... use DEMO_BOARD_SUPPORT for using GPIO instead of pinctrl
+	# evb projects... use DEMO_BOARD_SUPPORT=0 for using GPIO instead of pinctrl
 	else
 		ccflags-y += -DDEMO_BOARD_SUPPORT=1
 	endif
 #$(info "ARCH_MTK_PROJECT:$(ARCH_MTK_PROJECT)")
 endif
 
+subdir-ccflags-y	+= -I$(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/camera_hw
 obj-y				+= kd_sensorlist.o
 obj-y				+= camera_hw/
 

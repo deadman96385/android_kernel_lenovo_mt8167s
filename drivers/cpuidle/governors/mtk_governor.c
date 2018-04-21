@@ -21,7 +21,8 @@
 #include <linux/cpu.h>
 
 #undef INTEGRATE_WITH_MENU_GOV
-#if defined(CONFIG_MACH_MT6799)
+#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6759) \
+	|| defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758)
 #define	INTEGRATE_WITH_MENU_GOV
 #endif
 
@@ -44,7 +45,7 @@ int __attribute__((weak)) mtk_idle_select_base_on_menu_gov(int cpu, int menu_sel
 	return -1;
 }
 
-void __attribute__((weak)) mtk_cpuidle_framework_init(void)
+void __attribute__((weak)) __init mtk_cpuidle_framework_init(void)
 {
 
 }
@@ -575,7 +576,11 @@ static int mtk_governor_enable_device(struct cpuidle_driver *drv,
 
 static struct cpuidle_governor mtk_governor = {
 	.name =		"mtk_governor",
+#ifdef CONFIG_MTK_ACAO_SUPPORT
+	.rating =	10,
+#else
 	.rating =	100,
+#endif
 	.enable =	mtk_governor_enable_device,
 	.select =	mtk_governor_select,
 	.reflect =	mtk_governor_reflect,
@@ -588,7 +593,9 @@ static struct cpuidle_governor mtk_governor = {
 static int __init init_mtk_governor(void)
 {
 	/* TODO: check if debugfs_create_file() failed */
+#if !defined(CONFIG_FPGA_EARLY_PORTING)
 	mtk_cpuidle_framework_init();
+#endif
 	return cpuidle_register_governor(&mtk_governor);
 }
 

@@ -64,9 +64,17 @@ __weak int sdio_autok(void)
 /*
  * PMIC
  */
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+#define PMIC_VCORE_ADDR PMIC_RG_BUCK_VCORE_VOSEL_ADDR
+#define VCORE_BASE_UV		406250
+#else
 #define PMIC_VCORE_ADDR MT6351_PMIC_BUCK_VCORE_VOSEL_ON_ADDR
 #define VCORE_BASE_UV		600000
+#endif
+
 #define VCORE_STEP_UV		6250
+
+#define VCORE_PRCISE_ADJUST_UV (VCORE_STEP_UV * 3)
 
 #define VCORE_INVALID		0x80
 
@@ -102,6 +110,10 @@ struct governor_profile {
 	u32 autok_kir_group;
 	u32 cpu_dvfs_req;
 	u32 ddr_type;
+	u32 segment_code;
+	bool precise_lpm_vcore;
+	bool emi_grouping;
+	bool dfd_wakeup_src;
 
 	bool perform_bw_enable;
 	u32 perform_bw_ulpm_threshold;
@@ -112,6 +124,9 @@ struct governor_profile {
 	u32 total_bw_ulpm_threshold;
 	u32 total_bw_lpm_threshold;
 	u32 total_bw_hpm_threshold;
+
+	bool ulpm_perform_bw_enable;
+	bool ulpm_total_bw_enable;
 };
 
 static struct governor_profile governor_ctrl = {
@@ -128,6 +143,11 @@ static struct governor_profile governor_ctrl = {
 	.cpu_dvfs_req = 0,
 	.ddr_type = 0,
 
+	.segment_code = 0,
+	.precise_lpm_vcore = 0,
+	.emi_grouping = 0,
+	.dfd_wakeup_src = 0,
+
 	.curr_vcore_uv = VCORE_0_P_80_UV,
 	.curr_ddr_khz = FDDR_S0_KHZ,
 
@@ -140,6 +160,8 @@ static struct governor_profile governor_ctrl = {
 	.total_bw_ulpm_threshold = 0,
 	.total_bw_lpm_threshold = 0,
 	.total_bw_hpm_threshold = 0,
+	.ulpm_perform_bw_enable = 0,
+	.ulpm_total_bw_enable	= 0,
 };
 
 int kicker_table[LAST_KICKER] __nosavedata;
@@ -281,6 +303,7 @@ int vcorefs_get_curr_vcore(void)
 
 	return vcore < VCORE_INVALID ? vcore_pmic_to_uv(vcore) : 0;
 }
+EXPORT_SYMBOL(vcorefs_get_curr_vcore);
 
 int vcorefs_get_curr_ddr(void)
 {
@@ -417,6 +440,7 @@ static u32 sram_debug_info[SRAM_DEBUG_COUNT];
 static char *vcorefs_get_sram_debug_info(char *p)
 {
 	char *buff_end = p + PAGE_SIZE;
+
 	if (p) {
 		p += snprintf(p, buff_end - p,
 				"dvfs  up/down count: %u / %u\n",
@@ -571,6 +595,122 @@ static int vcorefs_enable_ddr(bool enable)
 	return 0;
 }
 
+static int init_vcorefs_cmd_table(void)
+{
+	struct governor_profile *gvrctrl = &governor_ctrl;
+	struct opp_profile *opp_ctrl_table = opp_table;
+	int opp;
+
+	mutex_lock(&governor_mutex);
+	gvrctrl->curr_vcore_uv = vcorefs_get_curr_vcore();
+	/* BUG_ON(gvrctrl->curr_vcore_uv == 0); */
+
+	gvrctrl->curr_ddr_khz = vcorefs_get_curr_ddr();
+
+	for (opp = 0; opp < NUM_OPP; opp++) {
+		switch (opp) {
+		case OPPI_PERF:
+			opp_ctrl_table[opp].vcore_uv = vcorefs_get_vcore_by_steps(opp);
+			opp_ctrl_table[opp].ddr_khz = vcorefs_get_ddr_by_steps(opp);
+			break;
+		case OPPI_LOW_PWR:
+			opp_ctrl_table[opp].vcore_uv = vcorefs_get_vcore_by_steps(opp);
+			if (gvrctrl->precise_lpm_vcore)
+				opp_ctrl_table[opp].vcore_uv -= VCORE_PRCISE_ADJUST_UV;
+			opp_ctrl_table[opp].ddr_khz = vcorefs_get_ddr_by_steps(opp);
+			break;
+		case OPPI_ULTRA_LOW_PWR:
+			opp_ctrl_table[opp].vcore_uv = vcorefs_get_vcore_by_steps(opp);
+			if (gvrctrl->precise_lpm_vcore)
+				opp_ctrl_table[opp].vcore_uv -= VCORE_PRCISE_ADJUST_UV;
+			opp_ctrl_table[opp].ddr_khz = vcorefs_get_ddr_by_steps(opp);
+			break;
+		default:
+			break;
+		}
+		vcorefs_crit("opp %u: vcore_uv: %u, ddr_khz: %u\n",
+								opp,
+								opp_ctrl_table[opp].vcore_uv,
+								opp_ctrl_table[opp].ddr_khz);
+	}
+
+	vcorefs_crit("curr_vcore_uv: %u, curr_ddr_khz: %u\n",
+							gvrctrl->curr_vcore_uv,
+							gvrctrl->curr_ddr_khz);
+
+	update_vcore_pwrap_cmd(opp_ctrl_table);
+	mutex_unlock(&governor_mutex);
+
+	return 0;
+}
+
+static int vcorefs_precise_lpm_vcore_enable(bool enable)
+{
+	struct kicker_config krconf;
+	struct governor_profile *gvrctrl = &governor_ctrl;
+
+	vcorefs_crit("precise_lpm_vcore_enable(%d) feature=%d\n", enable, is_vcorefs_feature_enable());
+	if (!is_vcorefs_feature_enable())
+		return -1;
+
+	mutex_lock(&governor_mutex);
+
+	kicker_table[KIR_SYSFS] = OPPI_PERF;
+	krconf.kicker = KIR_SYSFS;
+	krconf.opp = OPPI_PERF;
+	krconf.dvfs_opp = OPPI_PERF;
+	kick_dvfs_by_opp_index(&krconf);
+
+	gvrctrl->precise_lpm_vcore = enable;
+
+	mutex_unlock(&governor_mutex);
+
+	init_vcorefs_cmd_table();
+
+	mutex_lock(&governor_mutex);
+
+	kicker_table[KIR_SYSFS] = OPPI_UNREQ;
+	krconf.kicker = KIR_SYSFS;
+	krconf.opp = OPPI_UNREQ;
+	krconf.dvfs_opp = _get_dvfs_opp(KIR_SYSFS, krconf.opp);
+	kick_dvfs_by_opp_index(&krconf);
+
+	mutex_unlock(&governor_mutex);
+
+	return 0;
+}
+
+static int vcorefs_emi_grouping_enable(bool enable)
+{
+	struct kicker_config krconf;
+	struct governor_profile *gvrctrl = &governor_ctrl;
+
+	vcorefs_crit("emi_grouping_enable(%d) feature=%d\n", enable, is_vcorefs_feature_enable());
+	if (!is_vcorefs_feature_enable())
+		return -1;
+
+	mutex_lock(&governor_mutex);
+
+	kicker_table[KIR_SYSFS] = OPPI_PERF;
+	krconf.kicker = KIR_SYSFS;
+	krconf.opp = OPPI_PERF;
+	krconf.dvfs_opp = OPPI_PERF;
+	kick_dvfs_by_opp_index(&krconf);
+
+	gvrctrl->emi_grouping = enable;
+	spm_vcorefs_emi_grouping_req(gvrctrl->emi_grouping);
+
+	kicker_table[KIR_SYSFS] = OPPI_UNREQ;
+	krconf.kicker = KIR_SYSFS;
+	krconf.opp = OPPI_UNREQ;
+	krconf.dvfs_opp = _get_dvfs_opp(KIR_SYSFS, krconf.opp);
+	kick_dvfs_by_opp_index(&krconf);
+
+	mutex_unlock(&governor_mutex);
+
+	return 0;
+}
+
 int governor_debug_store(const char *buf)
 {
 	struct governor_profile *gvrctrl = &governor_ctrl;
@@ -593,7 +733,18 @@ int governor_debug_store(const char *buf)
 			spm_write(VCOREFS_SRAM_EMI_BLOCK_TIME, 0);
 		else if (!strcmp(cmd, "screen_off_ulpm"))
 			gvrctrl->screen_off_ulpm = !!val;
-		else
+		else if (!strcmp(cmd, "ulpm_perform_bw_en"))
+			vcorefs_enable_ulpm_perform_bw(!!val);
+		else if (!strcmp(cmd, "ulpm_total_bw_en"))
+			vcorefs_enable_ulpm_total_bw(!!val);
+		else if (!strcmp(cmd, "precise_lpm_vcore"))
+			r = vcorefs_precise_lpm_vcore_enable(!!val);
+		else if (!strcmp(cmd, "emi_grouping"))
+			r = vcorefs_emi_grouping_enable(!!val);
+		else if (!strcmp(cmd, "dfd_wakeup_src")) {
+			gvrctrl->dfd_wakeup_src = !!val;
+			spm_set_dfd_wakeup_src(!!val);
+		} else
 			r = -EPERM;
 	} else {
 		r = -EPERM;
@@ -618,6 +769,10 @@ char *governor_get_dvfs_info(char *p)
 	p += snprintf(p, buff_end - p, "[cpu_dvfs_req ]: 0x%x\n", gvrctrl->cpu_dvfs_req);
 	p += snprintf(p, buff_end - p, "[ddr_type ]: 0x%x\n", gvrctrl->ddr_type);
 	p += snprintf(p, buff_end - p, "[screen_off_ulpm]: %d\n", gvrctrl->screen_off_ulpm);
+	p += snprintf(p, buff_end - p, "[segment_code]: %d\n", gvrctrl->segment_code);
+	p += snprintf(p, buff_end - p, "[precise_lpm_vcore]: %d\n", gvrctrl->precise_lpm_vcore);
+	p += snprintf(p, buff_end - p, "[emi_grouping]: %d\n", gvrctrl->emi_grouping);
+	p += snprintf(p, buff_end - p, "[dfd_wakeup_src]: %d\n", gvrctrl->dfd_wakeup_src);
 	p += snprintf(p, buff_end - p, "\n");
 
 	p += snprintf(p, buff_end - p, "[vcore] uv : %u (0x%x)\n", uv, vcore_uv_to_pmic(uv));
@@ -636,6 +791,8 @@ char *governor_get_dvfs_info(char *p)
 			gvrctrl->total_bw_ulpm_threshold,
 			gvrctrl->total_bw_lpm_threshold,
 			gvrctrl->total_bw_hpm_threshold);
+	p += sprintf(p, "[ulpm perform_bw]: en=%d\n", gvrctrl->ulpm_perform_bw_enable);
+	p += sprintf(p, "[ulpm total_bw]  : en=%d\n", gvrctrl->ulpm_total_bw_enable);
 	p += snprintf(p, buff_end - p, "\n");
 
 	p = vcorefs_get_sram_debug_info(p);
@@ -706,6 +863,30 @@ int vcorefs_set_total_bw_threshold(u32 ulpm_threshold, u32 lpm_threshold, u32 hp
 
 	mutex_lock(&governor_mutex);
 	spm_vcorefs_set_total_bw_threshold(ulpm_threshold, lpm_threshold, hpm_threshold);
+	mutex_unlock(&governor_mutex);
+
+	return 0;
+}
+
+int vcorefs_enable_ulpm_perform_bw(bool enable)
+{
+	struct governor_profile *gvrctrl = &governor_ctrl;
+
+	mutex_lock(&governor_mutex);
+	gvrctrl->ulpm_perform_bw_enable = enable;
+	spm_vcorefs_enable_ulpm_perform_bw(enable, true);
+	mutex_unlock(&governor_mutex);
+
+	return 0;
+}
+
+int vcorefs_enable_ulpm_total_bw(bool enable)
+{
+	struct governor_profile *gvrctrl = &governor_ctrl;
+
+	mutex_lock(&governor_mutex);
+	gvrctrl->ulpm_total_bw_enable = enable;
+	spm_vcorefs_enable_ulpm_total_bw(enable, true);
 	mutex_unlock(&governor_mutex);
 
 	return 0;
@@ -924,8 +1105,6 @@ int vcorefs_late_init_dvfs(void)
 		spm_go_to_vcore_dvfs(flag, 0);
 	}
 
-
-
 	mutex_lock(&governor_mutex);
 	gvrctrl->late_init_opp = set_init_opp_index();
 
@@ -957,50 +1136,32 @@ int vcorefs_late_init_dvfs(void)
 
 	return 0;
 }
-static int init_vcorefs_cmd_table(void)
+
+#if 0
+static int vcorefs_is_lp_flavor(void)
 {
-	struct governor_profile *gvrctrl = &governor_ctrl;
-	struct opp_profile *opp_ctrl_table = opp_table;
-	int opp;
+#if defined(CONFIG_ARM64)
+	vcorefs_crit("flavor: %s\n", CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES);
 
-	mutex_lock(&governor_mutex);
-	gvrctrl->curr_vcore_uv = vcorefs_get_curr_vcore();
-	/* BUG_ON(gvrctrl->curr_vcore_uv == 0); */
+	if (strncmp(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES, "mediatek/k57pv1_dm_64_op01_lwctg_lp", 35) == 0)
+		return 1;
 
-	gvrctrl->curr_ddr_khz = vcorefs_get_curr_ddr();
+	if (strncmp(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES, "mediatek/k57pv1_dm_64_om_lwctg_lp", 33) == 0)
+		return 1;
 
-	for (opp = 0; opp < NUM_OPP; opp++) {
-		switch (opp) {
-		case OPPI_PERF:
-			opp_ctrl_table[opp].vcore_uv = vcorefs_get_vcore_by_steps(opp);
-			opp_ctrl_table[opp].ddr_khz = vcorefs_get_ddr_by_steps(opp);
-			break;
-		case OPPI_LOW_PWR:
-			opp_ctrl_table[opp].vcore_uv = vcorefs_get_vcore_by_steps(opp);
-			opp_ctrl_table[opp].ddr_khz = vcorefs_get_ddr_by_steps(opp);
-			break;
-		case OPPI_ULTRA_LOW_PWR:
-			opp_ctrl_table[opp].vcore_uv = vcorefs_get_vcore_by_steps(opp);
-			opp_ctrl_table[opp].ddr_khz = vcorefs_get_ddr_by_steps(opp);
-			break;
-		default:
-			break;
-		}
-		vcorefs_crit("opp %u: vcore_uv: %u, ddr_khz: %u\n",
-								opp,
-								opp_ctrl_table[opp].vcore_uv,
-								opp_ctrl_table[opp].ddr_khz);
-	}
+	if (strncmp(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES, "mediatek/k57pv1_64_op01_lwctg_lp", 32) == 0)
+		return 1;
 
-	vcorefs_crit("curr_vcore_uv: %u, curr_ddr_khz: %u\n",
-							gvrctrl->curr_vcore_uv,
-							gvrctrl->curr_ddr_khz);
+	if (strncmp(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES, "mediatek/k57pv1_64_om_lwctg_lp", 30) == 0)
+		return 1;
 
-	update_vcore_pwrap_cmd(opp_ctrl_table);
-	mutex_unlock(&governor_mutex);
+	if (strncmp(CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE_NAMES, "mediatek/k57pv1_dm_64_6m_cnop_lp", 32) == 0)
+		return 1;
+#endif
 
 	return 0;
 }
+#endif
 
 static int __init vcorefs_module_init(void)
 {
@@ -1013,6 +1174,25 @@ static int __init vcorefs_module_init(void)
 	return 0;
 #endif
 	gvrctrl->ddr_type = get_ddr_type();
+
+	gvrctrl->segment_code = (get_devinfo_with_index(30) & 0x000000E0) >> 5;
+
+	if (gvrctrl->segment_code == 3 || gvrctrl->segment_code == 7) {
+		/* gvrctrl->precise_lpm_vcore = 1; */
+		gvrctrl->dfd_wakeup_src = 1;
+		/* gvrctrl->emi_grouping = 1; */
+#if 0
+		if (gvrctrl->ddr_type != TYPE_LPDDR3) {
+			if (!vcorefs_is_lp_flavor()) {
+				gvrctrl->plat_feature_en = 0;
+				spm_vcorefs_off_load_lpm_req(0);
+			}
+		}
+#endif
+	}
+
+	spm_set_dfd_wakeup_src(gvrctrl->dfd_wakeup_src);
+	spm_vcorefs_emi_grouping_req(gvrctrl->emi_grouping);
 
 	r = init_vcorefs_cmd_table();
 	if (r) {
@@ -1044,9 +1224,12 @@ static int __init vcorefs_module_init(void)
 	vcorefs_init_sram_debug();
 
 	for (i = 0; i < NUM_KICKER; i++)
-		kicker_table[i] = -1;
+		kicker_table[i] = OPPI_UNREQ;
 
-	kicker_table[KIR_SYSFSX] = -1;
+	kicker_table[KIR_CPU] = OPPI_LOW_PWR;
+
+	kicker_table[KIR_SYSFSX] = OPPI_UNREQ;
+
 
 	return r;
 }

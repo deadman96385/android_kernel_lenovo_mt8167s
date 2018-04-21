@@ -15,6 +15,12 @@
 #include <linux/scatterlist.h>
 #include <linux/dma-mapping.h>
 #include <linux/dma-iommu.h>
+#ifndef CONFIG_ARM64
+#include <asm/dma-iommu.h>
+#include <asm/memory.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
+#endif
 #include <soc/mediatek/smi.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
@@ -195,11 +201,11 @@ static int MTK_M4U_flush(struct file *a_pstFile, fl_owner_t a_id)
 	return 0;
 }
 
-m4u_client_t *m4u_create_client(void)
+struct m4u_client_t *m4u_create_client(void)
 {
-	m4u_client_t *client;
+	struct m4u_client_t *client;
 
-	client = kmalloc(sizeof(m4u_client_t), GFP_ATOMIC);
+	client = kmalloc(sizeof(struct m4u_client_t), GFP_ATOMIC);
 	if (!client)
 		return NULL;
 
@@ -214,9 +220,9 @@ m4u_client_t *m4u_create_client(void)
 }
 EXPORT_SYMBOL(m4u_create_client);
 
-int m4u_destroy_client(m4u_client_t *client)
+int m4u_destroy_client(struct m4u_client_t *client)
 {
-	m4u_buf_info_t *pMvaInfo;
+	struct m4u_buf_info_t *pMvaInfo;
 	unsigned int mva, size;
 	M4U_PORT_ID port;
 
@@ -226,7 +232,7 @@ int m4u_destroy_client(m4u_client_t *client)
 			mutex_unlock(&(client->dataMutex));
 			break;
 		}
-		pMvaInfo = container_of(client->mvaList.next, m4u_buf_info_t, link);
+		pMvaInfo = container_of(client->mvaList.next, struct m4u_buf_info_t, link);
 		M4UINFO
 		    ("warnning: clean garbage at m4u close: module=%s,va=0x%lx,mva=0x%x,size=%d\n",
 		     m4u_get_port_name(pMvaInfo->port), pMvaInfo->va, pMvaInfo->mva,
@@ -250,7 +256,7 @@ EXPORT_SYMBOL(m4u_destroy_client);
 
 static int MTK_M4U_open(struct inode *inode, struct file *file)
 {
-	m4u_client_t *client;
+	struct m4u_client_t *client;
 
 	M4UDBG("enter MTK_M4U_open() process : %s\n", current->comm);
 	client = m4u_create_client();
@@ -266,7 +272,7 @@ static int MTK_M4U_open(struct inode *inode, struct file *file)
 
 static int MTK_M4U_release(struct inode *inode, struct file *file)
 {
-	m4u_client_t *client = file->private_data;
+	struct m4u_client_t *client = file->private_data;
 
 	M4UDBG("enter MTK_M4U_release() process : %s\n", current->comm);
 	m4u_destroy_client(client);
@@ -306,7 +312,7 @@ static int pseudo_m4u_session_init(void)
 
 int m4u_larb_restore_sec(unsigned int larb_idx)
 {
-	MTEEC_PARAM param[4];
+	union MTEEC_PARAM param[4];
 	uint32_t paramTypes;
 	TZ_RESULT ret;
 
@@ -330,7 +336,7 @@ int m4u_larb_restore_sec(unsigned int larb_idx)
 
 int m4u_larb_backup_sec(unsigned int larb_idx)
 {
-	MTEEC_PARAM param[4];
+	union MTEEC_PARAM param[4];
 	uint32_t paramTypes;
 	TZ_RESULT ret;
 
@@ -383,9 +389,9 @@ int smi_reg_restore_sec(void)
 	return 0;
 }
 
-int pseudo_m4u_do_config_port(M4U_PORT_STRUCT *pM4uPort)
+int pseudo_m4u_do_config_port(struct M4U_PORT_STRUCT *pM4uPort)
 {
-	MTEEC_PARAM param[4];
+	union MTEEC_PARAM param[4];
 	uint32_t paramTypes;
 	TZ_RESULT ret;
 
@@ -413,7 +419,7 @@ int pseudo_m4u_do_config_port(M4U_PORT_STRUCT *pM4uPort)
 static int pseudo_m4u_sec_init(unsigned int u4NonSecPa,
 			unsigned int L2_enable, unsigned int *security_mem_size)
 {
-	MTEEC_PARAM param[4];
+	union MTEEC_PARAM param[4];
 	uint32_t paramTypes;
 	TZ_RESULT ret;
 
@@ -436,7 +442,7 @@ static int pseudo_m4u_sec_init(unsigned int u4NonSecPa,
 /* the caller should enable smi clock, it should be only called by mtk_smi.c */
 int pseudo_config_port_tee(int kernelport)
 {
-	M4U_PORT_STRUCT pM4uPort;
+	struct M4U_PORT_STRUCT pM4uPort;
 
 	pM4uPort.ePortID = m4u_kernel2user_port(kernelport);
 	pM4uPort.Virtuality = 1;
@@ -486,13 +492,13 @@ struct device *m4u_get_larbdev(int portid)
 	return NULL;
 }
 
-static inline int pseudo_config_port(M4U_PORT_STRUCT *pM4uPort)
+static inline int pseudo_config_port(struct M4U_PORT_STRUCT *pM4uPort)
 {
 	/* all the port will be attached by dma and configed by iommu driver */
 	return 0;
 }
 
-int m4u_config_port(M4U_PORT_STRUCT *pM4uPort)
+int m4u_config_port(struct M4U_PORT_STRUCT *pM4uPort)
 {
 	int i, ret;
 
@@ -535,15 +541,15 @@ int m4u_config_port_array(struct m4u_port_array *port_array)
 	return ret;
 }
 
-mva_info_t *m4u_alloc_garbage_list(unsigned int mvaStart,
+struct mva_info_t *m4u_alloc_garbage_list(unsigned int mvaStart,
 				   unsigned int bufSize,
 				   M4U_MODULE_ID_ENUM eModuleID,
 				   unsigned long va,
 				   unsigned int flags, int security, int cache_coherent)
 {
-	mva_info_t *pList = NULL;
+	struct mva_info_t *pList = NULL;
 
-	pList = kmalloc(sizeof(mva_info_t), GFP_KERNEL);
+	pList = kmalloc(sizeof(struct mva_info_t), GFP_KERNEL);
 	if (pList == NULL) {
 		M4UERR("m4u_alloc_garbage_list(), pList = NULL\n");
 		return NULL;
@@ -560,6 +566,13 @@ mva_info_t *m4u_alloc_garbage_list(unsigned int mvaStart,
 }
 
 /* static struct iova_domain *giovad; */
+#ifndef CONFIG_ARM64
+static int __arm_coherent_iommu_map_sg(struct device *dev, struct scatterlist *sg,
+		int nents, enum dma_data_direction dir, struct dma_attrs *attrs);
+
+static void __arm_coherent_iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
+		int nents, enum dma_data_direction dir, struct dma_attrs *attrs);
+#endif
 
 /* since the device have been attached, then we get from the dma_ops->map_sg is arm_iommu_map_sg */
 static int __m4u_alloc_mva(M4U_PORT_ID port, unsigned long va, unsigned int size,
@@ -611,10 +624,18 @@ static int __m4u_alloc_mva(M4U_PORT_ID port, unsigned long va, unsigned int size
 	}
 
 	if (sg_table) {
+#ifdef CONFIG_ARM64
 		iommu_dma_map_sg(dev, table->sgl, table->nents, IOMMU_READ | IOMMU_WRITE);
+#else
+		__arm_coherent_iommu_map_sg(dev, table->sgl, table->nents, 1, NULL);
+#endif
 		dma_addr = sg_dma_address(table->sgl);
 	} else {
+#ifdef CONFIG_ARM64
 		iommu_dma_map_sg(dev, table->sgl, table->orig_nents, IOMMU_READ | IOMMU_WRITE);
+#else
+		__arm_coherent_iommu_map_sg(dev, table->sgl, table->orig_nents, 1, NULL);
+#endif
 		dma_addr = sg_dma_address(table->sgl);
 	}
 
@@ -651,27 +672,27 @@ err:
 	return -EINVAL;
 }
 
-static m4u_buf_info_t *m4u_alloc_buf_info(void)
+static struct m4u_buf_info_t *m4u_alloc_buf_info(void)
 {
-	m4u_buf_info_t *pList = NULL;
+	struct m4u_buf_info_t *pList = NULL;
 
-	pList = kzalloc(sizeof(m4u_buf_info_t), GFP_KERNEL);
+	pList = kzalloc(sizeof(struct m4u_buf_info_t), GFP_KERNEL);
 	if (pList == NULL) {
 		M4UMSG("m4u_client_add_buf(), pList=0x%p\n", pList);
 		return NULL;
 	}
-	M4UDBG("pList size %d, ptr %p\n", (int)sizeof(m4u_buf_info_t), pList);
+	M4UDBG("pList size %d, ptr %p\n", (int)sizeof(struct m4u_buf_info_t), pList);
 	INIT_LIST_HEAD(&(pList->link));
 	return pList;
 }
 
-static int m4u_free_buf_info(m4u_buf_info_t *pList)
+static int m4u_free_buf_info(struct m4u_buf_info_t *pList)
 {
 	kfree(pList);
 	return 0;
 }
 
-static int m4u_client_add_buf(m4u_client_t *client, m4u_buf_info_t *pList)
+static int m4u_client_add_buf(struct m4u_client_t *client, struct m4u_buf_info_t *pList)
 {
 	mutex_lock(&(client->dataMutex));
 	list_add(&(pList->link), &(client->mvaList));
@@ -692,11 +713,11 @@ static int m4u_client_add_buf(m4u_client_t *client, m4u_buf_info_t *pList)
 * @to-do    we need to add multi domain support here.
 * @author K Zhang      @date 2013/11/14
 ************************************************************/
-static m4u_buf_info_t *m4u_client_find_buf(m4u_client_t *client, unsigned int mva, int del)
+static struct m4u_buf_info_t *m4u_client_find_buf(struct m4u_client_t *client, unsigned int mva, int del)
 {
 	struct list_head *pListHead;
-	m4u_buf_info_t *pList = NULL;
-	m4u_buf_info_t *ret = NULL;
+	struct m4u_buf_info_t *pList = NULL;
+	struct m4u_buf_info_t *ret = NULL;
 
 	if (client == NULL) {
 		M4UERR("m4u_delete_from_garbage_list(), client is NULL!\n");
@@ -705,7 +726,7 @@ static m4u_buf_info_t *m4u_client_find_buf(m4u_client_t *client, unsigned int mv
 
 	mutex_lock(&(client->dataMutex));
 	list_for_each(pListHead, &(client->mvaList)) {
-		pList = container_of(pListHead, m4u_buf_info_t, link);
+		pList = container_of(pListHead, struct m4u_buf_info_t, link);
 		if (pList->mva == mva)
 			break;
 	}
@@ -724,7 +745,7 @@ static m4u_buf_info_t *m4u_client_find_buf(m4u_client_t *client, unsigned int mv
 }
 
 /* interface for ion */
-static m4u_client_t *ion_m4u_client;
+static struct m4u_client_t *ion_m4u_client;
 
 int m4u_alloc_mva_sg(port_mva_info_t *port_info,
 				struct sg_table *sg_table)
@@ -738,16 +759,16 @@ int m4u_alloc_mva_sg(port_mva_info_t *port_info,
 	}
 
 	return pseudo_alloc_mva(ion_m4u_client, port_info->eModuleID, 0, sg_table, port_info->BufSize, 0,
-				port_info->flags, (unsigned int *)port_info->pRetMVABuf);
+				port_info->flags, &port_info->mva);
 }
 
 
-int pseudo_alloc_mva(m4u_client_t *client, M4U_PORT_ID port,
+int pseudo_alloc_mva(struct m4u_client_t *client, M4U_PORT_ID port,
 			  unsigned long va, struct sg_table *sg_table,
 			  unsigned int size, unsigned int prot, unsigned int flags, unsigned int *pMva)
 {
 	int ret, offset;
-	m4u_buf_info_t *pbuf_info;
+	struct m4u_buf_info_t *pbuf_info;
 	unsigned int mva = 0;
 	unsigned long va_align = va;
 	unsigned int mva_align, size_align = size;
@@ -783,9 +804,9 @@ err:
 	return ret;
 }
 
-int pseudo_dealloc_mva(m4u_client_t *client, M4U_PORT_ID port, unsigned int mva)
+int pseudo_dealloc_mva(struct m4u_client_t *client, M4U_PORT_ID port, unsigned int mva)
 {
-	m4u_buf_info_t *pMvaInfo;
+	struct m4u_buf_info_t *pMvaInfo;
 	int offset, ret;
 
 	pMvaInfo = m4u_client_find_buf(client, mva, 1);
@@ -808,7 +829,7 @@ int m4u_alloc_mva_sg(M4U_MODULE_ID_ENUM eModuleID,
 		     const unsigned int BufSize,
 		     int security, int cache_coherent, unsigned int *pRetMVABuf)
 {
-	mva_info_t *pMvaInfo = NULL;
+	struct mva_info_t *pMvaInfo = NULL;
 	int ret;
 
 	pMvaInfo = m4u_alloc_garbage_list(0, BufSize,
@@ -922,7 +943,7 @@ int m4u_alloc_mva(M4U_MODULE_ID_ENUM eModuleID,
 		  unsigned int BufSize,
 		  int security, int cache_coherent, unsigned int *pRetMVABuf)
 {
-	mva_info_t *pMvaInfo = NULL;
+	struct mva_info_t *pMvaInfo = NULL;
 	int offset, ret;
 
 	/* we need to align the bufaddr to make sure the iova is continues */
@@ -1462,7 +1483,11 @@ int __m4u_dealloc_mva(M4U_MODULE_ID_ENUM eModuleID,
 	struct sg_table *table = NULL;
 	int kernelport = m4u_user2kernel_port(eModuleID);
 	struct device *dev = m4u_get_larbdev(kernelport);
+#ifdef CONFIG_ARM64
 	struct iommu_domain *domain;
+#else
+	struct dma_iommu_mapping *mapping;
+#endif
 	unsigned long addr_align = MVA;
 	unsigned int size_align = BufSize;
 	int offset;
@@ -1470,13 +1495,20 @@ int __m4u_dealloc_mva(M4U_MODULE_ID_ENUM eModuleID,
 	if (!dev) {
 		M4UMSG("%s, %d, dev is NULL\n", __func__, __LINE__);
 		return -EINVAL;
-	} else {
-		domain = iommu_get_domain_for_dev(dev);
-		if (!domain) {
-			M4UMSG("%s, %d, domain is NULL\n", __func__, __LINE__);
-			return -EINVAL;
-		}
 	}
+#ifdef CONFIG_ARM64
+	domain = iommu_get_domain_for_dev(dev);
+	if (!domain) {
+		M4UMSG("%s, %d, domain is NULL\n", __func__, __LINE__);
+		return -EINVAL;
+	}
+#else
+	mapping = to_dma_iommu_mapping(dev);
+	if (!mapping) {
+		M4UMSG("%s, %d, mapping is NULL\n", __func__, __LINE__);
+		return -EINVAL;
+	}
+#endif
 
 	M4UDBG
 	    ("m4u_dealloc_mva, module = %s, addr = 0x%lx, size = 0x%x, MVA = 0x%x, mva_end = 0x%x\n",
@@ -1487,7 +1519,7 @@ int __m4u_dealloc_mva(M4U_MODULE_ID_ENUM eModuleID,
 		offset = m4u_va_align(&addr_align, &size_align);
 
 	if (sg_table) {
-		m4u_buf_info_t *m4u_buf_info;
+		struct m4u_buf_info_t *m4u_buf_info;
 
 		m4u_buf_info = m4u_client_find_buf(ion_m4u_client, addr_align, 1);
 		if (m4u_buf_info && m4u_buf_info->mva != addr_align)
@@ -1514,7 +1546,11 @@ int __m4u_dealloc_mva(M4U_MODULE_ID_ENUM eModuleID,
 		table = m4u_del_sgtable(addr_align);
 
 	if (table)
+#ifdef CONFIG_ARM64
 		iommu_dma_unmap_sg(dev, table->sgl, table->orig_nents, 0, NULL);
+#else
+		__arm_coherent_iommu_unmap_sg(dev, table->sgl, table->nents, 0, NULL);
+#endif
 	else {
 		M4UERR("could not found the sgtable and would return error\n");
 		return -EINVAL;
@@ -1730,7 +1766,7 @@ int m4u_do_dma_cache_maint(M4U_MODULE_ID_ENUM eModuleID, const void *va, size_t 
 	else
 		ret = __m4u_cache_sync_kernel(va, size, direction);
 
-	M4UDBG("cache_sync: module=%s, addr=0x%lx, size=0x%lx\n",
+	M4UDBG("cache_sync: module=%s, addr=0x%lx, size=0x%zx\n",
 	       m4u_get_module_name(eModuleID),  (unsigned long)va, size);
 
 	return ret;
@@ -1749,12 +1785,12 @@ int m4u_dma_cache_maint(M4U_MODULE_ID_ENUM eModuleID,
 static long MTK_M4U_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	int ret = 0;
-	M4U_MOUDLE_STRUCT m4u_module;
-	M4U_PORT_STRUCT m4u_port;
+	struct M4U_MOUDLE_STRUCT m4u_module;
+	struct M4U_PORT_STRUCT m4u_port;
 	M4U_PORT_ID PortID;
 	M4U_PORT_ID ModuleID;
-	M4U_CACHE_STRUCT m4u_cache_data;
-	m4u_client_t *client = filp->private_data;
+	struct M4U_CACHE_STRUCT m4u_cache_data;
+	struct m4u_client_t *client = filp->private_data;
 
 	switch (cmd) {
 	case MTK_M4U_T_POWER_ON:
@@ -1776,13 +1812,19 @@ static long MTK_M4U_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 		break;
 
 	case MTK_M4U_T_ALLOC_MVA:
-		ret = copy_from_user(&m4u_module, (void *)arg, sizeof(M4U_MOUDLE_STRUCT));
+		ret = copy_from_user(&m4u_module, (void *)arg, sizeof(struct M4U_MOUDLE_STRUCT));
 		if (ret) {
 			M4UMSG("MTK_M4U_T_ALLOC_MVA,copy_from_user failed:%d\n", ret);
 			return -EFAULT;
 		}
 
 		M4UDBG("MTK_M4U_T_ALLOC_MVA, %s, %d\n", __func__, __LINE__);
+
+		if (m4u_module.port < 0 || m4u_module.port > M4U_PORT_HW_VDEC_PPWRAP_EXT) {
+			M4UMSG("MTK_M4U_T_ALLOC_MVA,port is invalid:%d\n", m4u_module.port);
+			return -EFAULT;
+		}
+
 		ret = pseudo_alloc_mva(client, m4u_module.port, m4u_module.BufAddr,
 				    NULL, m4u_module.BufSize, m4u_module.prot, m4u_module.flags,
 				    &(m4u_module.MVAStart));
@@ -1790,7 +1832,7 @@ static long MTK_M4U_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 		if (ret)
 			return ret;
 
-		ret = copy_to_user(&(((M4U_MOUDLE_STRUCT *) arg)->MVAStart), &(m4u_module.MVAStart),
+		ret = copy_to_user(&(((struct M4U_MOUDLE_STRUCT *) arg)->MVAStart), &(m4u_module.MVAStart),
 				sizeof(unsigned int));
 		if (ret) {
 			M4UMSG("MTK_M4U_T_ALLOC_MVA,copy_from_user failed:%d\n", ret);
@@ -1801,10 +1843,10 @@ static long MTK_M4U_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 	case MTK_M4U_T_DEALLOC_MVA:
 		{
 			int offset;
-			m4u_buf_info_t *pMvaInfo;
+			struct m4u_buf_info_t *pMvaInfo;
 			unsigned long align_mva;
 
-			ret = copy_from_user(&m4u_module, (void *)arg, sizeof(M4U_MOUDLE_STRUCT));
+			ret = copy_from_user(&m4u_module, (void *)arg, sizeof(struct M4U_MOUDLE_STRUCT));
 			if (ret) {
 				M4UMSG("MTK_M4U_T_DEALLOC_MVA,copy_from_user failed:%d\n", ret);
 				return -EFAULT;
@@ -1814,6 +1856,11 @@ static long MTK_M4U_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 			    ("MTK_M4U_T_DEALLOC_MVA, eModuleID : %d, VABuf:0x%lx, Length : %d, MVAStart = 0x%x \r\n",
 			     m4u_module.port, m4u_module.BufAddr, m4u_module.BufSize,
 			     m4u_module.MVAStart);
+
+			if (m4u_module.port < 0 || m4u_module.port > M4U_PORT_HW_VDEC_PPWRAP_EXT) {
+				M4UMSG("MTK_M4U_T_DEALLOC_MVA,port is invalid:%d\n", m4u_module.port);
+				return -EFAULT;
+			}
 
 			if (!m4u_module.BufAddr || !m4u_module.BufSize) {
 				M4UDBG("MTK_M4U_T_DEALLOC_MVA va is 0x%lx, size is 0x%x",
@@ -1864,11 +1911,17 @@ static long MTK_M4U_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 		break;
 
 	case MTK_M4U_T_CACHE_SYNC:
-		ret = copy_from_user(&m4u_cache_data, (void *)arg, sizeof(M4U_CACHE_STRUCT));
+		ret = copy_from_user(&m4u_cache_data, (void *)arg, sizeof(struct M4U_CACHE_STRUCT));
 		if (ret) {
 			M4UMSG("m4u_cache_sync,copy_from_user failed:%d\n", ret);
 			return -EFAULT;
 		}
+
+		if (m4u_cache_data.port < 0 || m4u_cache_data.port > M4U_PORT_HW_VDEC_PPWRAP_EXT) {
+			M4UMSG("MTK_M4U_T_CACHE_SYNC,port is invalid:%d\n", m4u_cache_data.port);
+			return -EFAULT;
+		}
+
 		M4UDBG("MTK_M4U_T_CACHE_INVALID_AFTER_HW_WRITE_MEM(),");
 		M4UDBG("moduleID = %d, eCacheSync = %d, buf_addr = 0x%lx, buf_length = 0x%x\n",
 			m4u_cache_data.port, m4u_cache_data.eCacheSync, m4u_cache_data.va,
@@ -1918,9 +1971,14 @@ static long MTK_M4U_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 		break;
 
 	case MTK_M4U_T_CONFIG_PORT:
-		ret = copy_from_user(&m4u_port, (void *)arg, sizeof(M4U_PORT_STRUCT));
+		ret = copy_from_user(&m4u_port, (void *)arg, sizeof(struct M4U_PORT_STRUCT));
 		if (ret) {
 			M4UMSG("MTK_M4U_T_CONFIG_PORT,copy_from_user failed:%d\n", ret);
+			return -EFAULT;
+		}
+
+		if (m4u_port.ePortID < 0 || m4u_port.ePortID  > M4U_PORT_HW_VDEC_PPWRAP_EXT) {
+			M4UMSG("MTK_M4U_T_CONFIG_PORT,port is invalid:%d\n", m4u_port.ePortID);
 			return -EFAULT;
 		}
 
@@ -1981,8 +2039,8 @@ static long MTK_M4U_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 
 #if IS_ENABLED(CONFIG_COMPAT)
 
-static int compat_get_m4u_module_struct(COMPAT_M4U_MOUDLE_STRUCT __user *data32,
-					M4U_MOUDLE_STRUCT __user *data)
+static int compat_get_m4u_module_struct(struct COMPAT_M4U_MOUDLE_STRUCT __user *data32,
+					struct M4U_MOUDLE_STRUCT __user *data)
 {
 	compat_uint_t u;
 	compat_ulong_t l;
@@ -2006,8 +2064,8 @@ static int compat_get_m4u_module_struct(COMPAT_M4U_MOUDLE_STRUCT __user *data32,
 	return err;
 }
 
-static int compat_put_m4u_module_struct(COMPAT_M4U_MOUDLE_STRUCT __user *data32,
-					M4U_MOUDLE_STRUCT __user *data)
+static int compat_put_m4u_module_struct(struct COMPAT_M4U_MOUDLE_STRUCT __user *data32,
+					struct M4U_MOUDLE_STRUCT __user *data)
 {
 	compat_uint_t u;
 	compat_ulong_t l;
@@ -2032,8 +2090,8 @@ static int compat_put_m4u_module_struct(COMPAT_M4U_MOUDLE_STRUCT __user *data32,
 	return err;
 }
 
-static int compat_get_m4u_cache_struct(COMPAT_M4U_CACHE_STRUCT __user *data32,
-				       M4U_CACHE_STRUCT __user *data)
+static int compat_get_m4u_cache_struct(struct COMPAT_M4U_CACHE_STRUCT __user *data32,
+				       struct M4U_CACHE_STRUCT __user *data)
 {
 	compat_uint_t u;
 	compat_ulong_t l;
@@ -2064,12 +2122,12 @@ long MTK_M4U_COMPAT_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 	switch (cmd) {
 	case COMPAT_MTK_M4U_T_ALLOC_MVA:
 		{
-			COMPAT_M4U_MOUDLE_STRUCT __user *data32;
-			M4U_MOUDLE_STRUCT __user *data;
+			struct COMPAT_M4U_MOUDLE_STRUCT __user *data32;
+			struct M4U_MOUDLE_STRUCT __user *data;
 			int err;
 
 			data32 = compat_ptr(arg);
-			data = compat_alloc_user_space(sizeof(M4U_MOUDLE_STRUCT));
+			data = compat_alloc_user_space(sizeof(struct M4U_MOUDLE_STRUCT));
 			if (data == NULL)
 				return -EFAULT;
 
@@ -2089,12 +2147,12 @@ long MTK_M4U_COMPAT_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 		}
 	case COMPAT_MTK_M4U_T_DEALLOC_MVA:
 		{
-			COMPAT_M4U_MOUDLE_STRUCT __user *data32;
-			M4U_MOUDLE_STRUCT __user *data;
+			struct COMPAT_M4U_MOUDLE_STRUCT __user *data32;
+			struct M4U_MOUDLE_STRUCT __user *data;
 			int err;
 
 			data32 = compat_ptr(arg);
-			data = compat_alloc_user_space(sizeof(M4U_MOUDLE_STRUCT));
+			data = compat_alloc_user_space(sizeof(struct M4U_MOUDLE_STRUCT));
 			if (data == NULL)
 				return -EFAULT;
 
@@ -2107,12 +2165,12 @@ long MTK_M4U_COMPAT_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 		}
 	case COMPAT_MTK_M4U_T_CACHE_SYNC:
 		{
-			COMPAT_M4U_CACHE_STRUCT __user *data32;
-			M4U_CACHE_STRUCT __user *data;
+			struct COMPAT_M4U_CACHE_STRUCT __user *data32;
+			struct M4U_CACHE_STRUCT __user *data;
 			int err;
 
 			data32 = compat_ptr(arg);
-			data = compat_alloc_user_space(sizeof(M4U_CACHE_STRUCT));
+			data = compat_alloc_user_space(sizeof(struct M4U_CACHE_STRUCT));
 			if (data == NULL)
 				return -EFAULT;
 
@@ -2144,8 +2202,596 @@ long MTK_M4U_COMPAT_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 
 #endif
 
+/*
+ * reserve the iova for direct mapping.
+ * without this, the direct mapping iova maybe allocated to other users,
+ * and the armv7s iopgtable may assert warning and return error.
+ * We reserve those iova to avoid this iova been allocated by other users.
+ */
+#ifdef CONFIG_ARM64
+static int pseudo_reserve_dm(void)
+{
+	struct iommu_dm_region *entry;
+	struct list_head mappings;
+	struct device *dev = m4u_get_larbdev(0);
+	struct iommu_domain *domain;
+	struct iova_domain *iovad;
+	struct iova *iova;
+	unsigned long pg_size = SZ_4K, limit, shift;
+
+	INIT_LIST_HEAD(&mappings);
+
+	iommu_get_dm_regions(dev, &mappings);
+
+	/* We need to consider overlapping regions for different devices */
+	list_for_each_entry(entry, &mappings, list) {
+		dma_addr_t start;
+
+		start = ALIGN(entry->start, pg_size);
+retry:
+		domain = iommu_get_domain_for_dev(dev);
+		if (!domain) {
+			M4UMSG("%s, %d, get iommu_domain failed\n", __func__, __LINE__);
+			domain = iommu_get_domain_for_dev(dev);
+			cond_resched();
+			goto retry;
+		}
+
+		iovad = domain->iova_cookie;
+		shift = iova_shift(iovad);
+		limit = (start + entry->length) >> shift;
+		/* add plus one page for the size of allocation or there maybe overlap */
+		iova = alloc_iova(iovad, (entry->length >> shift) + 1, limit, false);
+		if (!iova) {
+			dev_err(dev, "pseudo alloc_iova failed %s, %d, dm->start 0x%lx, dm->length 0x%zx\n",
+				__func__, __LINE__, (unsigned long)entry->start, entry->length);
+			return -1;
+		}
+
+		M4UMSG("reserve iova for dm success, dm->start 0x%lx, dm->length 0x%zx, start 0x%lx, end 0x%lx\n",
+			(unsigned long)entry->start, entry->length,
+			iova->pfn_lo << shift, iova->pfn_hi << shift);
+
+	}
+
+	return 0;
+}
+#else
+static struct dma_iommu_mapping *dmapping;
+static dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
+				      size_t size);
+static void __free_iova(struct dma_iommu_mapping *mapping,
+			       dma_addr_t addr, size_t size);
+
+static void dma_cache_maint_page(struct page *page, unsigned long offset,
+	size_t size, enum dma_data_direction dir,
+	void (*op)(const void *, size_t, int))
+{
+	unsigned long pfn;
+	size_t left = size;
+
+	pfn = page_to_pfn(page) + offset / PAGE_SIZE;
+	offset %= PAGE_SIZE;
+
+	/*
+	 * A single sg entry may refer to multiple physically contiguous
+	 * pages.  But we still need to process highmem pages individually.
+	 * If highmem is not configured then the bulk of this loop gets
+	 * optimized out.
+	 */
+	do {
+		size_t len = left;
+		void *vaddr;
+
+		page = pfn_to_page(pfn);
+
+		if (PageHighMem(page)) {
+			if (len + offset > PAGE_SIZE)
+				len = PAGE_SIZE - offset;
+
+			if (cache_is_vipt_nonaliasing()) {
+				vaddr = kmap_atomic(page);
+				op(vaddr + offset, len, dir);
+				kunmap_atomic(vaddr);
+			} else {
+				vaddr = kmap_high_get(page);
+				if (vaddr) {
+					op(vaddr + offset, len, dir);
+					kunmap_high(page);
+				}
+			}
+		} else {
+			vaddr = page_address(page) + offset;
+			op(vaddr, len, dir);
+		}
+		offset = 0;
+		pfn++;
+		left -= len;
+	} while (left);
+}
+
+static int __dma_direction_to_prot(enum dma_data_direction dir)
+{
+	int prot;
+
+	switch (dir) {
+	case DMA_BIDIRECTIONAL:
+		prot = IOMMU_READ | IOMMU_WRITE;
+		break;
+	case DMA_TO_DEVICE:
+		prot = IOMMU_READ;
+		break;
+	case DMA_FROM_DEVICE:
+		prot = IOMMU_WRITE;
+		break;
+	default:
+		prot = 0;
+	}
+
+	return prot;
+}
+
+/*
+ * Make an area consistent for devices.
+ * Note: Drivers should NOT use this function directly, as it will break
+ * platforms with CONFIG_DMABOUNCE.
+ * Use the driver DMA support - see dma-mapping.h (dma_sync_*)
+ */
+static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+	size_t size, enum dma_data_direction dir)
+{
+	phys_addr_t paddr;
+
+	dma_cache_maint_page(page, off, size, dir, dmac_map_area);
+
+	paddr = page_to_phys(page) + off;
+	if (dir == DMA_FROM_DEVICE)
+		outer_inv_range(paddr, paddr + size);
+	else
+		outer_clean_range(paddr, paddr + size);
+	/* FIXME: non-speculating: flush on bidirectional mappings? */
+}
+
+static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+	size_t size, enum dma_data_direction dir)
+{
+	phys_addr_t paddr = page_to_phys(page) + off;
+
+	/* FIXME: non-speculating: not required */
+	/* in any case, don't bother invalidating if DMA to device */
+	if (dir != DMA_TO_DEVICE) {
+		outer_inv_range(paddr, paddr + size);
+
+		dma_cache_maint_page(page, off, size, dir, dmac_unmap_area);
+	}
+
+	/*
+	 * Mark the D-cache clean for these pages to avoid extra flushing.
+	 */
+	if (dir != DMA_TO_DEVICE && size >= PAGE_SIZE) {
+		unsigned long pfn;
+		size_t left = size;
+
+		pfn = page_to_pfn(page) + off / PAGE_SIZE;
+		off %= PAGE_SIZE;
+		if (off) {
+			pfn++;
+			left -= PAGE_SIZE - off;
+		}
+		while (left >= PAGE_SIZE) {
+			page = pfn_to_page(pfn++);
+			set_bit(PG_dcache_clean, &page->flags);
+			left -= PAGE_SIZE;
+		}
+	}
+}
+
+static int __iommu_remove_mapping(struct device *dev, dma_addr_t iova, size_t size)
+{
+	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+
+	/*
+	 * add optional in-page offset from iova to size and align
+	 * result to page size
+	 */
+	size = PAGE_ALIGN((iova & ~PAGE_MASK) + size);
+	iova &= PAGE_MASK;
+
+	iommu_unmap(mapping->domain, iova, size);
+	__free_iova(mapping, iova, size);
+	return 0;
+}
+
+/*
+ * Map a part of the scatter-gather list into contiguous io address space
+ */
+static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+			  size_t size, dma_addr_t *handle,
+			  enum dma_data_direction dir, struct dma_attrs *attrs,
+			  bool is_coherent)
+{
+	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+	dma_addr_t iova, iova_base;
+	int ret = 0;
+	unsigned int count;
+	struct scatterlist *s;
+	int prot;
+
+	size = PAGE_ALIGN(size);
+
+	iova_base = iova = __alloc_iova(mapping, size);
+	if (iova == DMA_ERROR_CODE)
+		return -ENOMEM;
+
+	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
+
+		phys_addr_t phys;
+		unsigned int len;
+
+		/* for some pa do not have struct pages, we get the pa from sg_dma_address. */
+		/* we have set the iova to DMA_ERROR_CODE in __iommu_map_sg for which have pages */
+		if (!sg_dma_address(s) || sg_dma_address(s) == DMA_ERROR_CODE
+			|| !sg_dma_len(s)) {
+			phys = page_to_phys(sg_page(s));
+			len = PAGE_ALIGN(s->offset + s->length);
+		} else {
+			phys = sg_dma_address(s);
+			len = sg_dma_len(s);
+			/* clear the dma address after we get the pa. */
+			sg_dma_address(s) = DMA_ERROR_CODE;
+			sg_dma_len(s) = 0;
+		}
+		if (!is_coherent &&
+			!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs) && (sg_page(s)))
+			__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
+
+		prot = __dma_direction_to_prot(dir);
+
+		ret = iommu_map(mapping->domain, iova, phys, len, prot);
+		if (ret < 0)
+			goto fail;
+		count += len >> PAGE_SHIFT;
+		iova += len;
+	}
+	*handle = iova_base;
+
+	return 0;
+fail:
+	*handle = DMA_ERROR_CODE;
+	iommu_unmap(mapping->domain, iova_base, count * PAGE_SIZE);
+	__free_iova(mapping, iova_base, size);
+	return ret;
+}
+
+static int __iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+		     enum dma_data_direction dir, struct dma_attrs *attrs,
+		     bool is_coherent)
+{
+	struct scatterlist *s = sg, *dma = sg, *start = sg;
+	int i, count = 0;
+	unsigned int offset = s->offset;
+	unsigned int size = s->offset + s->length;
+	unsigned int max = dma_get_max_seg_size(dev);
+
+	for (i = 1; i < nents; i++) {
+		s = sg_next(s);
+		/*
+		 * this is for pseudo m4u driver user, since some user space memory do not have
+		 * struct pages, and we need to store the pa in sg->dma_address, this is to avoid
+		 * the dma to modify this value.
+		 */
+		if (!sg_dma_address(s) || !sg_dma_len(s)) {
+			sg_dma_address(s) = DMA_ERROR_CODE;
+			sg_dma_len(s) = 0;
+		}
+		if (s->offset || (size & ~PAGE_MASK) || size + s->length > max) {
+			if (__map_sg_chunk(dev, start, size, &dma->dma_address,
+			    dir, attrs, is_coherent) < 0)
+				goto bad_mapping;
+
+			dma->dma_address += offset;
+			dma->dma_length = size - offset;
+
+			size = offset = s->offset;
+			start = s;
+			dma = sg_next(dma);
+			count += 1;
+		}
+		if ((sg_dma_address(s)) && (sg_dma_address(s) != DMA_ERROR_CODE) && (sg_dma_len(s)))
+			size += sg_dma_len(s);
+		else
+			size += s->length;
+	}
+
+	/* map sg chunk would leave the last page if address is page aligned */
+	if ((sg_dma_address(s)) && (sg_dma_address(s) != DMA_ERROR_CODE) && (sg_dma_len(s))) {
+		size += PAGE_SIZE;
+		/* Add on plus page size to make sure th map and unmap would reach the end */
+		/*sg_dma_len(s) += PAGE_SIZE;*/
+	}
+	if (__map_sg_chunk(dev, start, size, &dma->dma_address, dir, attrs,
+		is_coherent) < 0)
+		goto bad_mapping;
+
+	dma->dma_address += offset;
+	dma->dma_length = size - offset;
+
+	return count+1;
+
+bad_mapping:
+	for_each_sg(sg, s, count, i)
+		__iommu_remove_mapping(dev, sg_dma_address(s), sg_dma_len(s));
+	/* tell the pseudo driver that the map have been failed. */
+	if (sg_dma_address(sg) && sg_dma_len(sg)) {
+		sg_dma_address(sg) = DMA_ERROR_CODE;
+		sg_dma_len(sg) = 0;
+	}
+	return 0;
+}
+
+/**
+ * arm_coherent_iommu_map_sg - map a set of SG buffers for streaming mode DMA
+ * @dev: valid struct device pointer
+ * @sg: list of buffers
+ * @nents: number of buffers to map
+ * @dir: DMA transfer direction
+ *
+ * Map a set of i/o coherent buffers described by scatterlist in streaming
+ * mode for DMA. The scatter gather list elements are merged together (if
+ * possible) and tagged with the appropriate dma address and length. They are
+ * obtained via sg_dma_{address,length}.
+ */
+int __arm_coherent_iommu_map_sg(struct device *dev, struct scatterlist *sg,
+		int nents, enum dma_data_direction dir, struct dma_attrs *attrs)
+{
+	return __iommu_map_sg(dev, sg, nents, dir, attrs, true);
+}
+
+static void __iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
+		int nents, enum dma_data_direction dir, struct dma_attrs *attrs,
+		bool is_coherent)
+{
+	struct scatterlist *s;
+	int i;
+
+	for_each_sg(sg, s, nents, i) {
+		if (sg_dma_len(s))
+			__iommu_remove_mapping(dev, sg_dma_address(s),
+					       sg_dma_len(s));
+		if (!is_coherent &&
+			!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs) && (sg_page(s)))
+			__dma_page_dev_to_cpu(sg_page(s), s->offset,
+					      s->length, dir);
+	}
+}
+
+/**
+ * arm_coherent_iommu_unmap_sg - unmap a set of SG buffers mapped by dma_map_sg
+ * @dev: valid struct device pointer
+ * @sg: list of buffers
+ * @nents: number of buffers to unmap (same as was passed to dma_map_sg)
+ * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+ *
+ * Unmap a set of streaming mode DMA translations.  Again, CPU access
+ * rules concerning calls here are the same as for dma_unmap_single().
+ */
+void __arm_coherent_iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
+		int nents, enum dma_data_direction dir, struct dma_attrs *attrs)
+{
+	__iommu_unmap_sg(dev, sg, nents, dir, attrs, true);
+}
+
+static int __extend_iommu_mapping(struct dma_iommu_mapping *mapping)
+{
+	int next_bitmap;
+
+	if (mapping->nr_bitmaps >= mapping->extensions)
+		return -EINVAL;
+
+	next_bitmap = mapping->nr_bitmaps;
+	mapping->bitmaps[next_bitmap] = kzalloc(mapping->bitmap_size,
+						GFP_ATOMIC);
+	if (!mapping->bitmaps[next_bitmap])
+		return -ENOMEM;
+
+	mapping->nr_bitmaps++;
+
+	return 0;
+}
+
+static dma_addr_t __alloc_iova(struct dma_iommu_mapping *mapping,
+				      size_t size)
+{
+	unsigned int order = get_order(size);
+	unsigned int align = 0;
+	unsigned int count, start;
+	size_t mapping_size = mapping->bits << PAGE_SHIFT;
+	unsigned long flags;
+	dma_addr_t iova;
+	int i;
+
+	if (order > CONFIG_ARM_DMA_IOMMU_ALIGNMENT)
+		order = CONFIG_ARM_DMA_IOMMU_ALIGNMENT;
+
+	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	align = (1 << order) - 1;
+
+	spin_lock_irqsave(&mapping->lock, flags);
+	for (i = 0; i < mapping->nr_bitmaps; i++) {
+		start = bitmap_find_next_zero_area(mapping->bitmaps[i],
+				mapping->bits, 0, count, align);
+
+		if (start > mapping->bits)
+			continue;
+
+		bitmap_set(mapping->bitmaps[i], start, count);
+		break;
+	}
+
+	/*
+	 * No unused range found. Try to extend the existing mapping
+	 * and perform a second attempt to reserve an IO virtual
+	 * address range of size bytes.
+	 */
+	if (i == mapping->nr_bitmaps) {
+		if (__extend_iommu_mapping(mapping)) {
+			spin_unlock_irqrestore(&mapping->lock, flags);
+			return DMA_ERROR_CODE;
+		}
+
+		start = bitmap_find_next_zero_area(mapping->bitmaps[i],
+				mapping->bits, 0, count, align);
+
+		if (start > mapping->bits) {
+			spin_unlock_irqrestore(&mapping->lock, flags);
+			return DMA_ERROR_CODE;
+		}
+
+		bitmap_set(mapping->bitmaps[i], start, count);
+	}
+	spin_unlock_irqrestore(&mapping->lock, flags);
+
+	iova = mapping->base + (mapping_size * i);
+	iova += start << PAGE_SHIFT;
+
+	return iova;
+}
+
+static void __free_iova(struct dma_iommu_mapping *mapping,
+			       dma_addr_t addr, size_t size)
+{
+	unsigned int start, count;
+	size_t mapping_size = mapping->bits << PAGE_SHIFT;
+	unsigned long flags;
+	dma_addr_t bitmap_base;
+	u32 bitmap_index;
+
+	if (!size)
+		return;
+
+	bitmap_index = (u32) (addr - mapping->base) / (u32) mapping_size;
+	WARN_ON(addr < mapping->base || bitmap_index > mapping->extensions);
+
+	bitmap_base = mapping->base + mapping_size * bitmap_index;
+
+	start = (addr - bitmap_base) >>	PAGE_SHIFT;
+
+	if (addr + size > bitmap_base + mapping_size) {
+		/*
+		 * The address range to be freed reaches into the iova
+		 * range of the next bitmap. This should not happen as
+		 * we don't allow this in __alloc_iova (at the
+		 * moment).
+		 */
+		WARN_ON(1);
+		return;
+	}
+
+	count = size >> PAGE_SHIFT;
+
+	spin_lock_irqsave(&mapping->lock, flags);
+	bitmap_clear(mapping->bitmaps[bitmap_index], start, count);
+	spin_unlock_irqrestore(&mapping->lock, flags);
+}
+
+static inline int __reserve_iova(struct dma_iommu_mapping *mapping,
+				dma_addr_t iova, size_t size)
+{
+	unsigned long count, start;
+	unsigned long flags;
+	int i, sbitmap, ebitmap;
+
+	if (iova < mapping->base)
+		return -EINVAL;
+
+	start = (iova - mapping->base) >> PAGE_SHIFT;
+	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+
+	sbitmap = start / mapping->bits;
+	ebitmap = (start + count) / mapping->bits;
+	start = start % mapping->bits;
+
+	if (ebitmap > mapping->extensions)
+		return -EINVAL;
+
+	spin_lock_irqsave(&mapping->lock, flags);
+
+	for (i = mapping->nr_bitmaps; i <= ebitmap; i++) {
+		if (__extend_iommu_mapping(mapping)) {
+			spin_unlock_irqrestore(&mapping->lock, flags);
+			return -ENOMEM;
+		}
+	}
+
+	for (i = sbitmap; count && i < mapping->nr_bitmaps; i++) {
+		int bits = count;
+
+		if (bits + start > mapping->bits)
+			bits = mapping->bits - start;
+
+		bitmap_set(mapping->bitmaps[i], start, bits);
+		start = 0;
+		count -= bits;
+	}
+
+	spin_unlock_irqrestore(&mapping->lock, flags);
+
+	return 0;
+}
+
+static int pseudo_reserve_dm(void)
+{
+	struct iommu_dm_region *entry;
+	struct list_head mappings;
+	struct device *dev = m4u_get_larbdev(0);
+	unsigned long pg_size;
+	struct iommu_domain	*domain = dmapping->domain;
+	int ret = 0;
+
+	WARN_ON(!domain->ops->pgsize_bitmap);
+
+	pg_size = 1UL << __ffs(domain->ops->pgsize_bitmap);
+	INIT_LIST_HEAD(&mappings);
+
+	iommu_get_dm_regions(dev, &mappings);
+
+	/* We need to consider overlapping regions for different devices */
+	list_for_each_entry(entry, &mappings, list) {
+		dma_addr_t start, end, addr;
+
+		start = ALIGN(entry->start, pg_size);
+		end   = ALIGN(entry->start + entry->length, pg_size);
+
+		for (addr = start; addr < end; addr += pg_size) {
+			phys_addr_t phys_addr;
+
+			phys_addr = iommu_iova_to_phys(domain, addr);
+			if (phys_addr)
+				continue;
+
+			ret = iommu_map(domain, addr, addr, pg_size, entry->prot);
+			if (ret)
+				goto out;
+		}
+
+		ret = __reserve_iova(dmapping, start, end - start);
+		if (ret != 0) {
+			M4UERR("failed to reserve mapping\n");
+			goto out;
+		}
+	}
+
+out:
+	iommu_put_dm_regions(dev, &mappings);
+
+	return ret;
+}
+#endif
+
+
 #ifdef M4U_TEE_SERVICE_ENABLE
 /* reserve iova address range for security world for 1GB memory */
+#ifdef CONFIG_ARM64
 static int __reserve_iova_sec(struct device *device,
 				dma_addr_t dma_addr, size_t size)
 {
@@ -2183,66 +2829,20 @@ retry:
 		return -1;
 	}
 
-	dev_err(dev, "reserve iova for security world success, we get the iova start 0x%lx, end 0x%lx\n",
+	dev_info(dev, "reserve iova for security world success, we get the iova start 0x%lx, end 0x%lx\n",
 			iova->pfn_lo << PAGE_SHIFT, iova->pfn_hi << PAGE_SHIFT);
 
 	return 0;
 }
+#else
+static int __reserve_iova_sec(struct device *device,
+				dma_addr_t dma_addr, size_t size) {
+
+	return __reserve_iova(dmapping, dma_addr, size);
+}
+#endif
 #endif
 
-/*
- * reserve the iova for direct mapping.
- * without this, the direct mapping iova maybe allocated to other users,
- * and the armv7s iopgtable may assert warning and return error.
- * We reserve those iova to avoid this iova been allocated by other users.
- */
-static int pseudo_reserve_dm(void)
-{
-	struct iommu_dm_region *entry;
-	struct list_head mappings;
-	struct device *dev = m4u_get_larbdev(0);
-	struct iommu_domain *domain;
-	struct iova_domain *iovad;
-	struct iova *iova;
-	unsigned long pg_size = SZ_4K, limit, shift;
-
-	INIT_LIST_HEAD(&mappings);
-
-	iommu_get_dm_regions(dev, &mappings);
-
-	/* We need to consider overlapping regions for different devices */
-	list_for_each_entry(entry, &mappings, list) {
-		dma_addr_t start;
-
-		start = ALIGN(entry->start, pg_size);
-retry:
-		domain = iommu_get_domain_for_dev(dev);
-		if (!domain) {
-			M4UMSG("%s, %d, get iommu_domain failed\n", __func__, __LINE__);
-			domain = iommu_get_domain_for_dev(dev);
-			cond_resched();
-			goto retry;
-		}
-
-		iovad = domain->iova_cookie;
-		shift = iova_shift(iovad);
-		limit = (start + entry->length) >> shift;
-		/* add plus one page for the size of allocation or there maybe overlap */
-		iova = alloc_iova(iovad, (entry->length >> shift) + 1, limit, false);
-		if (!iova) {
-			dev_err(dev, "pseudo alloc_iova failed %s, %d, dm->start 0x%lx, dm->length 0x%lx\n",
-				__func__, __LINE__, (unsigned long)entry->start, entry->length);
-			return -1;
-		}
-
-		M4UMSG("reserve iova for dm success, dm->start 0x%lx, dm->length 0x%lx, start 0x%lx, end 0x%lx\n",
-			(unsigned long)entry->start, entry->length,
-			iova->pfn_lo << shift, iova->pfn_hi << shift);
-
-	}
-
-	return 0;
-}
 
 static const struct file_operations g_stMTK_M4U_fops = {
 	.owner = THIS_MODULE,
@@ -2273,6 +2873,24 @@ static int pseudo_probe(struct platform_device *pdev)
 {
 	int i;
 
+#ifndef CONFIG_ARM64
+	struct device *dev = &pdev->dev;
+	struct device_node *node = dev->of_node;
+	struct platform_device *pimudev;
+
+	node = of_parse_phandle(pdev->dev.of_node, "iommus", 0);
+	if (!node)
+		return 0;
+
+	pimudev = of_find_device_by_node(node);
+	of_node_put(node);
+	if (WARN_ON(!pimudev))
+		return -EINVAL;
+
+	dmapping = pimudev->dev.archdata.iommu;
+	WARN_ON(!dmapping);
+#endif
+
 	for (i = 0; i < 3; i++) {
 		/* wait for larb probe done. */
 		if (mtk_smi_larb_ready(i) == 0)
@@ -2295,10 +2913,11 @@ static int pseudo_probe(struct platform_device *pdev)
 
 	/* bit[0:11] is reserved */
 	iommu_pgt_base &= 0xfffff000;
-	M4UMSG("%s, %d, iommu_pgt_base 0x%lx\n", __func__, __LINE__, iommu_pgt_base);
 	pseudo_m4u_sec_init(iommu_pgt_base, gM4U_L2_enable, &sec_mem_size);
-		/* reserve mva range for security world */
-	__reserve_iova_sec(dev, 0, sec_mem_size);
+	/* reserve mva range for security world */
+	M4UMSG("%s, %d, iommu_pgt_base 0x%lx size %u\n", __func__, __LINE__, iommu_pgt_base, sec_mem_size);
+	if (sec_mem_size > 0)
+		__reserve_iova_sec(dev, 0, sec_mem_size);
 }
 #endif
 	pseudo_reserve_dm();

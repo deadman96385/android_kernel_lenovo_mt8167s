@@ -28,6 +28,7 @@
 #ifdef CONFIG_MTK_GIC
 #include <linux/irqchip/mt-gic.h>
 #endif
+#include <linux/wakelock.h>
 
 #include <mt-plat/mtk_io.h>
 #include <mt-plat/dma.h>
@@ -42,14 +43,16 @@ struct cqdma_env_info {
 	u32 irq;
 };
 
-#if defined(CONFIG_MACH_MT6799)
+#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6763)
 #define MAX_CQDMA_CHANNELS 3
 #else
 #define MAX_CQDMA_CHANNELS 2
 #endif
 
 static struct cqdma_env_info env_info[MAX_CQDMA_CHANNELS];
+static u32 keep_clock_ao;
 static u32 nr_cqdma_channel;
+struct wake_lock wk_lock[MAX_CQDMA_CHANNELS];
 
 /*
  * DMA information
@@ -77,7 +80,7 @@ static u32 nr_cqdma_channel;
 #define DMA_AXIATTR(ch)            IOMEM((env_info[ch].base + 0x0038))
 #define DMA_DBG_STAT(ch)           IOMEM((env_info[ch].base + 0x0050))
 
-#if defined(CONFIG_MACH_MT6799)
+#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6763)
 #define DMA_GDMA_SEC_EN(ch)        IOMEM((env_info[ch].base + 0x003C))
 #define DMA_VIO_DBG1(ch)           IOMEM((env_info[ch].base + 0x0040))
 #define DMA_VIO_DBG(ch)            IOMEM((env_info[ch].base + 0x0044))
@@ -88,7 +91,7 @@ static u32 nr_cqdma_channel;
 #endif
 
 /*Everest,Elbrus,whitney:0x60,0x64,0x68*/
-#if defined(CONFIG_ARCH_MT6797) || defined(CONFIG_MACH_MT6799)
+#if defined(CONFIG_ARCH_MT6797) || defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6763)
 #define DMA_SRC_4G_SUPPORT(ch)     IOMEM((env_info[ch].base + 0x0060))
 #define DMA_DST_4G_SUPPORT(ch)     IOMEM((env_info[ch].base + 0x0064))
 #define DMA_JUMP_4G_SUPPORT(ch)    IOMEM((env_info[ch].base + 0x0068))
@@ -182,12 +185,12 @@ volatile unsigned int DMA_INT_DONE;
  * @chan: specify a channel or not
  * Return channel number for success; return negative errot code for failure.
  */
-int mt_req_gdma(DMA_CHAN chan)
+int mt_req_gdma(int chan)
 {
 	unsigned long flags;
 	int i;
 
-	if (clk_cqdma) {
+	if (clk_cqdma && !keep_clock_ao) {
 		if (clk_prepare_enable(clk_cqdma)) {
 			pr_err("enable CQDMA clk fail!\n");
 			return -DMA_ERR_NO_FREE_CH;
@@ -202,6 +205,7 @@ int mt_req_gdma(DMA_CHAN chan)
 				continue;
 			else {
 				dma_ctrl[i].in_use = 1;
+				wake_lock(&wk_lock[i]);
 				break;
 			}
 		}
@@ -211,6 +215,7 @@ int mt_req_gdma(DMA_CHAN chan)
 		else {
 			i = chan;
 			dma_ctrl[chan].in_use = 1;
+			wake_lock(&wk_lock[chan]);
 		}
 	}
 
@@ -222,7 +227,7 @@ int mt_req_gdma(DMA_CHAN chan)
 	}
 
 	/* disable cqdma clock */
-	if (clk_cqdma)
+	if (clk_cqdma && !keep_clock_ao)
 		clk_disable_unprepare(clk_cqdma);
 
 	return -DMA_ERR_NO_FREE_CH;
@@ -315,7 +320,7 @@ EXPORT_SYMBOL(mt_stop_gdma);
  * @flag: ALL, SRC, DST, or SRC_AND_DST.
  * Return 0 for success; return negative errot code for failure.
  */
-int mt_config_gdma(int channel, struct mt_gdma_conf *config, DMA_CONF_FLAG flag)
+int mt_config_gdma(int channel, struct mt_gdma_conf *config, int flag)
 {
 	unsigned int dma_con = 0x0, limiter = 0;
 
@@ -399,9 +404,11 @@ int mt_config_gdma(int channel, struct mt_gdma_conf *config, DMA_CONF_FLAG flag)
 					readl(DMA_DST_4G_SUPPORT(channel)),
 					readl(DMA_JUMP_4G_SUPPORT(channel)));
 		} else {
+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
 			mt_reg_sync_writel((u32)((u64)(config->src) >> 32), DMA_SRC_4G_SUPPORT(channel));
 			mt_reg_sync_writel((u32)((u64)(config->dst) >> 32), DMA_DST_4G_SUPPORT(channel));
 			mt_reg_sync_writel((u32)((u64)(config->jump) >> 32), DMA_JUMP_4G_SUPPORT(channel));
+#endif
 
 			pr_debug("2:ADDR2_cfg(4GB):SRC=0x%x  DST=0x%x JUMP=0x%x\n",
 					readl(DMA_SRC_4G_SUPPORT(channel)),
@@ -493,8 +500,10 @@ int mt_free_gdma(int channel)
 	mt_stop_gdma(channel);
 
 	/* disable cqdma clock */
-	if (clk_cqdma)
+	if (clk_cqdma && !keep_clock_ao)
 		clk_disable_unprepare(clk_cqdma);
+
+	wake_unlock(&wk_lock[channel]);
 
 	dma_ctrl[channel].isr_cb = NULL;
 	dma_ctrl[channel].data = NULL;
@@ -661,6 +670,7 @@ static int cqdma_probe(struct platform_device *pdev)
 	int ret = 0, irq = 0;
 	unsigned int i;
 	struct resource *res;
+	const char *keep_clk_ao_str = NULL;
 
 	pr_debug("[MTK CQDMA] module probe.\n");
 
@@ -689,12 +699,24 @@ static int cqdma_probe(struct platform_device *pdev)
 		ret = request_irq(env_info[i].irq, gdma1_irq_handler, IRQF_TRIGGER_NONE, "CQDMA", &dma_ctrl);
 		if (ret > 0)
 			pr_err("GDMA%d IRQ LINE NOT AVAILABLE,ret 0x%x!!\n", i, ret);
+
+		wake_lock_init(&wk_lock[i], WAKE_LOCK_SUSPEND, "cqdma_wakelock");
 	}
 
 	clk_cqdma = devm_clk_get(&pdev->dev, "cqdma");
 	if (IS_ERR(clk_cqdma)) {
 		pr_err("can not get CQDMA clock fail!\n");
 		return PTR_ERR(clk_cqdma);
+	}
+
+	if (!of_property_read_string(pdev->dev.of_node, "keep_clock_ao", &keep_clk_ao_str)) {
+		if (keep_clk_ao_str && !strncmp(keep_clk_ao_str, "yes", 3)) {
+			ret = clk_prepare_enable(clk_cqdma);
+			if (ret)
+				pr_info("enable CQDMA clk fail!\n");
+			else
+				keep_clock_ao = 1;
+		}
 	}
 
 	return ret;

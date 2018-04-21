@@ -31,11 +31,29 @@ extern void disable_soidle3_by_bit(int id);
 extern void enable_soidle_by_bit(int id);
 extern void disable_soidle_by_bit(int id);
 
-#define DPIDLE_START    1
-#define DPIDLE_END      2
-#define SOIDLE_START    3
-#define SOIDLE_END      4
+extern void enable_mcsodi_by_bit(int id);
+extern void disable_mcsodi_by_bit(int id);
+
+#if defined(CONFIG_MACH_MT6759) \
+	|| defined(CONFIG_MACH_MT6758) \
+	|| defined(CONFIG_MACH_MT6775)
+/* return 0: non-active, 1:active */
+int dpidle_active_status(void);
+#endif
+
+enum spm_idle_notify_id {
+	NOTIFY_DPIDLE_ENTER,
+	NOTIFY_DPIDLE_LEAVE,
+	NOTIFY_SOIDLE_ENTER,
+	NOTIFY_SOIDLE_LEAVE,
+	NOTIFY_SOIDLE3_ENTER,
+	NOTIFY_SOIDLE3_LEAVE,
+};
+
 extern int mtk_idle_notifier_register(struct notifier_block *n);
 extern void mtk_idle_notifier_unregister(struct notifier_block *n);
+
+extern void idle_lock_by_ufs(unsigned int lock);
+extern void idle_lock_by_gpu(unsigned int lock);
 
 #endif

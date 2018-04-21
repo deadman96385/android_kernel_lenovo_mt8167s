@@ -21,7 +21,7 @@
  */
 extern int spm_set_sleep_wakesrc(u32 wakesrc, bool enable, bool replace);
 extern u32 spm_get_sleep_wakesrc(void);
-extern wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data);
+extern unsigned int spm_go_to_sleep(u32 spm_flags, u32 spm_data);
 
 extern bool spm_is_md_sleep(void);
 extern bool spm_is_md1_sleep(void);
@@ -30,6 +30,7 @@ extern bool spm_is_conn_sleep(void);
 /* extern void spm_set_wakeup_src_check(void); */
 extern void spm_ap_mdsrc_req(u8 set);
 extern int get_spm_sleep_count(struct seq_file *s, void *unused);
+extern int get_spm_last_wakeup_src(struct seq_file *s, void *unused);
 extern bool spm_set_suspned_pcm_init_flag(u32 *suspend_flags);
 
 extern void spm_output_sleep_option(void);

@@ -606,8 +606,7 @@ static void msdc_set_timeout(struct msdc_host *host, u32 ns, u32 clks)
 
 static void msdc_gate_clock(struct msdc_host *host)
 {
-	if (!IS_ERR(host->src_clk_cg))
-		clk_disable_unprepare(host->src_clk_cg);
+	clk_disable_unprepare(host->src_clk_cg);
 	clk_disable_unprepare(host->src_clk);
 	clk_disable_unprepare(host->h_clk);
 }
@@ -616,8 +615,7 @@ static void msdc_ungate_clock(struct msdc_host *host)
 {
 	clk_prepare_enable(host->h_clk);
 	clk_prepare_enable(host->src_clk);
-	if (!IS_ERR(host->src_clk_cg))
-		clk_prepare_enable(host->src_clk_cg);
+	clk_prepare_enable(host->src_clk_cg);
 	while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
 		cpu_relax();
 }
@@ -682,8 +680,8 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
 	 * As src_clk/HCLK use the same bit to gate/ungate,
 	 * So if want to only gate src_clk, need gate its parent(mux).
 	 */
-	if (!IS_ERR(host->src_clk_cg))
-		clk_disable_unprepare(clk_get_parent(host->src_clk_cg));
+	if (host->src_clk_cg)
+		clk_disable_unprepare(host->src_clk_cg);
 	else
 		clk_disable_unprepare(clk_get_parent(host->src_clk));
 	if (host->dev_comp->clk_div_bits == 8)
@@ -694,8 +692,8 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
 		sdr_set_field(host->base + MSDC_CFG,
 				MSDC_CFG_CKMOD_EXTRA | MSDC_CFG_CKDIV_EXTRA,
 				(mode << 12) | (div % 0xfff));
-	if (!IS_ERR(host->src_clk_cg))
-		clk_prepare_enable(clk_get_parent(host->src_clk_cg));
+	if (host->src_clk_cg)
+		clk_prepare_enable(host->src_clk_cg);
 	else
 		clk_prepare_enable(clk_get_parent(host->src_clk));
 
@@ -923,7 +921,13 @@ static bool msdc_cmd_done(struct msdc_host *host, int events,
 	}
 
 	if (!sbc_error && !(events & MSDC_INT_CMDRDY)) {
-		msdc_reset_hw(host);
+		if (cmd->opcode != MMC_SEND_TUNING_BLOCK &&
+		    cmd->opcode != MMC_SEND_TUNING_BLOCK_HS200)
+			/*
+			 * should not clear fifo/interrupt as the tune data
+			 * may have alreay come.
+			 */
+			msdc_reset_hw(host);
 		if (cmd->flags & MMC_RSP_CRC && events & MSDC_INT_RSPCRCERR) {
 			cmd->error = -EILSEQ;
 			host->error |= REQ_CMD_EIO;
@@ -965,6 +969,16 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
 			cpu_relax();
 	}
 
+	/*
+	 * cmd12 is the unique cmd which will run in irq context.
+	 * in this case, can issue cmd12 directly.
+	 */
+	if (in_interrupt() && cmd->mrq->data && (cmd == cmd->mrq->data->stop))
+		return true;
+
+	while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
+			time_before(jiffies, tmo))
+		cpu_relax();
 	if (readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) {
 		dev_err(host->dev, "CMD bus busy detected\n");
 		host->error |= REQ_CMD_BUSY;
@@ -972,29 +986,24 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
 		return false;
 	}
 
-	if (cmd->opcode != MMC_SEND_STATUS) {
-		count = 0;
-		/* Consider that CMD6 crc error before card was init done,
+	if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
+		/*
+		 * Consider that CMD6 crc error before card was init done,
 		 * mmc_retune() will return directly as host->card is null.
 		 * and CMD6 will retry 3 times, must ensure card is in transfer
 		 * state when retry.
 		 */
-		tmo = jiffies + msecs_to_jiffies(60 * 1000);
+		tmo = jiffies + msecs_to_jiffies(1000);
 		while (1) {
 			if (!(readl(host->base + MSDC_PS) & BIT(16))) {
-				if (in_interrupt()) {
-					udelay(1);
-					count++;
-				} else {
-					msleep_interruptible(10);
-				}
+				msleep_interruptible(10);
 			} else {
 				break;
 			}
 			/* Timeout if the device never leaves the program state. */
-			if (count > 1000 || time_after(jiffies, tmo)) {
+			if (time_after(jiffies, tmo)) {
 				pr_err("%s: Card stuck in programming state! %s\n",
-				       mmc_hostname(host->mmc), __func__);
+						mmc_hostname(host->mmc), __func__);
 				host->error |= REQ_CMD_BUSY;
 				msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
 				return false;
@@ -1033,7 +1042,11 @@ static void msdc_start_command(struct msdc_host *host,
 static void msdc_cmd_next(struct msdc_host *host,
 		struct mmc_request *mrq, struct mmc_command *cmd)
 {
-	if (cmd->error || (mrq->sbc && mrq->sbc->error))
+	if ((cmd->error &&
+	    !(cmd->error == -EILSEQ &&
+	      (cmd->opcode == MMC_SEND_TUNING_BLOCK ||
+	       cmd->opcode == MMC_SEND_TUNING_BLOCK_HS200))) ||
+		(mrq->sbc && mrq->sbc->error))
 		msdc_request_done(host, mrq);
 	else if (cmd == mrq->sbc)
 		msdc_start_command(host, mrq, mrq->cmd);
@@ -1728,6 +1741,7 @@ static struct mmc_host_ops mt_msdc_ops = {
 	.request = msdc_ops_request,
 	.set_ios = msdc_ops_set_ios,
 	.get_ro = mmc_gpio_get_ro,
+	.get_cd = mmc_gpio_get_cd,
 	.start_signal_voltage_switch = msdc_ops_switch_volt,
 	.card_busy = msdc_card_busy,
 	.execute_tuning = msdc_execute_tuning,
@@ -1784,7 +1798,10 @@ static int msdc_drv_probe(struct platform_device *pdev)
 		goto host_free;
 	}
 
-	host->src_clk_cg = devm_clk_get(&pdev->dev, "src_clk_cg");
+	/*source clock control gate is optional clock*/
+	host->src_clk_cg = devm_clk_get(&pdev->dev, "source_cg");
+	if (IS_ERR(host->src_clk_cg))
+		host->src_clk_cg = NULL;
 
 	host->irq = platform_get_irq(pdev, 0);
 	if (host->irq < 0) {

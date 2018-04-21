@@ -14,9 +14,16 @@
 #ifndef SECMEM_H
 #define SECMEM_H
 
+#if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) \
+	|| defined(CONFIG_BLOWFISH_TEE_SUPPORT)
 #include "secmem_plat.h"
+#endif
 
-#define SECMEM_NAME     "secmem"
+#ifdef SECMEM_64BIT_PHYS_SUPPORT
+#define SECMEM_NAME     "secmem64"
+#else
+#define SECMEM_NAME     "secmem32"
+#endif
 
 #define MAX_NAME_SIZE   32
 
@@ -58,7 +65,9 @@ struct secmem_param {
 #if defined(CONFIG_CMA) && defined(CONFIG_MTK_SVP)
 /* SVP CMA API */
 extern int svp_region_offline(phys_addr_t *pa, unsigned long *size);
+extern int svp_region_offline64(phys_addr_t *pa, unsigned long *size);
 extern int svp_region_online(void);
+extern void spm_enable_sodi(bool);
 #endif
 
 #ifdef SECMEM_KERNEL_API

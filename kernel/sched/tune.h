@@ -1,6 +1,33 @@
 
 #ifdef CONFIG_SCHED_TUNE
 
+#include <linux/reciprocal_div.h>
+
+/*
+ * System energy normalization constants
+ */
+struct target_nrg {
+	unsigned long min_power;
+	unsigned long max_power;
+	struct reciprocal_value rdiv;
+	unsigned long max_dyn_pwr[32];
+	unsigned long max_stc_pwr[32];
+};
+
+struct target_cap {
+	int cap;
+	int freq;
+};
+
+extern struct target_nrg schedtune_target_nrg;
+
+extern int stune_task_threshold;
+
+void show_ste_info(void);
+void show_pwr_info(void);
+
+extern int sys_boosted;
+
 #ifdef CONFIG_CGROUP_SCHEDTUNE
 
 int schedtune_cpu_boost(int cpu);
@@ -22,6 +49,8 @@ void schedtune_dequeue_task(struct task_struct *p, int cpu);
 int schedtune_normalize_energy(int energy);
 int schedtune_accept_deltas(int nrg_delta, int cap_delta,
 			    struct task_struct *task);
+
+extern bool global_negative_flag;
 
 #else /* CONFIG_SCHED_TUNE */
 

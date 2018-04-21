@@ -164,7 +164,7 @@ static void mtee_pms_init(struct platform_device *pdev)
 				MODULE_NAME,
 				pm_name, PM_NAME_LEN-1, PM_NAME_LEN-1);
 		}
-		node = of_parse_phandle(pdev->dev.of_node, "pm-devs", 0);
+		node = of_parse_phandle(pdev->dev.of_node, "pm-devs", idx);
 		if (!node)
 			continue;
 
@@ -800,7 +800,7 @@ static long tz_client_tee_service(struct file *file, unsigned long arg,
 	struct kree_tee_service_cmd_param cparam;
 	unsigned long cret;
 	uint32_t tmpTypes;
-	MTEEC_PARAM param[4], oparam[4];
+	union MTEEC_PARAM param[4], oparam[4];
 	int i;
 	TZ_RESULT ret;
 	KREE_SESSION_HANDLE handle;
@@ -1406,10 +1406,12 @@ TZ_RESULT KREE_ServReleaseChunkmemPool(u32 op,
 			u8 uparam[REE_SERVICE_BUFFER_SIZE])
 {
 	if (secure_pages != NULL) {
+		phys_addr_t addr = page_to_phys(secure_pages);
+
 		cma_release(tz_cma, secure_pages,
 				cma_get_size(tz_cma)>>PAGE_SHIFT);
-		pr_warn("%s() release @%llx [0x%zx]\n", __func__,
-				page_to_phys(secure_pages), secure_size);
+		pr_warn("%s() release @%pax [0x%zx]\n", __func__,
+				&addr, secure_size);
 		secure_pages = NULL;
 		secure_size = 0;
 		return TZ_RESULT_SUCCESS;
@@ -1465,7 +1467,7 @@ static TZ_RESULT KREE_IsTeeChunkmemPoolReleasable(int *releasable)
 {
 	TZ_RESULT ret;
 	KREE_SESSION_HANDLE mem_session;
-	MTEEC_PARAM param[4];
+	union MTEEC_PARAM param[4];
 
 	if (releasable == NULL)
 		return TZ_RESULT_ERROR_BAD_FORMAT;

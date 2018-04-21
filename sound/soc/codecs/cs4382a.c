@@ -103,20 +103,6 @@ static const struct reg_default cs4382a_reg_defaults[] = {
 	{ 18, 0x70 },
 };
 
-/* volume linear to db table */
-static const unsigned char vol_linear_to_db[] = {
-50, 40, 34, 30, 28, 26, 24, 23, 22, 21,
-20, 19, 18, 18, 17, 16, 16, 15, 15, 14,
-14, 14, 13, 13, 12, 12, 12, 11, 11, 11,
-10, 10, 10, 10, 9, 9, 9, 9, 8, 8,
-8, 8, 8, 7, 7, 7, 7, 7, 6, 6,
-6, 6, 6, 6, 5, 5, 5, 5, 5, 5,
-4, 4, 4, 4, 4, 4, 4, 3, 3, 3,
-3, 3, 3, 3, 3, 2, 2, 2, 2, 2,
-2, 2, 2, 2, 2, 1, 1, 1, 1, 1,
-1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0
-};
-
 /* Private data for the cs4382a */
 struct cs4382a_private {
 	struct regmap *regmap;
@@ -124,11 +110,9 @@ struct cs4382a_private {
 	unsigned int mode; /* The mode (I2S or left-justified) */
 	unsigned int slave_mode;
 	unsigned int manual_mute;
-	int master_volume;
 	int rst_gpio;
 	/* power domain regulators */
 	struct regulator *supply; /* power for va vd vlc vls */
-	struct mutex mutex;
 };
 
 struct cs4382a_mode_ratios {
@@ -334,63 +318,11 @@ static int cs4382a_hw_params(struct snd_pcm_substream *substream,
  */
 static int cs4382a_dai_mute(struct snd_soc_dai *dai, int mute)
 {
-	struct snd_soc_codec *codec = dai->codec;
-	struct cs4382a_private *cs4382a = snd_soc_codec_get_drvdata(codec);
-	int ret;
-	int val = 0;
-
-	mutex_lock(&cs4382a->mutex);
-	if (cs4382a->master_volume == 0) {
-		dev_err(codec->dev, "current is mute state, do not do any change\n");
-		mutex_unlock(&cs4382a->mutex);
-		return 0;
-	}
-	if (mute){
-		val = 0x80;
-	}
-	else {
-		val = 0x00;
-	}
-	ret = regmap_update_bits(cs4382a->regmap, CS4382A_VOLA1, 0x80, val);
-	if (ret < 0)
-		dev_err(codec->dev, "%s set volume control failed(%d)\n",
-			__func__, ret);
-	mutex_unlock(&cs4382a->mutex);
-
-	return ret;
-}
-
-static int cs4382a_hw_prepare(struct snd_pcm_substream *substream,
-				   struct snd_soc_dai *dai)
-{
-	struct snd_soc_codec *codec = dai->codec;
-	struct cs4382a_private *cs4382a = snd_soc_codec_get_drvdata(codec);
-	int ret;
-
-	ret = regmap_update_bits(cs4382a->regmap, CS4382A_MODE1, CS4382A_MODE1_PDN, 0);
-	if (ret < 0)
-		dev_err(codec->dev, "set cs4382a pdn disable fail(%d)\n", ret);
-
-	return ret;
-}
-
-static void cs4382a_hw_shutdown(struct snd_pcm_substream *substream,
-				    struct snd_soc_dai *dai)
-{
-	struct snd_soc_codec *codec = dai->codec;
-	struct cs4382a_private *cs4382a = snd_soc_codec_get_drvdata(codec);
-	int ret;
-
-	ret = regmap_update_bits(cs4382a->regmap, CS4382A_MODE1, CS4382A_MODE1_PDN, CS4382A_MODE1_PDN);
-	if (ret < 0)
-		dev_err(codec->dev, "%s set cs4382a pdn disable fail(%d)\n", __func__, ret);
-
+	return 0;
 }
 
 static const struct snd_soc_dai_ops cs4382a_dai_ops = {
 	.hw_params	= cs4382a_hw_params,
-	.prepare	= cs4382a_hw_prepare,
-	.shutdown	= cs4382a_hw_shutdown,
 	.set_sysclk	= cs4382a_set_dai_sysclk,
 	.set_fmt	= cs4382a_set_dai_fmt,
 	.digital_mute	= cs4382a_dai_mute,
@@ -465,39 +397,26 @@ static int cs4382a_probe(struct snd_soc_codec *codec)
 
 	ret = regulator_enable(cs4382a->supply);
 	if (ret != 0) {
-		dev_err(codec->dev, "%s supply enable fail:%d\n",
-					__func__, ret);
+		dev_err(codec->dev, "%s supply enable fail:%d\n", __func__, ret);
 		return ret;
 	}
 
 	ret = cs4382a_reset(codec->dev, cs4382a);
 	if (ret != 0) {
-		dev_err(codec->dev, "%s codec reset fail:%d\n",
-					__func__, ret);
+		dev_err(codec->dev, "%s codec reset fail:%d\n", __func__, ret);
 		return ret;
 	}
 
 	/* Set the control port enable*/
 	ret = regmap_update_bits(cs4382a->regmap, CS4382A_MODE1, CS4382A_MODE1_CPEN, CS4382A_MODE1_CPEN);
 	if (ret < 0) {
-		dev_err(codec->dev, "%s set cs4382a control port enable fail(%d)\n",
-					__func__, ret);
+		dev_err(codec->dev, "set cs4382a control port enable fail(%d)\n", ret);
 		return ret;
 	}
-	/* set volume single mode */
-	ret = regmap_update_bits(cs4382a->regmap, CS4382A_MODE3, 0x20, 0x20);
-	if (ret < 0) {
-		dev_err(codec->dev, "%s set volume single control failed(%d)\n",
-					__func__, ret);
-		return ret;
-	}
-	/* mute output */
-	ret = regmap_update_bits(cs4382a->regmap, CS4382A_VOLA1, 0x80, 0x80);
-	if (ret < 0)
-		dev_err(codec->dev, "%s set volume control failed(%d)\n",
-					__func__, ret);
 
-	cs4382a->master_volume = 100;
+	ret = regmap_update_bits(cs4382a->regmap, CS4382A_MODE1, CS4382A_MODE1_PDN, 0);
+	if (ret < 0)
+		dev_err(codec->dev, "set cs4382a pdn disable fail(%d)\n", ret);
 
 	return ret;
 }
@@ -514,7 +433,6 @@ static int cs4382a_remove(struct snd_soc_codec *codec)
 
 	regmap_update_bits(cs4382a->regmap, CS4382A_MODE1, CS4382A_MODE1_PDN, CS4382A_MODE1_PDN);
 	regulator_disable(cs4382a->supply);
-	gpio_set_value(cs4382a->rst_gpio, 0);
 
 	return 0;
 };
@@ -532,63 +450,43 @@ static int cs4382a_remove(struct snd_soc_codec *codec)
 
 static int cs4382a_soc_suspend(struct snd_soc_codec *codec)
 {
+	struct cs4382a_private *cs4382a = snd_soc_codec_get_drvdata(codec);
+
+	regmap_update_bits(cs4382a->regmap, CS4382A_MODE1, CS4382A_MODE1_PDN, CS4382A_MODE1_PDN);
+	regulator_disable(cs4382a->supply);
+
 	return 0;
 }
 
 static int cs4382a_soc_resume(struct snd_soc_codec *codec)
 {
-	return 0;
+	struct cs4382a_private *cs4382a = snd_soc_codec_get_drvdata(codec);
+	int ret;
+
+	ret = regulator_enable(cs4382a->supply);
+	if (ret != 0)
+		return ret;
+
+	/* In case the device was put to hard reset during sleep, we need to
+	 * wait 500ns here before any I2C communication.
+	 */
+	ndelay(500);
+
+	/* first restore the entire register cache ... */
+	regcache_sync(cs4382a->regmap);
+
+	/* ... then disable the power-down bits */
+	ret = regmap_update_bits(cs4382a->regmap, CS4382A_MODE1, CS4382A_MODE1_PDN, 0);
+
+	return ret;
 }
 #else
 #define cs4382a_soc_suspend	NULL
 #define cs4382a_soc_resume	NULL
 #endif /* CONFIG_PM */
 
-static int cs4382a_vol_get(struct snd_kcontrol *kctl,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_component *component = snd_kcontrol_chip(kctl);
-	struct cs4382a_private *cs4382a =
-		snd_soc_component_get_drvdata(component);
-
-	ucontrol->value.integer.value[0] = cs4382a->master_volume;
-	pr_notice("read volume is :%d\n", cs4382a->master_volume);
-
-	return 0;
-}
-
-static int cs4382a_vol_put(struct snd_kcontrol *kctl,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_component *component = snd_kcontrol_chip(kctl);
-	struct cs4382a_private *cs4382a =
-		snd_soc_component_get_drvdata(component);
-	int value, db, ret;
-
-	mutex_lock(&cs4382a->mutex);
-	value = ucontrol->value.integer.value[0];
-	pr_notice("volume setting is :%d\n", value);
-	db = (int)(vol_linear_to_db[value]);
-	/* if set volume to -100db, do mute enable */
-	if (value == 0)
-		db |= 0x80;
-	else
-		db &= 0x7F;
-
-	ret = regmap_write(cs4382a->regmap, CS4382A_VOLA1, db);
-	if (ret < 0) {
-		pr_err("%s failed(%d) to set volume control\n",
-			__func__, ret);
-	}
-	cs4382a->master_volume = value;
-	mutex_unlock(&cs4382a->mutex);
-	return ret;
-}
-
-
 static const struct snd_kcontrol_new cs4382a_controls[] = {
 	SOC_SINGLE("Amute H/L Switch", CS4382A_MODE3, 3, 1, 0),
-	SOC_SINGLE("VOL Single Switch", CS4382A_MODE3, 5, 1, 0),
 	SOC_SINGLE("DAC MuteA1 Switch", CS4382A_VOLA1, 7, 1, 0),
 	SOC_SINGLE("DAC MuteB1 Switch", CS4382A_VOLB1, 7, 1, 0),
 	SOC_SINGLE("DAC MuteA2 Switch", CS4382A_VOLA2, 7, 1, 0),
@@ -597,13 +495,6 @@ static const struct snd_kcontrol_new cs4382a_controls[] = {
 	SOC_SINGLE("DAC MuteB3 Switch", CS4382A_VOLB3, 7, 1, 0),
 	SOC_SINGLE("DAC MuteA4 Switch", CS4382A_VOLA4, 7, 1, 0),
 	SOC_SINGLE("DAC MuteB4 Switch", CS4382A_VOLB4, 7, 1, 0),
-	SOC_SINGLE_EXT("DAC Master Volume",
-			    0,
-			    0,
-			    100,
-			    0,
-			    cs4382a_vol_get,
-			    cs4382a_vol_put),
 };
 
 /*
@@ -614,8 +505,8 @@ static const struct snd_soc_codec_driver soc_codec_device_cs4382a = {
 	.remove =		cs4382a_remove,
 	.suspend =		cs4382a_soc_suspend,
 	.resume =		cs4382a_soc_resume,
-	.controls =		cs4382a_controls,
-	.num_controls =		ARRAY_SIZE(cs4382a_controls),
+	.controls = cs4382a_controls,
+	.num_controls = ARRAY_SIZE(cs4382a_controls),
 };
 
 /*
@@ -689,7 +580,7 @@ static int cs4382a_i2c_probe(struct i2c_client *i2c_client,
 			__func__, ret);
 		return ret;
 	}
-	mutex_init(&cs4382a->mutex);
+
 	cs4382a_gpio_probe(&i2c_client->dev, cs4382a);
 
 	cs4382a->regmap = devm_regmap_init_i2c(i2c_client, &cs4382a_regmap);

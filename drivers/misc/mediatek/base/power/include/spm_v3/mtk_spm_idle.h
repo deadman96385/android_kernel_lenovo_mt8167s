@@ -27,13 +27,6 @@
 #define spm_idle_info(fmt, args...)		pr_debug(TAG fmt, ##args)
 #define spm_idle_ver(fmt, args...)		pr_debug(TAG fmt, ##args)	/* pr_debug show nothing */
 
-#ifdef SPM_SODI_PROFILE_TIME
-#define SPM_SODI_PROFILE_APXGPT     GPT2
-#endif
-#ifdef SPM_SODI3_PROFILE_TIME
-#define SPM_SODI3_PROFILE_APXGPT    GPT2
-#endif
-
 /*
  * for SPM common part
  */
@@ -56,8 +49,8 @@ extern long int spm_get_current_time_ms(void);
 void spm_deepidle_init(void);
 void spm_dpidle_before_wfi(int cpu);		 /* can be redefined */
 void spm_dpidle_after_wfi(int cpu, u32 spm_debug_flag);		 /* can be redefined */
-wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 log_cond, u32 operation_cond);
-wake_reason_t spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data);
+unsigned int spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 log_cond, u32 operation_cond);
+unsigned int spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data);
 int spm_set_dpidle_wakesrc(u32 wakesrc, bool enable, bool replace);
 bool spm_set_dpidle_pcm_init_flag(void);
 
@@ -68,12 +61,14 @@ bool spm_set_dpidle_pcm_init_flag(void);
 #define DEEPIDLE_OPT_VCORE_LP_MODE       (1 << 0)
 #define DEEPIDLE_OPT_DUMP_LP_GOLDEN      (1 << 1)
 #define DEEPIDLE_OPT_XO_UFS_ON_OFF       (1 << 2)
+#define DEEPIDLE_OPT_UFSCARD_MUX_SWITCH  (1 << 3)
+#define DEEPIDLE_OPT_CLKBUF_BBLPM        (1 << 4)
 
 /*
  * for Screen On Deep Idle 3.0
  */
 void spm_sodi3_init(void);
-wake_reason_t spm_go_to_sodi3(u32 spm_flags, u32 spm_data, u32 sodi_flags, u32 operation_cond);
+unsigned int spm_go_to_sodi3(u32 spm_flags, u32 spm_data, u32 sodi_flags, u32 operation_cond);
 void spm_enable_sodi3(bool);
 bool spm_get_sodi3_en(void);
 
@@ -81,7 +76,7 @@ bool spm_get_sodi3_en(void);
  * for Screen On Deep Idle
  */
 void spm_sodi_init(void);
-wake_reason_t spm_go_to_sodi(u32 spm_flags, u32 spm_data, u32 sodi_flags, u32 operation_cond);
+unsigned int spm_go_to_sodi(u32 spm_flags, u32 spm_data, u32 sodi_flags, u32 operation_cond);
 void spm_enable_sodi(bool);
 bool spm_get_sodi_en(void);
 
@@ -94,6 +89,7 @@ enum mt_sodi_flag {
 	SODI_FLAG_RESIDENCY         = (1 << 1),
 	SODI_FLAG_RESOURCE_USAGE    = (1 << 2),
 	SODI_FLAG_DUMP_LP_GS        = (1 << 3),
+	SODI_FLAG_3P0               = (1 << 8),
 };
 
 /*
@@ -114,5 +110,13 @@ bool spm_mcdi_can_enter(void);
 bool spm_is_cpu_irq_occur(int core_id);
 
 bool go_to_mcidle(int cpu);
+
+/*
+ * for Multi Core Screen On/Off Deep Idle
+ */
+void spm_mcsodi_init(void);
+void spm_go_to_mcsodi(u32 spm_flags, u32 spm_data, u32 mcsodi_flags, u32 operation_cond);
+int spm_leave_mcsodi(u32 cpu, u32 operation_cond);
+bool spm_mcsodi_start(void);
 
 #endif

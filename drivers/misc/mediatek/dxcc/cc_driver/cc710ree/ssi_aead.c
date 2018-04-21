@@ -181,7 +181,7 @@ static int ssi_aead_init(struct crypto_aead *tfm)
 	struct device *dev;
 
 	SSI_LOG_DEBUG("Initializing context @%p for %s\n", ctx, crypto_tfm_alg_name(&tfm->base));
-	CHECK_AND_RETURN_UPON_FIPS_ERROR();
+	CHECK_AND_RETURN_UPON_FIPS_TEE_ERROR();
 
 	/* Initialize modes in instance */
 	ctx->cipher_mode = ssi_alg->cipher_mode;
@@ -3003,6 +3003,8 @@ int ssi_aead_alloc(struct ssi_drvdata *drvdata)
 
 	/* Linux crypto */
 	for (alg = 0; alg < ARRAY_SIZE(aead_algs); alg++) {
+		if (aead_algs[alg].synchronous)
+			continue;
 		t_alg = ssi_aead_create_alg(&aead_algs[alg]);
 		if (IS_ERR(t_alg)) {
 			rc = PTR_ERR(t_alg);

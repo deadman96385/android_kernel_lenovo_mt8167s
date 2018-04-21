@@ -111,6 +111,12 @@ else								\
 #define CMDQ_THREAD_SEC_SUB_DISP		13
 #define CMDQ_THREAD_SEC_MDP				14
 
+/* max count of regs */
+#define CMDQ_MAX_COMMAND_SIZE		(0x10000)
+#define CMDQ_MAX_DUMP_REG_COUNT		(2048)
+#define CMDQ_MAX_WRITE_ADDR_COUNT	(PAGE_SIZE / sizeof(u32))
+#define CMDQ_MAX_DBG_STR_LEN		1024
+
 #ifdef CMDQ_DUMP_FIRSTERROR
 #ifdef CMDQ_LARGE_MAX_FIRSTERROR_BUFFER
 #define CMDQ_MAX_FIRSTERROR	(64*1024)
@@ -130,35 +136,31 @@ struct DumpFirstErrorStruct {
 #endif
 
 #define CMDQ_LOG(string, args...) \
-{			\
-if (1) {	\
-	pr_err("[CMDQ]"string, ##args); \
+do {			\
+	pr_notice("[CMDQ]"string, ##args); \
 	cmdq_core_save_first_dump("[CMDQ]"string, ##args); \
-}			\
-}
+} while (0)
 
 #define CMDQ_MSG(string, args...) \
-{			\
+do {			\
 if (cmdq_core_should_print_msg()) { \
-	pr_warn("[CMDQ]"string, ##args); \
+	pr_notice("[CMDQ]"string, ##args); \
 }			\
-}
+} while (0)
 
 #define CMDQ_VERBOSE(string, args...) \
-{			\
+do {			\
 if (cmdq_core_should_print_msg()) { \
 	pr_debug("[CMDQ]"string, ##args); \
 }			\
-}
-
+} while (0)
 
 #define CMDQ_ERR(string, args...) \
-{			\
-if (1) {	\
-	pr_err("[CMDQ][ERR]"string, ##args); \
+do {			\
+	pr_notice("[CMDQ][ERR]"string, ##args); \
 	cmdq_core_save_first_dump("[CMDQ][ERR]"string, ##args); \
-}			\
-}
+} while (0)
+
 #ifdef CMDQ_AEE_READY
 #define CMDQ_AEE_EX(DB_OPTs, tag, string, args...) \
 {		\
@@ -185,8 +187,8 @@ do {			\
 do {			\
 	char dispatchedTag[50]; \
 	snprintf(dispatchedTag, 50, "CRDISPATCH_KEY:%s", tag); \
-	pr_err("[CMDQ][AEE] AEE not READY!!!"); \
-	pr_err("[CMDQ][AEE]"string, ##args); \
+	pr_debug("[CMDQ][AEE] AEE not READY!!!"); \
+	pr_debug("[CMDQ][AEE]"string, ##args); \
 	cmdq_core_save_first_dump("[CMDQ][AEE]"string, ##args); \
 	cmdq_core_turnoff_first_dump(); \
 } while (0);	\
@@ -253,6 +255,9 @@ CMDQ_TIME _duration = end - start;		\
 do_div(_duration, 1000);				\
 target += (int32_t)_duration;			\
 }
+
+#define CMDQ_TASK_PRIVATE(task) ((struct TaskPrivateStruct *)task->privateData)
+#define CMDQ_TASK_IS_INTERNAL(task) (task->privateData && (CMDQ_TASK_PRIVATE(task)->internal))
 
 #define CMDQ_ENG_ISP_GROUP_FLAG(flag)   ((flag) & (CMDQ_ENG_ISP_GROUP_BITS))
 
@@ -464,6 +469,12 @@ struct CmdBufferStruct {
 struct CmdFreeWorkStruct {
 	struct list_head cmd_buffer_list;
 	struct work_struct free_buffer_work;
+};
+
+struct TaskPrivateStruct {
+	void *node_private_data;
+	bool internal;		/* internal used only task */
+	bool ignore_timeout;	/* timeout is expected */
 };
 
 struct TaskStruct {
@@ -714,6 +725,12 @@ struct DumpCommandBufferStruct {
 	char *cmdqString;
 };
 
+typedef void (*cmdqStressCallback)(struct TaskStruct *task, s32 thread);
+
+struct StressContextStruct {
+	cmdqStressCallback exec_suspend;
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -825,15 +842,13 @@ extern "C" {
  */
 	int32_t cmdqCoreSubmitTask(struct cmdqCommandStruct *pCommandDesc);
 
-
 /**
- * Helper function checking validity of a task pointer
+ * Helper function get valid task pointer
  *
  * Return:
- *     false if NOT a valid pointer
- *     true if valid
+ *     task pointer if available
  */
-	bool cmdqIsValidTaskPtr(void *pTask);
+	struct TaskStruct *cmdq_core_get_task_ptr(void *task_handle);
 
 /**
  * Immediately clear CMDQ event to 0 with CPU
@@ -919,6 +934,7 @@ extern "C" {
 					  uint32_t **regAddress);
 	int32_t cmdqCoreDebugRegDumpEnd(uint32_t taskID, uint32_t regCount, uint32_t *regValues);
 	int32_t cmdqCoreDebugDumpCommand(struct TaskStruct *pTask);
+	void cmdqCoreDumpCommandMem(const u32 *pCmd, s32 commandSize);
 	int32_t cmdqCoreQueryUsage(int32_t *pCount);
 
 	int cmdqCorePrintRecordSeq(struct seq_file *m, void *v);
@@ -985,6 +1001,7 @@ extern "C" {
  */
 	void cmdq_core_turnon_first_dump(const struct TaskStruct *pTask);
 	void cmdq_core_turnoff_first_dump(void);
+	void cmdq_core_reset_first_dump(void);
 /**
  * cmdq_core_save_first_dump - save a CMDQ first error dump to file
  */
@@ -1026,6 +1043,8 @@ extern "C" {
 								CmdqResourceReleaseCB resourceRelease);
 
 	void cmdq_core_dump_dts_setting(void);
+	int32_t cmdq_core_get_running_task_by_engine_unlock(uint64_t engineFlag,
+		uint32_t userDebugStrLen, struct TaskStruct *p_out_task);
 	int32_t cmdq_core_get_running_task_by_engine(uint64_t engineFlag,
 		uint32_t userDebugStrLen, struct TaskStruct *p_out_task);
 	uint32_t cmdq_core_thread_prefetch_size(const int32_t thread);
@@ -1037,6 +1056,9 @@ extern "C" {
 	void cmdq_core_set_mem_monitor(bool enable);
 	void cmdq_core_dump_mem_monitor(void);
 	struct ContextStruct *cmdq_core_get_cmdqcontext(void);
+	void cmdq_core_dump_task_mem(const struct TaskStruct *pTask);
+	struct StressContextStruct *cmdq_core_get_stress_context(void);
+	void cmdq_core_clean_stress_context(void);
 	bool cmdq_core_is_clock_enabled(void);
 #ifdef __cplusplus
 }

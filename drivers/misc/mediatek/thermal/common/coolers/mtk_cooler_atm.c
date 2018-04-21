@@ -21,8 +21,11 @@
 #include "mt-plat/mtk_thermal_monitor.h"
 #include "mach/mtk_thermal.h"
 #include "mt-plat/mtk_thermal_platform.h"
+#if defined(CONFIG_MTK_CLKMGR)
 #include <mach/mtk_clkmgr.h>
-
+#else
+#include <linux/clk.h>
+#endif
 #include <mach/wd_api.h>
 #include <linux/slab.h>
 #include <linux/seq_file.h>
@@ -244,9 +247,28 @@ static int CATMP_STEADY_TTJ_DELTA = 10000; /* magic number decided by experience
 #endif	/* end of CPT_ADAPTIVE_AP_COOLER */
 
 #ifdef FAST_RESPONSE_ATM
+#define KRTATM_HR	(1)
+#define KRTATM_NORMAL	(2)
+#define KRTATM_TIMER	KRTATM_NORMAL
+
 #define TS_MS_TO_NS(x) (x * 1000 * 1000)
-static struct hrtimer atm_hrtimer;
-static unsigned long atm_hrtimer_polling_delay = TS_MS_TO_NS(CLATM_INIT_HRTIMER_POLLING_DELAY);
+#if KRTATM_TIMER == KRTATM_HR
+	static struct hrtimer atm_hrtimer;
+	static unsigned long atm_hrtimer_polling_delay = TS_MS_TO_NS(CLATM_INIT_HRTIMER_POLLING_DELAY);
+#elif KRTATM_TIMER == KRTATM_NORMAL
+	static struct timer_list atm_timer;
+	static unsigned long atm_timer_polling_delay = CLATM_INIT_HRTIMER_POLLING_DELAY;
+	/**
+	 * If curr_temp >= polling_trip_temp1, use interval
+	 * else if cur_temp >= polling_trip_temp2 && curr_temp < polling_trip_temp1,
+	 * use interval*polling_factor1
+	 * else, use interval*polling_factor2
+	 */
+	static int polling_trip_temp1 = 65000;
+	static int polling_trip_temp2 = 40000;
+	static int polling_factor1 = 2;
+	static int polling_factor2 = 4;
+#endif
 static int atm_curr_maxtj;
 static int atm_prev_maxtj;
 static int krtatm_curr_maxtj;
@@ -400,6 +422,9 @@ int get_target_tj(void)
 /* ATM in SSPM requires ATM, PPB, CATM */
 static int atm_sspm_enabled;
 static int atm_prev_active_atm_cl_id = -100;
+
+static DEFINE_MUTEX(atm_cpu_lmt_mutex);
+static DEFINE_MUTEX(atm_gpu_lmt_mutex);
 
 static int atm_update_atm_param_to_sspm(void)
 {
@@ -606,8 +631,20 @@ static void atm_profile_gpu_power_limit(s64 latest_latency)
 
 static void set_adaptive_cpu_power_limit(unsigned int limit)
 {
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+#if THERMAL_ENABLE_TINYSYS_SSPM && CPT_ADAPTIVE_AP_COOLER && PRECISE_HYBRID_POWER_BUDGET && CONTINUOUS_TM
+	mutex_lock(&atm_cpu_lmt_mutex);
+#endif
+#endif
+
 	prv_adp_cpu_pwr_lim = adaptive_cpu_power_limit;
 	adaptive_cpu_power_limit = (limit != 0) ? limit : 0x7FFFFFFF;
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+#if THERMAL_ENABLE_TINYSYS_SSPM && CPT_ADAPTIVE_AP_COOLER && PRECISE_HYBRID_POWER_BUDGET && CONTINUOUS_TM
+	if (atm_sspm_enabled)
+		adaptive_cpu_power_limit = 0x7FFFFFFF;
+#endif
+#endif
 
 	if (prv_adp_cpu_pwr_lim != adaptive_cpu_power_limit) {
 #ifdef ATM_CFG_PROFILING
@@ -655,12 +692,31 @@ static void set_adaptive_cpu_power_limit(unsigned int limit)
 		}
 #endif
 	}
+
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+#if THERMAL_ENABLE_TINYSYS_SSPM && CPT_ADAPTIVE_AP_COOLER && PRECISE_HYBRID_POWER_BUDGET && CONTINUOUS_TM
+	mutex_unlock(&atm_cpu_lmt_mutex);
+#endif
+#endif
 }
 
 static void set_adaptive_gpu_power_limit(unsigned int limit)
 {
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+#if THERMAL_ENABLE_TINYSYS_SSPM && CPT_ADAPTIVE_AP_COOLER && PRECISE_HYBRID_POWER_BUDGET && CONTINUOUS_TM
+		mutex_lock(&atm_gpu_lmt_mutex);
+#endif
+#endif
+
 	prv_adp_gpu_pwr_lim = adaptive_gpu_power_limit;
 	adaptive_gpu_power_limit = (limit != 0) ? limit : 0x7FFFFFFF;
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+#if THERMAL_ENABLE_TINYSYS_SSPM && CPT_ADAPTIVE_AP_COOLER && PRECISE_HYBRID_POWER_BUDGET && CONTINUOUS_TM
+	if (atm_sspm_enabled)
+		adaptive_gpu_power_limit = 0x7FFFFFFF;
+#endif
+#endif
+
 	if (prv_adp_gpu_pwr_lim != adaptive_gpu_power_limit) {
 #ifdef ATM_CFG_PROFILING
 		ktime_t now, delta;
@@ -681,6 +737,12 @@ static void set_adaptive_gpu_power_limit(unsigned int limit)
 #endif
 
 	}
+
+#ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
+#if THERMAL_ENABLE_TINYSYS_SSPM && CPT_ADAPTIVE_AP_COOLER && PRECISE_HYBRID_POWER_BUDGET && CONTINUOUS_TM
+	mutex_unlock(&atm_gpu_lmt_mutex);
+#endif
+#endif
 }
 
 #if CPT_ADAPTIVE_AP_COOLER
@@ -767,9 +829,11 @@ static int _get_current_gpu_power(void)
 	unsigned int cur_gpu_power = 0;
 	int i = 0;
 
-	for (; i < Num_of_GPU_OPP; i++)
-		if (mtk_gpu_power[i].gpufreq_khz == cur_gpu_freq)
-			cur_gpu_power = mtk_gpu_power[i].gpufreq_power;
+	if (mtk_gpu_power != NULL) {
+		for (; i < Num_of_GPU_OPP; i++)
+			if (mtk_gpu_power[i].gpufreq_khz == cur_gpu_freq)
+				cur_gpu_power = mtk_gpu_power[i].gpufreq_power;
+	}
 
 	return (int) cur_gpu_power;
 }
@@ -911,6 +975,7 @@ static int P_adaptive(int total_power, unsigned int gpu_loading)
 				gpu_power = MAX(gpu_power, MINIMUM_GPU_POWER);
 			} else {
 				gpu_power = MIN(highest_possible_gpu_power, cur_gpu_power);
+				gpu_power = MAX(gpu_power, MINIMUM_GPU_POWER);
 			}
 		}  else {
 			gpu_power = 0;
@@ -1008,6 +1073,20 @@ static int phpb_calc_delta(int curr_temp, int prev_temp)
 	delta = __phpb_calc_delta(curr_temp, prev_temp, param_idx);
 
 	return delta;
+}
+
+/* get current power from current opp, real value, does not set minimum */
+int clatm_get_curr_opp_power(void)
+{
+	int cpu_power = 0, gpu_power = 0;
+
+	cpu_power = (int) mt_ppm_thermal_get_cur_power();
+	gpu_power = _get_current_gpu_power();
+
+	tscpu_dprintk("%s cpu power=%d gpu power=%d\n",
+		__func__, cpu_power, gpu_power);
+
+	return cpu_power + gpu_power;
 }
 
 /* calculated total power based on current opp */
@@ -1629,6 +1708,10 @@ static ssize_t tscpu_write_atm_setting(struct file *file, const char __user *buf
 
 			active_adp_cooler = i_id;
 
+			/* --- SPA parameters --- */
+			thermal_spa_t.t_spa_Tpolicy_info.min_cpu_power[i_id] = MINIMUM_CPU_POWERS[i_id];
+			thermal_spa_t.t_spa_Tpolicy_info.min_gpu_power[i_id] = MINIMUM_GPU_POWERS[i_id];
+
 			tscpu_printk("tscpu_write_dtm_setting applied %d %d %d %d %d %d %d %d %d\n",
 				     i_id, FIRST_STEP_TOTAL_POWER_BUDGETS[i_id],
 				     PACKAGE_THETA_JA_RISES[i_id], PACKAGE_THETA_JA_FALLS[i_id],
@@ -1936,6 +2019,10 @@ static ssize_t tscpu_write_ctm(struct file *file, const char __user *buffer, siz
 		}
 		/* --- cATM+ parameters --- */
 
+		/* --- SPA parameters --- */
+		thermal_spa_t.t_spa_Tpolicy_info.steady_target_tj = STEADY_TARGET_TJ;
+		thermal_spa_t.t_spa_Tpolicy_info.steady_exit_tj = STEADY_EXIT_TJ;
+
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
 #if THERMAL_ENABLE_TINYSYS_SSPM && CPT_ADAPTIVE_AP_COOLER && PRECISE_HYBRID_POWER_BUDGET && CONTINUOUS_TM
 		atm_update_catm_param_to_sspm();
@@ -2033,7 +2120,8 @@ static void phpb_params_init(void)
 	phpb_params[PHPB_PARAM_CPU].tt = 20;
 	phpb_params[PHPB_PARAM_CPU].tp = 20;
 #endif
-	strcpy(phpb_params[PHPB_PARAM_CPU].type, "cpu");
+	strncpy(phpb_params[PHPB_PARAM_CPU].type, "cpu", 3);
+	phpb_params[PHPB_PARAM_CPU].type[3] = '\0';
 
 #if defined(CLATM_SET_INIT_CFG)
 	phpb_params[PHPB_PARAM_GPU].tt = CLATM_INIT_CFG_PHPB_GPU_TT;
@@ -2042,7 +2130,8 @@ static void phpb_params_init(void)
 	phpb_params[PHPB_PARAM_GPU].tt = 80;
 	phpb_params[PHPB_PARAM_GPU].tp = 80;
 #endif
-	strcpy(phpb_params[PHPB_PARAM_GPU].type, "gpu");
+	strncpy(phpb_params[PHPB_PARAM_GPU].type, "gpu", 3);
+	phpb_params[PHPB_PARAM_GPU].type[3] = '\0';
 }
 #endif	/* PRECISE_HYBRID_POWER_BUDGET */
 
@@ -2092,6 +2181,12 @@ static ssize_t atm_sspm_write(struct file *file, const char __user *buffer, size
 		} else if (t_enabled == 1) {
 			int ret = 0;
 
+			/* Fix the problem that mMc mMg not updated when trip point is not reached. */
+			MINIMUM_CPU_POWER = MINIMUM_CPU_POWERS[0];
+			MAXIMUM_CPU_POWER = MAXIMUM_CPU_POWERS[0];
+			MINIMUM_GPU_POWER = MINIMUM_GPU_POWERS[0];
+			MAXIMUM_GPU_POWER = MAXIMUM_GPU_POWERS[0];
+
 			ret = atm_update_atm_param_to_sspm();
 			if (ret == -2) {
 				tscpu_printk("%s atm in sspm not supported!\n", __func__);
@@ -2103,6 +2198,8 @@ static ssize_t atm_sspm_write(struct file *file, const char __user *buffer, size
 			atm_update_ttj_to_sspm();
 			atm_enable_atm_in_sspm(1);
 			atm_sspm_enabled = 1;
+			set_adaptive_cpu_power_limit(0);
+			set_adaptive_gpu_power_limit(0);
 		}
 
 		return count;
@@ -2299,6 +2396,8 @@ static void tscpu_cooler_create_fs(void)
 }
 
 #ifdef FAST_RESPONSE_ATM
+
+#if KRTATM_TIMER == KRTATM_HR
 void atm_cancel_hrtimer(void)
 {
 	hrtimer_try_to_cancel(&atm_hrtimer);
@@ -2334,15 +2433,50 @@ static unsigned long atm_get_timeout_time(int curr_temp)
 #endif
 }
 
+#elif KRTATM_TIMER == KRTATM_NORMAL
+
+void atm_cancel_hrtimer(void)
+{
+}
+
+void atm_restart_hrtimer(void)
+{
+}
+
+static unsigned long atm_get_timeout_time(int curr_temp)
+{
+
+#ifdef ATM_CFG_PROFILING
+	return atm_timer_polling_delay;
+#else
+
+	if (curr_temp >= polling_trip_temp1)
+		return atm_timer_polling_delay;
+	else if (curr_temp < polling_trip_temp2)
+		return atm_timer_polling_delay * polling_factor2;
+	else
+		return atm_timer_polling_delay * polling_factor1;
+#endif
+}
+#endif
+
+
+#if KRTATM_TIMER == KRTATM_HR
 static enum hrtimer_restart atm_loop(struct hrtimer *timer)
 {
 	ktime_t ktime;
+#elif KRTATM_TIMER == KRTATM_NORMAL
+static int atm_loop(void)
+{
+#endif
 	int temp;
 	static int hasDisabled;
 	char buffer[128];
 	unsigned long polling_time;
+#if KRTATM_TIMER == KRTATM_HR
 	unsigned long polling_time_s;
 	unsigned long polling_time_ns;
+#endif
 
 	tscpu_workqueue_start_timer();
 
@@ -2395,7 +2529,8 @@ static enum hrtimer_restart atm_loop(struct hrtimer *timer)
 #endif
 #endif
 
-	wake_up_process(krtatm_thread_handle);
+	if (krtatm_thread_handle != NULL)
+		wake_up_process(krtatm_thread_handle);
 
 
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
@@ -2405,6 +2540,8 @@ exit:
 #endif
 
 	polling_time = atm_get_timeout_time(atm_curr_maxtj);
+
+#if KRTATM_TIMER == KRTATM_HR
 
 	/*avoid overflow*/
 	if (polling_time > (1000000000-1)) {
@@ -2419,8 +2556,17 @@ exit:
 	hrtimer_forward_now(timer, ktime);
 
 	return HRTIMER_RESTART;
+#elif KRTATM_TIMER == KRTATM_NORMAL
+
+	atm_timer.expires = jiffies + msecs_to_jiffies(polling_time);
+	add_timer(&atm_timer);
+
+	return 0;
+#endif
+
 }
 
+#if KRTATM_TIMER == KRTATM_HR
 static void atm_hrtimer_init(void)
 {
 	ktime_t ktime;
@@ -2438,6 +2584,23 @@ static void atm_hrtimer_init(void)
 	atm_hrtimer.function = atm_loop;
 	hrtimer_start(&atm_hrtimer, ktime, HRTIMER_MODE_REL);
 }
+#elif KRTATM_TIMER == KRTATM_NORMAL
+
+static void atm_timer_init(void)
+{
+	tscpu_dprintk("%s\n", __func__);
+
+	/*polling delay can't larger than 100ms*/
+	atm_timer_polling_delay = (atm_timer_polling_delay < 100) ?
+		atm_timer_polling_delay : 100;
+
+	init_timer_deferrable(&atm_timer);
+	atm_timer.function = (void *)&atm_loop;
+	atm_timer.data = (unsigned long)&atm_timer;
+	atm_timer.expires = jiffies + msecs_to_jiffies(atm_timer_polling_delay);
+	add_timer(&atm_timer);
+}
+#endif
 
 #define KRTATM_RT	(1)
 #define KRTATM_CFS	(2)
@@ -2559,7 +2722,12 @@ static int __init mtk_cooler_atm_init(void)
 	tscpu_cooler_create_fs();
 
 #ifdef FAST_RESPONSE_ATM
+
+#if KRTATM_TIMER == KRTATM_HR
 	atm_hrtimer_init();
+#elif KRTATM_SCH == KRTATM_NORMAL
+	atm_timer_init();
+#endif
 
 	tscpu_dprintk("%s creates krtatm\n", __func__);
 	krtatm_thread_handle = kthread_create(krtatm_thread, (void *)NULL, "krtatm");
@@ -2579,7 +2747,12 @@ static int __init mtk_cooler_atm_init(void)
 static void __exit mtk_cooler_atm_exit(void)
 {
 #ifdef FAST_RESPONSE_ATM
+
+#if KRTATM_TIMER == KRTATM_HR
 	hrtimer_cancel(&atm_hrtimer);
+#elif KRTATM_SCH == KRTATM_NORMAL
+	del_timer(&atm_timer);
+#endif
 
 	if (krtatm_thread_handle)
 		kthread_stop(krtatm_thread_handle);

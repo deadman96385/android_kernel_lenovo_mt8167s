@@ -24,6 +24,7 @@
 #include "mtk_spm_vcore_dvfs.h"
 #include "mtk_vcorefs_governor.h"
 #include "mtk_spm_internal.h"
+#include "mtk_spm_resource_req_internal.h"
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
@@ -55,17 +56,45 @@
 #endif
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
 #include "mtk_dramc.h"
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+#include "mt6355/mtk_pmic_api_buck.h"
+#include "mt-plat/mtk_rtc.h"
+#endif
 #endif
 #ifndef dmac_map_area
 #define dmac_map_area __dma_map_area
 #endif
 
+#include <mt-plat/mtk_cirq.h>
+
 static struct dentry *spm_dir;
 static struct dentry *spm_file;
 struct platform_device *pspmdev;
 static int dyna_load_pcm_done __nosavedata;
+static int dyna_load_pcm_progress;
+static int dyna_load_pcm_addr_2nd;
+#define LOAD_FW_BY_DEV 0
+#define LOAD_FW_BY_HIB 1
+#define LOAD_FW_BY_AEE 2
 
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+static char *dyna_load_pcm_path[] = {
+	[DYNA_LOAD_PCM_SUSPEND] = "pcm_suspend_mt6355.bin",
+	[DYNA_LOAD_PCM_SUSPEND_BY_MP1] = "pcm_suspend_by_mp1_mt6355.bin",
+	[DYNA_LOAD_PCM_SUSPEND_LPDDR4] = "pcm_suspend_lpddr4_mt6355.bin",
+	[DYNA_LOAD_PCM_SUSPEND_LPDDR4_BY_MP1] = "pcm_suspend_lpddr4_by_mp1_mt6355.bin",
+	[DYNA_LOAD_PCM_SODI] = "pcm_sodi_ddrdfs_mt6355.bin",
+	[DYNA_LOAD_PCM_SODI_BY_MP1] = "pcm_sodi_ddrdfs_by_mp1_mt6355.bin",
+	[DYNA_LOAD_PCM_SODI_LPDDR4] = "pcm_sodi_ddrdfs_lpddr4_mt6355.bin",
+	[DYNA_LOAD_PCM_SODI_LPDDR4_BY_MP1] = "pcm_sodi_ddrdfs_lpddr4_by_mp1_mt6355.bin",
+	[DYNA_LOAD_PCM_DEEPIDLE] = "pcm_deepidle_mt6355.bin",
+	[DYNA_LOAD_PCM_DEEPIDLE_BY_MP1] = "pcm_deepidle_by_mp1_mt6355.bin",
+	[DYNA_LOAD_PCM_DEEPIDLE_LPDDR4] = "pcm_deepidle_lpddr4_mt6355.bin",
+	[DYNA_LOAD_PCM_DEEPIDLE_LPDDR4_BY_MP1] = "pcm_deepidle_lpddr4_by_mp1_mt6355.bin",
+	[DYNA_LOAD_PCM_MAX] = "pcm_path_max",
+};
+#else
 static char *dyna_load_pcm_path[] = {
 	[DYNA_LOAD_PCM_SUSPEND] = "pcm_suspend.bin",
 	[DYNA_LOAD_PCM_SUSPEND_BY_MP1] = "pcm_suspend_by_mp1.bin",
@@ -81,6 +110,7 @@ static char *dyna_load_pcm_path[] = {
 	[DYNA_LOAD_PCM_DEEPIDLE_LPDDR4_BY_MP1] = "pcm_deepidle_lpddr4_by_mp1.bin",
 	[DYNA_LOAD_PCM_MAX] = "pcm_path_max",
 };
+#endif
 
 MODULE_FIRMWARE(dyna_load_pcm_path[DYNA_LOAD_PCM_SUSPEND]);
 MODULE_FIRMWARE(dyna_load_pcm_path[DYNA_LOAD_PCM_SUSPEND_BY_MP1]);
@@ -171,6 +201,11 @@ void __attribute__((weak)) spm_sodi_init(void)
 }
 
 void __attribute__((weak)) spm_mcdi_init(void)
+{
+
+}
+
+void __attribute__((weak)) spm_mcsodi_init(void)
 {
 
 }
@@ -613,10 +648,15 @@ static void spm_register_init(void)
 	spm_write(PCM_PWR_IO_EN, PCM_RF_SYNC_R7);
 	spm_write(PCM_PWR_IO_EN, 0);
 
+#if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+	/* init cg status for MC-SODI */
+	spm_write(SPM_BSI_CLK_SR, 1);
+#endif
+
 	spin_unlock_irqrestore(&__spm_lock, flags);
 }
 
-int spm_module_init(void)
+int __init spm_module_init(void)
 {
 	int r = 0;
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
@@ -638,6 +678,11 @@ int spm_module_init(void)
 		r = -EPERM;
 #endif
 
+#ifdef CONFIG_FAST_CIRQ_CLONE_FLUSH
+	set_wakeup_sources(edge_trig_irqs, NF_EDGE_TRIG_IRQS);
+#endif
+
+
 #if 0
 #ifdef CONFIG_MTK_WD_KICKER
 	get_wd_api(&wd_api);
@@ -652,6 +697,7 @@ int spm_module_init(void)
 	spm_sodi3_init();
 	spm_sodi_init();
 	spm_mcdi_init();
+	spm_mcsodi_init();
 	spm_deepidle_init();
 #if 1				/* FIXME: wait for DRAMC golden setting enable */
 	if (spm_golden_setting_cmp(1) != 0) {
@@ -663,6 +709,9 @@ int spm_module_init(void)
 	spm_set_dummy_read_addr();
 
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+	/* TODO: needs to add support of MT6355 */
+#else
 	/* debug code */
 	r = pmic_read_interface_nolock(MT6351_WDTDBG_CON1, &reg_val, 0xffff, 0);
 	spm_crit("[PMIC]wdtdbg_con1 : 0x%x\n", reg_val);
@@ -674,6 +723,7 @@ int spm_module_init(void)
 	spm_crit("[PMIC]vcore vosel_on=0x%x\n", reg_val);
 	r = pmic_read_interface_nolock(MT6351_WDTDBG_CON1, &reg_val, 0xffff, 0);
 	spm_crit("[PMIC]wdtdbg_con1-after : 0x%x\n", reg_val);
+#endif
 #endif
 #endif
 /* set Vcore DVFS bootup opp by ddr shuffle opp */
@@ -790,6 +840,8 @@ int spm_load_pcm_firmware(struct platform_device *pdev)
 		spm_fw_count++;
 	}
 
+	dyna_load_pcm_addr_2nd = addr_2nd;
+
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS)
 	/* check addr_2nd */
 	if (spm_fw_count == DYNA_LOAD_PCM_MAX) {
@@ -824,12 +876,28 @@ int spm_load_pcm_firmware(struct platform_device *pdev)
 	return err;
 }
 
-int spm_load_pcm_firmware_nodev(void)
+int spm_load_pcm_firmware_nodev(int src)
 {
+	int i;
+
+	spm_crit("spm_load_pcm_firmware_nodev by src %d\n", src);
+
 	if (spm_fw_count == 0)
 		spm_load_pcm_firmware(pspmdev);
 	else
 		spm_crit("spm_fw_count = %d\n", spm_fw_count);
+
+	for (i = DYNA_LOAD_PCM_SUSPEND; i < DYNA_LOAD_PCM_MAX; i++) {
+		struct pcm_desc *pdesc = &(dyna_load_pcm[i].desc);
+
+		if (dyna_load_pcm[i].ready &&
+		    (pdesc->addr_2nd == 0) &&
+		    (dyna_load_pcm_addr_2nd == (pdesc->size - 3))) {
+			spm_crit("recover addr_2nd (%d), %d %d\n", i, dyna_load_pcm_addr_2nd, pdesc->size);
+			*(u16 *) &pdesc->size = dyna_load_pcm_addr_2nd;
+		}
+	}
+
 	return 0;
 }
 
@@ -850,8 +918,10 @@ void *get_spm_firmware_version(uint32_t index)
 	}
 #endif
 
-	if (!dyna_load_pcm_done)
-		spm_load_pcm_firmware_nodev();
+	if (!dyna_load_pcm_done) {
+		dyna_load_pcm_progress = 1;
+		spm_load_pcm_firmware_nodev(LOAD_FW_BY_AEE);
+	}
 
 	if (dyna_load_pcm_done) {
 		if (index == 0) {
@@ -923,7 +993,8 @@ static const struct file_operations spm_debug_fops = {
 static int SPM_detect_open(struct inode *inode, struct file *file)
 {
 	pr_debug("open major %d minor %d (pid %d)\n", imajor(inode), iminor(inode), current->pid);
-	spm_load_pcm_firmware_nodev();
+	if (dyna_load_pcm_progress == 0)
+		spm_load_pcm_firmware_nodev(LOAD_FW_BY_DEV);
 
 	return 0;
 }
@@ -995,7 +1066,7 @@ static int spm_pm_event(struct notifier_block *notifier, unsigned long pm_event,
 			iounmap(local_buf);
 			local_buf = NULL;
 		}
-		spm_load_pcm_firmware_nodev();
+		spm_load_pcm_firmware_nodev(LOAD_FW_BY_HIB);
 
 		return NOTIFY_DONE;
 	}
@@ -1061,6 +1132,7 @@ int spm_module_late_init(void)
 		dyna_load_pcm[i].ready = 0;
 
 	spm_file = debugfs_create_file("spm_sleep_count", S_IRUGO, spm_dir, NULL, &spm_sleep_count_fops);
+	spm_resource_req_debugfs_init(spm_dir);
 
 	ret = register_pm_notifier(&spm_pm_notifier_func);
 	if (ret) {
@@ -1144,7 +1216,7 @@ void spm_twam_set_mon_type(struct twam_sig *mon)
 		mon_type.sig3 = mon->sig3 & 0x3;
 	}
 }
-EXPORT_SYMBOL(spm_twam_set_mon_type)
+EXPORT_SYMBOL(spm_twam_set_mon_type);
 
 void spm_twam_register_handler(twam_handler_t handler)
 {
@@ -1369,6 +1441,44 @@ int spm_golden_setting_cmp(bool en)
 #endif
 
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+/* for PMIC power settings */
+#define RG_VCORE_SLEEP_VOLTAGE_0P568	0x0	/* 2'b00: 0.568V,default */
+#define RG_VCORE_SLEEP_VOLTAGE_0P625	0x1	/* 2'b01: 0.625V */
+#define RG_VCORE_SLEEP_VOLTAGE_0P65	0x2	/* 2'b10: 0.65V */
+#define RG_VCORE_SLEEP_VOLTAGE_0P75	0x3	/* 2'b11: 0.75V */
+static void spm_pmic_set_rg_vcore(int vcore, int lock)
+{
+	if (lock == 0) {
+		pmic_config_interface_nolock(PMIC_RG_VCORE_SLEEP_VOLTAGE_ADDR,
+					     vcore,
+					     PMIC_RG_VCORE_SLEEP_VOLTAGE_MASK,
+					     PMIC_RG_VCORE_SLEEP_VOLTAGE_SHIFT);
+	} else {
+		pmic_config_interface(PMIC_RG_VCORE_SLEEP_VOLTAGE_ADDR,
+				      vcore,
+				      PMIC_RG_VCORE_SLEEP_VOLTAGE_MASK,
+				      PMIC_RG_VCORE_SLEEP_VOLTAGE_SHIFT);
+	}
+}
+
+#define RG_BUCK_VCORE_VOSEL_SLEEP_0P65	0x27	/* 7'b0100111 */
+#define RG_BUCK_VCORE_VOSEL_SLEEP_0P75	0x37	/* 7'b0110111 */
+static void spm_pmic_set_vcore(int vcore, int lock)
+{
+	if (lock == 0) {
+		pmic_config_interface_nolock(PMIC_RG_BUCK_VCORE_VOSEL_SLEEP_ADDR,
+					     vcore,
+					     PMIC_RG_BUCK_VCORE_VOSEL_SLEEP_MASK,
+					     PMIC_RG_BUCK_VCORE_VOSEL_SLEEP_SHIFT);
+	} else {
+		pmic_config_interface(PMIC_RG_BUCK_VCORE_VOSEL_SLEEP_ADDR,
+				      vcore,
+				      PMIC_RG_BUCK_VCORE_VOSEL_SLEEP_MASK,
+				      PMIC_RG_BUCK_VCORE_VOSEL_SLEEP_SHIFT);
+	}
+}
+#else /* not MT6355 */
 /* for PMIC power settings */
 #define VCORE_VOSEL_SLEEP_0P6	0x00	/* 7'b0000000 */
 #define VCORE_VOSEL_SLEEP_0P65	0x08	/* 7'b0001000 */
@@ -1700,10 +1810,56 @@ static void spm_pmic_set_extra_low_power_mode(int lock)
 #define PMIC_LDO_SRCLKEN0	0
 #define PMIC_LDO_SRCLKEN2	2
 #endif
+#endif
 
 void spm_pmic_power_mode(int mode, int force, int lock)
 {
 #if !defined(CONFIG_FPGA_EARLY_PORTING)
+#if defined(CONFIG_MTK_PMIC_CHIP_MT6355)
+	static int prev_mode = -1;
+
+	if (mode < PMIC_PWR_NORMAL || mode >= PMIC_PWR_NUM) {
+		pr_debug("wrong spm pmic power mode");
+		return;
+	}
+
+	if (force == 0 && mode == prev_mode)
+		return;
+
+	switch (mode) {
+	case PMIC_PWR_NORMAL:
+		/* nothing */
+		break;
+	case PMIC_PWR_DEEPIDLE:
+		spm_pmic_set_rg_vcore(RG_VCORE_SLEEP_VOLTAGE_0P75, lock);
+		spm_pmic_set_vcore(RG_BUCK_VCORE_VOSEL_SLEEP_0P75, lock);
+		pmic_buck_vcore_lp(SRCLKEN2, 0, HW_LP);
+		pmic_buck_vcore_lp(SPM, 1, SPM_ON);
+		break;
+	case PMIC_PWR_SODI3:
+		spm_pmic_set_rg_vcore(RG_VCORE_SLEEP_VOLTAGE_0P75, lock);
+		spm_pmic_set_vcore(RG_BUCK_VCORE_VOSEL_SLEEP_0P75, lock);
+
+		pmic_ldo_vldo28_lp(SRCLKEN0, 0, HW_LP);
+		pmic_ldo_vldo28_lp(SW, 1, SW_ON);
+		pmic_ldo_vbif28_lp(SRCLKEN0, 1, HW_LP);
+		break;
+	case PMIC_PWR_SODI:
+		/* nothing */
+		break;
+	case PMIC_PWR_SUSPEND:
+		spm_pmic_set_rg_vcore(RG_VCORE_SLEEP_VOLTAGE_0P65, lock);
+		spm_pmic_set_vcore(RG_BUCK_VCORE_VOSEL_SLEEP_0P65, lock);
+
+		pmic_ldo_vldo28_lp(SRCLKEN0, 1, HW_LP);
+		pmic_ldo_vbif28_lp(SRCLKEN0, 1, HW_OFF);
+		break;
+	default:
+		pr_debug("spm pmic power mode (%d) is not configured\n", mode);
+	}
+
+	prev_mode = mode;
+#else
 	static int prev_mode = -1;
 
 	if (mode < PMIC_PWR_NORMAL || mode >= PMIC_PWR_NUM) {
@@ -1820,6 +1976,7 @@ void spm_pmic_power_mode(int mode, int force, int lock)
 	}
 
 	prev_mode = mode;
+#endif
 #endif
 }
 

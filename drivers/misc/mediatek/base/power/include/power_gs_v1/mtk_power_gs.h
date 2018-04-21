@@ -30,13 +30,13 @@
 
 extern bool is_already_snap_shot;
 
-typedef enum {
+enum {
 	MODE_NORMAL,
 	MODE_COMPARE,
 	MODE_APPLY,
 	MODE_COLOR,
 	MODE_DIFF,
-} print_mode;
+};
 
 struct golden_setting {
 	unsigned int addr;
@@ -53,7 +53,7 @@ struct snapshot {
 struct golden {
 	unsigned int is_golden_log;
 
-	print_mode mode;
+	unsigned int mode;
 
 	char func[64];
 	unsigned int line;
@@ -86,8 +86,15 @@ struct base_remap {
 	struct phys_to_virt_table *table;
 };
 
+struct pmic_manual_dump {
+	unsigned int array_pos;
+	unsigned int array_size;
+	unsigned int *addr_array;
+};
+
 unsigned int golden_read_reg(unsigned int addr);
 int snapshot_golden_setting(const char *func, const unsigned int line);
+void mt_power_gs_pmic_manual_dump(void);
 void mt_power_gs_compare(char *scenario, char *pmic_name,
 			 const unsigned int *pmic_gs, unsigned int pmic_gs_len);
 unsigned int _golden_read_reg(unsigned int addr);
@@ -102,8 +109,10 @@ bool _is_exist_in_phys_to_virt_table(unsigned int phys_base);
 void __iomem *_get_virt_base_from_table(unsigned int phys_base);
 unsigned int mt_power_gs_base_remap_init(char *scenario, char *pmic_name,
 			 const unsigned int *pmic_gs, unsigned int pmic_gs_len);
+void mt_power_gs_internal_init(void);
 void mt_power_gs_table_init(void);
 
 extern struct golden _golden;
+extern bool slp_chk_golden_diff_mode;
 
 #endif

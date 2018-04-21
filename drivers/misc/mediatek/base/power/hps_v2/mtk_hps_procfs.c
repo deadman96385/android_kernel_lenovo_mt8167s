@@ -29,36 +29,94 @@ static int hps_proc_uint_show(struct seq_file *m, void *v)
 	return 0;
 }
 
+static int hps_sanitize_var(unsigned int *hpsvar, unsigned int newv)
+{
+	int rc = -EINVAL;
+
+	if (hpsvar == &hps_ctxt.enabled) {
+		if (newv >= 0 && newv <= 1)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.heavy_task_enabled) {
+		if (newv >= 0 && newv <= 1)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.suspend_enabled) {
+		if (newv >= 0 && newv <= 1)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.cur_dump_enabled) {
+		if (newv >= 0 && newv <= 1)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.stats_dump_enabled) {
+		if (newv >= 0 && newv <= 1)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.up_threshold) {
+		if (newv > 0)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.up_times) {
+		if (newv > 0 && newv <= (unsigned int)MAX_CPU_UP_TIMES)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.down_threshold) {
+		if (newv > 0)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.down_times) {
+		if (newv > 0 && newv <= (unsigned int)MAX_CPU_DOWN_TIMES)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.input_boost_enabled) {
+		if (newv >= 0 && newv <= 1)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.input_boost_cpu_num) {
+		/* NOTE: what is the maximum? */
+		if (newv > 0)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.rush_boost_enabled) {
+		if (newv >= 0 && newv <= 1)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.rush_boost_threshold) {
+		if (newv > 0)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.rush_boost_times) {
+		if (newv > 0)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.tlp_times) {
+		if (newv > 0 && newv <= (unsigned int)MAX_TLP_TIMES)
+			rc = 0;
+	} else if (hpsvar == &hps_ctxt.power_mode) {
+		/* NOTE: what is the accepted range? */
+		if (newv > 0)
+			rc = 0;
+	} else {
+		tag_pr_info("Unknown hps procfs node\n");
+		rc = -EINVAL;
+	}
+
+	return rc;
+}
+
 static ssize_t hps_proc_uint_write(struct file *file, const char __user *buffer,
 				   size_t count, loff_t *pos,
 				   func_void before_write, func_void after_write)
 {
-	int len = 0;
-	char desc[32];
 	unsigned int var;
 	unsigned int *pv;
+	int rc;
 
-	pv = (unsigned int *)((struct seq_file *)file->private_data)->private;
-	len = min(count, sizeof(desc) - 1);
-	if (copy_from_user(desc, buffer, len))
-		return 0;
-	desc[len] = '\0';
+	rc = kstrtouint_from_user(buffer, count, 0, &var);
+	if (rc)
+		return rc;
 
-	if (!kstrtouint(desc, 0, &var)) {
-		if (before_write)
-			before_write();
+	pv = ((struct seq_file *)file->private_data)->private;
+	rc = hps_sanitize_var(pv, var);
+	if (rc)
+		return rc;
 
-		*pv = var;
+	if (before_write)
+		before_write();
 
-		if (after_write)
-			after_write();
+	*pv = var;
 
-		return count;
-	}
+	if (after_write)
+		after_write();
 
-	hps_warn("%s(): bad argument\n", __func__);
-
-	return -EINVAL;
+	return count;
 }
 
 static void lock_hps_ctxt(void)
@@ -206,14 +264,14 @@ static ssize_t hps_num_base_perf_serv_proc_write(struct file *file,
 	    && (sscanf(desc, "%u %u", &little_num_base_perf_serv, &big_num_base_perf_serv) == 2)) {
 		if (little_num_base_perf_serv > num_possible_little_cpus()
 		    || little_num_base_perf_serv < 1) {
-			hps_warn("hps_num_base_perf_serv_proc_write, bad argument(%u, %u)\n",
-				 little_num_base_perf_serv, big_num_base_perf_serv);
+			tag_pr_info("hps_num_base_perf_serv_proc_write, bad argument(%u, %u)\n",
+				    little_num_base_perf_serv, big_num_base_perf_serv);
 			return -EINVAL;
 		}
 
 		if (big_num_base_perf_serv > num_possible_big_cpus()) {
-			hps_warn("hps_num_base_perf_serv_proc_write, bad argument(%u, %u)\n",
-				 little_num_base_perf_serv, big_num_base_perf_serv);
+			tag_pr_info("hps_num_base_perf_serv_proc_write, bad argument(%u, %u)\n",
+				    little_num_base_perf_serv, big_num_base_perf_serv);
 			return -EINVAL;
 		}
 
@@ -252,8 +310,8 @@ static ssize_t hps_num_base_perf_serv_proc_write(struct file *file,
 		   && !kstrtouint(desc, 0, &little_num_base_perf_serv)) {
 		if (little_num_base_perf_serv > num_possible_little_cpus()
 		    || little_num_base_perf_serv < 1) {
-			hps_warn("hps_num_base_perf_serv_proc_write, bad argument(%u)\n",
-				 little_num_base_perf_serv);
+			tag_pr_info("hps_num_base_perf_serv_proc_write, bad argument(%u)\n",
+				    little_num_base_perf_serv);
 			return -EINVAL;
 		}
 
@@ -276,7 +334,7 @@ static ssize_t hps_num_base_perf_serv_proc_write(struct file *file,
 		return count;
 	}
 
-	hps_warn("hps_num_base_perf_serv_proc_write, bad argument\n");
+	tag_pr_info("hps_num_base_perf_serv_proc_write, bad argument\n");
 
 	return -EINVAL;
 }
@@ -315,14 +373,14 @@ static ssize_t hps_num_limit_thermal_proc_write(struct file *file,
 	    && (sscanf(desc, "%u %u", &little_num_limit_thermal, &big_num_limit_thermal) == 2)) {
 		if (little_num_limit_thermal > num_possible_little_cpus()
 		    || little_num_limit_thermal < 1) {
-			hps_warn("hps_num_limit_thermal_proc_write, bad argument(%u, %u)\n",
-				 little_num_limit_thermal, big_num_limit_thermal);
+			tag_pr_info("hps_num_limit_thermal_proc_write, bad argument(%u, %u)\n",
+				    little_num_limit_thermal, big_num_limit_thermal);
 			return -EINVAL;
 		}
 
 		if (big_num_limit_thermal > num_possible_big_cpus()) {
-			hps_warn("hps_num_limit_thermal_proc_write, bad argument(%u, %u)\n",
-				 little_num_limit_thermal, big_num_limit_thermal);
+			tag_pr_info("hps_num_limit_thermal_proc_write, bad argument(%u, %u)\n",
+				    little_num_limit_thermal, big_num_limit_thermal);
 			return -EINVAL;
 		}
 
@@ -342,8 +400,8 @@ static ssize_t hps_num_limit_thermal_proc_write(struct file *file,
 		   && !kstrtouint(desc, 0, &little_num_limit_thermal)) {
 		if (little_num_limit_thermal > num_possible_little_cpus()
 		    || little_num_limit_thermal < 1) {
-			hps_warn("hps_num_limit_thermal_proc_write, bad argument(%u)\n",
-				 little_num_limit_thermal);
+			tag_pr_info("hps_num_limit_thermal_proc_write, bad argument(%u)\n",
+				    little_num_limit_thermal);
 			return -EINVAL;
 		}
 
@@ -358,7 +416,7 @@ static ssize_t hps_num_limit_thermal_proc_write(struct file *file,
 		return count;
 	}
 
-	hps_warn("hps_num_limit_thermal_proc_write, bad argument\n");
+	tag_pr_info("hps_num_limit_thermal_proc_write, bad argument\n");
 
 	return -EINVAL;
 }
@@ -399,14 +457,14 @@ static ssize_t hps_num_limit_low_battery_proc_write(struct file *file,
 		       &big_num_limit_low_battery) == 2)) {
 		if (little_num_limit_low_battery > num_possible_little_cpus()
 		    || little_num_limit_low_battery < 1) {
-			hps_warn("hps_num_limit_low_battery_proc_write, bad argument(%u, %u)\n",
-				 little_num_limit_low_battery, big_num_limit_low_battery);
+			tag_pr_info("hps_num_limit_low_battery_proc_write, bad argument(%u, %u)\n",
+				    little_num_limit_low_battery, big_num_limit_low_battery);
 			return -EINVAL;
 		}
 
 		if (big_num_limit_low_battery > num_possible_big_cpus()) {
-			hps_warn("hps_num_limit_low_battery_proc_write, bad argument(%u, %u)\n",
-				 little_num_limit_low_battery, big_num_limit_low_battery);
+			tag_pr_info("hps_num_limit_low_battery_proc_write, bad argument(%u, %u)\n",
+				    little_num_limit_low_battery, big_num_limit_low_battery);
 			return -EINVAL;
 		}
 
@@ -426,8 +484,8 @@ static ssize_t hps_num_limit_low_battery_proc_write(struct file *file,
 		   && !kstrtouint(desc, 0, &little_num_limit_low_battery)) {
 		if (little_num_limit_low_battery > num_possible_little_cpus()
 		    || little_num_limit_low_battery < 1) {
-			hps_warn("hps_num_limit_low_battery_proc_write, bad argument(%u)\n",
-				 little_num_limit_low_battery);
+			tag_pr_info("hps_num_limit_low_battery_proc_write, bad argument(%u)\n",
+				    little_num_limit_low_battery);
 			return -EINVAL;
 		}
 
@@ -442,7 +500,7 @@ static ssize_t hps_num_limit_low_battery_proc_write(struct file *file,
 		return count;
 	}
 
-	hps_warn("hps_num_limit_low_battery_proc_write, bad argument\n");
+	tag_pr_info("hps_num_limit_low_battery_proc_write, bad argument\n");
 
 	return -EINVAL;
 }
@@ -487,14 +545,14 @@ static ssize_t hps_num_limit_ultra_power_saving_proc_write(struct file *file,
 		    &big_num_limit_ultra_power_saving) == 2)) {
 		if (little_num_limit_ultra_power_saving >
 		    num_possible_little_cpus() || little_num_limit_ultra_power_saving < 1) {
-			hps_warn
+			tag_pr_info
 			    ("hps_num_limit_ultra_power_saving_proc_write, bad argument(%u, %u)\n",
 			     little_num_limit_ultra_power_saving, big_num_limit_ultra_power_saving);
 			return -EINVAL;
 		}
 
 		if (big_num_limit_ultra_power_saving > num_possible_big_cpus()) {
-			hps_warn
+			tag_pr_info
 			    ("hps_num_limit_ultra_power_saving_proc_write, bad argument(%u, %u)\n",
 			     little_num_limit_ultra_power_saving, big_num_limit_ultra_power_saving);
 			return -EINVAL;
@@ -516,8 +574,8 @@ static ssize_t hps_num_limit_ultra_power_saving_proc_write(struct file *file,
 		   && !kstrtouint(desc, 0, &little_num_limit_ultra_power_saving)) {
 		if (little_num_limit_ultra_power_saving > num_possible_little_cpus()
 		    || little_num_limit_ultra_power_saving < 1) {
-			hps_warn("hps_num_limit_ultra_power_saving_proc_write, bad argument(%u)\n",
-				 little_num_limit_ultra_power_saving);
+			tag_pr_info("hps_num_limit_ultra_power_saving_proc_write, bad argument(%u)\n",
+				    little_num_limit_ultra_power_saving);
 			return -EINVAL;
 		}
 
@@ -532,7 +590,7 @@ static ssize_t hps_num_limit_ultra_power_saving_proc_write(struct file *file,
 		return count;
 	}
 
-	hps_warn("hps_num_limit_ultra_power_saving_proc_write, bad argument\n");
+	tag_pr_info("hps_num_limit_ultra_power_saving_proc_write, bad argument\n");
 
 	return -EINVAL;
 }
@@ -573,14 +631,14 @@ static ssize_t hps_num_limit_power_serv_proc_write(struct file *file,
 	    (sscanf(desc, "%u %u", &little_num_limit_power_serv, &big_num_limit_power_serv) == 2)) {
 		if (little_num_limit_power_serv > num_possible_little_cpus()
 		    || little_num_limit_power_serv < 1) {
-			hps_warn("hps_num_limit_power_serv_proc_write, bad argument(%u, %u)\n",
-				 little_num_limit_power_serv, big_num_limit_power_serv);
+			tag_pr_info("hps_num_limit_power_serv_proc_write, bad argument(%u, %u)\n",
+				    little_num_limit_power_serv, big_num_limit_power_serv);
 			return -EINVAL;
 		}
 
 		if (big_num_limit_power_serv > num_possible_big_cpus()) {
-			hps_warn("hps_num_limit_power_serv_proc_write, bad argument(%u, %u)\n",
-				 little_num_limit_power_serv, big_num_limit_power_serv);
+			tag_pr_info("hps_num_limit_power_serv_proc_write, bad argument(%u, %u)\n",
+				    little_num_limit_power_serv, big_num_limit_power_serv);
 			return -EINVAL;
 		}
 
@@ -600,8 +658,8 @@ static ssize_t hps_num_limit_power_serv_proc_write(struct file *file,
 		   && !kstrtouint(desc, 0, &little_num_limit_power_serv)) {
 		if (little_num_limit_power_serv > num_possible_little_cpus()
 		    || little_num_limit_power_serv < 1) {
-			hps_warn("hps_num_limit_power_serv_proc_write, bad argument(%u)\n",
-				 little_num_limit_power_serv);
+			tag_pr_info("hps_num_limit_power_serv_proc_write, bad argument(%u)\n",
+				    little_num_limit_power_serv);
 			return -EINVAL;
 		}
 
@@ -616,7 +674,7 @@ static ssize_t hps_num_limit_power_serv_proc_write(struct file *file,
 		return count;
 	}
 
-	hps_warn("hps_num_limit_power_serv_proc_write, bad argument\n");
+	tag_pr_info("hps_num_limit_power_serv_proc_write, bad argument\n");
 
 
 	return -EINVAL;
@@ -665,18 +723,18 @@ int hps_procfs_init(void)
 		PROC_ENTRY(power_mode),
 	};
 
-	hps_warn("hps_procfs_init\n");
+	tag_pr_info("hps_procfs_init\n");
 
 	hps_dir = proc_mkdir("hps", NULL);
 	if (hps_dir == NULL) {
-		hps_emerg("mkdir /proc/hps fail\n");
+		tag_pr_notice("mkdir /proc/hps fail\n");
 		return -1;
 	}
 
 	for (i = 0; i < ARRAY_SIZE(entries); i++) {
 		if (!proc_create(entries[i].name,
 				 S_IRUGO | S_IWUSR | S_IWGRP, hps_dir, entries[i].fops))
-			hps_emerg("create /proc/hps/%s failed\n", entries[i].name);
+			tag_pr_notice("create /proc/hps/%s failed\n", entries[i].name);
 	}
 
 	return r;

@@ -29,6 +29,7 @@
 #include "mtk_thermal_timer.h"
 #include <linux/uidgid.h>
 #include <linux/slab.h>
+
 /*=============================================================
  *Weak functions
  *=============================================================
@@ -42,6 +43,8 @@ mtk_wcn_cmb_stub_query_ctrl(void)
 /*=============================================================*/
 static kuid_t uid = KUIDT_INIT(0);
 static kgid_t gid = KGIDT_INIT(1000);
+static DEFINE_SEMAPHORE(sem_mutex);
+static int isTimerCancelled;
 
 static int wmt_tm_debug_log;
 #define wmt_tm_dprintk(fmt, args...)   \
@@ -65,9 +68,9 @@ struct linux_thermal_ctrl_if {
 	struct thermal_cooling_device *cl_pa2_dev;
 };
 
-typedef struct wmt_tm {
+struct wmt_tm_t {
 	struct linux_thermal_ctrl_if linux_if;
-} wmt_tm_t;
+};
 
 struct wmt_stats {
 	unsigned long pre_time;
@@ -112,8 +115,7 @@ static unsigned int tm_pid;
 static unsigned int tm_input_pid;
 static unsigned int tm_wfd_stat;
 /* static unsigned int wifi_in_soc = 0; */
-static struct task_struct g_task;
-static struct task_struct *pg_task = &g_task;
+static struct task_struct *pg_task;
 
 /* + Cooler info + */
 static int g_num_trip;
@@ -148,8 +150,8 @@ static unsigned int g_trip_temp[COOLER_NUM] = { 125000, 115000, 105000, 85000, 0
 static int g_thermal_trip[COOLER_NUM] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 /* - Cooler info - */
 
-wmt_tm_t g_wmt_tm;
-wmt_tm_t *pg_wmt_tm = &g_wmt_tm;
+static struct wmt_tm_t g_wmt_tm;
+static struct wmt_tm_t *pg_wmt_tm = &g_wmt_tm;
 
 #define init_wifi_tput_ratio (100)
 
@@ -214,6 +216,9 @@ static int wmt_send_signal(int level)
 
 	if (ret == 0 && tm_input_pid != tm_pid) {
 		tm_pid = tm_input_pid;
+
+		if (pg_task != NULL)
+			put_task_struct(pg_task);
 		pg_task = get_pid_task(find_vpid(tm_pid), PIDTYPE_PID);
 	}
 
@@ -411,6 +416,11 @@ static unsigned long get_tx_bytes(void)
 	}
 	read_unlock(&dev_base_lock);
 	return tx_bytes;
+}
+
+int tswmt_get_WiFi_tx_tput(void)
+{
+	return tx_throughput;
 }
 
 static int wmt_cal_stats(unsigned long data)
@@ -1298,8 +1308,16 @@ static void mtkts_wmt_cancel_thermal_timer(void)
 	/* pr_debug("mtkts_wmt_cancel_thermal_timer\n"); */
 
 	/* stop thermal framework polling when entering deep idle */
-	if (p_linux_if->thz_dev)
+
+	if (down_trylock(&sem_mutex))
+		return;
+
+	if (p_linux_if->thz_dev) {
 		cancel_delayed_work(&(p_linux_if->thz_dev->poll_queue));
+		isTimerCancelled = 1;
+	}
+
+	up(&sem_mutex);
 }
 
 static void mtkts_wmt_start_thermal_timer(void)
@@ -1315,9 +1333,19 @@ static void mtkts_wmt_start_thermal_timer(void)
 
 	/* pr_debug("mtkts_wmt_start_thermal_timer\n"); */
 	/* resume thermal framework polling when leaving deep idle */
+
+	if (!isTimerCancelled)
+		return;
+
+	isTimerCancelled = 0;
+
+	if (down_trylock(&sem_mutex))
+		return;
+
 	if (p_linux_if->thz_dev != NULL && p_linux_if->interval != 0)
-		mod_delayed_work(system_freezable_wq, &(p_linux_if->thz_dev->poll_queue),
+		mod_delayed_work(system_freezable_power_efficient_wq, &(p_linux_if->thz_dev->poll_queue),
 				 round_jiffies(msecs_to_jiffies(2000)));
+	up(&sem_mutex);
 }
 
 static struct thermal_zone_device_ops wmt_thz_dev_ops = {
@@ -1480,6 +1508,8 @@ static ssize_t wmt_tm_write(struct file *filp, const char __user *buf, size_t co
 	     &ptr_tm_data->time_msec) == 32) {
 
 		/* unregister */
+		down(&sem_mutex);
+		wmt_tm_dprintk("[%s] mtktswmt unregister thermal\n", __func__);
 		if (p_linux_if->thz_dev) {
 			mtk_thermal_zone_device_unregister(p_linux_if->thz_dev);
 			p_linux_if->thz_dev = NULL;
@@ -1492,6 +1522,7 @@ static ssize_t wmt_tm_write(struct file *filp, const char __user *buf, size_t co
 			#endif
 			wmt_tm_info("[%s] bad argument = %s\n", __func__, ptr_tm_data->desc);
 			kfree(ptr_tm_data);
+			up(&sem_mutex);
 			return -EINVAL;
 		}
 
@@ -1550,9 +1581,11 @@ static ssize_t wmt_tm_write(struct file *filp, const char __user *buf, size_t co
 		/* thermal_zone_device_update(p_linux_if->thz_dev); */
 
 		/* register */
+		wmt_tm_dprintk("[%s] mtktswmt register thermal\n", __func__);
 		p_linux_if->thz_dev = mtk_thermal_zone_device_register("mtktswmt", g_num_trip, NULL,
 								       &wmt_thz_dev_ops, 0, 0, 0,
 								       p_linux_if->interval);
+		up(&sem_mutex);
 
 		wmt_tm_dprintk("[wmt_tm_write] time_ms=%d\n", p_linux_if->interval);
 

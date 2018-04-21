@@ -1,6 +1,17 @@
 #! /usr/bin/python
 # -*- coding: utf-8 -*-
 
+# Copyright (C) 2016 MediaTek Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+
 import re
 import os
 import string
@@ -118,6 +129,7 @@ class EintObj(ModuleObj):
                     EintData._builtin_map[builtin_list[0]] = temp_map
                     EintData._builtin_eint_count += len(temp_map)
 
+        self.__gpio_obj.set_eint_map_table(EintData._map_table)
 
     #def compare(self, value):
         #return string.atoi(value[4:])
@@ -196,8 +208,12 @@ class EintObj(ModuleObj):
             if value != -1:
                 gen_str += '''<%d %d>,\n\t\t\t\t\t''' %(key, value)
 
-        for (key, value) in EintData._int_eint.items():
+        sorted_list = sorted(EintData.get_internalEint().keys())
+        for key in sorted_list:
+            value = EintData.get_internalEint()[key]
             gen_str += '''<%s %s>,\n\t\t\t\t\t''' %(value, key)
+        #for (key, value) in EintData._int_eint.items():
+            #gen_str += '''<%s %s>,\n\t\t\t\t\t''' %(value, key)
 
         gen_str = gen_str[0:len(gen_str)-7]
         gen_str += ''';\n'''
@@ -292,4 +308,93 @@ class EintObj(ModuleObj):
 
         return gen_str
 
+    def get_gpioObj(self):
+        return self.__gpio_obj
 
+class EintObj_MT6750S(EintObj):
+    def __init__(self, gpio_obj):
+        EintObj.__init__(self, gpio_obj)
+
+    def parse(self, node):
+        EintObj.parse(self, node)
+
+    def gen_files(self):
+        EintObj.gen_files(self)
+
+    def gen_spec(self, para):
+        EintObj.gen_spec(self, para)
+
+    def fill_mappingTable(self):
+        return ''
+
+class EintObj_MT6739(EintObj):
+    def __init__(self, gpio_obj):
+        EintObj.__init__(self, gpio_obj)
+
+    def fill_dtsiFile(self):
+        gen_str = '''#include <dt-bindings/interrupt-controller/irq.h>\n'''
+        gen_str += '''#include <dt-bindings/interrupt-controller/arm-gic.h>\n'''
+        gen_str += '''\n'''
+
+        gen_str += self.fill_mappingTable()
+
+        sorted_list = sorted(ModuleObj.get_data(self).keys(), key=compare)
+
+        for key in sorted_list:
+            value = ModuleObj.get_data(self)[key]
+            gen_str += '''&%s {\n''' % (value.get_varName().lower())
+            gen_str += '''\tinterrupt-parent = <&pio>;\n'''
+
+            temp = ''
+            polarity = value.get_polarity()
+            sensitive = value.get_sensitiveLevel()
+
+            if cmp(polarity, 'High') == 0 and cmp(sensitive, 'Edge') == 0:
+                temp = 'IRQ_TYPE_EDGE_RISING'
+            elif cmp(polarity, 'Low') == 0 and cmp(sensitive, 'Edge') == 0:
+                temp = 'IRQ_TYPE_EDGE_FALLING'
+            elif cmp(polarity, 'High') == 0 and cmp(sensitive, 'Level') == 0:
+                temp = 'IRQ_TYPE_LEVEL_HIGH'
+            elif cmp(polarity, 'Low') == 0 and cmp(sensitive, 'Level') == 0:
+                temp = 'IRQ_TYPE_LEVEL_LOW'
+
+            gen_str += '''\tinterrupts = <%s %s %s %d>;\n''' % (key[4:], temp, self.refGpio(key[4:], True)[0], self.refGpio_defMode(key[4:], True))
+            if cmp(value.get_debounceEnable(), 'Enable') == 0:
+                gen_str += '''\tdeb-gpios = <&pio %s 0>;\n''' % (self.refGpio(key[4:], True)[0])
+                gen_str += '''\tdebounce = <%d>;\n''' % (string.atoi(value.get_debounceTime()) * 1000)
+            gen_str += '''\tstatus = \"okay\";\n'''
+            gen_str += '''};\n'''
+            gen_str += '''\n'''
+
+        return gen_str
+
+    def fill_mappingTable(self):
+        return ''
+
+    def refGpio_defMode(self, eint_num, flag):
+        refGpio_defMode = 0
+
+        gpio_num = EintData.get_gpioNum(string.atoi(eint_num))
+        if gpio_num >= 0:
+            if flag:
+                item_data = self.get_gpioObj().get_gpioData(gpio_num)
+                refGpio_defMode = item_data.get_defMode()
+                mode_name = EintData.get_modeName(gpio_num, refGpio_defMode)
+                if re.match(r'GPIO[\d]+', mode_name) or re.match(r'EINT[\d]+', mode_name):
+                    return refGpio_defMode
+
+        for key in EintData._builtin_map.keys():
+            if string.atoi(eint_num) == string.atoi(key):
+                temp_map = EintData._builtin_map[key]
+
+                if flag:
+                    for item in temp_map.keys():
+                        item_data = self.get_gpioObj().get_gpioData(string.atoi(item))
+
+                        if item_data.get_defMode() == string.atoi(temp_map[item].split(':')[0]):
+                            refGpio_defMode = item_data.get_defMode()
+                            return refGpio_defMode
+
+                break
+
+        return refGpio_defMode

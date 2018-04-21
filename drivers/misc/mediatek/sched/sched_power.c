@@ -21,6 +21,8 @@
 
 #include "sched_power.h"
 
+#include <mt-plat/met_drv.h>
+
 /*
  * V1.04 support hybrid(EAS+HMP)
  * V1.05 if system is balanced, select CPU with max sparse capacity when wakeup
@@ -44,30 +46,50 @@ struct eas_data eas_info;
 static int ver_major = 1;
 static int ver_minor = 8;
 
-#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
-static const char module_name[64] = "arctic, sched-assist dvfs,hps";
-#else
-static const char module_name[64] = "arctic";
-#endif
+static char module_name[128];
 
+/* To define limit of SODI */
+int sodi_limit = DEFAULT_SODI_LIMIT;
+
+/* A lock for scheduling switcher */
+DEFINE_SPINLOCK(sched_switch_lock);
 
 #define VOLT_SCALE 10
+
+int sched_scheduler_switch(SCHED_LB_TYPE new_sched)
+{
+	unsigned long flags;
+
+	if (sched_type >= SCHED_UNKNOWN_LB)
+		return -1;
+
+	spin_lock_irqsave(&sched_switch_lock, flags);
+	sched_type = new_sched;
+	spin_unlock_irqrestore(&sched_switch_lock, flags);
+
+	return 0;
+}
+EXPORT_SYMBOL(sched_scheduler_switch);
 
 struct power_tuning_t *get_eas_power_setting(void)
 {
 	return &power_tuning;
 }
 
-void game_hint_notifier(int is_game_mode)
+bool is_game_mode;
+
+#ifdef CONFIG_MTK_GPU_SUPPORT
+void game_hint_notifier(int is_game)
 {
-	if (is_game_mode) {
-		STUNE_TASK_THRESHOLD = 80;
-		capacity_margin = 1024;
+	if (is_game) {
+		sodi_limit = 120;
+		is_game_mode = true;
 	} else {
-		STUNE_TASK_THRESHOLD = 0;
-		capacity_margin = 1280;
+		sodi_limit = DEFAULT_SODI_LIMIT;
+		is_game_mode = false;
 	}
 }
+#endif
 
 bool is_eas_enabled(void)
 {
@@ -79,27 +101,30 @@ bool is_hybrid_enabled(void)
 	return (sched_type == SCHED_HYBRID_LB) ? true : false;
 }
 
-/* MT6799: cluster 0 & 2 is buck shared. */
+#if defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758)
+/* MT6763: 2 gears. cluster 0 & 1 is buck shared. */
+static int share_buck[3] = {1, 0, 2};
+/* cpu7 is L+ */
+int l_plus_cpu = 7;
+#elif defined(CONFIG_MACH_MT6799)
+/* MT6799: 3 gears. cluster 0 & 2 is buck shared. */
+static int share_buck[3] = {2, 1, 0};
+/* No L+ */
+int l_plus_cpu = -1;
+#else
+/* no buck shared */
+static int share_buck[3] = {0, 1, 2};
+int l_plus_cpu = -1;
+#endif
+
 bool is_share_buck(int cid, int *co_buck_cid)
 {
 	bool ret = false;
 
-	switch (cid) {
-	case 0:
-		*co_buck_cid = 2;
+	if (share_buck[cid] != cid) {
+		*co_buck_cid = share_buck[cid];
 		ret = true;
-		break;
-	case 2:
-		*co_buck_cid = 0;
-		ret = true;
-		break;
-	case 1:
-		ret = false;
-		break;
-	default:
-		WARN_ON(1);
 	}
-
 
 	return ret;
 }
@@ -118,7 +143,7 @@ static unsigned long mtk_cluster_max_usage(int cid, struct energy_env *eenv, int
 	for_each_cpu(cpu, &cls_cpus) {
 		int cpu_usage = 0;
 
-		if (likely(!cpu_online(cpu)))
+		if (!cpu_online(cpu))
 			continue;
 
 		delta = calc_util_delta(eenv, cpu);
@@ -154,9 +179,12 @@ int mtk_cluster_capacity_idx(int cid, struct energy_env *eenv)
 	} else
 		return -1;
 
-#ifdef CONFIG_CPU_FREQ_GOV_SCHED
+	/* default is max_cap if we don't find a match */
+	sel_idx = sge->nr_cap_states - 1;
+
+#ifdef CONFIG_CPU_FREQ_GOV_SCHEDPLUS
 	/* OPP idx to refer capacity margin */
-	new_capacity = util * capacity_margin >> SCHED_CAPACITY_SHIFT;
+	new_capacity = util * capacity_margin_dvfs >> SCHED_CAPACITY_SHIFT;
 #endif
 
 	for (idx = 0; idx < sge->nr_cap_states; idx++) {
@@ -166,11 +194,10 @@ int mtk_cluster_capacity_idx(int cid, struct energy_env *eenv)
 		}
 	}
 
-#if 1
 	mt_sched_printf(sched_eas_energy_calc,
 			"cid=%d max_cpu=%d (util=%ld new=%ld) opp_idx=%d (cap=%lld)",
-				cid, cpu, util, new_capacity, sel_idx, sge->cap_states[sel_idx].cap);
-#endif
+				cid, cpu, util, new_capacity, sel_idx,
+				(sel_idx > -1) ? sge->cap_states[sel_idx].cap : 0);
 
 	return sel_idx;
 }
@@ -453,28 +480,39 @@ int show_cpu_capacity(char *buf, int buf_size)
 	int len = 0;
 
 	for_each_possible_cpu(cpu) {
+#if defined(CONFIG_CPU_FREQ_GOV_SCHED) || defined(CONFIG_CPU_FREQ_GOV_SCHEDPLUS)
 		struct sched_capacity_reqs *scr;
 
 		scr = &per_cpu(cpu_sched_capacity_reqs, cpu);
-		len += snprintf(buf+len, buf_size-len, "cpu=%d orig_cap=%lu cap=%lu max_cap=%lu limited_freq=%luMHZ ",
+#endif
+		len += snprintf(buf+len, buf_size-len, "cpu=%d orig_cap=%lu cap=%lu max_cap=%lu max=%lu min=%lu ",
 				cpu,
 				cpu_rq(cpu)->cpu_capacity_orig,
 				cpu_online(cpu)?cpu_rq(cpu)->cpu_capacity:0,
 				cpu_online(cpu)?cpu_rq(cpu)->rd->max_cpu_capacity.val:0,
-				/* limited freq */
-				cpu_online(cpu)?arch_scale_get_max_freq(cpu) / 1000 : 0
+				/* limited frequency */
+				cpu_online(cpu)?arch_scale_get_max_freq(cpu) / 1000 : 0,
+				cpu_online(cpu)?arch_scale_get_min_freq(cpu) / 1000 : 0
 				);
 
-		len += snprintf(buf+len, buf_size-len, "cur=%lu cur_freq=%luMHZ util=%lu rt=%lu\n",
-				/* current capacity */
-				cpu_online(cpu)?capacity_curr_of(cpu):0,
-				/* frequency info */
+		len += snprintf(buf+len, buf_size-len, "cur_freq=%luMHZ, cur=%lu util=%lu cfs=%lu rt=%lu (%s)\n",
+				/* current frequency */
 				cpu_online(cpu)?capacity_curr_of(cpu) *
 				arch_scale_get_max_freq(cpu) /
 				cpu_rq(cpu)->cpu_capacity_orig / 1000 : 0,
+
+				/* current capacity */
+				cpu_online(cpu)?capacity_curr_of(cpu):0,
+
 				/* cpu utilization */
 				cpu_online(cpu)?cpu_util(cpu):0,
-				scr->rt
+#if defined(CONFIG_CPU_FREQ_GOV_SCHED) || defined(CONFIG_CPU_FREQ_GOV_SCHEDPLUS)
+				scr->cfs,
+				scr->rt,
+#else
+				0UL, 0UL,
+#endif
+				cpu_online(cpu)?"on":"off"
 				);
 	}
 
@@ -547,8 +585,13 @@ static ssize_t store_eas_knob(struct kobject *kobj,
 	 * 2: Hybrid
 	 */
 	if (sscanf(buf, "%iu", &val) != 0) {
-		if (val < SCHED_UNKNOWN_LB)
+		if (val < SCHED_UNKNOWN_LB) {
+			unsigned long flags;
+
+			spin_lock_irqsave(&sched_switch_lock, flags);
 			sched_type = val;
+			spin_unlock_irqrestore(&sched_switch_lock, flags);
+		}
 	}
 
 	return count;
@@ -557,6 +600,7 @@ static ssize_t store_eas_knob(struct kobject *kobj,
 static struct kobj_attribute eas_knob_attr =
 __ATTR(enable, S_IWUSR | S_IRUSR, show_eas_knob,
 		store_eas_knob);
+
 
 /* For read info for EAS */
 static ssize_t show_eas_info_attr(struct kobject *kobj,
@@ -587,6 +631,9 @@ static ssize_t show_eas_info_attr(struct kobject *kobj,
 
 	len += snprintf(buf+len, max_len - len, "foreground boost=%d\n", group_boost_read(1));
 
+	len += snprintf(buf+len, max_len - len, "top-app boost=%d\n", group_boost_read(3));
+
+
 	return len;
 }
 
@@ -598,8 +645,10 @@ static ssize_t store_stune_task_thresh_knob(struct kobject *kobj,
 
 	if (sscanf(buf, "%iu", &val) != 0) {
 		if (val < 1024 || val >= 0)
-			STUNE_TASK_THRESHOLD = val;
+			stune_task_threshold = val;
 	}
+
+	met_tag_oneshot(0, "sched_stune_filter", stune_task_threshold);
 
 	return count;
 }
@@ -610,7 +659,9 @@ static ssize_t show_stune_task_thresh_knob(struct kobject *kobj,
 	unsigned int len = 0;
 	unsigned int max_len = 4096;
 
-	len += snprintf(buf, max_len, "stune_task_thresh=%d\n", STUNE_TASK_THRESHOLD);
+	len += snprintf(buf, max_len, "stune_task_thresh=%d\n", stune_task_threshold);
+
+	met_tag_oneshot(0, "sched_stune_filter", stune_task_threshold);
 
 	return len;
 }
@@ -626,10 +677,12 @@ __ATTR(info, S_IRUSR, show_eas_info_attr, NULL);
 static ssize_t store_cap_margin_knob(struct kobject *kobj,
 		struct kobj_attribute *attr, const char *buf, size_t count)
 {
+#if defined(CONFIG_CPU_FREQ_GOV_SCHED) || defined(CONFIG_CPU_FREQ_GOV_SCHEDPLUS)
 	int val = 0;
 
 	if (sscanf(buf, "%iu", &val) != 0)
-		capacity_margin = val;
+		capacity_margin_dvfs = val;
+#endif
 
 	return count;
 }
@@ -638,20 +691,20 @@ static ssize_t show_cap_margin_knob(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
 	unsigned int len = 0;
+#if defined(CONFIG_CPU_FREQ_GOV_SCHED) || defined(CONFIG_CPU_FREQ_GOV_SCHEDPLUS)
 	unsigned int max_len = 4096;
 
-	len += snprintf(buf, max_len, "capacity_margin=%d\n", capacity_margin);
+	len += snprintf(buf, max_len, "capacity_margin_dvfs=%d\n", capacity_margin_dvfs);
+#endif
 
 	return len;
 }
 
-static struct kobj_attribute eas_cap_margin_attr =
-__ATTR(cap_margin, S_IWUSR | S_IRUSR, show_cap_margin_knob,
+static struct kobj_attribute eas_cap_margin_dvfs_attr =
+__ATTR(cap_margin_dvfs, S_IWUSR | S_IRUSR, show_cap_margin_knob,
 		store_cap_margin_knob);
 
-/* To define limit of SODI */
-int sodi_limit = 120;
-
+/* To set limit of SODI */
 static ssize_t store_sodi_limit_knob(struct kobject *kobj,
 		struct kobj_attribute *attr, const char *buf, size_t count)
 {
@@ -678,14 +731,88 @@ static struct kobj_attribute eas_sodi_limit_attr =
 __ATTR(sodi_limit, S_IWUSR | S_IRUSR, show_sodi_limit_knob,
 		store_sodi_limit_knob);
 
+#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
+/* for scheddvfs debug */
+static ssize_t store_dvfs_debug_knob(struct kobject *kobj,
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int val = 0;
+
+	if (sscanf(buf, "%iu", &val) != 0)
+		dbg_id = val;
+
+	return count;
+}
+
+static ssize_t show_dvfs_debug_knob(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	unsigned int len = 0;
+	unsigned int max_len = 4096;
+
+	len += snprintf(buf, max_len, "dbg_id=%d\n", dbg_id);
+
+	return len;
+}
+
+static struct kobj_attribute eas_dvfs_debug_attr =
+__ATTR(dvfs_debug, S_IWUSR | S_IRUSR, show_dvfs_debug_knob,
+		store_dvfs_debug_knob);
+#endif
+
+#ifdef CONFIG_MTK_SCHED_VIP_TASKS
+
+/* for scheddvfs debug */
+static ssize_t store_vip_knob(struct kobject *kobj,
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	int val = 0;
+
+	if (sscanf(buf, "%iu", &val) != 0) {
+		int pid = val;
+
+		if (pid <= 0)
+			return count;
+
+		store_vip(pid);
+	}
+	return count;
+}
+
+static ssize_t show_vip_knob(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	unsigned int len = 0;
+	unsigned int max_len = 4096;
+	int i;
+
+	for (i = 0; i < 4; i++)
+		len += snprintf(buf+len, max_len-len, "[%d]=%d\n", i, get_vip_pid(i));
+
+	len += snprintf(buf+len, max_len-len, "ref_count=%d\n", get_vip_ref_count());
+
+	return len;
+}
+
+static struct kobj_attribute eas_vip_attr =
+__ATTR(vip_tasks, S_IWUSR | S_IRUSR, show_vip_knob,
+		store_vip_knob);
+#endif
+
 static struct attribute *eas_attrs[] = {
 	&eas_info_attr.attr,
 	&eas_knob_attr.attr,
 	&eas_watershed_attr.attr,
 	&eas_turning_point_attr.attr,
 	&eas_stune_task_thresh_attr.attr,
-	&eas_cap_margin_attr.attr,
+	&eas_cap_margin_dvfs_attr.attr,
 	&eas_sodi_limit_attr.attr,
+#ifdef CONFIG_CPU_FREQ_SCHED_ASSIST
+	&eas_dvfs_debug_attr.attr,
+#endif
+#ifdef CONFIG_MTK_SCHED_VIP_TASKS
+	&eas_vip_attr.attr,
+#endif
 	NULL,
 };
 
@@ -719,13 +846,30 @@ static int __init eas_stats_init(void)
 
 	eas_info.init = 0;
 
+
+	snprintf(module_name, sizeof(module_name), "%s %s%d %s",
+		"arctic",
+#if (defined CONFIG_CPU_FREQ_GOV_SCHED) || defined(CONFIG_CPU_FREQ_GOV_SCHEDPLUS)
+		"sched-dvfs:", sched_dvfs_type,
+#else
+		"unknown:", 0,
+#endif
+
+#ifdef CONFIG_MTK_ACAO_SUPPORT
+		"acao"
+#else
+		"hps"
+#endif
+	);
+
 	ret = init_eas_attribs();
 
 	if (ret)
 		eas_info.init = 1;
 
+#ifdef CONFIG_MTK_GPU_SUPPORT
 	ged_kpi_set_game_hint_value_fp = game_hint_notifier;
-
+#endif
 	return ret;
 }
 late_initcall(eas_stats_init);

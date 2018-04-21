@@ -18,9 +18,10 @@
 #include <linux/genalloc.h>
 #include <linux/sched.h>
 #include <linux/mutex.h>
-//#include <linux/xlog.h>
+#include<linux/slab.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/fb.h>
 #include <mt-plat/mtk_gpu_utility.h>
 
 #include "ged_base.h"
@@ -31,6 +32,8 @@
 
 #include "ged_notify_sw_vsync.h"
 #include "ged_kpi.h"
+#include "ged_fdvfs.h"
+
 
 static struct dentry* gpsHALDir = NULL;
 static struct dentry* gpsTotalGPUFreqLevelCountEntry = NULL;
@@ -44,6 +47,11 @@ static struct dentry* gpsDvfsPreFreqEntry = NULL;
 static struct dentry* gpsDvfsGpuUtilizationEntry = NULL;
 static struct dentry* gpsFpsUpperBoundEntry = NULL;
 static struct dentry* gpsIntegrationReportReadEntry = NULL;
+#ifdef GED_FDVFS_ENABLE
+static struct dentry *gpsGpuFreqHintEntry;
+#endif
+
+
 
 int tokenizer(char* pcSrc, int i32len, int* pi32IndexArray, int i32NumToken)
 {
@@ -261,15 +269,80 @@ static int ged_custom_upbound_gpu_freq_seq_show(struct seq_file *psSeqFile, void
 
 	return 0;
 }
-//-----------------------------------------------------------------------------
-static struct seq_operations gsCustomUpboundGpuFreqReadOps = 
-{
+/* ----------------------------------------------------------------------------- */
+const struct seq_operations gsCustomUpboundGpuFreqReadOps = {
 	.start = ged_custom_upbound_gpu_freq_seq_start,
 	.stop = ged_custom_upbound_gpu_freq_seq_stop,
 	.next = ged_custom_upbound_gpu_freq_seq_next,
 	.show = ged_custom_upbound_gpu_freq_seq_show,
 };
-//-----------------------------------------------------------------------------
+/* ----------------------------------------------------------------------------- */
+#ifdef GED_FDVFS_ENABLE
+static ssize_t ged_gpu_freq_hint_write_entry(const char __user *pszBuffer,
+				size_t uiCount, loff_t uiPosition,
+				void *pvData)
+{
+#define GED_HAL_DEBUGFS_SIZE 64
+	char acBuffer[GED_HAL_DEBUGFS_SIZE];
+
+	int i32Value;
+
+	if ((uiCount > 0) && (uiCount < GED_HAL_DEBUGFS_SIZE)) {
+		if (ged_copy_from_user(acBuffer, pszBuffer, uiCount) == 0) {
+			acBuffer[uiCount] = '\0';
+			/* if (sscanf(acBuffer, "%d", &i32Value) == 1)	{ */
+			if (kstrtoint(acBuffer, 0, &i32Value) == 0) {
+				if (i32Value < 0)
+					i32Value = 0;
+				mtk_gpu_freq_hint(i32Value);
+			}
+		}
+	}
+
+	return uiCount;
+}
+
+/* ----------------------------------------------------------------------------- */
+static void *ged_gpu_freq_hint_seq_start(struct seq_file *psSeqFile, loff_t *puiPosition)
+{
+	if (*puiPosition == 0)
+		return SEQ_START_TOKEN;
+
+	return NULL;
+}
+/* ----------------------------------------------------------------------------- */
+static void ged_gpu_freq_hint_seq_stop(struct seq_file *psSeqFile, void *pvData)
+{
+
+}
+/* ----------------------------------------------------------------------------- */
+static void *ged_gpu_freq_hint_seq_next(struct seq_file *psSeqFile, void *pvData, loff_t *puiPosition)
+{
+	return NULL;
+}
+/* ----------------------------------------------------------------------------- */
+static int ged_gpu_freq_hint_seq_show(struct seq_file *psSeqFile, void *pvData)
+{
+	if (pvData != NULL)	{
+		unsigned int ui32BoostGpuFreqLevel;
+
+		if (false == mtk_gpu_get_freq_hint(&ui32BoostGpuFreqLevel))
+			ui32BoostGpuFreqLevel = 0;
+
+		seq_printf(psSeqFile, "%u\n", ui32BoostGpuFreqLevel);
+	}
+
+	return 0;
+}
+/* ----------------------------------------------------------------------------- */
+const struct seq_operations gsGpuFreqHintReadOps = {
+	.start = ged_gpu_freq_hint_seq_start,
+	.stop = ged_gpu_freq_hint_seq_stop,
+	.next = ged_gpu_freq_hint_seq_next,
+	.show = ged_gpu_freq_hint_seq_show,
+};
+
+#endif
 
 static bool bForce=GED_FALSE;
 static ssize_t ged_vsync_offset_enable_write_entry(const char __user *pszBuffer, size_t uiCount, loff_t uiPosition, void *pvData)
@@ -285,116 +358,58 @@ static ssize_t ged_vsync_offset_enable_write_entry(const char __user *pszBuffer,
 
 	char acBuffer[GED_HAL_DEBUGFS_SIZE];
 	int aint32Indx[NUM_TOKEN];
-	char* pcCMD;
-	char* pcValue;
+	char *pcCMD;
+	char *pcValue;
+	int value;
 	int i;
 
+	if (uiCount >= GED_HAL_DEBUGFS_SIZE)
+		goto normal_exit;
 
+	if (ged_copy_from_user(acBuffer, pszBuffer, uiCount))
+		goto normal_exit;
 
-	if ((0 < uiCount) && (uiCount < GED_HAL_DEBUGFS_SIZE))
+	acBuffer[uiCount] = '\0';
+	i = tokenizer(acBuffer, uiCount, aint32Indx, NUM_TOKEN);
+	if (i != NUM_TOKEN)
+		goto normal_exit;
+
+	pcCMD = acBuffer + aint32Indx[0];
+	pcValue = acBuffer + aint32Indx[1];
+
+	value = (pcValue[0] - '0');
+
+	if (strcmp(pcCMD, "touch_down") == 0)
 	{
-		if (0 == ged_copy_from_user(acBuffer, pszBuffer, uiCount))
-		{
-			acBuffer[uiCount] = '\0';
-			i=tokenizer(acBuffer, uiCount, aint32Indx, NUM_TOKEN);
-			if(i==NUM_TOKEN)
-			{
-				pcCMD = acBuffer+aint32Indx[0];
+		ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_TOUCH_EVENT, !!value);
+#ifdef GED_FDVFS_ENABLE
+		mtk_gpu_touch_hint(!!value ? 1 : 0);
+#endif
+	} else if (strcmp(pcCMD, "enable_WFD") == 0)
+		ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_WFD_EVENT, !!value);
+	else if (strcmp(pcCMD, "enable_debug") == 0) {
+		if (value == 1) {
+			ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_FORCE_OFF, true);
+			bForce = GED_FALSE;
+		} else if (value == 2) {
+			ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_FORCE_ON, true);
+			bForce = GED_TRUE;
+		} else if (value == 0)
+			ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_DEBUG_CLEAR_EVENT, true);
+	} else if (strcmp(pcCMD, "gas") == 0) {
+		ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_GAS_EVENT, !!value);
+		ged_kpi_set_game_hint(!!value ? 1 : 0);
+		mtk_gpu_gas_hint(!!value ? 1 : 0);
+	} else if (strcmp(pcCMD, "enable_VR") == 0)
+		ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_VR_EVENT, !!value);
+	else if (strcmp(pcCMD, "mhl4k-vid") == 0)
+		ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_MHL4K_VID_EVENT, !!value);
+	else if (strcmp(pcCMD, "low-power-mode") == 0)
+		ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_LOW_POWER_MODE_EVENT, !!value);
+	else
+		GED_LOGE("unknown command:%s %c", pcCMD, *pcValue);
 
-				pcValue = acBuffer+aint32Indx[1];
- 
-				if(strcmp(pcCMD,"touch_down")==0)
-				{
-					if ( (*pcValue)=='1'|| (*pcValue) =='0')
-					{
-						if( (*pcValue) -'0'==0) // touch up
-							ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_TOUCH_EVENT , false);
-						else // touch down
-							ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_TOUCH_EVENT , true);
-					}  
-				}
-				else if(strcmp(pcCMD,"enable_WFD")==0)
-				{
-					if ( (*pcValue) =='1'|| (*pcValue) =='0')
-					{
-						if( (*pcValue) -'0'==0) // WFD turn-off
-							ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_WFD_EVENT , false);
-						else // WFD turn-on
-							ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_WFD_EVENT , true);
-					}
-				}
-				else if(strcmp(pcCMD,"enable_debug")==0)
-					{
-						if ( (*pcValue) =='1'|| (*pcValue) =='0'||(*pcValue) =='2')
-						{
-							if( (*pcValue) -'0'==1) // force off
-							{
-								ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_FORCE_OFF , true);
-								bForce = GED_FALSE;
-							}
-							else if( (*pcValue) -'0'==2) // force on
-							{
-								ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_FORCE_ON , true);
-								bForce = GED_TRUE;
-							}
-							else // turn-off debug
-								ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_DEBUG_CLEAR_EVENT , true);
-						}
-					}
-					else if(strcmp(pcCMD, "gas") == 0)
-					{
-						if ( (*pcValue) =='1'|| (*pcValue) =='0')
-						{
-							if( (*pcValue) -'0'==0)
-								ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_GAS_EVENT, false);
-							else
-								ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_GAS_EVENT, true);
-						}
-
-						if ((*pcValue) == '1') {
-							ged_kpi_set_game_hint(1);
-						} else {
-							ged_kpi_set_game_hint(0);
-						}
-					}
-					else if(strcmp(pcCMD, "enable_VR") == 0)
-					{
-						if ( (*pcValue) =='1'|| (*pcValue) =='0')
-						{
-							if( (*pcValue) -'0'==0)
-								ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_VR_EVENT, false);
-							else
-								ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_VR_EVENT, true);
-						}
-					}
-					else if (strcmp(pcCMD, "mhl4k-vid") == 0)
-					{
-						if ((*pcValue) == '1'|| (*pcValue) == '0')
-						{
-							if ((*pcValue) -'0' == 0)
-								ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_MHL4K_VID_EVENT, false);
-							else
-								ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_MHL4K_VID_EVENT, true);
-						}
-					}
-					else if (strcmp(pcCMD, "low-power-mode") == 0)
-                                        {
-                                                if ((*pcValue) == '1'|| (*pcValue) == '0')
-                                                {
-                                                        if ((*pcValue) -'0' == 0)
-                                                                ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_LOW_POWER_MODE_EVENT, false);
-                                                        else
-                                                                ged_dvfs_vsync_offset_event_switch(GED_DVFS_VSYNC_OFFSET_LOW_POWER_MODE_EVENT, true);
-                                                }
-					}
-					else
-					{
-						GED_LOGE("unknow command:%s %c",pcCMD,*pcValue);
-					}
-			}
-
-		}
-	}
+normal_exit:
 	return uiCount;
 
 }
@@ -449,6 +464,7 @@ static int ged_vsync_offset_enable_seq_show(struct seq_file *psSeqFile, void *pv
 			seq_printf(psSeqFile, "Thermal: %d\n", g_ui32EventStatus&GED_EVENT_THERMAL?1:0 );
 			seq_printf(psSeqFile, "Low power mode: %d\n", g_ui32EventStatus & GED_EVENT_LOW_POWER_MODE ? 1 : 0);
 			seq_printf(psSeqFile, "MHL4K Video: %d\n", g_ui32EventStatus & GED_EVENT_MHL4K_VID ? 1 : 0);
+			seq_printf(psSeqFile, "LCD: %d\n", g_ui32EventStatus & GED_EVENT_LCD ? 1 : 0);
 		}
 	}
 
@@ -916,6 +932,115 @@ static const struct seq_operations gsKpi_info_ReadOps = {
 	.show = ged_kpi_info_seq_show,
 };
 #endif
+
+static struct notifier_block ged_fb_notifier;
+
+static int ged_fb_notifier_callback(struct notifier_block *self, unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	int blank;
+
+	/* If we aren't interested in this event, skip it immediately ... */
+	if (event != FB_EVENT_BLANK)
+		return 0;
+
+	blank = *(int *)evdata->data;
+
+	switch (blank) {
+	case FB_BLANK_UNBLANK:
+		g_ui32EventStatus |= GED_EVENT_LCD;
+		ged_dvfs_probe_signal(GED_GAS_SIGNAL_EVENT);
+		break;
+	case FB_BLANK_POWERDOWN:
+		g_ui32EventStatus &= ~GED_EVENT_LCD;
+		ged_dvfs_probe_signal(GED_GAS_SIGNAL_EVENT);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+typedef struct {
+	ged_event_change_fp callback;
+	void *private_data;
+	char name[128];
+	struct list_head sList;
+} ged_event_change_entry_t;
+
+static struct {
+	struct mutex lock;
+	struct list_head listen;
+} g_ged_event_change = {
+	.lock     = __MUTEX_INITIALIZER(g_ged_event_change.lock),
+	.listen   = LIST_HEAD_INIT(g_ged_event_change.listen),
+};
+
+bool mtk_register_ged_event_change(const char *name, ged_event_change_fp callback, void *private_data)
+{
+	ged_event_change_entry_t *entry = NULL;
+
+	entry = kmalloc(sizeof(ged_event_change_entry_t), GFP_KERNEL);
+	if (entry == NULL)
+		return false;
+
+	entry->callback = callback;
+	entry->private_data = private_data;
+	strncpy(entry->name, name, sizeof(entry->name) - 1);
+	entry->name[sizeof(entry->name) - 1] = 0;
+	INIT_LIST_HEAD(&entry->sList);
+
+	mutex_lock(&g_ged_event_change.lock);
+
+	list_add(&entry->sList, &g_ged_event_change.listen);
+
+	mutex_unlock(&g_ged_event_change.lock);
+
+	return true;
+}
+
+bool mtk_unregister_ged_event_change(const char *name)
+{
+	struct list_head *pos, *head;
+	ged_event_change_entry_t *entry = NULL;
+
+	mutex_lock(&g_ged_event_change.lock);
+
+	head = &g_ged_event_change.listen;
+	list_for_each(pos, head) {
+		entry = list_entry(pos, ged_event_change_entry_t, sList);
+		if (strncmp(entry->name, name, sizeof(entry->name) - 1) == 0)
+			break;
+		entry = NULL;
+	}
+
+	if (entry) {
+		list_del(&entry->sList);
+		kfree(entry);
+	}
+
+	mutex_unlock(&g_ged_event_change.lock);
+
+	return true;
+}
+
+void mtk_ged_event_notify(int events)
+{
+	struct list_head *pos, *head;
+	ged_event_change_entry_t *entry = NULL;
+
+	mutex_lock(&g_ged_event_change.lock);
+
+	head = &g_ged_event_change.listen;
+	list_for_each(pos, head) {
+		entry = list_entry(pos, ged_event_change_entry_t, sList);
+		entry->callback(entry->private_data, events);
+	}
+
+	mutex_unlock(&g_ged_event_change.lock);
+}
+
 /* ----------------------------------------------------------------------------- */
 GED_ERROR ged_hal_init(void)
 {
@@ -991,7 +1116,7 @@ GED_ERROR ged_hal_init(void)
 	err = ged_debugFS_create_entry(
 			"media_event",
 			gpsHALDir,
-			NULL,
+			&gsVsync_offset_enableReadOps,
 			ged_vsync_offset_enable_write_entry,
 			NULL,
 			&gpsVsyncOffsetEnableEntry);
@@ -1073,6 +1198,21 @@ GED_ERROR ged_hal_init(void)
 			NULL,
 			&gpsGedInfoKPIEntry);
 #endif
+#ifdef GED_FDVFS_ENABLE
+    /* Control the gpu freq hint*/
+	err = ged_debugFS_create_entry(
+			"gpu_freq_hint",
+			gpsHALDir,
+			&gsGpuFreqHintReadOps,
+			ged_gpu_freq_hint_write_entry,
+			NULL,
+			&gpsGpuFreqHintEntry);
+
+	if (unlikely(err != GED_OK)) {
+		GED_LOGE("ged: failed to create freq_hint entry!\n");
+		goto ERROR;
+	}
+#endif
 
 	/* Report Integration Status */
 	err = ged_debugFS_create_entry(
@@ -1082,6 +1222,10 @@ GED_ERROR ged_hal_init(void)
 			NULL,
 			NULL,
 			&gpsIntegrationReportReadEntry);
+
+	ged_fb_notifier.notifier_call = ged_fb_notifier_callback;
+	if (fb_register_client(&ged_fb_notifier))
+		GED_LOGE("register fb_notifier fail!\n");
 
 	if (unlikely(err != GED_OK))
 	{

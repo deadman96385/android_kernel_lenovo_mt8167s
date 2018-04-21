@@ -19,8 +19,13 @@
 #include <linux/of_address.h>
 #include <ddp_reg.h>
 
+#if 0
 #define PWM_MSG(fmt, arg...) pr_debug("[PWM] " fmt "\n", ##arg)
 #define PWM_ERR(fmt, arg...) pr_err("[PWM] " fmt "\n", ##arg)
+#else
+#define PWM_MSG(fmt, arg...)
+#define PWM_ERR(fmt, arg...)
+#endif
 
 /*****************************************************************************
  *

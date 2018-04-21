@@ -121,6 +121,7 @@ static kal_bool diso_thread_timeout = KAL_FALSE;
 static struct delayed_work diso_polling_work;
 static void diso_polling_handler(struct work_struct *work);
 static DISO_Polling_Data DISO_Polling;
+static bool g_diso_otg;
 #else
 DISO_IRQ_Data DISO_IRQ;
 #endif
@@ -434,7 +435,14 @@ static unsigned int charging_get_charger_det_status(void *data)
 {
 	unsigned int status = STATUS_OK;
 
+#if !defined(CONFIG_MTK_DUAL_INPUT_CHARGER_SUPPORT)
 	*(kal_bool *)(data) = upmu_get_rgs_chrdet();
+#else
+	if (((g_diso_state >> 1) & 0x3) != 0x0 || upmu_get_rgs_chrdet())
+		*(kal_bool *)(data) = KAL_TRUE;
+	else
+		*(kal_bool *)(data) = KAL_FALSE;
+#endif
 
 	return status;
 }
@@ -639,12 +647,18 @@ static unsigned int charging_set_ta_current_pattern(void *data)
 }
 
 #if defined(CONFIG_MTK_DUAL_INPUT_CHARGER_SUPPORT)
+void set_diso_otg(bool enable)
+{
+	g_diso_otg = enable;
+}
+
 void set_vusb_auxadc_irq(bool enable, bool flag)
 {
 #if !defined(MTK_AUXADC_IRQ_SUPPORT)
 	hrtimer_cancel(&diso_kthread_timer);
 
 	DISO_Polling.reset_polling = KAL_TRUE;
+	DISO_Polling.vusb_polling_measure.trigger_state = false;
 	DISO_Polling.vusb_polling_measure.notify_irq_en = enable;
 	DISO_Polling.vusb_polling_measure.notify_irq = flag;
 
@@ -674,6 +688,7 @@ void set_vdc_auxadc_irq(bool enable, bool flag)
 	hrtimer_cancel(&diso_kthread_timer);
 
 	DISO_Polling.reset_polling = KAL_TRUE;
+	DISO_Polling.vdc_polling_measure.trigger_state = false;
 	DISO_Polling.vdc_polling_measure.notify_irq_en = enable;
 	DISO_Polling.vdc_polling_measure.notify_irq = flag;
 
@@ -702,13 +717,17 @@ static void diso_polling_handler(struct work_struct *work)
 {
 	int trigger_channel = -1;
 	int trigger_flag = -1;
+	DISO_polling_channel *VDC_Polling = &DISO_Polling.vdc_polling_measure;
+	DISO_polling_channel *VUSB_Polling = &DISO_Polling.vusb_polling_measure;
 
-	if (DISO_Polling.vdc_polling_measure.notify_irq_en)
+	if (VDC_Polling->notify_irq_en && VDC_Polling->trigger_state) {
+		VDC_Polling->trigger_state = false;
 		trigger_channel = AP_AUXADC_DISO_VDC_CHANNEL;
-	else if (DISO_Polling.vusb_polling_measure.notify_irq_en)
+	} else if (VUSB_Polling->notify_irq_en && VUSB_Polling->trigger_state) {
+		VUSB_Polling->trigger_state = false;
 		trigger_channel = AP_AUXADC_DISO_VUSB_CHANNEL;
+	}
 
-	pr_debug("[DISO]auxadc handler triggered\n");
 	switch (trigger_channel) {
 	case AP_AUXADC_DISO_VDC_CHANNEL:
 		trigger_flag = DISO_Polling.vdc_polling_measure.notify_irq;
@@ -716,16 +735,18 @@ static void diso_polling_handler(struct work_struct *work)
 #ifdef MTK_DISCRETE_SWITCH /*for DSC DC plugin handle */
 		set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
 		set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
+		set_vdc_auxadc_irq(DISO_IRQ_ENABLE, (~trigger_flag) & 0x1);
 		set_vusb_auxadc_irq(DISO_IRQ_ENABLE, DISO_IRQ_FALLING);
+		DISO_data.diso_state.pre_vusb_state  = DISO_data.diso_state.cur_vusb_state;
+		DISO_data.diso_state.pre_otg_state	= DISO_data.diso_state.cur_otg_state;
 		if (trigger_flag == DISO_IRQ_RISING) {
-			DISO_data.diso_state.pre_vusb_state  = DISO_ONLINE;
-			DISO_data.diso_state.pre_vdc_state  = DISO_OFFLINE;
-			DISO_data.diso_state.pre_otg_state  = DISO_OFFLINE;
-			DISO_data.diso_state.cur_vusb_state  = DISO_ONLINE;
+			DISO_data.diso_state.pre_vdc_state  = DISO_data.diso_state.cur_vdc_state;
 			DISO_data.diso_state.cur_vdc_state  = DISO_ONLINE;
-			DISO_data.diso_state.cur_otg_state  = DISO_OFFLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[2]);
-		}
+		} else if (trigger_flag == DISO_IRQ_FALLING) {
+			DISO_data.diso_state.pre_vdc_state  = DISO_OFFLINE;
+			DISO_data.diso_state.cur_vdc_state  = DISO_OFFLINE;
+		} else
+			pr_debug("[%s] wrong trigger flag!\n", __func__);
 #else /*for load switch OTG leakage handle*/
 		set_vdc_auxadc_irq(DISO_IRQ_ENABLE, (~trigger_flag) & 0x1);
 		if (trigger_flag == DISO_IRQ_RISING) {
@@ -735,7 +756,6 @@ static void diso_polling_handler(struct work_struct *work)
 			DISO_data.diso_state.cur_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.cur_vdc_state  = DISO_ONLINE;
 			DISO_data.diso_state.cur_otg_state  = DISO_ONLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[5]);
 		} else if (trigger_flag == DISO_IRQ_FALLING) {
 			DISO_data.diso_state.pre_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.pre_vdc_state  = DISO_ONLINE;
@@ -743,7 +763,6 @@ static void diso_polling_handler(struct work_struct *work)
 			DISO_data.diso_state.cur_vusb_state  = DISO_OFFLINE;
 			DISO_data.diso_state.cur_vdc_state  = DISO_OFFLINE;
 			DISO_data.diso_state.cur_otg_state  = DISO_ONLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[1]);
 		} else
 			pr_debug("[%s] wrong trigger flag!\n", __func__);
 #endif
@@ -753,25 +772,46 @@ static void diso_polling_handler(struct work_struct *work)
 		pr_debug("[DISO]VUSB IRQ triggered, channel ==%d, flag ==%d\n", trigger_channel, trigger_flag);
 		set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
 		set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
+		set_vusb_auxadc_irq(DISO_IRQ_ENABLE, (~trigger_flag) & 0x1);
+#ifdef MTK_DISCRETE_SWITCH
+		set_vdc_auxadc_irq(DISO_IRQ_ENABLE, DISO_IRQ_FALLING);
 		if (trigger_flag == DISO_IRQ_FALLING) {
 			DISO_data.diso_state.pre_vusb_state  = DISO_ONLINE;
-			DISO_data.diso_state.pre_vdc_state  = DISO_ONLINE;
-			DISO_data.diso_state.pre_otg_state  = DISO_OFFLINE;
-			DISO_data.diso_state.cur_vusb_state  = DISO_OFFLINE;
-			DISO_data.diso_state.cur_vdc_state  = DISO_ONLINE;
-			DISO_data.diso_state.cur_otg_state  = DISO_OFFLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[4]);
+			DISO_data.diso_state.pre_vdc_state = DISO_ONLINE;
+			DISO_data.diso_state.pre_otg_state = DISO_OFFLINE;
+			DISO_data.diso_state.cur_vusb_state = DISO_OFFLINE;
+			DISO_data.diso_state.cur_otg_state = DISO_OFFLINE;
 		} else if (trigger_flag == DISO_IRQ_RISING) {
-			DISO_data.diso_state.pre_vusb_state  = DISO_OFFLINE;
-			DISO_data.diso_state.pre_vdc_state  = DISO_ONLINE;
-			DISO_data.diso_state.pre_otg_state  = DISO_OFFLINE;
-			DISO_data.diso_state.cur_vusb_state  = DISO_ONLINE;
-			DISO_data.diso_state.cur_vdc_state  = DISO_ONLINE;
-			DISO_data.diso_state.cur_otg_state  = DISO_OFFLINE;
-			pr_debug(" cur diso_state is %s!\n", DISO_state_s[6]);
+			DISO_data.diso_state.pre_vusb_state = DISO_OFFLINE;
+			DISO_data.diso_state.pre_vdc_state = DISO_ONLINE;
+			DISO_data.diso_state.pre_otg_state = DISO_OFFLINE;
+			if (!g_diso_otg) {
+				DISO_data.diso_state.cur_vusb_state = DISO_ONLINE;
+				DISO_data.diso_state.cur_otg_state = DISO_OFFLINE;
+			} else {
+				DISO_data.diso_state.cur_vusb_state = DISO_OFFLINE;
+				DISO_data.diso_state.cur_otg_state = DISO_ONLINE;
+			}
 		} else
 			pr_debug("[%s] wrong trigger flag!\n", __func__);
-			set_vusb_auxadc_irq(DISO_IRQ_ENABLE, (~trigger_flag)&0x1);
+#else
+		if (trigger_flag == DISO_IRQ_FALLING) {
+			DISO_data.diso_state.pre_vusb_state  = DISO_ONLINE;
+			DISO_data.diso_state.pre_vdc_state = DISO_ONLINE;
+			DISO_data.diso_state.pre_otg_state = DISO_OFFLINE;
+			DISO_data.diso_state.cur_vusb_state = DISO_OFFLINE;
+			DISO_data.diso_state.cur_vdc_state = DISO_ONLINE;
+			DISO_data.diso_state.cur_otg_state = DISO_OFFLINE;
+		} else if (trigger_flag == DISO_IRQ_RISING) {
+			DISO_data.diso_state.pre_vusb_state = DISO_OFFLINE;
+			DISO_data.diso_state.pre_vdc_state = DISO_ONLINE;
+			DISO_data.diso_state.pre_otg_state = DISO_OFFLINE;
+			DISO_data.diso_state.cur_vusb_state = DISO_ONLINE;
+			DISO_data.diso_state.cur_vdc_state = DISO_ONLINE;
+			DISO_data.diso_state.cur_otg_state = DISO_OFFLINE;
+		} else
+			pr_debug("[%s] wrong trigger flag!\n", __func__);
+#endif
 		break;
 	default:
 		set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
@@ -781,7 +821,9 @@ static void diso_polling_handler(struct work_struct *work)
 	}
 
 	g_diso_state = *(int *)&DISO_data.diso_state;
-	pr_debug("[DISO]g_diso_state: 0x%x\n", g_diso_state);
+	pr_debug("[DISO] DISO_STATE: 0x%x, cur diso_state is %s\n",
+		g_diso_state, DISO_state_s[g_diso_state & 0x7]);
+
 	DISO_data.irq_callback_func(0, NULL);
 }
 #else
@@ -916,7 +958,7 @@ static void _get_diso_interrupt_state(void)
 	pr_debug("[DISO]	Current VBUS voltage  mV = %d\n", vol);
 
 	if (vol > VBUS_MIN_VOLTAGE/1000 && vol < VBUS_MAX_VOLTAGE/1000) {
-		if (!mt_usb_is_device()) {
+		if (g_diso_otg) {
 			diso_state |= 0x1; /*SET OTG bit as 1*/
 			diso_state &= ~0x2; /*SET VBUS bit as 0*/
 		} else {
@@ -927,7 +969,7 @@ static void _get_diso_interrupt_state(void)
 	} else {
 		diso_state &= 0x4; /*SET OTG and VBUS bit as 0*/
 	}
-	pr_debug("[DISO] DISO_STATE==0x%x\n", diso_state);
+	pr_debug("[DISO] DISO_STATE = 0x%x\n", diso_state);
 	g_diso_state = diso_state;
 }
 #if !defined(MTK_AUXADC_IRQ_SUPPORT)
@@ -984,20 +1026,21 @@ static void _get_polling_state(void)
 		vusb_vol_dir = _get_irq_direction(VUSB_Polling->preVoltage, VUSB_Polling->curVoltage);
 	}
 
-	if (VDC_Polling->notify_irq_en &&
+	if ((vdc_vol == 0) && (vusb_vol == 0)) {
+		VDC_Polling->notify_irq_en = 0;
+		VUSB_Polling->notify_irq_en = 0;
+	} else if (VDC_Polling->notify_irq_en &&
 	(vdc_vol_dir == VDC_Polling->notify_irq)) {
+		VDC_Polling->trigger_state = true;
 		schedule_delayed_work(&diso_polling_work, 10*HZ/1000); /*10ms*/
 		pr_debug("[%s] ready to trig VDC irq, irq: %d\n",
 		__func__, VDC_Polling->notify_irq);
 	} else if (VUSB_Polling->notify_irq_en && (vusb_vol_dir == VUSB_Polling->notify_irq)) {
+		VUSB_Polling->trigger_state = true;
 		schedule_delayed_work(&diso_polling_work, 10*HZ/1000);
 		pr_debug("[%s] ready to trig VUSB irq, irq: %d\n",
 		__func__, VUSB_Polling->notify_irq);
-	} else if ((vdc_vol == 0) && (vusb_vol == 0)) {
-		VDC_Polling->notify_irq_en = 0;
-		VUSB_Polling->notify_irq_en = 0;
 	}
-
 }
 
 enum hrtimer_restart diso_kthread_hrtimer_func(struct hrtimer *timer)
@@ -1128,40 +1171,41 @@ static unsigned int charging_get_diso_state(void *data)
 	int diso_state = 0x0;
 	DISO_ChargerStruct *pDISO_data = (DISO_ChargerStruct *)data;
 
+	set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
+	set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
+
 	_get_diso_interrupt_state();
 	diso_state = g_diso_state;
 	pr_debug("[do_chrdet_int_task] current diso state is %s!\n", DISO_state_s[diso_state]);
 	if (((diso_state >> 1) & 0x3) != 0x0) {
 		switch (diso_state) {
 		case USB_ONLY:
-			set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
-			set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
-#ifdef MTK_DISCRETE_SWITCH
-			set_vdc_auxadc_irq(DISO_IRQ_ENABLE, 1);
-#endif
+			#ifdef MTK_DISCRETE_SWITCH
+			set_vdc_auxadc_irq(DISO_IRQ_ENABLE, DISO_IRQ_RISING);
+			#endif
 			pDISO_data->diso_state.cur_vusb_state = DISO_ONLINE;
 			pDISO_data->diso_state.cur_vdc_state = DISO_OFFLINE;
 			pDISO_data->diso_state.cur_otg_state = DISO_OFFLINE;
 			break;
 		case DC_ONLY:
-			set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
-			set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
 			set_vusb_auxadc_irq(DISO_IRQ_ENABLE, DISO_IRQ_RISING);
 			pDISO_data->diso_state.cur_vusb_state = DISO_OFFLINE;
 			pDISO_data->diso_state.cur_vdc_state = DISO_ONLINE;
 			pDISO_data->diso_state.cur_otg_state = DISO_OFFLINE;
 			break;
 		case DC_WITH_USB:
-			set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
-			set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
 			set_vusb_auxadc_irq(DISO_IRQ_ENABLE, DISO_IRQ_FALLING);
+			#ifdef MTK_DISCRETE_SWITCH
+			set_vdc_auxadc_irq(DISO_IRQ_ENABLE, DISO_IRQ_FALLING);
+			#endif
 			pDISO_data->diso_state.cur_vusb_state = DISO_ONLINE;
 			pDISO_data->diso_state.cur_vdc_state = DISO_ONLINE;
 			pDISO_data->diso_state.cur_otg_state = DISO_OFFLINE;
 			break;
 		case DC_WITH_OTG:
-			set_vdc_auxadc_irq(DISO_IRQ_DISABLE, 0);
-			set_vusb_auxadc_irq(DISO_IRQ_DISABLE, 0);
+			#ifdef MTK_DISCRETE_SWITCH
+			set_vusb_auxadc_irq(DISO_IRQ_ENABLE, DISO_IRQ_FALLING);
+			#endif
 			pDISO_data->diso_state.cur_vusb_state = DISO_OFFLINE;
 			pDISO_data->diso_state.cur_vdc_state = DISO_ONLINE;
 			pDISO_data->diso_state.cur_otg_state = DISO_ONLINE;
@@ -1263,7 +1307,7 @@ signed int chr_control_interface(CHARGING_CTRL_CMD cmd, void *data)
 	if (cmd < CHARGING_CMD_NUMBER && charging_func[cmd])
 		status = charging_func[cmd](data);
 	else {
-		pr_err("Unsupported charging command:%d!\n", cmd);
+		pr_debug("Unsupported charging command:%d!\n", cmd);
 		return STATUS_UNSUPPORTED;
 	}
 	return status;

@@ -31,12 +31,159 @@ struct mt8167_evb_priv {
 	uint32_t ext_spk_amp_shutdown_time_us;
 	uint32_t hp_spk_amp_warmup_time_us;
 	uint32_t hp_spk_amp_shutdown_time_us;
+	long ext_spk_amp_en;
+	long ext_hp_amp_en;
 };
 
 static const char * const mt8167_evb_pinctrl_pin_str[PIN_STATE_MAX] = {
 	"default",
 	"extamp_on",
 	"extamp_off",
+};
+
+static void mt8167_evb_ext_spk_amp_turn_on(struct snd_soc_card *card)
+{
+	struct mt8167_evb_priv *card_data = snd_soc_card_get_drvdata(card);
+	int ret = 0;
+
+	if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_ON]))
+		return;
+
+	ret = pinctrl_select_state(card_data->pinctrl,
+		card_data->pin_states[PIN_STATE_EXTAMP_ON]);
+	if (ret)
+		dev_err(card->dev, "%s failed to select state %d\n",
+			__func__, ret);
+
+	if (card_data->ext_spk_amp_warmup_time_us > 0)
+		usleep_range(card_data->ext_spk_amp_warmup_time_us,
+			card_data->ext_spk_amp_warmup_time_us + 1);
+}
+
+static void mt8167_evb_ext_spk_amp_turn_off(struct snd_soc_card *card)
+{
+	struct mt8167_evb_priv *card_data = snd_soc_card_get_drvdata(card);
+	int ret = 0;
+
+	if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_OFF]))
+		return;
+
+	ret = pinctrl_select_state(card_data->pinctrl,
+		card_data->pin_states[PIN_STATE_EXTAMP_OFF]);
+	if (ret)
+		dev_err(card->dev, "%s failed to select state %d\n",
+			__func__, ret);
+
+	if (card_data->ext_spk_amp_shutdown_time_us > 0)
+		usleep_range(card_data->ext_spk_amp_shutdown_time_us,
+			card_data->ext_spk_amp_shutdown_time_us + 1);
+}
+
+/* Ext Spk Amp Switch */
+static int mt8167_evb_ext_spk_amp_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct mt8167_evb_priv *card_data = snd_soc_card_get_drvdata(card);
+
+	ucontrol->value.integer.value[0] = card_data->ext_spk_amp_en;
+
+	return 0;
+}
+
+static int mt8167_evb_ext_spk_amp_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct mt8167_evb_priv *card_data = snd_soc_card_get_drvdata(card);
+
+	card_data->ext_spk_amp_en = ucontrol->value.integer.value[0];
+
+	if (card_data->ext_spk_amp_en)
+		mt8167_evb_ext_spk_amp_turn_on(card);
+	else
+		mt8167_evb_ext_spk_amp_turn_off(card);
+
+	return 0;
+}
+
+static void mt8167_evb_ext_hp_amp_turn_on(struct snd_soc_card *card)
+{
+	struct mt8167_evb_priv *card_data = snd_soc_card_get_drvdata(card);
+	int ret = 0;
+
+	if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_ON]))
+		return;
+
+	ret = pinctrl_select_state(card_data->pinctrl,
+		card_data->pin_states[PIN_STATE_EXTAMP_ON]);
+	if (ret)
+		dev_err(card->dev, "%s failed to select state %d\n",
+			__func__, ret);
+
+	if (card_data->hp_spk_amp_warmup_time_us > 0)
+		usleep_range(card_data->hp_spk_amp_warmup_time_us,
+			card_data->hp_spk_amp_warmup_time_us + 1);
+}
+
+static void mt8167_evb_ext_hp_amp_turn_off(struct snd_soc_card *card)
+{
+	struct mt8167_evb_priv *card_data = snd_soc_card_get_drvdata(card);
+	int ret = 0;
+
+	if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_OFF]))
+		return;
+
+	ret = pinctrl_select_state(card_data->pinctrl,
+		card_data->pin_states[PIN_STATE_EXTAMP_OFF]);
+	if (ret)
+		dev_err(card->dev, "%s failed to select state %d\n",
+			__func__, ret);
+
+	if (card_data->hp_spk_amp_shutdown_time_us > 0)
+		usleep_range(card_data->hp_spk_amp_shutdown_time_us,
+			card_data->hp_spk_amp_shutdown_time_us + 1);
+}
+
+/* Ext HP Amp Switch */
+static int mt8167_evb_ext_hp_amp_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct mt8167_evb_priv *card_data = snd_soc_card_get_drvdata(card);
+
+	ucontrol->value.integer.value[0] = card_data->ext_hp_amp_en;
+
+	return 0;
+}
+
+static int mt8167_evb_ext_hp_amp_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct mt8167_evb_priv *card_data = snd_soc_card_get_drvdata(card);
+
+	card_data->ext_hp_amp_en = ucontrol->value.integer.value[0];
+
+	if (card_data->ext_hp_amp_en)
+		mt8167_evb_ext_hp_amp_turn_on(card);
+	else
+		mt8167_evb_ext_hp_amp_turn_off(card);
+
+	return 0;
+}
+
+static const struct snd_kcontrol_new mt8167_evb_controls[] = {
+	/* Ext Spk Amp Switch */
+	SOC_SINGLE_BOOL_EXT("Ext Spk Amp Switch",
+		0,
+		mt8167_evb_ext_spk_amp_get,
+		mt8167_evb_ext_spk_amp_put),
+	/* Ext HP Amp Switch */
+	SOC_SINGLE_BOOL_EXT("Ext HP Amp Switch",
+		0,
+		mt8167_evb_ext_hp_amp_get,
+		mt8167_evb_ext_hp_amp_put),
 };
 
 static int mt8167_evb_mic1_event(struct snd_soc_dapm_widget *w,
@@ -109,39 +256,15 @@ static int mt8167_evb_hp_spk_amp_event(struct snd_soc_dapm_widget *w,
 {
 	struct snd_soc_dapm_context *dapm = w->dapm;
 	struct snd_soc_card *card = dapm->card;
-	struct mt8167_evb_priv *card_data = snd_soc_card_get_drvdata(card);
-	int ret = 0;
 
 	dev_dbg(card->dev, "%s, event %d\n", __func__, event);
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
-		if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_ON]))
-			return 0;
-
-		ret = pinctrl_select_state(card_data->pinctrl,
-			card_data->pin_states[PIN_STATE_EXTAMP_ON]);
-		if (ret)
-			dev_err(card->dev, "%s failed to select state %d\n",
-				__func__, ret);
-
-		if (card_data->hp_spk_amp_warmup_time_us > 0)
-			usleep_range(card_data->hp_spk_amp_warmup_time_us,
-				card_data->hp_spk_amp_warmup_time_us + 1);
+		mt8167_evb_ext_hp_amp_turn_on(card);
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
-		if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_OFF]))
-			return 0;
-
-		ret = pinctrl_select_state(card_data->pinctrl,
-			card_data->pin_states[PIN_STATE_EXTAMP_OFF]);
-		if (ret)
-			dev_err(card->dev, "%s failed to select state %d\n",
-				__func__, ret);
-
-		if (card_data->hp_spk_amp_shutdown_time_us > 0)
-			usleep_range(card_data->hp_spk_amp_shutdown_time_us,
-				card_data->hp_spk_amp_shutdown_time_us + 1);
+		mt8167_evb_ext_hp_amp_turn_off(card);
 		break;
 	default:
 		break;
@@ -160,39 +283,15 @@ static int mt8167_evb_ext_spk_amp_wevent(struct snd_soc_dapm_widget *w,
 {
 	struct snd_soc_dapm_context *dapm = w->dapm;
 	struct snd_soc_card *card = dapm->card;
-	struct mt8167_evb_priv *card_data = snd_soc_card_get_drvdata(card);
-	int ret = 0;
 
 	dev_dbg(card->dev, "%s, event %d\n", __func__, event);
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
-		if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_ON]))
-			return 0;
-
-		ret = pinctrl_select_state(card_data->pinctrl,
-			card_data->pin_states[PIN_STATE_EXTAMP_ON]);
-		if (ret)
-			dev_err(card->dev, "%s failed to select state %d\n",
-				__func__, ret);
-
-		if (card_data->ext_spk_amp_warmup_time_us > 0)
-			usleep_range(card_data->ext_spk_amp_warmup_time_us,
-				card_data->ext_spk_amp_warmup_time_us + 1);
+		mt8167_evb_ext_spk_amp_turn_on(card);
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
-		if (IS_ERR(card_data->pin_states[PIN_STATE_EXTAMP_OFF]))
-			return 0;
-
-		ret = pinctrl_select_state(card_data->pinctrl,
-			card_data->pin_states[PIN_STATE_EXTAMP_OFF]);
-		if (ret)
-			dev_err(card->dev, "%s failed to select state %d\n",
-				__func__, ret);
-
-		if (card_data->ext_spk_amp_shutdown_time_us > 0)
-			usleep_range(card_data->ext_spk_amp_shutdown_time_us,
-				card_data->ext_spk_amp_shutdown_time_us + 1);
+		mt8167_evb_ext_spk_amp_turn_off(card);
 		break;
 	default:
 		break;
@@ -232,7 +331,7 @@ static const struct snd_soc_dapm_route mt8167_evb_audio_map[] = {
 
 #ifdef CONFIG_MTK_SPEAKER
 	/* use internal spk amp of MT6392 */
-	{"Int Spk Amp", NULL, "AU_LOL"},
+	{"MT6392 AIF RX", NULL, "AU_LOL"},
 #endif
 
 	/* use external spk amp via AU_LOL */
@@ -342,7 +441,33 @@ static struct snd_soc_dai_link mt8167_evb_dais[] = {
 		.dynamic = 1,
 		.dpcm_capture = 1,
 	},
-#ifdef CONFIG_MTK_BTCVSD_ALSA
+	{
+		.name = "VIRTUAL_MRG",
+		.stream_name = "MRGRX_PLayback",
+		.cpu_dai_name = "VIRTURL_MRG",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.trigger = {
+			SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST
+		},
+		.dynamic = 1,
+		.dpcm_playback = 1,
+	},
+	{
+		.name = "MRGRX_CAPTURE",
+		.cpu_dai_name = "AWB",
+		.stream_name = "MRGRX_CAPTURE",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.trigger = {
+			SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST
+		},
+		.dynamic = 1,
+		.dpcm_capture = 1,
+	},
+#ifdef CONFIG_SND_SOC_MTK_BTCVSD
 	{
 		.name = "BTCVSD_RX",
 		.stream_name = "BTCVSD_Capture",
@@ -440,15 +565,30 @@ static struct snd_soc_dai_link mt8167_evb_dais[] = {
 	},
 };
 
+#ifdef CONFIG_MTK_SPEAKER
+static struct snd_soc_aux_dev mt8167_evb_aux_dev[] = {
+	{
+		.name = "MT6392",
+		.codec_name = "mt6392-codec",
+	},
+};
+#endif
+
 static struct snd_soc_card mt8167_evb_card = {
 	.name = "mt-snd-card",
 	.owner = THIS_MODULE,
 	.dai_link = mt8167_evb_dais,
 	.num_links = ARRAY_SIZE(mt8167_evb_dais),
+	.controls = mt8167_evb_controls,
+	.num_controls = ARRAY_SIZE(mt8167_evb_controls),
 	.dapm_widgets = mt8167_evb_dapm_widgets,
 	.num_dapm_widgets = ARRAY_SIZE(mt8167_evb_dapm_widgets),
 	.dapm_routes = mt8167_evb_audio_map,
 	.num_dapm_routes = ARRAY_SIZE(mt8167_evb_audio_map),
+#ifdef CONFIG_MTK_SPEAKER
+	.aux_dev = mt8167_evb_aux_dev,
+	.num_aux_devs = ARRAY_SIZE(mt8167_evb_aux_dev),
+#endif
 };
 
 static int mt8167_evb_gpio_probe(struct snd_soc_card *card)

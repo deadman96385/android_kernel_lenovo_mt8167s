@@ -31,7 +31,7 @@ void generic_fillattr(struct inode *inode, struct kstat *stat)
 	stat->atime = inode->i_atime;
 	stat->mtime = inode->i_mtime;
 	stat->ctime = inode->i_ctime;
-	stat->blksize = (1 << inode->i_blkbits);
+	stat->blksize = i_blocksize(inode);
 	stat->blocks = inode->i_blocks;
 }
 
@@ -53,9 +53,13 @@ int vfs_getattr_nosec(struct path *path, struct kstat *stat)
 {
 	struct inode *inode = d_backing_inode(path->dentry);
 
+	if (!inode->i_op)
+		goto out;
+
 	if (inode->i_op->getattr)
 		return inode->i_op->getattr(path->mnt, path->dentry, stat);
 
+out:
 	generic_fillattr(inode, stat);
 	return 0;
 }
@@ -454,6 +458,7 @@ void __inode_add_bytes(struct inode *inode, loff_t bytes)
 		inode->i_bytes -= 512;
 	}
 }
+EXPORT_SYMBOL(__inode_add_bytes);
 
 void inode_add_bytes(struct inode *inode, loff_t bytes)
 {

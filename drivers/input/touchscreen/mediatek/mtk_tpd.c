@@ -1,22 +1,15 @@
-/******************************************************************************
- * mtk_tpd.c - MTK Android Linux Touch Panel Device Driver               *
- *                                                                            *
- * Copyright 2008-2009 MediaTek Co.,Ltd.                                      *
- *                                                                            *
- * DESCRIPTION:                                                               *
- *     this file provide basic touch panel event to input sub system          *
- *                                                                            *
- * AUTHOR:                                                                    *
- *     Kirby.Wu (mtk02247)                                                    *
- *                                                                            *
- * NOTE:                                                                      *
- * 1. Sensitivity for touch screen should be set to edge-sensitive.           *
- *    But in this driver it is assumed to be done by interrupt core,          *
- *    though not done yet. Interrupt core may provide interface to            *
- *    let drivers set the sensitivity in the future. In this case,            *
- *    this driver should set the sensitivity of the corresponding IRQ         *
- *    line itself.                                                            *
- ******************************************************************************/
+/*
+ * Copyright (C) 2016 MediaTek Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ */
 
 #include "tpd.h"
 #include <linux/slab.h>
@@ -26,6 +19,10 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/fb.h>
+#include <linux/pinctrl/consumer.h>
+#ifdef CONFIG_MTK_MT6306_GPIO_SUPPORT
+#include <mach/mtk_6306_gpio.h>
+#endif
 
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
@@ -52,39 +49,53 @@ struct pinctrl *pinctrl1;
 struct pinctrl_state *pins_default;
 struct pinctrl_state *eint_as_int, *eint_output0, *eint_output1, *rst_output0, *rst_output1;
 const struct of_device_id touch_of_match[] = {
-	{ .compatible = "mediatek,mt6735-touch", },
-	{ .compatible = "mediatek,mt6580-touch", },
 	{ .compatible = "mediatek,mt8173-touch", },
-	{ .compatible = "mediatek,mt6755-touch", },
 	{ .compatible = "mediatek,mt6757-touch", },
+	{ .compatible = "mediatek,mt6763-touch", },
 	{ .compatible = "mediatek,mt6797-touch", },
 	{ .compatible = "mediatek,mt8163-touch", },
 	{ .compatible = "mediatek,mt8127-touch", },
 	{ .compatible = "mediatek,mt2701-touch", },
 	{ .compatible = "mediatek,mt7623-touch", },
-	{ .compatible = "mediatek,elbrus-touch", },
 	{ .compatible = "mediatek,mt6799-touch", },
+	{ .compatible = "mediatek,mt6739-touch", },
+	{ .compatible = "mediatek,mt6771-touch", },
+	{ .compatible = "mediatek,touch", },
 	{},
 };
 
 void tpd_get_dts_info(void)
 {
 	struct device_node *node1 = NULL;
-	int key_dim_local[16], i;
+	int key_dim_local[16], i, ret;
 
 	node1 = of_find_matching_node(node1, touch_of_match);
 	if (node1) {
-		of_property_read_u32(node1, "tpd-max-touch-num", &tpd_dts_data.touch_max_num);
-		of_property_read_u32(node1, "use-tpd-button", &tpd_dts_data.use_tpd_button);
-		pr_debug("[tpd]use-tpd-button = %d\n", tpd_dts_data.use_tpd_button);
-		of_property_read_u32_array(node1, "tpd-resolution",
+		ret = of_property_read_u32(node1, "tpd-max-touch-num", &tpd_dts_data.touch_max_num);
+		if (ret != 0)
+			TPD_DEBUG("tpd-max-touch-num not found\n");
+		ret = of_property_read_u32(node1, "use-tpd-button", &tpd_dts_data.use_tpd_button);
+		if (ret != 0)
+			TPD_DEBUG("use-tpd-button not found\n");
+		else
+			TPD_DEBUG("[tpd]use-tpd-button = %d\n", tpd_dts_data.use_tpd_button);
+		ret = of_property_read_u32_array(node1, "tpd-resolution",
 			tpd_dts_data.tpd_resolution, ARRAY_SIZE(tpd_dts_data.tpd_resolution));
+		if (ret != 0)
+			TPD_DEBUG("tpd-resolution not found\n");
 		if (tpd_dts_data.use_tpd_button) {
-			of_property_read_u32(node1, "tpd-key-num", &tpd_dts_data.tpd_key_num);
-			of_property_read_u32_array(node1, "tpd-key-local",
+			ret = of_property_read_u32(node1, "tpd-key-num", &tpd_dts_data.tpd_key_num);
+			if (ret != 0)
+				TPD_DEBUG("tpd-key-num not found\n");
+			ret = of_property_read_u32_array(node1, "tpd-key-local",
 				tpd_dts_data.tpd_key_local, ARRAY_SIZE(tpd_dts_data.tpd_key_local));
-			of_property_read_u32_array(node1, "tpd-key-dim-local",
+			if (ret != 0)
+				TPD_DEBUG("tpd-key-local not found\n");
+			ret = of_property_read_u32_array(node1, "tpd-key-dim-local",
 				key_dim_local, ARRAY_SIZE(key_dim_local));
+			if (ret != 0)
+				TPD_DEBUG("tpd-key-dim-local not found\n");
+
 			memcpy(tpd_dts_data.tpd_key_dim_local, key_dim_local, sizeof(key_dim_local));
 			for (i = 0; i < 4; i++) {
 				pr_debug("[tpd]key[%d].key_x = %d\n", i, tpd_dts_data.tpd_key_dim_local[i].key_x);
@@ -93,19 +104,31 @@ void tpd_get_dts_info(void)
 				pr_debug("[tpd]key[%d].key_H = %d\n", i, tpd_dts_data.tpd_key_dim_local[i].key_height);
 			}
 		}
-		of_property_read_u32(node1, "tpd-filter-enable", &tpd_dts_data.touch_filter.enable);
+		ret = of_property_read_u32(node1, "tpd-filter-enable", &tpd_dts_data.touch_filter.enable);
+		if (ret != 0)
+			TPD_DEBUG("tpd-filter-enable not found\n");
 		if (tpd_dts_data.touch_filter.enable) {
-			of_property_read_u32(node1, "tpd-filter-pixel-density",
+			ret = of_property_read_u32(node1, "tpd-filter-pixel-density",
 						&tpd_dts_data.touch_filter.pixel_density);
-			of_property_read_u32_array(node1, "tpd-filter-custom-prameters",
+			if (ret != 0)
+				TPD_DEBUG("tpd-filter-pixel-density not found\n");
+			ret = of_property_read_u32_array(node1, "tpd-filter-custom-prameters",
 				(u32 *)tpd_dts_data.touch_filter.W_W, ARRAY_SIZE(tpd_dts_data.touch_filter.W_W));
-			of_property_read_u32_array(node1, "tpd-filter-custom-speed",
+			if (ret != 0)
+				TPD_DEBUG("tpd-filter-custom-prameters not found\n");
+			ret = of_property_read_u32_array(node1, "tpd-filter-custom-speed",
 				tpd_dts_data.touch_filter.VECLOCITY_THRESHOLD,
 				ARRAY_SIZE(tpd_dts_data.touch_filter.VECLOCITY_THRESHOLD));
+			if (ret != 0)
+				TPD_DEBUG("tpd-filter-custom-speed not found\n");
 		}
 		memcpy(&tpd_filter, &tpd_dts_data.touch_filter, sizeof(tpd_filter));
-		pr_debug("[tpd]tpd-filter-enable = %d, pixel_density = %d\n",
+		TPD_DEBUG("[tpd]tpd-filter-enable = %d, pixel_density = %d\n",
 					tpd_filter.enable, tpd_filter.pixel_density);
+		tpd_dts_data.tpd_use_ext_gpio = of_property_read_bool(node1, "tpd-use-ext-gpio");
+		ret = of_property_read_u32(node1, "tpd-rst-ext-gpio-num", &tpd_dts_data.rst_ext_gpio_num);
+		if (ret != 0)
+			TPD_DEBUG("tpd-rst-ext-gpio-num not found\n");
 	} else {
 		pr_err("[tpd]%s can't find touch compatible custom node\n", __func__);
 	}
@@ -131,10 +154,17 @@ void tpd_gpio_output(int pin, int level)
 		else
 			pinctrl_select_state(pinctrl1, eint_output0);
 	} else {
-		if (level)
-			pinctrl_select_state(pinctrl1, rst_output1);
-		else
-			pinctrl_select_state(pinctrl1, rst_output0);
+		if (tpd_dts_data.tpd_use_ext_gpio) {
+#ifdef CONFIG_MTK_MT6306_GPIO_SUPPORT
+			mt6306_set_gpio_dir(tpd_dts_data.rst_ext_gpio_num, 1);
+			mt6306_set_gpio_out(tpd_dts_data.rst_ext_gpio_num, level);
+#endif
+		} else {
+			if (level)
+				pinctrl_select_state(pinctrl1, rst_output1);
+			else
+				pinctrl_select_state(pinctrl1, rst_output0);
+		}
 	}
 	mutex_unlock(&tpd_set_gpio_mutex);
 }
@@ -174,17 +204,19 @@ pr_err("Lomen 0.2\n");
 		dev_err(&pdev->dev, "fwq Cannot find touch pinctrl state_eint_output1!\n");
 		return ret;
 	}
-	rst_output0 = pinctrl_lookup_state(pinctrl1, "state_rst_output0");
-	if (IS_ERR(rst_output0)) {
-		ret = PTR_ERR(rst_output0);
-		dev_err(&pdev->dev, "fwq Cannot find touch pinctrl state_rst_output0!\n");
-		return ret;
-	}
-	rst_output1 = pinctrl_lookup_state(pinctrl1, "state_rst_output1");
-	if (IS_ERR(rst_output1)) {
-		ret = PTR_ERR(rst_output1);
-		dev_err(&pdev->dev, "fwq Cannot find touch pinctrl state_rst_output1!\n");
-		return ret;
+	if (tpd_dts_data.tpd_use_ext_gpio == false) {
+		rst_output0 = pinctrl_lookup_state(pinctrl1, "state_rst_output0");
+		if (IS_ERR(rst_output0)) {
+			ret = PTR_ERR(rst_output0);
+			dev_err(&pdev->dev, "fwq Cannot find touch pinctrl state_rst_output0!\n");
+			return ret;
+		}
+		rst_output1 = pinctrl_lookup_state(pinctrl1, "state_rst_output1");
+		if (IS_ERR(rst_output1)) {
+			ret = PTR_ERR(rst_output1);
+			dev_err(&pdev->dev, "fwq Cannot find touch pinctrl state_rst_output1!\n");
+			return ret;
+		}
 	}
 	TPD_DEBUG("[tpd%d] mt_tpd_pinctrl----------\n", pdev->id);
 	return 0;
@@ -512,7 +544,8 @@ pr_err("Lomen 1\n");
 	#ifdef CONFIG_MTK_LCM_PHYSICAL_ROTATION
 	if (strncmp(CONFIG_MTK_LCM_PHYSICAL_ROTATION, "90", 2) == 0
 		|| strncmp(CONFIG_MTK_LCM_PHYSICAL_ROTATION, "270", 3) == 0) {
-#ifdef CONFIG_MTK_FB	/*Fix build errors,as some projects  cannot support these apis while bring up*/
+/*Fix build errors,as some projects  cannot support these apis while bring up*/
+#if defined(CONFIG_MTK_FB) && defined(CONFIG_MTK_LCM)
 		TPD_RES_Y = DISP_GetScreenWidth();
 		TPD_RES_X = DISP_GetScreenHeight();
 #endif
@@ -520,8 +553,9 @@ pr_err("Lomen 1\n");
     #endif
 	{
 #ifdef CONFIG_CUSTOM_LCM_X
-#ifndef CONFIG_MTK_FPGA
-#ifdef CONFIG_MTK_FB	/*Fix build errors,as some projects  cannot support these apis while bring up*/
+#ifndef CONFIG_FPGA_EARLY_PORTING
+/*Fix build errors,as some projects  cannot support these apis while bring up*/
+#if defined(CONFIG_MTK_FB) && defined(CONFIG_MTK_LCM)
 		TPD_RES_X = DISP_GetScreenWidth();
 		TPD_RES_Y = DISP_GetScreenHeight();
 #else/*for some projects, we do not use mtk framebuffer*/

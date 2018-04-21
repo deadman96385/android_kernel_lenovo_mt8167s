@@ -228,6 +228,7 @@ enum DAL_STATUS DAL_Clean(void)
 	if (r != MFC_STATUS_OK) {
 		pr_debug("DISP/DAL: Warning: call MFC_XXX function failed in %s(), line: %d, ret: %x\n",
 			__func__, __LINE__, r);
+		up(&dal_sem);
 		return DAL_STATUS_FATAL_ERROR;
 	}
 
@@ -273,11 +274,15 @@ enum DAL_STATUS DAL_Clean(void)
 			dal_clean_cnt++);
 		isAEEEnabled = 0;
 		DAL_Dynamic_Change_FB_Layer(isAEEEnabled);	/* restore UI layer to DEFAULT_UI_LAYER */
+
+		mutex_lock(&disp_trigger_lock);
+		ret = primary_display_trigger(0, NULL, 0);
+		mutex_unlock(&disp_trigger_lock);
 	}
 
+	mmprofile_log_ex(ddp_mmp_get_events()->dal_clean, MMPROFILE_FLAG_END, 0, 0);
 	up(&dal_sem);
 
-	mmprofile_log_ex(ddp_mmp_get_events()->dal_clean, MMPROFILE_FLAG_END, 0, 0);
 	return ret;
 }
 EXPORT_SYMBOL(DAL_Clean);
@@ -286,14 +291,7 @@ int is_DAL_Enabled(void)
 {
 	int ret = 0;
 
-	if (down_interruptible(&dal_sem)) {
-		pr_debug("DISP/DAL Can't get semaphore in %s()\n", __func__);
-		return DAL_STATUS_LOCK_FAIL;
-	}
-
 	ret = isAEEEnabled;
-
-	up(&dal_sem);
 
 	return ret;
 }
@@ -344,7 +342,9 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 				__func__, __LINE__, r);
 			return DAL_STATUS_FATAL_ERROR;
 		}
+	}
 
+	{
 		session_input = &captured_session_input[DISP_SESSION_PRIMARY - 1];
 		session_input->setter = SESSION_USER_AEE;
 		session_input->config_layer_num = 4;
@@ -371,35 +371,30 @@ enum DAL_STATUS DAL_Printf(const char *fmt, ...)
 
 		captured_session_input[DISP_SESSION_PRIMARY - 1].config[input.layer_id] = input;
 		ret = primary_display_config_input_multiple(session_input);
+
+		va_start(args, fmt);
+		i = vsprintf(dal_print_buffer, fmt, args);
+		WARN_ON(i >= ARRAY_SIZE(dal_print_buffer));
+		va_end(args);
+
+		r = MFC_Print(mfc_handle, dal_print_buffer);
+		if (r != MFC_STATUS_OK) {
+			pr_debug("DISP/DAL: Warning: call MFC_XXX function failed in %s(), line: %d, ret: %x\n",
+					__func__, __LINE__, r);
+			ret = DAL_STATUS_FATAL_ERROR;
+		} else {
+			/*flush_cache_all();*/
+			if (!dal_shown)
+				dal_shown = true;
+
+			mutex_lock(&disp_trigger_lock);
+			ret = primary_display_trigger(0, NULL, 0);
+			mutex_unlock(&disp_trigger_lock);
+		}
 	}
-
-	va_start(args, fmt);
-	i = vsprintf(dal_print_buffer, fmt, args);
-	WARN_ON(i >= ARRAY_SIZE(dal_print_buffer));
-	va_end(args);
-
-	r = MFC_Print(mfc_handle, dal_print_buffer);
-	if (r != MFC_STATUS_OK) {
-		pr_debug("DISP/DAL: Warning: call MFC_XXX function failed in %s(), line: %d, ret: %x\n",
-			__func__, __LINE__, r);
-		return DAL_STATUS_FATAL_ERROR;
-	}
-
-	/*flush_cache_all();*/
-
-	if (!dal_shown)
-		dal_shown = true;
-
-	mutex_lock(&disp_trigger_lock);
-	/* Since the output buffer may not exsit, so skip frame trigger update. */
-	if (primary_display_get_session_mode() != DISP_SESSION_DECOUPLE_MIRROR_MODE
-		&& primary_display_get_session_mode() != DISP_SESSION_DECOUPLE_MODE)
-		ret = primary_display_trigger(0, NULL, 0);
-	mutex_unlock(&disp_trigger_lock);
-
-	up(&dal_sem);
 
 	mmprofile_log_ex(ddp_mmp_get_events()->dal_printf, MMPROFILE_FLAG_END, 0, 0);
+	up(&dal_sem);
 
 	return ret;
 }

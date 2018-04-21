@@ -32,8 +32,8 @@
  */
 void spm_dpidle_before_wfi(void);		 /* can be redefined */
 void spm_dpidle_after_wfi(void);		 /* can be redefined */
-wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log);
-wake_reason_t spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data);
+unsigned int spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log);
+unsigned int spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data);
 int spm_set_dpidle_wakesrc(u32 wakesrc, bool enable, bool replace);
 void spm_deepidle_init(void);
 /* #define SPM_DEEPIDLE_PROFILE_TIME */

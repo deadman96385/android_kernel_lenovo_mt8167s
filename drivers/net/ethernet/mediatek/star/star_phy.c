@@ -1,10 +1,15 @@
 /* Mediatek STAR MAC network driver.
  *
- * Copyright (c) 2016-2017 Mediatek Corporation
+ * Copyright (c) 2016-2017 MediaTek Inc.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation.
+ * program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
 #include "star.h"
@@ -201,9 +206,8 @@ void rtl8201fr_wol_enable(struct net_device *netdev)
 
 	memcpy(sa.sa_data, netdev->dev_addr, netdev->addr_len);
 	STAR_PR_INFO("device mac address:%x %x %x %x %x %x.\n",
-		     netdev->dev_addr[0], netdev->dev_addr[1],
-		     netdev->dev_addr[2], netdev->dev_addr[3],
-		     netdev->dev_addr[4], netdev->dev_addr[5]);
+		     netdev->dev_addr[0], netdev->dev_addr[1], netdev->dev_addr[2],
+		 netdev->dev_addr[3], netdev->dev_addr[4], netdev->dev_addr[5]);
 
 	/* enable phy wol */
 	star_mdc_mdio_write(dev, star_prv->phy_addr, 4, 0x61);

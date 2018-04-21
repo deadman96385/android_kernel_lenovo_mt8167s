@@ -1,19 +1,15 @@
 /*
-* Copyright (C) 2011-2014 MediaTek Inc.
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*      http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
-
+ * Copyright (C) 2016 MediaTek Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ */
 #ifndef _MTK_LINUX_ION_H
 #define _MTK_LINUX_ION_H
 enum mtk_ion_heap_type {
@@ -22,6 +18,7 @@ enum mtk_ion_heap_type {
 	ION_HEAP_TYPE_MULTIMEDIA_FOR_CAMERA = 12,
 	ION_HEAP_TYPE_MULTIMEDIA_SEC = 13,
 	ION_HEAP_TYPE_MULTIMEDIA_MAP_MVA = 14,
+	ION_HEAP_TYPE_MULTIMEDIA_PA2MVA = 15,
 /* WARNING: DO NOT EDIT, AUTO-GENERATED CODE - SEE TOP FOR INSTRUCTIONS */
 };
 
@@ -30,6 +27,7 @@ enum mtk_ion_heap_type {
 #define ION_HEAP_CAMERA_MASK BIT(ION_HEAP_TYPE_MULTIMEDIA_FOR_CAMERA)
 #define ION_HEAP_MULTIMEDIA_SEC_MASK BIT(ION_HEAP_TYPE_MULTIMEDIA_SEC)
 #define ION_HEAP_MULTIMEDIA_MAP_MVA_MASK BIT(ION_HEAP_TYPE_MULTIMEDIA_MAP_MVA)
+#define ION_HEAP_MULTIMEDIA_PA2MVA_MASK BIT(ION_HEAP_TYPE_MULTIMEDIA_PA2MVA)
 
 
 #define ION_NUM_HEAP_IDS (sizeof(unsigned int) * 8)

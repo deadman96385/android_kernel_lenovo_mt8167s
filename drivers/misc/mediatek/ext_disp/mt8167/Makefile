@@ -18,7 +18,7 @@
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/ \
              -I$(srctree)/drivers/misc/mediatek/include/mt-plat/trustzone  \
              -I$(srctree)/drivers/misc/mediatek/ext_disp/  \
-             -I$(srctree)/drivers/misc/mediatek/ext_disp/v1/  \
+             -I$(srctree)/drivers/misc/mediatek/ext_disp/include/  \
              -I$(srctree)/drivers/misc/mediatek/ext_disp/common/test/ \
              -I$(srctree)/drivers/misc/mediatek/video/   \
              -I$(srctree)/drivers/misc/mediatek/video/common/rdma10/ \
@@ -46,10 +46,10 @@ endif
 
 obj-y :=  \
     external_display.o \
-    ./../mtk_extd_mgr.o   \
-    ./../extd_debug.o \
-    ./../extd_utils.o \
-    ./../v1/extd_hdmi.o \
-    ./../extd_epd.o \
-    ./../v1/extd_multi_control.o \
-    ./../extd_factory.o
+    mtk_extd_mgr.o   \
+    extd_debug.o \
+    extd_utils.o \
+    extd_hdmi.o \
+    extd_epd.o \
+    extd_multi_control.o \
+    extd_factory.o

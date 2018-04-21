@@ -21,7 +21,7 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/include/ \
 
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/dispsys
 
-ifeq (y, $(filter y, $(CONFIG_MACH_MT6799)))
+ifeq (y, $(filter y, $(CONFIG_MACH_MT6763) $(CONFIG_MACH_MT6799) $(CONFIG_MACH_MT6759) $(CONFIG_MACH_MT6758) $(CONFIG_MACH_MT6775) $(CONFIG_MACH_MT6771) $(CONFIG_MACH_MT6739)))
 ccflags-y += \
 		-I$(srctree)/drivers/misc/mediatek/cmdq/v3/ \
 		-I$(srctree)/drivers/misc/mediatek/cmdq/v3/$(MTK_PLATFORM)/
@@ -39,19 +39,26 @@ else ifeq ($(strip $(CONFIG_MTK_PQ_COLOR_MODE)),"OFF")
     ccflags-y += -DDISP_COLOR_OFF
 endif
 
-ifeq (y, $(filter y, $(CONFIG_MACH_MT6755) $(CONFIG_MACH_MT6797) $(CONFIG_MACH_MT6757)))
+ifneq (y, $(filter y, $(CONFIG_MACH_MT6580) $(CONFIG_MACH_MT6570)))
     ccflags-y += -DCCORR_SUPPORT
 endif
 
-ifeq (y, $(filter y, $(CONFIG_MACH_MT6797) $(CONFIG_MACH_MT6799)))
+ifeq (y, $(filter y, $(CONFIG_MACH_MT6797) $(CONFIG_MACH_MT6757) $(CONFIG_MACH_MT6799) \
+			$(CONFIG_MACH_MT6759) $(CONFIG_MACH_MT6763) $(CONFIG_MACH_MT6758) $(CONFIG_MACH_MT6775) $(CONFIG_MACH_MT6771)))
     ccflags-y += -DCOLOR_2_1
+endif
+
+ifeq (y, $(filter y, $(CONFIG_MACH_MT6757) $(CONFIG_MACH_MT6759) $(CONFIG_MACH_MT6799) \
+			$(CONFIG_MACH_MT6763) $(CONFIG_MACH_MT6758) $(CONFIG_MACH_MT6775) $(CONFIG_MACH_MT6771)))
+    ccflags-y += -DCOLOR_3_0
 endif
 
 ifeq (y, $(filter y, $(CONFIG_MACH_MT6799)))
     ccflags-y += -DSUPPORT_HDR
 endif
 
-ifeq (y, $(filter y, $(CONFIG_MACH_MT6797) $(CONFIG_MACH_MT6799)))
+ifeq (y, $(filter y, $(CONFIG_MACH_MT6797) $(CONFIG_MACH_MT6799) $(CONFIG_MACH_MT6763) \
+             $(CONFIG_MACH_MT6758) $(CONFIG_MACH_MT6775) $(CONFIG_MACH_MT6771)))
     ccflags-y += -DSUPPORT_ULTRA_RESOLUTION
 endif
 

@@ -9,6 +9,7 @@ obj-$(CONFIG_MTK_FB) += mtkfb_console.o        \
 			    disp_lcm.o             \
 			    disp_utils.o           \
 			    mtk_disp_mgr.o         \
+			    compat_mtk_disp_mgr.o  \
 			    mtk_mira.o             \
 			    mtk_ovl.o              \
 			    disp_dts_gpio.o        \
@@ -33,6 +34,8 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/include/     \
              -I$(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)/include/mach/ \
              -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM) \
              -I$(srctree)/drivers/misc/mediatek/smi/ \
+             -I$(srctree)/drivers/misc/mediatek/leds/ \
+             -I$(srctree)/drivers/misc/mediatek/leds/$(MTK_PLATFORM) \
 			 -I$(srctree)/drivers/misc/mediatek/include/mt-plat/trustzone  \
              -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
 

@@ -28,6 +28,7 @@
 #include <linux/timer.h>
 #include <linux/ioport.h>
 #include <linux/io.h>
+#include <linux/types.h>
 #include <linux/atomic.h>
 #include <mt-plat/sync_write.h>
 #include "sspm_define.h"
@@ -37,7 +38,13 @@
 #include "sspm_sysfs.h"
 #include "sspm_logger.h"
 
+#ifdef SSPM_PLT_LOGGER_BUF_LEN
+/* use platform-defined buffer length */
+#define BUF_LEN				SSPM_PLT_LOGGER_BUF_LEN
+#else
+/* otherwise use default buffer length */
 #define BUF_LEN				(1 * 1024 * 1024)
+#endif
 #define LBUF_LEN			(4 * 1024)
 #define SSPM_TIMER_TIMEOUT	(1 * HZ) /* 1 seconds*/
 #define ROUNDUP(a, b)		(((a) + ((b)-1)) & ~((b)-1))
@@ -91,7 +98,7 @@ static void sspm_log_timeout(unsigned long data)
 ssize_t sspm_log_read(char __user *data, size_t len)
 {
 	unsigned long w_pos, r_pos, datalen;
-	char *buf;
+	char *buf, *tmp_buf;
 
 	if (!sspm_logger_inited)
 		return 0;
@@ -115,15 +122,19 @@ ssize_t sspm_log_read(char __user *data, size_t len)
 		datalen = len;
 
 	buf = ((char *) log_ctl) + log_ctl->buff_ofs + r_pos;
-
+	tmp_buf = kmalloc((size_t)len, GFP_KERNEL);
 	len = datalen;
 
-#if 0	/* TODO: memcpy ?*/
-	while (len-- > 0)
-		*(data++) = *(buf++);
-#endif
+	if (tmp_buf) {
+		memcpy_fromio(tmp_buf, buf, len);
+		if (copy_to_user(data, tmp_buf, len))
+			pr_debug("sspm logger: copy data failed !!!\n");
 
-	memcpy_fromio(data, buf, len);
+		kfree(tmp_buf);
+	} else {
+		pr_debug("sspm logger: create log buffer failed !!!\n");
+		goto error;
+	}
 
 	r_pos += datalen;
 	if (r_pos >= BUF_LEN)
@@ -159,8 +170,8 @@ static unsigned int sspm_log_enable_set(unsigned int enable)
 		ipi_data.cmd = PLT_LOG_ENABLE;
 		ipi_data.u.logger.enable = enable;
 
-		ret = sspm_ipi_send_sync(IPI_ID_PLATFORM, IPI_OPT_LOCK_BUSY,
-				&ipi_data, sizeof(ipi_data) / MBOX_SLOT_SIZE, &ackdata);
+		ret = sspm_ipi_send_sync(IPI_ID_PLATFORM, IPI_OPT_WAIT,
+				&ipi_data, sizeof(ipi_data) / MBOX_SLOT_SIZE, &ackdata, 1);
 		if (ret != 0) {
 			pr_err("SSPM: logger IPI fail ret=%d\n", ret);
 			goto error;
@@ -253,7 +264,7 @@ unsigned int __init sspm_logger_init(phys_addr_t start, phys_addr_t limit)
 
 	last_ofs = 0;
 
-	log_ctl = (struct log_ctrl_s *) start;
+	log_ctl = (struct log_ctrl_s *)(uintptr_t) start;
 	log_ctl->base = PLT_LOG_ENABLE; /* magic */
 	log_ctl->enable = 0;
 	log_ctl->size = sizeof(*log_ctl);

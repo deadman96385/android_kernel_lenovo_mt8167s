@@ -15,24 +15,19 @@
 # If KERNELRELEASE is defined, we've been invoked from the
 # kernel build system and can use its language.
 ifneq ($(KERNELRELEASE),)
-subdir-ccflags-y += -D MTK_WCN_REMOVE_KERNEL_MODULE
-ifeq ($(CONFIG_ARM64), y)
-subdir-ccflags-y += -D CONFIG_MTK_WCN_ARM64
-endif
+    subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include
+    subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/clkbuf_v1
+    subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+    subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat
+    subdir-ccflags-y += -I$(srctree)/drivers/mmc/core
+    subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/$(MTK_PLATFORM)
+    subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/
 
-ifeq ($(CONFIG_MTK_CONN_LTE_IDC_SUPPORT),y)
-    subdir-ccflags-y += -D WMT_IDC_SUPPORT=1
-else
-    subdir-ccflags-y += -D WMT_IDC_SUPPORT=0
-endif
-    subdir-ccflags-y += -D MTK_WCN_WMT_STP_EXP_SYMBOL_ABSTRACT
-
-    obj-y += common/
-    obj-$(CONFIG_MTK_COMBO_BT) += bt/
-    obj-$(CONFIG_MTK_COMBO_WIFI) += wlan/
-    obj-$(CONFIG_MTK_COMBO_GPS) += gps/
-    obj-$(CONFIG_MTK_FMRADIO) += fmradio/
-    obj-n := dummy.o
+    # Do Nothing, move to standalone repo
+    MODULE_NAME := connadp
+    obj-y += $(MODULE_NAME).o
+    $(MODULE_NAME)-objs += common/connectivity_build_in_adapter.o
+    $(MODULE_NAME)-objs += common/wmt_build_in_adapter.o
 
 # Otherwise we were called directly from the command line;
 # invoke the kernel build system.

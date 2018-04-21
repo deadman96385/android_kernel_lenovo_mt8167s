@@ -31,7 +31,7 @@ else
               ifneq (,$(filter y,$(CONFIG_MACH_MT6580)))
 	              MDI_IP_FOLDER:=mt6350
               else
-                ifneq (,$(filter y,$(CONFIG_MACH_MT6755) $(CONFIG_MACH_MT6797) $(CONFIG_MACH_MT6757) $(CONFIG_MACH_KIBOPLUS)))
+                ifneq (,$(filter y,$(CONFIG_MACH_MT6755) $(CONFIG_MACH_MT6797) $(CONFIG_MACH_MT6757)))
 	                MDI_IP_FOLDER:=mt6351
 	              else
 	                ifneq (,$(filter y,$(CONFIG_MACH_MT8173)))
@@ -48,7 +48,25 @@ ifneq (,$(filter y,$(CONFIG_MTK_PMIC_CHIP_MT6335)))
   MDI_IP_FOLDER:=mt6335
 endif
 
+ifneq (,$(filter y,$(CONFIG_MTK_PMIC_CHIP_MT6355)))
+  MDI_IP_FOLDER:=mt6355
+endif
+
+ifneq (,$(filter y,$(CONFIG_MTK_PMIC_CHIP_MT6356)))
+  MDI_IP_FOLDER:=mt6356
+endif
+
+ifneq (,$(filter y,$(CONFIG_MTK_PMIC_CHIP_MT6357)))
+  MDI_IP_FOLDER:=mt6357
+endif
+
+ifneq (,$(filter y,$(CONFIG_MTK_PMIC_CHIP_MT6358)))
+  MDI_IP_FOLDER:=mt6358
+endif
+
 MDP_COMMON_FOLDER:= ./
+
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/rtc/$(MDI_IP_FOLDER)
 
 #Top level common code
 obj-$(CONFIG_MTK_RTC) += mtk_rtc_common.o mtk_rtc_hal_common.o

@@ -19,6 +19,9 @@
 
 #include "dt_idle_states.h"
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/mtk_idle_event.h>
+
 void __attribute__((weak)) mt_cpuidle_framework_init(void) { }
 
 int __attribute__((weak)) rgidle_enter(int cpu)
@@ -47,6 +50,11 @@ int __attribute__((weak)) dpidle_enter(int cpu)
 }
 
 int __attribute__((weak)) soidle3_enter(int cpu)
+{
+	return 1;
+}
+
+int __attribute__((weak)) mcsodi_enter(int cpu)
 {
 	return 1;
 }
@@ -89,6 +97,12 @@ static int mtk_soidle3_enter(struct cpuidle_device *dev,
 	return soidle3_enter(smp_processor_id());
 }
 
+static int mtk_mcsodi_enter(struct cpuidle_device *dev,
+			      struct cpuidle_driver *drv, int index)
+{
+	return mcsodi_enter(smp_processor_id());
+}
+
 static struct cpuidle_driver mt67xx_v3_cpuidle_driver = {
 	.name             = "mt67xx_v3_cpuidle",
 	.owner            = THIS_MODULE,
@@ -101,12 +115,19 @@ static struct cpuidle_driver mt67xx_v3_cpuidle_driver = {
 	},
 	.states[1] = {
 		.enter			= mtk_slidle_enter,
-		.exit_latency		= 300,
-		.target_residency	= 2000,
+		.exit_latency		= 3,
+		.target_residency	= 20,
 		.name			= "Slow idle",
 		.desc			= "Slow idle",
 	},
 	.states[2] = {
+		.enter			= mtk_mcsodi_enter,
+		.exit_latency		= 50,
+		.target_residency	= 200,
+		.name			= "MCSODI",
+		.desc			= "Multi Core DRAM SR",
+	},
+	.states[3] = {
 		.enter			= mtk_mcidle_enter,
 		.exit_latency		= 400,
 		.target_residency	= 2000,
@@ -114,9 +135,9 @@ static struct cpuidle_driver mt67xx_v3_cpuidle_driver = {
 		.flags			= CPUIDLE_FLAG_TIMER_STOP,
 #endif
 		.name			= "MCDI",
-		.desc			= "MCDI",
+		.desc			= "Multi Core deep idle",
 	},
-	.states[3] = {
+	.states[4] = {
 		.enter			= mtk_soidle_enter,
 		.exit_latency		= 1200,
 		.target_residency	= 4200,
@@ -126,7 +147,7 @@ static struct cpuidle_driver mt67xx_v3_cpuidle_driver = {
 		.name			= "SODI",
 		.desc			= "Screen-ON deep idle",
 	},
-	.states[4] = {
+	.states[5] = {
 		.enter			= mtk_dpidle_enter,
 		.exit_latency		= 1200,
 		.target_residency	= 4200,
@@ -136,7 +157,7 @@ static struct cpuidle_driver mt67xx_v3_cpuidle_driver = {
 		.name			= "dpidle",
 		.desc			= "deep idle",
 	},
-	.states[5] = {
+	.states[6] = {
 		.enter			= mtk_soidle3_enter,
 		.exit_latency		= 5000,
 		.target_residency	= 10500,
@@ -146,7 +167,7 @@ static struct cpuidle_driver mt67xx_v3_cpuidle_driver = {
 		.name			= "SODI3",
 		.desc			= "Screen-ON deep idle - v3",
 	},
-	.state_count = 6,
+	.state_count = 7,
 	.safe_state_index = 0,
 };
 

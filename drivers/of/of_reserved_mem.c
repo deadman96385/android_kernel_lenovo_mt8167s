@@ -23,9 +23,21 @@
 #include <linux/sort.h>
 #include <mt-plat/mtk_memcfg.h>
 
-#define MAX_RESERVED_REGIONS	16
+#define MAX_RESERVED_REGIONS	30
 static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
 static int reserved_mem_count;
+
+int get_reserved_mem_count(void)
+{
+	return reserved_mem_count;
+}
+
+struct reserved_mem get_reserved_mem(int num)
+{
+	if (num >= MAX_RESERVED_REGIONS)
+		BUG();
+	return reserved_mem[num];
+}
 
 #if defined(CONFIG_HAVE_MEMBLOCK)
 #include <linux/memblock.h>
@@ -128,8 +140,12 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
 	}
 
 	/* Need adjust the alignment to satisfy the CMA requirement */
-	if (IS_ENABLED(CONFIG_CMA) && of_flat_dt_is_compatible(node, "shared-dma-pool"))
-		align = max(align, (phys_addr_t)PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order));
+	if (IS_ENABLED(CONFIG_CMA) && of_flat_dt_is_compatible(node, "shared-dma-pool")) {
+		unsigned long order =
+			max_t(unsigned long, MAX_ORDER - 1, pageblock_order);
+
+		align = max(align, (phys_addr_t)PAGE_SIZE << order);
+	}
 
 	prop = of_get_flat_dt_prop(node, "alloc-ranges", &len);
 	if (prop) {

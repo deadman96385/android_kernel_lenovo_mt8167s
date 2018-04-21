@@ -321,10 +321,7 @@ __acquires(musb->lock)
 				request = next_request(musb_ep);
 				if (!musb_ep->busy && request) {
 					/* limit debug mechanism to avoid printk too much */
-					static DEFINE_RATELIMIT_STATE(ratelimit, 1 * HZ, 10);
-
-					if ((__ratelimit(&ratelimit)))
-						DBG(0, "restarting the request\n");
+					DBG_LIMIT(10, "restarting the request");
 					musb_ep_restart(musb, request);
 				} else if (!is_in) { /* Modification for ALPS00451478 */
 					csr  = musb_readw(regs, MUSB_RXCSR);
@@ -429,6 +426,11 @@ __acquires(musb->lock)
 					default:
 						goto stall;
 					}
+
+					if (musb->usb_rev6_setting &&
+						(musb->test_mode_nr == MUSB_TEST_K ||
+						musb->test_mode_nr == MUSB_TEST_J))
+						musb->usb_rev6_setting(0x0);
 
 					/* enter test mode after irq */
 #if defined(CONFIG_USBIF_COMPLIANCE)
@@ -656,7 +658,7 @@ musb_read_setup(struct musb *musb, struct usb_ctrlrequest *req)
 {
 	struct musb_request	*r;
 	void __iomem		*regs = musb->control_ep->regs;
-	unsigned long		time_count = 3*1000*1000; /* 3 sec */
+	int time_count = 500; /* 0.5 sec */
 
 	musb_read_fifo(&musb->endpoints[0], sizeof(*req), (u8 *)req);
 
@@ -668,10 +670,6 @@ musb_read_setup(struct musb *musb, struct usb_ctrlrequest *req)
 		req->bRequest,
 		le16_to_cpu(req->wValue),
 		le16_to_cpu(req->wIndex),
-		le16_to_cpu(req->wLength));
-
-	USB_LOGGER(MUSB_READ_SETUP, MUSB_READ_SETUP, req->bRequestType,
-		req->bRequest, le16_to_cpu(req->wValue), le16_to_cpu(req->wIndex),
 		le16_to_cpu(req->wLength));
 
 	/* clean up any leftover transfers */
@@ -699,8 +697,8 @@ musb_read_setup(struct musb *musb, struct usb_ctrlrequest *req)
 		/* skip if waiting over 3 sec */
 		while ((musb_readw(regs, MUSB_CSR0)
 				& MUSB_CSR0_RXPKTRDY) != 0 && time_count--)
-			udelay(1);
-		if (!time_count)
+			mdelay(1);
+		if (time_count <= 0)
 			ERR("%s, timeout\n", __func__);
 		musb->ackpend = 0;
 	} else
@@ -719,9 +717,6 @@ __acquires(musb->lock)
 	if (!musb->gadget_driver)
 		return -EOPNOTSUPP;
 	spin_unlock(&musb->lock);
-
-	USB_LOGGER(FORWARD_TO_DRIVER,	FORWARD_TO_DRIVER,
-		musb->gadget_driver->driver.name);
 
 	retval = musb->gadget_driver->setup(&musb->g, ctrlrequest);
 
@@ -757,9 +752,6 @@ irqreturn_t musb_g_ep0_irq(struct musb *musb)
 
 	DBG(2, "csr %04x, count %d, ep0stage %s\n",
 			csr, len, decode_ep0stage(musb->ep0_state));
-
-	USB_LOGGER(MUSB_G_EP0_IRQ, MUSB_G_EP0_IRQ, csr, len,
-		musb_readb(mbase, MUSB_FADDR), decode_ep0stage(musb->ep0_state));
 
 	if (csr & MUSB_CSR0_P_DATAEND) {
 		/*
@@ -903,6 +895,16 @@ setup:
 			musb_read_setup(musb, &setup);
 			retval = IRQ_HANDLED;
 
+			if (unlikely(setup_end_err)) {
+				DBG(0, "%s SETUP req%02x.%02x v%04x i%04x l%d\n",
+					decode_ep0stage(musb->ep0_state),
+					setup.bRequestType,
+					setup.bRequest,
+					le16_to_cpu(setup.wValue),
+					le16_to_cpu(setup.wIndex),
+					le16_to_cpu(setup.wLength));
+			}
+
 			/* sometimes the RESET won't be reported */
 			if (unlikely(musb->g.speed == USB_SPEED_UNKNOWN)) {
 				u8	power;
@@ -1002,8 +1004,10 @@ finish:
 		break;
 	}
 
-	if (unlikely(setup_end_err))
-		ERR("SetupEnd, retval=%d\n", retval);
+	if (unlikely(setup_end_err)) {
+		ERR("SetupEnd, retval=%d, ep0stage=%s\n", retval,
+			decode_ep0stage(musb->ep0_state));
+	}
 
 	return retval;
 }

@@ -18,9 +18,6 @@
 #include <linux/dma-mapping.h>
 #include "mt8167-codec.h"
 #include "mt8167-codec-utils.h"
-#ifdef CONFIG_MTK_SPEAKER
-#include "mt6392-codec.h"
-#endif
 #ifdef CONFIG_MTK_AUXADC
 #include "mtk_auxadc.h"
 #endif
@@ -708,7 +705,8 @@ static int32_t mt8167_codec_query_avg_voltage(struct snd_soc_codec *codec,
 	int64_t auxadc_val_sum = 0;
 	int32_t auxadc_val_avg = 0;
 	int32_t count = 0;
-	const int32_t countlimit = 22;
+	const int32_t count_shift = 4;
+	const int32_t countlimit = (1 << count_shift) + 2;
 
 	for (count = 0; count < countlimit; count++) {
 #ifdef CONFIG_MTK_AUXADC
@@ -729,10 +727,11 @@ static int32_t mt8167_codec_query_avg_voltage(struct snd_soc_codec *codec,
 			__func__, auxadc_val_cur, auxadc_val_sum);
 	}
 
+	/* discard min and max */
 	auxadc_val_sum -= auxadc_val_max;
 	auxadc_val_sum -= auxadc_val_min;
 
-	auxadc_val_avg = auxadc_val_sum / (countlimit - 2);
+	auxadc_val_avg = auxadc_val_sum >> count_shift;
 
 	return auxadc_val_avg;
 }
@@ -1708,24 +1707,18 @@ static void mt8167_codec_turn_on_dl_path(struct snd_soc_codec *codec,
 	uint32_t lpbk_type)
 {
 	mt8167_codec_setup_dl_rate(codec, lpbk_type);
-	if (dl_is_spk(lpbk_type)) {
+	if (dl_is_spk(lpbk_type))
 		mt8167_codec_turn_on_dl_spk_path(codec);
-#ifdef CONFIG_MTK_SPEAKER
-		mt6392_int_spk_turn_on(codec);
-#endif
-	} else if (dl_is_hp(lpbk_type))
+	else if (dl_is_hp(lpbk_type))
 		mt8167_codec_turn_on_dl_hp_path(codec);
 }
 
 static void mt8167_codec_turn_off_dl_path(struct snd_soc_codec *codec,
 	uint32_t lpbk_type)
 {
-	if (dl_is_spk(lpbk_type)) {
-#ifdef CONFIG_MTK_SPEAKER
-		mt6392_int_spk_turn_off(codec);
-#endif
+	if (dl_is_spk(lpbk_type))
 		mt8167_codec_turn_off_dl_spk_path(codec);
-	} else if (dl_is_hp(lpbk_type))
+	else if (dl_is_hp(lpbk_type))
 		mt8167_codec_turn_off_dl_hp_path(codec);
 }
 

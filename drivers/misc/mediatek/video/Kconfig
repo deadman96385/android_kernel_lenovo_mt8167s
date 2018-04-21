@@ -28,6 +28,15 @@ config MTK_LCM_PHYSICAL_ROTATION
 	  MTK_LCM_PHYSICAL_ROTATION=0 means not rotation.
 	  MTK_LCM_PHYSICAL_ROTATION=180 means 180 rotation.
 
+config MTK_ROUND_CORNER_SUPPORT
+	bool "enable medietak display round corner"
+	default n
+	help
+	  define CONFIG_MTK_ROUND_CORNER_SUPPORT to enable Mediatek Round Corner on display.
+	  If you want to use Meditek Round Corner on display, please make sure it is Y in xxx_defconfig.mk.
+	  This feature require round corner pattern provided in lcm driver folder.
+	  If unsure, set N.
+
 config LCM_HEIGHT
 	string "define LCM HEIGHT size"
 	default "1920"
@@ -63,6 +72,15 @@ config CUSTOM_LCM_Y
 	  This define in xxx_defconfig.mk.
 	  If you want to change LCM resolution, please set it.
 	  defaule value is "0".
+
+config MTK_ROUND_CORNER_SUPPORT
+        bool "enable medietak display round corner"
+        default n
+        help
+          define CONFIG_MTK_ROUND_CORNER_SUPPORT to enable Mediatek Round Corner on display.
+          If you want to use Meditek Round Corner on display, please make sure it is Y in xxx_defconfig.mk.
+	  This feature require round corner pattern provided in lcm driver folder.
+          If unsure, set N.
 
 config MTK_FB_SUPPORT_ASSERTION_LAYER
 	bool "AEE Assertion Layer Support"
@@ -131,3 +149,12 @@ config MTK_PQ_COLOR_MODE
 	  if value equals to MDP, only mdp color is on.
 	  if value equals to DISP_MDP, mdp and display color are both on.
 	  if value equals to OFF, mdp and display color are both off.
+
+config MTK_DRE30_SUPPORT
+	bool "support DRE 30"
+	default n
+	help
+	  Decide whether to support ambient-light adaptive luma and
+	  display visual enhancement ver.3.
+	  This feature requires the cowork of AAL user-space algorithm process.
+	  Please also turn on MTK_AAL_SUPPORT amd MTK_DRE30_SUPPORT in ProjectConfig.mk.

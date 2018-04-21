@@ -87,7 +87,7 @@ void aee_rr_proc_init(struct proc_dir_entry *aed_proc_dir)
 	aee_rr_file = proc_create(RR_PROC_NAME,
 				  0444, aed_proc_dir, &aee_rr_reboot_reason_proc_fops);
 	if (aee_rr_file == NULL)
-		LOGE("%s: Can't create rr proc entry\n", __func__);
+		pr_notice("%s: Can't create rr proc entry\n", __func__);
 }
 EXPORT_SYMBOL(aee_rr_proc_init);
 
@@ -100,19 +100,29 @@ EXPORT_SYMBOL(aee_rr_proc_done);
 /* define /sys/bootinfo/powerup_reason */
 static ssize_t powerup_reason_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
-	int g_boot_reason = 0;
+	char boot_reason[64];
 	char *br_ptr;
+	char *br_ptr_e;
 
-	br_ptr = strstr(saved_command_line, "boot_reason=");
+	memset(boot_reason, 0x0, 64);
+	br_ptr = strstr(saved_command_line, "androidboot.bootreason=");
 	if (br_ptr != 0) {
+		br_ptr_e = strstr(br_ptr, " ");
 		/* get boot reason */
-		g_boot_reason = br_ptr[12] - '0';
-		LOGE("g_boot_reason=%d\n", g_boot_reason);
+		if (br_ptr_e != 0) {
+			strncpy(boot_reason, br_ptr + 23, br_ptr_e - br_ptr - 23);
+			boot_reason[br_ptr_e - br_ptr - 23] = '\0';
+		}
 #ifdef CONFIG_MTK_RAM_CONSOLE
 		if (aee_rr_last_fiq_step() != 0)
-			g_boot_reason = BR_KERNEL_PANIC;
+			strncpy(boot_reason, "kpanic", 7);
 #endif
-		return snprintf(buf, REBOOT_REASON_LEN - 1, "%s\n", boot_reason[g_boot_reason]);
+		if (!strncmp(boot_reason, "2sec_reboot", strlen("2sec_reboot"))) {
+			br_ptr = strstr(saved_command_line, "has_battery_removed=0");
+			if (br_ptr != 0)
+				return snprintf(buf, sizeof(boot_reason), "%s_abnormal\n", boot_reason);
+		}
+		return snprintf(buf, sizeof(boot_reason), "%s\n", boot_reason);
 	} else
 		return 0;
 
@@ -243,12 +253,13 @@ inline void aee_print_regs(struct pt_regs *regs)
 inline void aee_print_bt(struct pt_regs *regs)
 {
 	int i;
+	int ret;
 	unsigned long high, bottom, fp;
 	struct stackframe cur_frame;
 	struct pt_regs *excp_regs;
 
 	bottom = regs->reg_sp;
-	if (!virt_addr_valid(bottom)) {
+	if (!mrdump_virt_addr_valid(bottom)) {
 		aee_nested_printf("invalid sp[%lx]\n", regs);
 		return;
 	}
@@ -256,6 +267,8 @@ inline void aee_print_bt(struct pt_regs *regs)
 	cur_frame.fp = regs->reg_fp;
 	cur_frame.pc = regs->reg_pc;
 	cur_frame.sp = regs->reg_sp;
+	aee_nested_printf("\n[<%p>] %pS\n", (void *)cur_frame.pc, (void *)cur_frame.pc);
+	aee_nested_printf("[<%p>] %pS\n", (void *)regs->reg_lr, (void *)regs->reg_lr);
 	for (i = 0; i < AEE_MAX_EXCP_FRAME; i++) {
 		fp = cur_frame.fp;
 		if ((fp < bottom) || (fp >= (high + THREAD_SIZE))) {
@@ -263,21 +276,26 @@ inline void aee_print_bt(struct pt_regs *regs)
 				aee_nested_printf("fp(%lx)", fp);
 			break;
 		}
-		unwind_frame(&cur_frame);
-		if (!((cur_frame.pc >= (PAGE_OFFSET + THREAD_SIZE))
-		      && virt_addr_valid(cur_frame.pc)))
+#ifdef __aarch64__
+		ret = unwind_frame(current, &cur_frame);
+#else
+		ret = unwind_frame(&cur_frame);
+#endif
+		if (ret < 0 || !mrdump_virt_addr_valid(cur_frame.pc))
 			break;
 		if (in_exception_text(cur_frame.pc)) {
 #ifdef __aarch64__
 			/* work around for unknown reason do_mem_abort stack abnormal */
 			excp_regs = (void *)(cur_frame.fp + 0x10 + 0xa0);
-			unwind_frame(&cur_frame);	/* skip do_mem_abort & el1_da */
+			ret = unwind_frame(current, &cur_frame);	/* skip do_mem_abort & el1_da */
+			if (ret < 0)
+				break;
 #else
 			excp_regs = (void *)(cur_frame.fp + 4);
 #endif
 			cur_frame.pc = excp_regs->reg_pc;
 		}
-		aee_nested_printf("%p, ", (void *)cur_frame.pc);
+		aee_nested_printf("[<%p>] %pS\n", (void *)cur_frame.pc, (void *)cur_frame.pc);
 
 	}
 	aee_nested_printf("\n");
@@ -287,7 +305,7 @@ inline int aee_nested_save_stack(struct pt_regs *regs)
 {
 	int len = 0;
 
-	if (!virt_addr_valid(regs->reg_sp))
+	if (!mrdump_virt_addr_valid(regs->reg_sp))
 		return -1;
 	aee_nested_printf("[%lx %lx]\n", regs->reg_sp, regs->reg_sp + 256);
 
@@ -330,6 +348,25 @@ __weak int aee_rr_curr_fiq_step(void)
 }
 #endif
 
+#define TS_MAX_LEN 64
+static const char *get_timestamp_string(char *buf, int bufsize)
+{
+	u64 ts;
+	unsigned long rem_nsec;
+
+	ts = local_clock();
+	rem_nsec = do_div(ts, 1000000000);
+	snprintf(buf, bufsize, "[%5lu.%06lu]",
+		       (unsigned long)ts, rem_nsec / 1000);
+	return buf;
+}
+
+asmlinkage void aee_save_excp_regs(struct pt_regs *regs)
+{
+	if (!user_mode(regs))
+		aee_excp_regs = regs;
+}
+
 asmlinkage void aee_stop_nested_panic(struct pt_regs *regs)
 {
 	struct thread_info *thread = current_thread_info();
@@ -344,6 +381,7 @@ asmlinkage void aee_stop_nested_panic(struct pt_regs *regs)
 	int prev_fiq_step = aee_rr_curr_fiq_step();
 	/* everytime enter nested_panic flow, add 8 */
 	static int step_base = -8;
+	char tsbuf[TS_MAX_LEN] = {0};
 
 	step_base = step_base < 48 ? step_base + 8 : 56;
 
@@ -354,7 +392,8 @@ asmlinkage void aee_stop_nested_panic(struct pt_regs *regs)
 	aee_rec_step_nested_panic(step_base + 2);
 	/*nested panic may happens more than once on many/single cpus */
 	if (atomic_read(&nested_panic_time) < 3)
-		aee_nested_printf("\nCPU%dpanic%d@%d\n", cpu, nested_panic_time, prev_fiq_step);
+		aee_nested_printf("\nCPU%dpanic%d@%d-%s\n", cpu, nested_panic_time, prev_fiq_step,
+				  get_timestamp_string(tsbuf, TS_MAX_LEN));
 	atomic_inc(&nested_panic_time);
 
 	switch (atomic_read(&nested_panic_time)) {
@@ -367,7 +406,7 @@ asmlinkage void aee_stop_nested_panic(struct pt_regs *regs)
 		/* must guarantee Only one cpu can run here */
 		/* first check if thread valid */
 	case 1:
-		if (virt_addr_valid(thread) && virt_addr_valid(thread->regs_on_excp)) {
+		if (mrdump_virt_addr_valid(thread) && mrdump_virt_addr_valid(thread->regs_on_excp)) {
 			excp_regs = thread->regs_on_excp;
 		} else {
 			/* if thread invalid, which means wrong sp or thread_info corrupted,
@@ -399,7 +438,7 @@ asmlinkage void aee_stop_nested_panic(struct pt_regs *regs)
 
 			/*Dump second panic stack */
 			aee_nested_printf("Current\n");
-			if (virt_addr_valid(regs)) {
+			if (mrdump_virt_addr_valid(regs)) {
 				len = aee_nested_save_stack(regs);
 				aee_nested_printf("\nbacktrace:");
 				aee_print_bt(regs);
@@ -409,22 +448,23 @@ asmlinkage void aee_stop_nested_panic(struct pt_regs *regs)
 		ipanic_recursive_ke(regs, excp_regs, cpu);
 
 		aee_rec_step_nested_panic(step_base + 6);
-		/* we donot want a FIQ after this, so disable hwt */
-#ifdef CONFIG_MTK_WATCHDOG
-		res = get_wd_api(&wd_api);
-
-		if (res)
-			aee_nested_printf("get_wd_api error\n");
-		else
-			wd_api->wd_aee_confirm_hwreboot();
-#else
-		aee_nested_printf("mtk watchdog not enable.\n");
-#endif
-		aee_rec_step_nested_panic(step_base + 7);
 		break;
 	default:
 		break;
 	}
+
+	/* we donot want a FIQ after this, so disable hwt */
+#ifdef CONFIG_MTK_WATCHDOG
+	res = get_wd_api(&wd_api);
+
+	if (res)
+		aee_nested_printf("get_wd_api error\n");
+	else
+		wd_api->wd_aee_confirm_hwreboot();
+#else
+	aee_nested_printf("mtk watchdog not enable.\n");
+#endif
+	aee_rec_step_nested_panic(step_base + 7);
 
 	/* waiting for the WDT timeout */
 	while (1) {

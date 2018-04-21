@@ -56,7 +56,7 @@
 
 #define CMDQ_INITIAL_CMD_BLOCK_SIZE     (PAGE_SIZE)
 #define CMDQ_INST_SIZE                  (2 * sizeof(uint32_t))	/* instruction is 64-bit */
-#define CMDQ_CMD_BUFFER_SIZE			(PAGE_SIZE)
+#define CMDQ_CMD_BUFFER_SIZE		(PAGE_SIZE - 32 * CMDQ_INST_SIZE)
 
 
 #define CMDQ_MAX_LOOP_COUNT             (1000000)
@@ -329,12 +329,12 @@ struct cmdqSecAddrMetadataStruct {
 	 *	A~B or B~D: size
 	 */
 
-	enum CMDQ_SEC_ADDR_METADATA_TYPE type;	/* [IN] addr handle type */
-	uint32_t baseHandle;	/* [IN]_h, secure address handle */
+	uint32_t type;		/* [IN] addr handle type */
+	uint64_t baseHandle;	/* [IN]_h, secure address handle */
 	uint32_t blockOffset;	/* [IN]_b, block offset from handle(PA) to current block(plane) */
-	uint32_t offset;		/* [IN]_b, buffser offset to secure handle */
-	uint32_t size;			/* buffer size */
-	uint32_t port;			/* hw port id (i.e. M4U port id) */
+	uint32_t offset;	/* [IN]_b, buffser offset to secure handle */
+	uint32_t size;		/* buffer size */
+	uint32_t port;		/* hw port id (i.e. M4U port id) */
 };
 
 /* tablet use */

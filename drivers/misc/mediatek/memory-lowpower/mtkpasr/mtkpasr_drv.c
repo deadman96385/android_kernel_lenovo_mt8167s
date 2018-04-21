@@ -45,7 +45,6 @@ static unsigned int max_channel_num;
 static struct pasrvec *mtkpasr_vec;
 static int dcs_acquired;
 static enum dcs_status dcs_status = DCS_BUSY;
-static unsigned int ddrphy_on, ddrphy_off;
 #endif
 
 /* Internal control parameters */
@@ -141,6 +140,12 @@ static void enable_dcs_pasr(void)
 	}
 
 	/* Step0 - switch to lowpower mode */
+#ifdef DCS_SCREENOFF_ONLY_MODE
+	ret = dcs_exit_perf(DCS_KICKER_DEBUG);
+	if (ret)
+		pr_err("exit perf failed, kick=%d\n", DCS_KICKER_DEBUG);
+#endif
+
 	ret = dcs_switch_to_lowpower();
 	if (ret != 0) {
 		pr_warn("%s: failed to swtich to lowpower mode, error (%d)\n", __func__, ret);
@@ -182,16 +187,6 @@ bypass_dcs:
 		for (chid = 0; chid < max_channel_num; chid++)
 			enter_dcs_pasr_dpd_config(mtkpasr_vec[chid].pasr_on & 0xFF,
 						mtkpasr_vec[chid].pasr_on >> 0x8, chid);
-
-		/* Step3 - Turn off DDRPHY */
-		/*
-		if (mtkpasr_vec[chconfig].pasr_on ==
-				query_channel_segment_bits()) {
-			dcs_mpu_protection(1);
-			dram_turn_on_off_ch(0);
-			ddrphy_off++;
-		}
-		*/
 	} else {
 		pr_warn("%s: should not be here\n", __func__);
 		goto err;
@@ -206,17 +201,12 @@ err:
 
 static void disable_dcs_pasr(void)
 {
+#ifdef DCS_SCREENOFF_ONLY_MODE
+	int ret;
+#endif
+
 	if (!dcs_acquired)
 		return;
-
-	/* Turn on DDRPHY */
-	/*
-	if ((dcs_status == DCS_LOWPOWER) && ((ddrphy_off - ddrphy_on) == 1)) {
-		dram_turn_on_off_ch(1);
-		dcs_mpu_protection(0);
-		ddrphy_on++;
-	}
-	*/
 
 	/* Restore PASR */
 	if (dcs_status == DCS_NORMAL)
@@ -231,6 +221,13 @@ static void disable_dcs_pasr(void)
 	dcs_status = DCS_BUSY;
 	if (dcs_initialied())
 		dcs_get_dcs_status_unlock();
+
+#ifdef DCS_SCREENOFF_ONLY_MODE
+	/* enter performance mode */
+	ret = dcs_enter_perf(DCS_KICKER_DEBUG);
+	if (ret)
+		pr_err("enter perf failed, kick=%d\n", DCS_KICKER_DEBUG);
+#endif
 }
 #endif
 
@@ -242,6 +239,9 @@ static int mtkpasr_config(int times, get_range_t func)
 {
 	unsigned long spfn, epfn;
 	int which, i;
+#ifndef CONFIG_MTK_DCS
+	int retry = 3;
+#endif
 
 	/* Not enable */
 	if (!mtkpasr_enable)
@@ -275,10 +275,14 @@ static int mtkpasr_config(int times, get_range_t func)
 #endif
 
 #ifndef CONFIG_MTK_DCS
+retry_pasr:
 	/* APMCU flow */
 	MTKPASR_PRINT("%s: PASR[0x%lx]\n", __func__, mtkpasr_on);
-	if (enter_pasr_dpd_config(mtkpasr_on & 0xFF, mtkpasr_on >> 0x8) != 0)
+	if (enter_pasr_dpd_config(mtkpasr_on & 0xFF, mtkpasr_on >> 0x8) != 0) {
+		if (--retry)
+			goto retry_pasr;
 		MTKPASR_PRINT("%s: failed to program DRAMC!\n", __func__);
+	}
 #else
 	/* Channel based PASR configuration */
 	enable_dcs_pasr();
@@ -338,16 +342,21 @@ static struct memory_lowpower_operation mtkpasr_handler = {
 /* ++ SYSFS Interface ++ */
 int mtkpasr_show_banks(char *buf)
 {
+#define MTKPASR_SHOW_BANKS_LIMIT	(128)
 	int i, len = 0, tmp;
 
 	/* Show banks */
 	for (i = 0; i < num_banks; i++) {
-		tmp = sprintf(buf, "Bank[%d] - start_pfn[0x%lx] end_pfn[0x%lx] segment[%d] rank[%d]\n",
+		tmp = snprintf(buf, MTKPASR_SHOW_BANKS_LIMIT,
+				"Bank[%2d] - start_pfn[%6lx] end_pfn[%6lx] segment[%2d] rank[%d] %s\n",
 				i, mtkpasr_banks[i].start_pfn, mtkpasr_banks[i].end_pfn - 1,
-				mtkpasr_banks[i].segment, mtkpasr_banks[i].rank);
+				mtkpasr_banks[i].segment, mtkpasr_banks[i].rank,
+				((mtkpasr_on >> mtkpasr_banks[i].segment) & 0x1) ? "[ON]" : "");
 		buf += tmp;
 		len += tmp;
 	}
+
+#undef MTKPASR_SHOW_BANKS_LIMIT
 
 	return len;
 }
@@ -397,10 +406,6 @@ static int show_pasr_status(char *buf)
 			buf += tmp;
 			len += tmp;
 		}
-		tmp = sprintf(buf, "ddrphy on=%u, ddrphy off=%u\n",
-				ddrphy_on, ddrphy_off);
-		buf += tmp;
-		len += tmp;
 	}
 #endif
 	return len;
@@ -485,8 +490,8 @@ static int __init mtkpasr_construct_bankrank(void)
 	unsigned long start_pfn, end_pfn;
 
 	/* Init mtkpasr range */
-	start_pfn = memory_lowpower_cma_base() >> PAGE_SHIFT;
-	end_pfn = start_pfn + (memory_lowpower_cma_size() >> PAGE_SHIFT);
+	start_pfn = memory_lowpower_base() >> PAGE_SHIFT;
+	end_pfn = start_pfn + (memory_lowpower_size() >> PAGE_SHIFT);
 	max_bank_pfns = 0;
 	ret = mtkpasr_init_range(start_pfn, end_pfn, &max_bank_pfns);
 	if (ret <= 0 || max_bank_pfns == 0) {

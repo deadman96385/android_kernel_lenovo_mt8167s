@@ -16,6 +16,10 @@
 
 #include "mtk_hps.h"
 #include "mtk_hps_internal.h"
+
+
+#include <mt-plat/met_drv.h>
+
 static int cal_base_cores(void)
 {
 	int i, base_val;
@@ -46,12 +50,18 @@ static int hps_cal_cores(void)
 static int hps_algo_rush_boost(void)
 {
 	int val, base_val;
+	unsigned int idx, total_rel_load;
+	int ret = 0;
+
+	idx = total_rel_load = 0;
+	for (idx = 0 ; idx < hps_sys.cluster_num ; idx++)
+		total_rel_load += hps_sys.cluster_info[idx].rel_load;
 
 	if (!hps_ctxt.rush_boost_enabled)
 		return 0;
 	base_val = cal_base_cores();
 
-	if (hps_ctxt.cur_loads > hps_ctxt.rush_boost_threshold * hps_sys.total_online_cores)
+	if (total_rel_load > hps_ctxt.rush_boost_threshold * hps_sys.total_online_cores)
 		++hps_ctxt.rush_count;
 	else
 		hps_ctxt.rush_count = 0;
@@ -72,9 +82,17 @@ static int hps_algo_rush_boost(void)
 		hps_sys.rush_cnt = hps_ctxt.rush_count;
 		hps_cal_core_num(&hps_sys, val, base_val);
 
-		return 1;
-	} else
-		return 0;
+
+		/* [MET] debug for geekbench */
+		met_tag_oneshot(0, "sched_rush_boost", 1);
+
+		ret = 1;
+	} else {
+		/* [MET] debug for geekbench */
+		met_tag_oneshot(0, "sched_rush_boost", 0);
+		ret = 0;
+	}
+	return ret;
 }
 static int hps_algo_eas(void)
 {
@@ -92,7 +110,7 @@ static int hps_algo_eas(void)
 		continue;
 
 		/*if loading > up_threshod ==> power on cores*/
-		if ((hps_sys.cluster_info[i].loading >=
+		if ((hps_sys.cluster_info[i].loading >
 			(hps_sys.cluster_info[i].up_threshold*hps_sys.cluster_info[i].online_core_num))) {
 			val = hps_sys.cluster_info[i].loading / hps_sys.cluster_info[i].up_threshold;
 			if (hps_sys.cluster_info[i].loading % hps_sys.cluster_info[i].up_threshold)
@@ -102,7 +120,8 @@ static int hps_algo_eas(void)
 			else
 				hps_sys.cluster_info[i].target_core_num = hps_sys.cluster_info[i].limit_value;
 			ret = 1;
-		} else {
+		} else if ((hps_sys.cluster_info[i].loading <
+			(hps_sys.cluster_info[i].down_threshold*hps_sys.cluster_info[i].online_core_num))) {
 		/*if loading < down_threshod ==> power off cores*/
 			if (!hps_sys.cluster_info[i].loading) {
 				hps_sys.cluster_info[i].target_core_num = 0;
@@ -110,8 +129,6 @@ static int hps_algo_eas(void)
 			}
 			val = hps_sys.cluster_info[i].loading /	hps_sys.cluster_info[i].down_threshold;
 			if (hps_sys.cluster_info[i].loading % hps_sys.cluster_info[i].down_threshold)
-				val++;
-			if (!val)
 				val++;
 			if (val >= hps_sys.cluster_info[i].base_value)
 				hps_sys.cluster_info[i].target_core_num = val;
@@ -121,16 +138,17 @@ static int hps_algo_eas(void)
 		}
 	}
 
-
+#if 0
 	/*Check with big task criteriai*/
 	for (i = 1 ; i < hps_sys.cluster_num ; i++) {
 		if ((!hps_sys.cluster_info[i].bigTsk_value) &&
 		(!(hps_sys.cluster_info[i].loading / hps_sys.cluster_info[i].down_threshold)))
 			hps_sys.cluster_info[i].target_core_num = 0;
 	}
-
+#endif
 	return ret;
 }
+#if 0
 /*
  * update history - up
  */
@@ -223,7 +241,7 @@ static int hps_algo_down(void)
 	return 0;
 }
 
-#if 0
+
 int hps_algo_heavytsk_det(void)
 {
 	int i, j, ret, sys_cores, hvy_cores;
@@ -295,7 +313,8 @@ static int hps_algo_perf_indicator(void)
 
 /* Notice : Sorting function pointer by priority */
 static int (*hps_func[]) (void) = {
-hps_algo_perf_indicator, hps_algo_rush_boost, hps_algo_eas, hps_algo_up, hps_algo_down};
+/*hps_algo_perf_indicator, hps_algo_rush_boost, hps_algo_eas, hps_algo_up, hps_algo_down};*/
+hps_algo_perf_indicator, hps_algo_rush_boost, hps_algo_eas};
 int hps_ops_init(void)
 {
 	int i;

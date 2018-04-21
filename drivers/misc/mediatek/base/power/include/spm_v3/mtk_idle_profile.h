@@ -22,12 +22,12 @@
 #define APXGPT_SYS_TICKS_PER_US ((u32)(13))
 #define APXGPT_RTC_TICKS_PER_MS ((u32)(32))
 
-typedef struct mtk_idle_twam {
+struct mtk_idle_twam {
 	u32 event;
 	u32 sel;
 	bool running;
 	bool speed_mode;
-} idle_twam_t, *p_idle_twam_t;
+};
 
 struct mtk_idle_buf {
 	char buf[IDLE_LOG_BUF_LEN];
@@ -44,15 +44,16 @@ struct mtk_idle_recent_ratio {
 	unsigned long long end_ts;
 };
 
-#define reset_idle_buf(idle) ((idle).p_idx = (idle).buf)
+#define reset_idle_buf(idle) \
+	do { (idle).p_idx = (idle).buf; (idle).buf[0] = '\0'; } while (0)
 #define get_idle_buf(idle)   ((idle).buf)
 #define idle_buf_append(idle, fmt, args...) \
-	((idle).p_idx += snprintf((idle).p_idx, IDLE_LOG_BUF_LEN - strlen((idle).buf), fmt, ##args))
+	((idle).p_idx += scnprintf((idle).p_idx, IDLE_LOG_BUF_LEN - strlen((idle).buf), fmt, ##args))
 
 void mtk_idle_twam_callback(struct twam_sig *ts);
 void mtk_idle_twam_disable(void);
 void mtk_idle_twam_enable(u32 event);
-p_idle_twam_t mtk_idle_get_twam(void);
+struct mtk_idle_twam *mtk_idle_get_twam(void);
 
 bool mtk_idle_get_ratio_status(void);
 void mtk_idle_ratio_calc_start(int type, int cpu);
@@ -66,15 +67,92 @@ bool mtk_idle_select_state(int type, int reason);
 void mtk_idle_block_setting(int type, unsigned long *cnt, unsigned long *block_cnt, unsigned int *block_mask);
 void mtk_idle_twam_init(void);
 
-static inline long int idle_get_current_time_ms(void)
-{
-	struct timeval t;
-
-	do_gettimeofday(&t);
-	return ((t.tv_sec & 0xFFF) * 1000000 + t.tv_usec) / 1000;
-}
-
+unsigned long long idle_get_current_time_ms(void);
 void mtk_idle_recent_ratio_get(int *window_length_ms, struct mtk_idle_recent_ratio *ratio);
+
+
+/* ---------- DP/SODI/SODI3 Latency Profiling ---------- */
+
+enum {
+	PIDX_SELECT_TO_ENTER,
+	PIDX_ENTER_TOTAL,
+	PIDX_LEAVE_TOTAL,
+	PIDX_IDLE_NOTIFY_ENTER,
+	PIDX_PRE_HANDLER,
+	PIDX_SSPM_BEFORE_WFI,
+	PIDX_PRE_IRQ_PROCESS,
+	PIDX_PCM_SETUP_BEFORE_WFI,
+	PIDX_SSPM_BEFORE_WFI_ASYNC_WAIT,
+	PIDX_SSPM_AFTER_WFI,
+	PIDX_PCM_SETUP_AFTER_WFI,
+	PIDX_POST_IRQ_PROCESS,
+	PIDX_POST_HANDLER,
+	PIDX_SSPM_AFTER_WFI_ASYNC_WAIT,
+	PIDX_IDLE_NOTIFY_LEAVE,
+	NR_PIDX
+};
+
+void mtk_idle_latency_profile_enable(bool enable);
+bool mtk_idle_latency_profile_is_on(void);
+void mtk_idle_latency_profile(unsigned int idle_type, int idx);
+void mtk_idle_latency_profile_result(unsigned int idle_type);
+
+#define profile_dp_start(idx) \
+	do { \
+		if (mtk_idle_latency_profile_is_on()) \
+			mtk_idle_latency_profile(IDLE_TYPE_DP, 2*idx); \
+	} while (0)
+
+#define profile_dp_end(idx) \
+	do { \
+		if (mtk_idle_latency_profile_is_on()) \
+			mtk_idle_latency_profile(IDLE_TYPE_DP, 2*idx+1); \
+	} while (0)
+
+#define profile_dp_dump() \
+	do { \
+		if (mtk_idle_latency_profile_is_on()) \
+			mtk_idle_latency_profile_result(IDLE_TYPE_DP); \
+	} while (0)
+
+#define profile_so_start(idx) \
+	do { \
+		if (mtk_idle_latency_profile_is_on()) \
+			mtk_idle_latency_profile(IDLE_TYPE_SO, 2*idx); \
+	} while (0)
+
+#define profile_so_end(idx) \
+	do { \
+		if (mtk_idle_latency_profile_is_on()) \
+			mtk_idle_latency_profile(IDLE_TYPE_SO, 2*idx+1); \
+	} while (0)
+
+#define profile_so_dump() \
+	do { \
+		if (mtk_idle_latency_profile_is_on()) \
+			mtk_idle_latency_profile_result(IDLE_TYPE_SO); \
+	} while (0)
+
+#define profile_so3_start(idx) \
+	do { \
+		if (mtk_idle_latency_profile_is_on()) \
+			mtk_idle_latency_profile(IDLE_TYPE_SO3, 2*idx); \
+	} while (0)
+
+#define profile_so3_end(idx) \
+	do { \
+		if (mtk_idle_latency_profile_is_on()) \
+			mtk_idle_latency_profile(IDLE_TYPE_SO3, 2*idx+1); \
+	} while (0)
+
+#define profile_so3_dump() \
+	do { \
+		if (mtk_idle_latency_profile_is_on()) \
+			mtk_idle_latency_profile_result(IDLE_TYPE_SO3); \
+	} while (0)
+
+
+
 
 #endif /* __MTK_IDLE_PROFILE_H__ */
 

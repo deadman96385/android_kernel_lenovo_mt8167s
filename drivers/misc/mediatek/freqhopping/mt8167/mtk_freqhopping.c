@@ -88,7 +88,7 @@ static unsigned int	g_initialize;
 #define LVDSPLL_DEF_FREQ      1976000
 
 /* keep track the status of each PLL */
-static  fh_pll_t g_fh_pll[FH_PLL_NUM] = {
+static  struct fh_pll_t g_fh_pll[FH_PLL_NUM] = {
 	{FH_FH_DISABLE,	    FH_PLL_ENABLE, 0, ARMCA7PLL_DEF_FREQ,    0},
 	{FH_FH_DISABLE,	    FH_PLL_ENABLE, 0, MAINPLL_DEF_FREQ,      0},
 	{FH_FH_DISABLE,     FH_PLL_ENABLE, 0, MEMPLL_DEF_FREQ,       0},
@@ -311,8 +311,8 @@ static void fh_sync_ncpo_to_fhctl_dds(enum FH_PLL_ID pll_id)
 
 	VALIDATE_PLLID(pll_id);
 
-	reg_src = g_reg_pll_con1[pll_id];
-	reg_dst = g_reg_dds[pll_id];
+	reg_src = g_reg_pll_con1[(int)pll_id];
+	reg_dst = g_reg_dds[(int)pll_id];
 
 	if (pll_id == FH_MEM_PLLID)
 		fh_write32(reg_dst, ((fh_read32(reg_src) >> 10) & MASK21b)|BIT32);
@@ -401,7 +401,7 @@ static int __freqhopping_ctrl(struct freqhopping_ioctl *fh_ctl, bool enable)
 	const struct freqhopping_ssc *pSSC_setting = NULL;
 	unsigned int    ssc_setting_id = 0;
 	int retVal = 1;
-	fh_pll_t *pfh_pll = NULL;
+	struct fh_pll_t *pfh_pll = NULL;
 
 	FH_MSG("%s for pll %d", __func__, fh_ctl->pll_id);
 
@@ -1125,7 +1125,7 @@ static int mt_fh_hal_is_support_DFS_mode(void)
 /* TODO: module_exit(cpufreq_exit); */
 
 /* mt8167 fhctl MB */
-static int __fh_debug_proc_read(struct seq_file *m, void *v, fh_pll_t *pll)
+static int __fh_debug_proc_read(struct seq_file *m, void *v, struct fh_pll_t *pll)
 {
 	FH_MSG("EN: %s", __func__);
 
@@ -1195,7 +1195,7 @@ static void __ioctl(unsigned int ctlid, void *arg)
 	switch (ctlid) {
 	case FH_IO_PROC_READ:
 	{
-		FH_IO_PROC_READ_T *tmp = (FH_IO_PROC_READ_T *)(arg);
+		struct FH_IO_PROC_READ_T *tmp = (struct FH_IO_PROC_READ_T *)(arg);
 
 		__fh_debug_proc_read(tmp->m, tmp->v, tmp->pll);
 	} break;

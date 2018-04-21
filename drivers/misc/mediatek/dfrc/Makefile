@@ -27,6 +27,7 @@ ccflags-y += \
 	-I$(srctree)/drivers/misc/mediatek/video/common/rdma10/ \
 	-I$(srctree)/drivers/misc/mediatek/video/common/wdma10/ \
 	-I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/dispsys/   \
+	-I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/videox/   \
 	-I$(srctree)/drivers/misc/mediatek/sync/      \
 	-I$(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)/include/mach/ \
 	-I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM) \
@@ -61,4 +62,9 @@ ccflags-y += \
 	-I$(srctree)/drivers/misc/mediatek/gud/$(MTK_PLATFORM)/gud/MobiCoreKernelApi/include \
 	-I$(srctree)/../vendor/trustonic/platform/$(MTK_PLATFORM)/trustlets/tplay/Tltplay/public
 endif
+endif
+
+ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6799"))
+ccflags-y += \
+	-DPLATFORM_SUPPORT_ARR
 endif

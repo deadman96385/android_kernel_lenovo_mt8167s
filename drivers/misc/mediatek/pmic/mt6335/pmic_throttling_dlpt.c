@@ -68,6 +68,7 @@
 #include <mt-plat/mtk_battery.h>
 #include <mach/mtk_battery_property.h>
 #include <linux/reboot.h>
+#include <mtk_battery_internal.h>
 #else
 #include <mt-plat/battery_meter.h>
 #include <mt-plat/battery_common.h>
@@ -175,14 +176,14 @@ void exec_low_battery_callback(LOW_BATTERY_LEVEL low_battery_level)
 	}
 }
 
-void lbat_min_en_setting(int en_val)
+static void lbat_min_en_setting(int en_val)
 {
 	pmic_set_register_value(PMIC_AUXADC_LBAT_EN_MIN, en_val);
 	pmic_set_register_value(PMIC_AUXADC_LBAT_IRQ_EN_MIN, en_val);
 	pmic_enable_interrupt(INT_BAT_L, en_val, "pmic_throttling_dlpt");
 }
 
-void lbat_max_en_setting(int en_val)
+static void lbat_max_en_setting(int en_val)
 {
 	pmic_set_register_value(PMIC_AUXADC_LBAT_EN_MAX, en_val);
 	pmic_set_register_value(PMIC_AUXADC_LBAT_IRQ_EN_MAX, en_val);
@@ -583,7 +584,7 @@ void pmic_auxadc_unlock(void)
 	mt6335_auxadc_unlock();
 }
 
-int do_ptim_internal(bool isSuspend, unsigned int *bat, signed int *cur)
+int do_ptim_internal(bool isSuspend, unsigned int *bat, signed int *cur, bool *is_charging)
 {
 	unsigned int vbat_reg;
 	int ret = 0;
@@ -653,7 +654,8 @@ int do_ptim_internal(bool isSuspend, unsigned int *bat, signed int *cur)
 	*bat = (vbat_reg * 3 * 18000) / 32768;
 
 #if defined(CONFIG_MTK_SMART_BATTERY)
-	fgauge_read_IM_current((void *)cur);
+	/*fgauge_read_IM_current((void *)cur);*/
+	gauge_get_ptim_current(cur, is_charging);
 #else
 	*cur = 0;
 #endif
@@ -668,11 +670,12 @@ int do_ptim_internal(bool isSuspend, unsigned int *bat, signed int *cur)
 int do_ptim(bool isSuspend)
 {
 	int ret;
+	bool is_charging;
 
 	if (isSuspend == false)
 		pmic_auxadc_lock();
 
-	ret = do_ptim_internal(isSuspend, &ptim_bat_vol, &ptim_R_curr);
+	ret = do_ptim_internal(isSuspend, &ptim_bat_vol, &ptim_R_curr, &is_charging);
 
 	if (isSuspend == false)
 		pmic_auxadc_unlock();
@@ -682,11 +685,26 @@ int do_ptim(bool isSuspend)
 int do_ptim_ex(bool isSuspend, unsigned int *bat, signed int *cur)
 {
 	int ret;
+	bool is_charging;
 
 	if (isSuspend == false)
 		pmic_auxadc_lock();
 
-	ret = do_ptim_internal(isSuspend, bat, cur);
+	ret = do_ptim_internal(isSuspend, bat, cur, &is_charging);
+
+	if (isSuspend == false)
+		pmic_auxadc_unlock();
+	return ret;
+}
+
+int do_ptim_gauge(bool isSuspend, unsigned int *bat, signed int *cur, bool *is_charging)
+{
+	int ret;
+
+	if (isSuspend == false)
+		pmic_auxadc_lock();
+
+	ret = do_ptim_internal(isSuspend, bat, cur, is_charging);
 
 	if (isSuspend == false)
 		pmic_auxadc_unlock();
@@ -1260,11 +1278,10 @@ int dlpt_notify_handler(void *unused)
 			if (ptim_rac_val_avg == 0)
 				pr_err("[DLPT] ptim_rac_val_avg=0 , skip\n");
 			else {
-				if (upmu_get_rgs_chrdet()) {
+				if (upmu_get_rgs_chrdet())
 					g_imix_val = get_dlpt_imix_charging();
-				} else {
+				else
 					g_imix_val = get_dlpt_imix();
-				}
 
 				/*Notify*/
 				if (g_imix_val >= 1) {
@@ -1417,7 +1434,20 @@ int get_dlpt_imix_spm(void)
 	return 1;
 }
 
+int get_rac(void)
+{
+	return 0;
+}
 
+int get_imix(void)
+{
+	return 0;
+}
+
+int do_ptim_ex(bool isSuspend, unsigned int *bat, signed int *cur)
+{
+	return 0;
+}
 #endif				/*#ifdef DLPT_FEATURE_SUPPORT */
 
 #ifdef LOW_BATTERY_PROTECT
@@ -2075,26 +2105,22 @@ void pmic_throttling_dlpt_debug_init(struct platform_device *dev, struct dentry 
 
 int pmic_throttling_dlpt_init(void)
 {
-#ifdef DLPT_FEATURE_SUPPORT
-	const int *pimix = NULL;
-	int len = 0;
-#endif
 #if defined(CONFIG_MTK_SMART_BATTERY)
 	struct device_node *np;
 	u32 val;
-	char *path = "/bus/BAT_METTER";
-
-	np = of_find_node_by_path(path);
+	char *path;
 
 	#if (CONFIG_MTK_GAUGE_VERSION == 30)
-	if (of_property_read_u32(np, "car_tune_value", &val) == 0) {
+	path = "/bat_gm30";
+	np = of_find_node_by_path(path);
+	if (of_property_read_u32(np, "CAR_TUNE_VALUE", &val) == 0) {
 		fg_cust_data.car_tune_value = (int)val*10;
 		pr_err("Get car_tune_value from DT: %d\n", fg_cust_data.car_tune_value);
 	} else {
 		fg_cust_data.car_tune_value = CAR_TUNE_VALUE*10;
 		pr_err("Get default car_tune_value= %d\n", fg_cust_data.car_tune_value);
 	}
-	if (of_property_read_u32(np, "r_fg_value", &val) == 0) {
+	if (of_property_read_u32(np, "R_FG_VALUE", &val) == 0) {
 		fg_cust_data.r_fg_value = (int)val*10;
 		pr_err("Get r_fg_value from DT: %d\n", fg_cust_data.r_fg_value);
 	} else {
@@ -2103,6 +2129,8 @@ int pmic_throttling_dlpt_init(void)
 	}
 	pr_err("Get default UNIT_FGCURRENT= %d\n", UNIT_FGCURRENT);
 	#else
+	path = "/bus/BAT_METTER";
+	np = of_find_node_by_path(path);
 	if (of_property_read_u32(np, "car_tune_value", &val) == 0) {
 		batt_meter_cust_data.car_tune_value = (int)val;
 		PMICLOG("Get car_tune_value from DT: %d\n", batt_meter_cust_data.car_tune_value);
@@ -2112,18 +2140,7 @@ int pmic_throttling_dlpt_init(void)
 	}
 	#endif
 #endif
-#ifdef DLPT_FEATURE_SUPPORT
-	if (of_scan_flat_dt(fb_early_init_dt_get_chosen, NULL) > 0)
-		pimix = of_get_flat_dt_prop(pmic_node, "atag,imix_r", &len);
-	if (pimix == NULL) {
-		pr_err(" pimix == NULL len = %d\n", len);
-	} else {
-		pr_err(" pimix = %d\n", *pimix);
-		ptim_rac_val_avg = *pimix;
-	}
 
-	PMICLOG("******** MT pmic driver probe!! ********%d\n", ptim_rac_val_avg);
-#endif /* #ifdef DLPT_FEATURE_SUPPORT */
 #if !defined CONFIG_HAS_WAKELOCKS
 	wakeup_source_init(&bat_percent_notify_lock, "bat_percent_notify_lock wakelock");
 	wakeup_source_init(&dlpt_notify_lock, "dlpt_notify_lock wakelock");
@@ -2173,6 +2190,28 @@ int pmic_throttling_dlpt_init(void)
 #endif
 	return 0;
 }
+
+static int __init pmic_throttling_dlpt_rac_init(void)
+{
+#ifdef DLPT_FEATURE_SUPPORT
+	const int *pimix = NULL;
+	int len = 0;
+
+	if (of_scan_flat_dt(fb_early_init_dt_get_chosen, NULL) > 0)
+		pimix = of_get_flat_dt_prop(pmic_node, "atag,imix_r", &len);
+	if (pimix == NULL) {
+		pr_notice(" pimix == NULL len = %d\n", len);
+	} else {
+		pr_info(" pimix = %d\n", *pimix);
+		ptim_rac_val_avg = *pimix;
+	}
+
+	PMICLOG("******** MT pmic driver probe!! ********%d\n", ptim_rac_val_avg);
+#endif /* #ifdef DLPT_FEATURE_SUPPORT */
+	return 0;
+}
+
+fs_initcall(pmic_throttling_dlpt_rac_init);
 
 MODULE_AUTHOR("Argus Lin");
 MODULE_DESCRIPTION("MT PMIC Device Driver");

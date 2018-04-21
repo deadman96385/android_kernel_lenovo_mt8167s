@@ -62,6 +62,7 @@
 
 #include <linux/blkdev.h>
 #include "../../scsi/sd.h"
+#include "usb_boost.h"
 
 
 /***********************************************************************
@@ -466,9 +467,12 @@ int usb_stor_bulk_srb(struct us_data* us, unsigned int pipe,
 		      struct scsi_cmnd* srb)
 {
 	unsigned int partial;
-	int result = usb_stor_bulk_transfer_sglist(us, pipe, scsi_sglist(srb),
-				      scsi_sg_count(srb), scsi_bufflen(srb),
-				      &partial);
+	int result;
+
+	usb_boost();
+	result = usb_stor_bulk_transfer_sglist(us, pipe, scsi_sglist(srb),
+			scsi_sg_count(srb), scsi_bufflen(srb),
+			&partial);
 
 	scsi_set_resid(srb, scsi_bufflen(srb) - partial);
 	return result;
@@ -919,10 +923,15 @@ int usb_stor_CB_transport(struct scsi_cmnd *srb, struct us_data *us)
 
 	/* COMMAND STAGE */
 	/* let's send the command via the control pipe */
+	/*
+	 * Command is sometime (f.e. after scsi_eh_prep_cmnd) on the stack.
+	 * Stack may be vmallocated.  So no DMA for us.  Make a copy.
+	 */
+	memcpy(us->iobuf, srb->cmnd, srb->cmd_len);
 	result = usb_stor_ctrl_transfer(us, us->send_ctrl_pipe,
 				      US_CBI_ADSC, 
 				      USB_TYPE_CLASS | USB_RECIP_INTERFACE, 0, 
-				      us->ifnum, srb->cmnd, srb->cmd_len);
+				      us->ifnum, us->iobuf, srb->cmd_len);
 
 	/* check the return code for the command */
 	usb_stor_dbg(us, "Call to usb_stor_ctrl_transfer() returned %d\n",
@@ -1070,6 +1079,8 @@ int usb_stor_Bulk_transport(struct scsi_cmnd *srb, struct us_data *us)
 	int fake_sense = 0;
 	unsigned int cswlen;
 	unsigned int cbwlen = US_BULK_CB_WRAP_LEN;
+	/*Logical block address*/
+	u32 LBA;
 
 	/* Take care of BULK32 devices; set extra byte to 0 */
 	if (unlikely(us->fflags & US_FL_BULK32)) {
@@ -1091,6 +1102,7 @@ int usb_stor_Bulk_transport(struct scsi_cmnd *srb, struct us_data *us)
 	/* copy the command payload */
 	memset(bcb->CDB, 0, sizeof(bcb->CDB));
 	memcpy(bcb->CDB, srb->cmnd, bcb->Length);
+	LBA = (bcb->CDB[2]<<24)|(bcb->CDB[3]<<16)|(bcb->CDB[4]<<8)|(bcb->CDB[5]);
 
 	/* send it to out endpoint */
 	usb_stor_dbg(us, "Bulk Command S 0x%x T 0x%x L %d F %d Trg %d LUN %d CL %d\n",
@@ -1118,6 +1130,9 @@ int usb_stor_Bulk_transport(struct scsi_cmnd *srb, struct us_data *us)
 				us->recv_bulk_pipe : us->send_bulk_pipe;
 		result = usb_stor_bulk_srb(us, pipe, srb);
 		usb_stor_dbg(us, "Bulk data transfer result 0x%x\n", result);
+		if (result != USB_STOR_XFER_GOOD)
+			pr_info("Bulk data transfer result 0x%x LBA=%u\n", result, LBA);
+
 		if (result == USB_STOR_XFER_ERROR)
 			return USB_STOR_TRANSPORT_ERROR;
 

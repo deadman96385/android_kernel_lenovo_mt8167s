@@ -22,6 +22,11 @@
 #include <linux/uaccess.h>
 #include <linux/fs.h>
 
+/* kernel standard for PMIC*/
+#if !defined(CONFIG_MTK_LEGACY)
+#include <linux/regulator/consumer.h>
+#endif
+
 #include "lens_info.h"
 #include "OIS_head.h"
 
@@ -50,8 +55,54 @@ static unsigned long g_u4TargetPosition;
 static unsigned long g_u4CurrPosition;
 static unsigned int g_u4CheckDrvStatus;
 
+/* PMIC */
+#if !defined(CONFIG_MTK_LEGACY)
+static struct regulator *regVCAMAF;
+static struct device *lens_device;
+#endif
 
-static int s4AK7372AF_WriteReg(u16 a_u2Addr, u16 a_u2Data)
+static void TimeoutHandle(void)
+{
+	LOG_INF("TimeoutHandle\n");
+
+	#if !defined(CONFIG_MTK_LEGACY)
+	lens_device = &g_pstAF_I2Cclient->dev;
+
+	if (regVCAMAF == NULL)
+		regVCAMAF = regulator_get(lens_device, "vcamaf");
+
+	if (regulator_is_enabled(regVCAMAF)) {
+		LOG_INF("Camera Power enable\n");
+
+		if (regulator_is_enabled(regVCAMAF)) {
+			if (regulator_disable(regVCAMAF) != 0)
+				LOG_INF("Fail to regulator_disable\n");
+			if (regulator_disable(regVCAMAF) != 0)
+				LOG_INF("Fail to regulator_disable\n");
+		}
+
+		msleep(20);
+
+		if (!regulator_is_enabled(regVCAMAF)) {
+			LOG_INF("AF Power off\n");
+			if (regulator_set_voltage(regVCAMAF, 2800000, 2800000) != 0)
+				LOG_INF("regulator_set_voltage fail\n");
+			if (regulator_set_voltage(regVCAMAF, 2800000, 2800000) != 0)
+				LOG_INF("regulator_set_voltage fail\n");
+
+			LOG_INF("AF Power On\n");
+			if (regulator_enable(regVCAMAF) != 0)
+				LOG_INF("regulator_enable fail\n");
+			if (regulator_enable(regVCAMAF) != 0)
+				LOG_INF("regulator_enable fail\n");
+		}
+	} else {
+		LOG_INF("Camera Power disable\n");
+	}
+	#endif
+}
+
+static int s4AK7372AF_WriteReg(unsigned short a_u2Addr, unsigned short a_u2Data)
 {
 	int i4RetValue = 0;
 
@@ -71,29 +122,58 @@ static int s4AK7372AF_WriteReg(u16 a_u2Addr, u16 a_u2Data)
 	return 0;
 }
 
+static int s4AK7372AF_ReadReg(u8 a_uAddr, u16 *a_pu2Result)
+{
+	int i4RetValue = 0;
+	char pBuff;
+	char puSendCmd[1];
+
+	puSendCmd[0] = a_uAddr;
+
+	g_pstAF_I2Cclient->addr = AK7372AF_I2C_SLAVE_ADDR;
+
+	g_pstAF_I2Cclient->addr = g_pstAF_I2Cclient->addr >> 1;
+
+	i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmd, 1);
+
+	if (i4RetValue < 0) {
+		LOG_INF("I2C read - send failed!!\n");
+		return -1;
+	}
+
+	i4RetValue = i2c_master_recv(g_pstAF_I2Cclient, &pBuff, 1);
+
+	if (i4RetValue < 0) {
+		LOG_INF("I2C read - recv failed!!\n");
+		return -1;
+	}
+	*a_pu2Result = pBuff;
+
+	return 0;
+}
+
 static inline int setAK7372AFPos(unsigned long a_u4Position)
 {
 	int i4RetValue = 0;
 
-	i4RetValue = s4AK7372AF_WriteReg(0x0, (u16) ((a_u4Position >> 2) & 0xff));
+	i4RetValue = s4AK7372AF_WriteReg(0x0, (unsigned short) ((a_u4Position >> 2) & 0xff));
 
 	if (i4RetValue < 0)
 		return -1;
 
-	i4RetValue = s4AK7372AF_WriteReg(0x1, (u16) ((g_u4TargetPosition & 0x3) << 6));
+	i4RetValue = s4AK7372AF_WriteReg(0x1, (unsigned short) ((g_u4TargetPosition & 0x3) << 6));
 
 	return i4RetValue;
 }
 
-int s4EEPROM_ReadReg_BU63169AF(u16 addr, u16 *data)
+int s4EEPROM_ReadReg_BU63169AF(unsigned short addr, unsigned short *data)
 {
 	int i4RetValue = 0;
 
-        *data = 0;
+	unsigned char u8data[2];
+	unsigned char pu_send_cmd[2] = { (unsigned char) (addr >> 8), (unsigned char) (addr & 0xFF) };
 
-	/* u8 u8data[2];
-	u8 pu_send_cmd[2] = { (u8) (addr >> 8), (u8) (addr & 0xFF) };
-
+	*data = 0;
 	g_pstAF_I2Cclient->addr = (EEPROM_I2C_SLAVE_ADDR) >> 1;
 	if (i2c_master_send(g_pstAF_I2Cclient, pu_send_cmd, 2) < 0) {
 		LOG_INF("read I2C send failed!!\n");
@@ -106,14 +186,14 @@ int s4EEPROM_ReadReg_BU63169AF(u16 addr, u16 *data)
 	LOG_INF("u8data[0] = 0x%x\n", u8data[0]);
 	LOG_INF("u8data[1] = 0x%x\n", u8data[1]);
 
-	*data = u8data[1] << 8 |  u8data[0]; */
+	*data = u8data[1] << 8 |  u8data[0];
 
 	LOG_INF("s4EEPROM_ReadReg2 0x%x, 0x%x\n", addr, *data);
 
 	return i4RetValue;
 }
 
-int s4AF_WriteReg_BU63169AF(u16 i2c_id, u8 *a_pSendData, u16 a_sizeSendData)
+int s4AF_WriteReg_BU63169AF(unsigned short i2c_id, unsigned char *a_pSendData, unsigned short a_sizeSendData)
 {
 	int i4RetValue = 0;
 
@@ -126,6 +206,9 @@ int s4AF_WriteReg_BU63169AF(u16 i2c_id, u8 *a_pSendData, u16 a_sizeSendData)
 
 	i4RetValue = i2c_master_send(g_pstAF_I2Cclient, a_pSendData, a_sizeSendData);
 
+	if (i4RetValue == -EIO)
+		TimeoutHandle();
+
 	if (i4RetValue != a_sizeSendData) {
 		g_u4CheckDrvStatus++;
 		LOG_INF("I2C send failed!!, Addr = 0x%x, Data = 0x%x\n", a_pSendData[0], a_pSendData[1]);
@@ -135,7 +218,8 @@ int s4AF_WriteReg_BU63169AF(u16 i2c_id, u8 *a_pSendData, u16 a_sizeSendData)
 	return 0;
 }
 
-int s4AF_ReadReg_BU63169AF(u16 i2c_id, u8 *a_pSendData, u16 a_sizeSendData, u8 *a_pRecvData, u16 a_sizeRecvData)
+int s4AF_ReadReg_BU63169AF(unsigned short i2c_id, unsigned char *a_pSendData,
+		unsigned short a_sizeSendData, unsigned char *a_pRecvData, unsigned short a_sizeRecvData)
 {
 	int i4RetValue;
 	struct i2c_msg msg[2];
@@ -157,7 +241,10 @@ int s4AF_ReadReg_BU63169AF(u16 i2c_id, u8 *a_pSendData, u16 a_sizeSendData, u8 *
 	msg[1].len = a_sizeRecvData;
 	msg[1].buf = a_pRecvData;
 
-	i4RetValue = i2c_transfer(g_pstAF_I2Cclient->adapter, msg, sizeof(msg)/sizeof(msg[0]));
+	i4RetValue = i2c_transfer(g_pstAF_I2Cclient->adapter, msg, ARRAY_SIZE(msg));
+
+	if (i4RetValue == -EIO)
+		TimeoutHandle();
 
 	if (i4RetValue != 2) {
 		g_u4CheckDrvStatus++;
@@ -167,9 +254,9 @@ int s4AF_ReadReg_BU63169AF(u16 i2c_id, u8 *a_pSendData, u16 a_sizeSendData, u8 *
 	return 0;
 }
 
-static inline int getAFInfo(__user stAF_MotorInfo *pstMotorInfo)
+static inline int getAFInfo(__user struct stAF_MotorInfo *pstMotorInfo)
 {
-	stAF_MotorInfo stMotorInfo;
+	struct stAF_MotorInfo stMotorInfo;
 
 	stMotorInfo.u4MacroPosition = g_u4AF_MACRO;
 	stMotorInfo.u4InfPosition = g_u4AF_INF;
@@ -183,7 +270,7 @@ static inline int getAFInfo(__user stAF_MotorInfo *pstMotorInfo)
 	else
 		stMotorInfo.bIsMotorOpen = 0;
 
-	if (copy_to_user(pstMotorInfo, &stMotorInfo, sizeof(stAF_MotorInfo)))
+	if (copy_to_user(pstMotorInfo, &stMotorInfo, sizeof(struct stAF_MotorInfo)))
 		LOG_INF("copy to user failed when getting motor information\n");
 
 	return 0;
@@ -222,6 +309,10 @@ static inline int moveAF(unsigned long a_u4Position)
 		spin_unlock(g_pAF_SpinLock);
 	} else {
 		LOG_INF("set I2C failed when moving the motor\n");
+		spin_lock(g_pAF_SpinLock);
+		g_u4CurrPosition = (unsigned long)g_u4TargetPosition;
+		spin_unlock(g_pAF_SpinLock);
+		return -1;
 	}
 
 	return 0;
@@ -243,11 +334,11 @@ static inline int setAFMacro(unsigned long a_u4Position)
 	return 0;
 }
 
-static inline int setAFPara(__user stAF_MotorCmd * pstMotorCmd)
+static inline int setAFPara(__user struct stAF_MotorCmd *pstMotorCmd)
 {
-	stAF_MotorCmd stMotorCmd;
+	struct stAF_MotorCmd stMotorCmd;
 
-	if (copy_from_user(&stMotorCmd , pstMotorCmd, sizeof(stMotorCmd)))
+	if (copy_from_user(&stMotorCmd, pstMotorCmd, sizeof(stMotorCmd)))
 		LOG_INF("copy to user failed when getting motor command\n");
 
 	LOG_INF("Motor CmdID : %x\n", stMotorCmd.u4CmdID);
@@ -258,7 +349,44 @@ static inline int setAFPara(__user stAF_MotorCmd * pstMotorCmd)
 	case 1:
 		setOISMode((int)1); /* 1 : disable */
 		break;
+	case 2:
+		if (*g_pAF_Opened == 2 && stMotorCmd.u4Param > 0) {
+			unsigned short PosX, PosY;
+
+			PosX = stMotorCmd.u4Param / 10000;
+			PosY = stMotorCmd.u4Param - PosX * 10000;
+
+			LOG_INF("OIS mode : %x\n", I2C_OIS_mem__read(0x7F));
+			I2C_OIS_mem_write(0x7F, 0x2C0C); /* Set manual mode */
+			I2C_OIS_mem_write(0x17, PosX); /* move Lens to target position of X-axis */
+			I2C_OIS_mem_write(0x97, PosY); /* move Lens to target position of Y-axis */
+			LOG_INF("Target : (%d ,  %d)\n", PosX, PosY);
+		}
+		break;
 	}
+
+	return 0;
+}
+
+static inline int getOISInfo(__user struct stAF_MotorOisInfo *pstMotorOisInfo)
+{
+	struct stAF_MotorOisInfo stMotorOisInfo;
+
+	if (*g_pAF_Opened == 2) {
+		stMotorOisInfo.i4OISHallPosXum = ((short)I2C_OIS_mem__read(0x3F)) * 1000;
+		stMotorOisInfo.i4OISHallPosYum = ((short)I2C_OIS_mem__read(0xBF)) * 1000;
+	} else {
+		stMotorOisInfo.i4OISHallPosXum = 0;
+		stMotorOisInfo.i4OISHallPosYum = 0;
+	}
+	stMotorOisInfo.i4OISHallFactorX = 26487; /* 26.487 [LSB/um] */
+	stMotorOisInfo.i4OISHallFactorY = 26487;
+	/* Res(um) = HallPosX / 26.487 */
+
+	/* LOG_INF("HALL [%d %d]\n", stMotorOisInfo.i4OISHallPosXum, stMotorOisInfo.i4OISHallPosYum); */
+
+	if (copy_to_user(pstMotorOisInfo, &stMotorOisInfo, sizeof(struct stAF_MotorOisInfo)))
+		LOG_INF("copy to user failed when getting motor information\n");
 
 	return 0;
 }
@@ -270,7 +398,7 @@ long BU63169AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command, unsigned 
 
 	switch (a_u4Command) {
 	case AFIOC_G_MOTORINFO:
-		i4RetValue = getAFInfo((__user stAF_MotorInfo *) (a_u4Param));
+		i4RetValue = getAFInfo((__user struct stAF_MotorInfo *) (a_u4Param));
 		break;
 
 	case AFIOC_T_MOVETO:
@@ -286,7 +414,11 @@ long BU63169AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command, unsigned 
 		break;
 
 	case AFIOC_S_SETPARA:
-		i4RetValue = setAFPara((__user stAF_MotorCmd *) (a_u4Param));
+		i4RetValue = setAFPara((__user struct stAF_MotorCmd *) (a_u4Param));
+		break;
+
+	case AFIOC_G_MOTOROISINFO:
+		i4RetValue = getOISInfo((__user struct stAF_MotorOisInfo *) (a_u4Param));
 		break;
 
 	default:
@@ -328,11 +460,46 @@ int BU63169AF_Release(struct inode *a_pstInode, struct file *a_pstFile)
 	return 0;
 }
 
-void BU63169AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient, spinlock_t *pAF_SpinLock, int *pAF_Opened)
+int BU63169AF_PowerDown(void)
+{
+	LOG_INF("+\n");
+	if (*g_pAF_Opened == 0) {
+		unsigned short data = 0;
+		int cnt = 0;
+
+		while (1) {
+			data = 0;
+
+			s4AK7372AF_WriteReg(0x02, 0x20);
+
+			s4AK7372AF_ReadReg(0x02, &data);
+
+			LOG_INF("Addr : 0x02 , Data : %x\n", data);
+
+			OIS_Standby();
+
+			if (data == 0x20 || cnt == 1)
+				break;
+
+			cnt++;
+		}
+	}
+	LOG_INF("-\n");
+
+	return 0;
+}
+
+int BU63169AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient, spinlock_t *pAF_SpinLock, int *pAF_Opened)
 {
 	g_pstAF_I2Cclient = pstAF_I2Cclient;
 	g_pAF_SpinLock = pAF_SpinLock;
 	g_pAF_Opened = pAF_Opened;
+	#if !defined(CONFIG_MTK_LEGACY)
+	regVCAMAF = NULL;
+	lens_device = NULL;
+	#endif
 
 	LOG_INF("SetI2Cclient\n");
+
+	return 1;
 }

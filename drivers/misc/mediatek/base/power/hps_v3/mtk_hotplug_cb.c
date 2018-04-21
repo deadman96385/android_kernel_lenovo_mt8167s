@@ -21,23 +21,30 @@
 #include <linux/cpumask.h>
 #include <linux/delay.h>
 #include <linux/bug.h>
+#include <linux/suspend.h>
 #include <asm/cacheflush.h>
 #include <mt-plat/mtk_secure_api.h>
 #include <mt-plat/mtk_auxadc_intf.h>
 #include <linux/topology.h>
 #include "mtk_hps_internal.h"
-#ifdef CONFIG_MACH_MT6799
+#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6759) \
+|| defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758)
 #include "include/pmic_regulator.h"
 #include "mtk_pmic_regulator.h"
 #include "mach/mtk_freqhopping.h"
-#include "mtk_etc.h"
+#endif
+
+#ifdef CONFIG_MTK_ICCS_SUPPORT
+#include <mach/mtk_cpufreq_api.h>
+#include <mtk_iccs.h>
 #endif
 
 #define BUCK_CTRL_DBLOG		(0)
 
 static struct notifier_block cpu_hotplug_nb;
+#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6759)
 static struct notifier_block hps_pm_notifier_func;
-
+#endif
 static DECLARE_BITMAP(cpu_cluster0_bits, CONFIG_NR_CPUS);
 struct cpumask *mtk_cpu_cluster0_mask = to_cpumask(cpu_cluster0_bits);
 
@@ -58,14 +65,23 @@ static int cpu_hotplug_cb_notifier(struct notifier_block *self,
 	struct cpumask cpuhp_cpumask;
 	struct cpumask cpu_online_cpumask;
 	unsigned int first_cpu;
+#ifdef CONFIG_MACH_MT6799
 	int ret;
-
+#endif
 	switch (action) {
 	case CPU_UP_PREPARE:
 	case CPU_UP_PREPARE_FROZEN:
 		if (cpu < cpumask_weight(mtk_cpu_cluster0_mask)) {
 			first_cpu = cpumask_first_and(cpu_online_mask, mtk_cpu_cluster0_mask);
 			if (first_cpu == CONFIG_NR_CPUS) {
+#ifdef CONFIG_MTK_ICCS_SUPPORT
+				if (hps_get_iccs_pwr_status(cpu >> 2) == 0x7) {
+					iccs_set_cache_shared_state(cpu >> 2, 0);
+					break;
+				}
+#endif
+#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6759) \
+|| defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758)
 				/*1. Turn on ARM PLL*/
 				armpll_control(1, 1);
 
@@ -79,6 +95,7 @@ static int cpu_hotplug_cb_notifier(struct notifier_block *self,
 
 				/*3. Switch to HW mode*/
 				mp_enter_suspend(0, 1);
+#endif
 				mt_secure_call(MTK_SIP_POWER_UP_CLUSTER, 0, 0, 0);
 			}
 		} else if ((cpu >= cpumask_weight(mtk_cpu_cluster0_mask)) &&
@@ -86,35 +103,35 @@ static int cpu_hotplug_cb_notifier(struct notifier_block *self,
 				  cpumask_weight(mtk_cpu_cluster1_mask)))) {
 			first_cpu = cpumask_first_and(cpu_online_mask, mtk_cpu_cluster1_mask);
 			if (first_cpu == CONFIG_NR_CPUS) {
+#ifdef CONFIG_MTK_ICCS_SUPPORT
+				if (hps_get_iccs_pwr_status(cpu >> 2) == 0x7) {
+					iccs_set_cache_shared_state(cpu >> 2, 0);
+					break;
+				}
+#endif
+#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6759) \
+|| defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758)
+#if !defined(CONFIG_MACH_MT6763) && !defined(CONFIG_MACH_MT6758)
 				if (hps_ctxt.init_state == INIT_STATE_DONE) {
 #if CPU_BUCK_CTRL
-#if BUCK_CTRL_DBLOG
-					pr_info("MP1_ON:[1,");
-#endif
 					/*1. Power ON VSram*/
 					ret = buck_enable(VSRAM_DVFS2, 1);
 					if (ret != 1)
 						WARN_ON(1);
-#if BUCK_CTRL_DBLOG
-					pr_info("1],[2,");
-#endif
 					/*2. Set the stttle time to 3000us*/
+					dsb(sy);
 					mdelay(3);
-#if BUCK_CTRL_DBLOG
-					pr_info("2],[3,");
-#endif
+					dsb(sy);
 					/*3. Power ON Vproc2*/
 					hps_power_on_vproc2();
-#if BUCK_CTRL_DBLOG
-					pr_info("3],[4,");
-#endif
+					dsb(sy);
+					mdelay(1);
+					dsb(sy);
 #endif
 				}
+#endif
 					/*4. Turn on ARM PLL*/
 					armpll_control(2, 1);
-#if BUCK_CTRL_DBLOG
-					pr_info("4],[5,");
-#endif
 
 					/*5. Non-pause FQHP function*/
 #if 0
@@ -123,14 +140,9 @@ static int cpu_hotplug_cb_notifier(struct notifier_block *self,
 					else
 #endif
 					mt_pause_armpll(FH_PLL1, 0);
-#if BUCK_CTRL_DBLOG
-					pr_info("5],[6,");
-#endif
 
 					/*6. Switch to HW mode*/
 					mp_enter_suspend(1, 1);
-#if BUCK_CTRL_DBLOG
-					pr_info("6]\n");
 #endif
 				mt_secure_call(MTK_SIP_POWER_UP_CLUSTER, 1, 0, 0);
 			}
@@ -141,6 +153,13 @@ static int cpu_hotplug_cb_notifier(struct notifier_block *self,
 				cpumask_weight(mtk_cpu_cluster2_mask))))  {
 			first_cpu = cpumask_first_and(cpu_online_mask, mtk_cpu_cluster2_mask);
 			if (first_cpu == CONFIG_NR_CPUS) {
+#ifdef CONFIG_MTK_ICCS_SUPPORT
+				if (hps_get_iccs_pwr_status(cpu >> 2) == 0x7) {
+					iccs_set_cache_shared_state(cpu >> 2, 0);
+					break;
+				}
+#endif
+#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6759)
 				/*1. Turn on ARM PLL*/
 				armpll_control(3, 1);
 
@@ -153,9 +172,8 @@ static int cpu_hotplug_cb_notifier(struct notifier_block *self,
 					mt_pause_armpll(FH_PLL2, 0);
 				/*3. Switch to HW mode*/
 				mp_enter_suspend(2, 1);
+#endif
 				mt_secure_call(MTK_SIP_POWER_UP_CLUSTER, 2, 0, 0);
-				/* pr_crit("Start to power up cluster and init etc !!\n"); */
-				mtk_etc_init();
 			}
 		}
 		break;
@@ -167,11 +185,16 @@ static int cpu_hotplug_cb_notifier(struct notifier_block *self,
 		arch_get_cluster_cpus(&cpuhp_cpumask, arch_get_cluster_id(cpu));
 		cpumask_and(&cpu_online_cpumask, &cpuhp_cpumask, cpu_online_mask);
 		if (!cpumask_weight(&cpu_online_cpumask)) {
-			/*pr_info("Start to power off cluster %d\n", cpu/4);*/
-			if (cpu/4 == 2)
-				mtk_etc_power_off();
-			/* pr_crit("Start to power off etc and cluster %d\n", cpu/4); */
+#ifdef CONFIG_MTK_ICCS_SUPPORT
+			if (hps_get_iccs_pwr_status(cpu >> 2) == 0xb) {
+				mt_cpufreq_set_iccs_frequency_by_cluster(1, cpu >> 2, iccs_get_shared_cluster_freq());
+				iccs_set_cache_shared_state(cpu >> 2, 1);
+				break;
+			}
+#endif
 			mt_secure_call(MTK_SIP_POWER_DOWN_CLUSTER, cpu/4, 0, 0);
+#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6759) \
+|| defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6758)
 			/*pr_info("End of power off cluster %d\n", cpu/4);*/
 			switch (cpu/4) {/*Turn off ARM PLL*/
 			case 0:
@@ -188,44 +211,28 @@ static int cpu_hotplug_cb_notifier(struct notifier_block *self,
 				armpll_control(1, 0);
 				break;
 			case 1:
-#if BUCK_CTRL_DBLOG
-				pr_info("MP1_OFF:[1,");
-#endif
 				/*1. Switch to SW mode*/
 				mp_enter_suspend(1, 0);
-#if BUCK_CTRL_DBLOG
-				pr_info("1],[2,");
-#endif
 				/*2. Pause FQHP function*/
 				if (action == CPU_DEAD_FROZEN)
 					mt_pause_armpll(FH_PLL1, 0x11);
 				else
 					mt_pause_armpll(FH_PLL1, 0x01);
-#if BUCK_CTRL_DBLOG
-				pr_info("2],[3,");
-#endif
 				/*3. Turn off ARM PLL*/
 				armpll_control(2, 0);
-#if BUCK_CTRL_DBLOG
-				pr_info("3],[4,");
-#endif
+#if !defined(CONFIG_MACH_MT6763) && !defined(CONFIG_MACH_MT6758)
 				if (hps_ctxt.init_state == INIT_STATE_DONE) {
 #if CPU_BUCK_CTRL
 					/*4. Power off Vproc2*/
 					hps_power_off_vproc2();
-#if BUCK_CTRL_DBLOG
-					pr_info("4],[5,");
-#endif
 
 					/*5. Turn off VSram*/
 					ret = buck_enable(VSRAM_DVFS2, 0);
 					if (ret == 1)
 						WARN_ON(1);
-#if BUCK_CTRL_DBLOG
-					pr_info("5]\n");
-#endif
 #endif
 				}
+#endif
 				break;
 			case 2:
 				 /*1. Switch to SW mode*/
@@ -242,6 +249,7 @@ static int cpu_hotplug_cb_notifier(struct notifier_block *self,
 			default:
 				break;
 			}
+#endif
 		}
 		break;
 #endif /* CONFIG_HOTPLUG_CPU */
@@ -251,7 +259,7 @@ static int cpu_hotplug_cb_notifier(struct notifier_block *self,
 	}
 	return NOTIFY_OK;
 }
-
+#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6759)
 /*HPS PM notifier*/
 static int hps_pm_event(struct notifier_block *notifier, unsigned long pm_event,
 			void *unused)
@@ -277,7 +285,7 @@ static int hps_pm_event(struct notifier_block *notifier, unsigned long pm_event,
 	}
 	return NOTIFY_OK;
 }
-
+#endif
 static __init int hotplug_cb_init(void)
 {
 	int ret;
@@ -301,7 +309,7 @@ static __init int hotplug_cb_init(void)
 	if (ret)
 		return ret;
 	pr_info("CPU Hotplug Low Power Notification\n");
-
+#if defined(CONFIG_MACH_MT6799) || defined(CONFIG_MACH_MT6759)
 	hps_pm_notifier_func = (struct notifier_block){
 		.notifier_call = hps_pm_event,
 		.priority = 0,
@@ -313,7 +321,7 @@ static __init int hotplug_cb_init(void)
 		return ret;
 	}
 	pr_info("HPS PM Notification\n");
-
+#endif
 	return 0;
 }
 early_initcall(hotplug_cb_init);

@@ -47,9 +47,17 @@ struct charger_consumer {
 	void *cm;
 	struct notifier_block *pnb;
 	struct list_head list;
+	bool hv_charging_disabled;
 };
 
-/* charger consumer interface */
+/* ============================================= */
+/* The following are charger consumer interfaces */
+/* ============================================= */
+
+/* @supply_name: name of charging port
+ * use charger_port1, charger_port2, ...
+ * for most cases, use charging_port1
+ */
 extern struct charger_consumer *charger_manager_get_by_name(struct device *dev,
 	const char *supply_name);
 extern int charger_manager_set_input_current_limit(struct charger_consumer *consumer,
@@ -65,7 +73,14 @@ extern int register_charger_manager_notifier(struct charger_consumer *consumer,
 	struct notifier_block *nb);
 extern int charger_manager_get_charger_temperature(struct charger_consumer *consumer,
 	int idx, int *tchg_min,	int *tchg_max);
-extern int unregister_charger_manager__notifier(struct charger_consumer *consumer,
+extern int unregister_charger_manager_notifier(struct charger_consumer *consumer,
 				struct notifier_block *nb);
+extern int charger_manager_enable_high_voltage_charging(struct charger_consumer *consumer,
+	bool en);
+extern int charger_manager_enable_power_path(struct charger_consumer *consumer,
+	int idx, bool en);
+extern int charger_manager_get_zcv(struct charger_consumer *consumer, int idx, u32 *uV);
+extern int charger_manager_enable_kpoc_shutdown(struct charger_consumer *consumer,
+	bool en);
 
 #endif /* __MTK_CHARGER_H__ */

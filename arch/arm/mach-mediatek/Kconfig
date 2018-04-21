@@ -62,10 +62,12 @@ config MACH_MT6757
 	select MTK_L2C_PARITY_CHECK
 	select MTK_LASTPC_V2
 	select MTK_USB2JTAG_SUPPORT
-	select MTK_WATCHPOINT
 	select ARM_ERRATA_855873
 	select MTK_SEC_DEINT_SUPPORT
 	select MTK_BOUNCING_CHECK
+	select ARM_CRYPTO
+	select CRYPTO_SHA2_ARM_CE
+	select CRYPTO_AES_ARM_CE
 	help
 	  This enables support for MediaTek Helio P20 - MT6757
 	  Highly power-efficient, performance-oriented 4G LTE processor for premium,
@@ -75,3 +77,118 @@ config MACH_MT6757
 	  significant multitasking and multimedia improvements thanks to its new
 	  LPDDR4X memory support.
 
+config MACH_MT6763
+	bool "MediaTek MT6763"
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	select ARCH_HAS_CPUFREQ
+	select ARM_AMBA
+	select CPU_V7
+	select HAVE_SMP
+	select IRQ_DOMAIN
+	select IRQ_DOMAIN_DEBUG
+	select GENERIC_SCHED_CLOCK
+	select MTK_SYS_CIRQ
+	select ARMV7_COMPAT
+	select ARMV7_COMPAT_CPUINFO
+	select CPU_IDLE
+	select KERNEL_MODE_NEON
+	select PINCTRL
+	select PINCTRL_MT6763
+	select MFD_SYSCON
+	select MTK_BASE_POWER
+	select MTK_GIC_V3_EXT
+	select ARM_GIC_V3
+	select MTK_LM_MODE if !MTK_GMO_RAM_OPTIMIZE
+	select MTK_EIC_HISTORY_DUMP
+	select MTK_EIC
+	select MTK_BOUNCING_CHECK
+	select MTK_SYSTRACKER_V2
+	select MTK_IRQ_NEW_DESIGN
+	select MTK_IRQ_NEW_DESIGN_DEBUG
+	select ARM_CRYPTO
+	select CRYPTO_SHA2_ARM_CE
+	select CRYPTO_AES_ARM_CE
+	help
+	  This enables support for MediaTek MT6763
+	  Support for arm Architecture
+	  Support for k63v1 related projects
+
+config MACH_MT6739
+	bool "MediaTek MT6739"
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	select ARCH_HAS_CPUFREQ
+	select ARM_AMBA
+	select CPU_V7
+	select HAVE_SMP
+	select IRQ_DOMAIN
+	select IRQ_DOMAIN_DEBUG
+	select GENERIC_SCHED_CLOCK
+	select MTK_SYS_CIRQ
+	select ARMV7_COMPAT
+	select ARMV7_COMPAT_CPUINFO
+	select CPU_IDLE
+	select KERNEL_MODE_NEON
+	select PINCTRL
+	select PINCTRL_MT6739
+	select MFD_SYSCON
+	select MTK_BASE_POWER
+	select MTK_GIC_V3_EXT
+	select ARM_GIC_V3
+	select MTK_LM_MODE if !MTK_GMO_RAM_OPTIMIZE
+	select MTK_BOUNCING_CHECK
+	select MTK_SYSTRACKER_V2
+	select MTK_IRQ_NEW_DESIGN
+	select MTK_IRQ_NEW_DESIGN_DEBUG
+	select MTK_SYSIRQ
+	select FAST_CIRQ_CLONE_FLUSH
+	select ARM_CRYPTO
+	select CRYPTO_SHA2_ARM_CE
+	select CRYPTO_AES_ARM_CE
+	help
+	  This enables support for MediaTek MT6739
+	  Support for arm Architecture
+	  Support for 4 core archtecture
+	  Support for k39v1 related projects
+
+config MACH_MT8167
+	bool "MediaTek MT8167"
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	select ARCH_HAS_CPUFREQ
+	select ARM_AMBA
+	select CPU_V7
+	select HAVE_SMP
+	select IRQ_DOMAIN
+	select IRQ_DOMAIN_DEBUG
+	select GENERIC_SCHED_CLOCK
+	select MTK_SYS_CIRQ
+	select ARMV7_COMPAT
+	select ARMV7_COMPAT_CPUINFO
+	select CPU_IDLE
+	select PINCTRL
+	select PINCTRL_MT8167
+	select MFD_SYSCON
+	select MTK_BASE_POWER
+	select MTK_GIC_EXT
+	select ARM_GIC_V3
+	select SMP
+	select POWER_SUPPLY
+	select POWER_RESET
+	select HAVE_ARM_ARCH_TIMER
+	select ARM_PSCI
+	select HAVE_MTK_IN_HOUSE_TEE_SUPPORT
+	select MTK_ICE_DEBUG
+	select VFP
+	select AEABI
+	select NEON
+	select KERNEL_MODE_NEON
+	select HAVE_FUTEX_CMPXCHG
+	select HIGHMEM
+	select ARM_CRYPTO
+	select CRYPTO_SHA2_ARM_CE
+	select CRYPTO_AES_ARM_CE
+	help
+	  This enables support for MediaTek MT8167
+	  Support for arm Architecture

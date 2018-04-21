@@ -76,6 +76,11 @@
 #include "disp_dts_gpio.h" /* set gpio via DTS */
 #endif
 #include "disp_helper.h"
+#include "mtk_disp_mgr.h"
+
+#ifdef CONFIG_MTK_LEDS
+#include "mtk_leds_drv.h"
+#endif
 
 #define ALIGN_TO(x, n)	(((x) + ((n) - 1)) & ~((n) - 1))
 
@@ -509,7 +514,7 @@ static int mtkfb_pan_display_impl(struct fb_var_screeninfo *var, struct fb_info 
 	int ret = 0;
 	unsigned int src_pitch = 0;
 	static unsigned int pan_display_cnt;
-	struct disp_session_input_config *session_input;
+	struct disp_session_input_config *session_input = captured_session_input;
 	struct disp_input_config *input;
 
 	DISPFUNC();
@@ -529,13 +534,6 @@ static int mtkfb_pan_display_impl(struct fb_var_screeninfo *var, struct fb_info 
 	paStart = fb_pa + offset;
 	vaStart = info->screen_base + offset;
 	vaEnd = vaStart + info->var.yres * info->fix.line_length;
-
-	session_input = kzalloc(sizeof(*session_input), GFP_KERNEL);
-	if (!session_input) {
-		DISPERR("session input allocat fail\n");
-		ASSERT(0);
-		return -1;
-	}
 
 	/* pan display use layer 0 */
 	input = &session_input->config[0];
@@ -565,7 +563,6 @@ static int mtkfb_pan_display_impl(struct fb_var_screeninfo *var, struct fb_info 
 		break;
 	default:
 		DISPERR("Invalid color format bpp: %d\n", var->bits_per_pixel);
-		kfree(session_input);
 		return -1;
 	}
 	input->alpha_enable = false;
@@ -575,14 +572,14 @@ static int mtkfb_pan_display_impl(struct fb_var_screeninfo *var, struct fb_info 
 	src_pitch = ALIGN_TO(var->xres, MTK_FB_ALIGNMENT);
 	input->src_pitch = src_pitch;
 
-	session_input->config_layer_num++;
+	session_input->config_layer_num = 1;
 
 	if (!is_DAL_Enabled()) {
 		/* disable font layer(layer3) drawed in lk */
 		session_input->config[1].layer_id = primary_display_get_option("ASSERT_LAYER");
 		session_input->config[1].next_buff_idx = -1;
 		session_input->config[1].layer_enable = 0;
-		session_input->config_layer_num++;
+		session_input->config_layer_num = 2;
 	}
 
 	ret = primary_display_config_input_multiple(session_input);
@@ -594,7 +591,6 @@ static int mtkfb_pan_display_impl(struct fb_var_screeninfo *var, struct fb_info 
 #error "aee dynamic switch, set overlay race condition protection"
 #endif
 
-	kfree(session_input);
 	return ret;
 }
 
@@ -996,7 +992,7 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg
 	DISPFUNC();
 	/* M: dump debug mmprofile log info */
 	mmprofile_log_ex(MTKFB_MMP_Events.IOCtrl, MMPROFILE_FLAG_PULSE, _IOC_NR(cmd), arg);
-	pr_debug("mtkfb_ioctl, info=%p, cmd nr=0x%08x, cmd size=0x%08x\n", info,
+	MTKFB_LOG_DBG("mtkfb_ioctl, info=%p, cmd nr=0x%08x, cmd size=0x%08x\n", info,
 		 (unsigned int)_IOC_NR(cmd), (unsigned int)_IOC_SIZE(cmd));
 
 	switch (cmd) {
@@ -1031,6 +1027,7 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg
 		} else {
 			DISPERR("information for displayid: %d is not available now\n",
 				displayid);
+			return -EFAULT;
 		}
 
 		if (copy_to_user((void __user *)arg, &(dispif_info[displayid]), sizeof(struct mtk_dispif_info))) {
@@ -1327,6 +1324,8 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg
 		struct fb_var_screeninfo var;
 
 		if (copy_from_user(&var, argp, sizeof(var)))
+			return -EFAULT;
+		if (info->var.yres + var.yoffset > info->var.yres_virtual)
 			return -EFAULT;
 
 		info->var.yoffset = var.yoffset;
@@ -1652,6 +1651,9 @@ static void mtkfb_blank_resume(void);
 
 static int mtkfb_blank(int blank_mode, struct fb_info *info)
 {
+	if (get_boot_mode() == RECOVERY_BOOT)
+		return 0;
+
 	switch (blank_mode) {
 	case FB_BLANK_UNBLANK:
 	case FB_BLANK_NORMAL:
@@ -2104,21 +2106,12 @@ unsigned int islcmconnected;
 unsigned int vramsize;
 phys_addr_t fb_base;
 static int is_videofb_parse_done;
-static unsigned long video_node;
-
-static int fb_early_init_dt_get_chosen(unsigned long node, const char *uname, int depth, void *data)
-{
-	if (depth != 1 || (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen@0") != 0))
-		return 0;
-
-	video_node = node;
-	return 1;
-}
 
 /* Retrun value: 0: success, 1: fail */
 int _parse_tag_videolfb(void)
 {
 	struct tag_videolfb *videolfb_tag = NULL;
+	struct device_node *chosen_node;
 	/* not necessary */
 	/* DISPCHECK("[DT][videolfb]isvideofb_parse_done = %d\n",is_videofb_parse_done); */
 
@@ -2129,14 +2122,19 @@ int _parse_tag_videolfb(void)
 	return 1;
 #endif
 
-	if (of_scan_flat_dt(fb_early_init_dt_get_chosen, NULL) > 0) {
-		videolfb_tag = (struct tag_videolfb *)of_get_flat_dt_prop(video_node, "atag,videolfb", NULL);
+	chosen_node = of_find_node_by_path("/chosen");
+	if (!chosen_node)
+		chosen_node = of_find_node_by_path("/chosen@0");
+
+	if (chosen_node) {
+		videolfb_tag = (struct tag_videolfb *)of_get_property(chosen_node, "atag,videolfb", NULL);
 		if (videolfb_tag) {
 			memset((void *)mtkfb_lcm_name, 0, sizeof(mtkfb_lcm_name));
 			strcpy((char *)mtkfb_lcm_name, videolfb_tag->lcmname);
 			mtkfb_lcm_name[strlen(videolfb_tag->lcmname)] = '\0';
 
 			lcd_fps = videolfb_tag->fps;
+			DISPPRINT("lcd_fps = %d\n", lcd_fps);
 			if (lcd_fps == 0)
 				lcd_fps = 6000;
 
@@ -2476,9 +2474,9 @@ cleanup:
 }
 
 /* Called when the device is being detached from the driver */
-static int mtkfb_remove(struct device *dev)
+static int mtkfb_remove(struct platform_device *pdev)
 {
-	struct mtkfb_device *fbdev = dev_get_drvdata(dev);
+	struct mtkfb_device *fbdev = dev_get_drvdata(&pdev->dev);
 	enum mtkfb_state saved_state = fbdev->state;
 
 	MSG_FUNC_ENTER();
@@ -2492,7 +2490,7 @@ static int mtkfb_remove(struct device *dev)
 }
 
 /* PM suspend */
-static int mtkfb_suspend(struct device *pdev, pm_message_t mesg)
+static int mtkfb_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
 	/* NOT_REFERENCED(pdev); */
 	MSG_FUNC_ENTER();
@@ -2533,10 +2531,12 @@ int mtkfb_ipo_init(void)
 	return 0;
 }
 
-static void mtkfb_shutdown(struct device *pdev)
+static void mtkfb_shutdown(struct platform_device *pdev)
 {
 	MTKFB_LOG("[FB Driver] mtkfb_shutdown()\n");
-	/* mt65xx_leds_brightness_set(MT65XX_LED_TYPE_LCD, LED_OFF); */
+#ifdef CONFIG_MTK_LEDS
+	mt65xx_leds_brightness_set(MT65XX_LED_TYPE_LCD, LED_OFF);
+#endif
 	if (!lcd_fps)
 		msleep(30);
 	else
@@ -2600,7 +2600,7 @@ static void mtkfb_blank_suspend(void)
 
 	pr_debug("[FB Driver] enter early_suspend\n");
 #ifdef CONFIG_MTK_LEDS
-/* mt65xx_leds_brightness_set(MT65XX_LED_TYPE_LCD, LED_OFF); */
+	mt65xx_leds_brightness_set(MT65XX_LED_TYPE_LCD, LED_OFF);
 #endif
 	msleep(30);
 
@@ -2614,7 +2614,7 @@ static void mtkfb_blank_suspend(void)
 }
 #endif
 /* PM resume */
-static int mtkfb_resume(struct device *pdev)
+static int mtkfb_resume(struct platform_device *pdev)
 {
 	/* NOT_REFERENCED(pdev); */
 	MSG_FUNC_ENTER();
@@ -2660,7 +2660,7 @@ int mtkfb_pm_suspend(struct device *device)
 
 	WARN_ON(pdev == NULL);
 
-	return mtkfb_suspend((struct device *)pdev, PMSG_SUSPEND);
+	return mtkfb_suspend(pdev, PMSG_SUSPEND);
 }
 
 int mtkfb_pm_resume(struct device *device)
@@ -2670,7 +2670,7 @@ int mtkfb_pm_resume(struct device *device)
 
 	WARN_ON(pdev == NULL);
 
-	return mtkfb_resume((struct device *)pdev);
+	return mtkfb_resume(pdev);
 }
 
 int mtkfb_pm_freeze(struct device *device)
@@ -2717,16 +2717,16 @@ const struct dev_pm_ops mtkfb_pm_ops = {
 
 static struct platform_driver mtkfb_driver = {
 	.probe = mtkfb_probe,
+	.remove = mtkfb_remove,
+	.shutdown = mtkfb_shutdown,
+	.suspend = mtkfb_suspend,
+	.resume = mtkfb_resume,
 	.driver = {
 		.name = MTKFB_DRIVER,
 #ifdef CONFIG_PM
 		.pm = &mtkfb_pm_ops,
 #endif
 		.bus = &platform_bus_type,
-		.remove = mtkfb_remove,
-		.suspend = mtkfb_suspend,
-		.resume = mtkfb_resume,
-		.shutdown = mtkfb_shutdown,
 		.of_match_table = mtkfb_of_ids,
 	},
 };
@@ -2820,7 +2820,7 @@ static void __exit mtkfb_cleanup(void)
 
 	MSG_FUNC_LEAVE();
 }
-module_init(mtkfb_init);
+late_initcall(mtkfb_init);
 module_exit(mtkfb_cleanup);
 MODULE_DESCRIPTION("MEDIATEK framebuffer driver");
 MODULE_AUTHOR("Xuecheng Zhang <Xuecheng.Zhang@mediatek.com>");

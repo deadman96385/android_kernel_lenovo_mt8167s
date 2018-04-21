@@ -1,15 +1,14 @@
 /*
- * Copyright (c) 2013-2016 TRUSTONIC LIMITED
- * All Rights Reserved.
+ * Copyright (C) 2016 MediaTek Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
 /**
@@ -30,6 +29,7 @@
 #define DCI_RPMB_CMD_READ_DATA      1
 #define DCI_RPMB_CMD_GET_WCNT       2
 #define DCI_RPMB_CMD_WRITE_DATA     3
+#define DCI_RPMB_CMD_PROGRAM_KEY    4
 
 
 /*... add more command ids when needed */
@@ -40,18 +40,18 @@
  * @param len Length of the data to process.
  * @param data Data to be processed
  */
-typedef struct {
-	dciCommandHeader_t  header;     /**< Command header */
+struct cmd_t {
+	struct dciCommandHeader_t header;     /**< Command header */
 	uint32_t            len;        /**< Length of data to process */
-} cmd_t;
+};
 
 /**
  * Response structure
  */
-typedef struct {
-	dciResponseHeader_t header;     /**< Response header */
+struct rsp_t {
+	struct dciResponseHeader_t header;     /**< Response header */
 	uint32_t            len;
-} rsp_t;
+};
 
 
 /*
@@ -67,27 +67,27 @@ typedef struct {
 #define MAX_RPMB_REQUEST_SIZE (512*MAX_RPMB_TRANSFER_BLK) /* 512B(1blks) per requests. */
 #endif
 
-typedef struct {
+struct rpmb_req_t {
 	uint8_t frame[MAX_RPMB_REQUEST_SIZE];
 	uint32_t frameLen;
 	uint16_t type;
 	uint16_t addr;
 	uint16_t blks;
 	uint16_t result;
-} rpmb_req_t;
+};
 
 /*
  * DCI message data.
  */
-typedef struct {
+struct dciMessage_t {
 	union {
-		cmd_t     command;
-		rsp_t     response;
+		struct cmd_t  command;
+		struct rsp_t  response;
 	};
 
-	rpmb_req_t    request;
+	struct rpmb_req_t request;
 
-} dciMessage_t;
+};
 
 /*
  * Driver UUID. Update accordingly after reserving UUID

@@ -18,7 +18,6 @@
 #include <linux/genalloc.h>
 #include <linux/sched.h>
 #include <linux/mutex.h>
-//#include <linux/xlog.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/rtc.h>
@@ -110,6 +109,7 @@ static struct dentry* gpsGEDLogBufsDir = NULL;
 static GED_HASHTABLE_HANDLE ghHashTable = NULL;
 
 unsigned int ged_log_trace_enable = 0;
+unsigned int ged_log_perf_trace_enable;
 
 //-----------------------------------------------------------------------------
 //
@@ -284,7 +284,7 @@ static int __ged_log_buf_write(GED_LOG_BUF *psGEDLogBuf, const char __user *pszB
 
 	buf[cnt] = 0;
 
-	__ged_log_buf_print(psGEDLogBuf, buf);
+	__ged_log_buf_print(psGEDLogBuf, "%s", buf);
 
 	return cnt;
 }
@@ -395,6 +395,11 @@ static int ged_log_buf_seq_show(struct seq_file *psSeqFile, void *pvData)
 	if (psGEDLogBuf != NULL)
 	{
 		int i;
+
+#if defined(CONFIG_MACH_MT8167) || defined(CONFIG_MACH_MT8173) || defined(CONFIG_MACH_MT6739)
+		if (strncmp(psGEDLogBuf->acName, "fw_trace", 8) == 0)
+			ged_dump_fw();
+#endif
 
 		spin_lock_irqsave(&psGEDLogBuf->sSpinLock, psGEDLogBuf->ulIRQFlags);
 
@@ -549,9 +554,9 @@ GED_LOG_BUF_HANDLE ged_log_buf_alloc(
 
 	GED_LOGI("ged_log_buf_alloc OK\n");
 
-	while (__ged_log_buf_check_get_early_list(psGEDLogBuf->ulHashNodeID, pszName)) {
-		continue;
-	};
+	if (pszName)
+		while (__ged_log_buf_check_get_early_list(psGEDLogBuf->ulHashNodeID, pszName))
+			;
 
 	return (GED_LOG_BUF_HANDLE)psGEDLogBuf->ulHashNodeID;
 }
@@ -776,12 +781,10 @@ GED_ERROR ged_log_buf_print(GED_LOG_BUF_HANDLE hLogBuf, const char *fmt, ...)
 {
 	va_list args;
 	GED_ERROR err;
-	GED_LOG_BUF *psGEDLogBuf;
+	GED_LOG_BUF *psGEDLogBuf = ged_log_buf_from_handle(hLogBuf);
 
-	if (hLogBuf)
+	if (psGEDLogBuf)
 	{
-		psGEDLogBuf = ged_log_buf_from_handle(hLogBuf);
-
 		va_start(args, fmt);
 		err = __ged_log_buf_vprint(psGEDLogBuf, fmt, args, psGEDLogBuf->attrs);
 		va_end(args);
@@ -793,12 +796,10 @@ GED_ERROR ged_log_buf_print2(GED_LOG_BUF_HANDLE hLogBuf, int i32LogAttrs, const 
 {
 	va_list args;
 	GED_ERROR err;
-	GED_LOG_BUF *psGEDLogBuf;
+	GED_LOG_BUF *psGEDLogBuf = ged_log_buf_from_handle(hLogBuf);
 
-	if (hLogBuf)
+	if (psGEDLogBuf)
 	{
-		psGEDLogBuf = ged_log_buf_from_handle(hLogBuf);
-
 		/* clear reserved attrs */
 		i32LogAttrs &= ~0xff;
 
@@ -989,6 +990,7 @@ GED_ERROR ged_log_system_init(void)
 	}
 
 	ged_log_trace_enable = 0;
+	ged_log_perf_trace_enable = 0;
 
 	return err;
 
@@ -1012,6 +1014,73 @@ int ged_log_buf_write(GED_LOG_BUF_HANDLE hLogBuf, const char __user *pszBuffer, 
 	return __ged_log_buf_write(psGEDLogBuf, pszBuffer, i32Count);
 }
 
+static int ged_log_buf_dump(GED_LOG_BUF *psGEDLogBuf, int i)
+{
+	int err = 0;
+	GED_LOG_BUF_LINE *line;
+
+	line = &psGEDLogBuf->psLine[i];
+
+	if (line->offset >= 0) {
+		if (line->tattrs & GED_LOG_ATTR_TIME) {
+			unsigned long long t;
+			unsigned long nanosec_rem;
+
+			t = line->time;
+			nanosec_rem = do_div(t, 1000000000);
+
+			pr_err("[%5llu.%06lu] ", t, nanosec_rem / 1000);
+		}
+
+		if (line->tattrs & GED_LOG_ATTR_TIME_TPT) {
+			unsigned long local_time;
+			struct rtc_time tm;
+
+			local_time = line->time;
+			rtc_time_to_tm(local_time, &tm);
+
+			pr_err("%02d-%02d %02d:%02d:%02d.%06lu %5d %5d ",
+					/*tm.tm_year + 1900,*/ tm.tm_mon + 1, tm.tm_mday,
+					tm.tm_hour, tm.tm_min, tm.tm_sec,
+					line->time_usec, line->pid, line->tid);
+		}
+
+		pr_err("%s\n", psGEDLogBuf->pcBuffer + line->offset);
+	}
+
+	return err;
+}
+
+void ged_log_dump(GED_LOG_BUF_HANDLE hLogBuf)
+{
+	GED_LOG_BUF *psGEDLogBuf = ged_log_buf_from_handle(hLogBuf);
+
+	if (psGEDLogBuf != NULL) {
+		int i;
+
+		spin_lock_irqsave(&psGEDLogBuf->sSpinLock, psGEDLogBuf->ulIRQFlags);
+
+		if (psGEDLogBuf->acName[0] != '\0')
+			pr_err("---------- %s (%d/%d) ----------\n",
+					psGEDLogBuf->acName, psGEDLogBuf->i32BufferCurrent, psGEDLogBuf->i32BufferSize);
+
+		if (psGEDLogBuf->attrs & GED_LOG_ATTR_RINGBUFFER) {
+			for (i = psGEDLogBuf->i32LineCurrent; i < psGEDLogBuf->i32LineCount; ++i)
+				if (ged_log_buf_dump(psGEDLogBuf, i) != 0)
+					break;
+
+			for (i = 0; i < psGEDLogBuf->i32LineCurrent; ++i)
+				if (ged_log_buf_dump(psGEDLogBuf, i) != 0)
+					break;
+		} else if (psGEDLogBuf->attrs & GED_LOG_ATTR_QUEUEBUFFER)
+			for (i = 0; i < psGEDLogBuf->i32LineCount; ++i)
+				if (ged_log_buf_dump(psGEDLogBuf, i) != 0)
+					break;
+
+		spin_unlock_irqrestore(&psGEDLogBuf->sSpinLock, psGEDLogBuf->ulIRQFlags);
+	}
+}
+
 static unsigned long __read_mostly tracing_mark_write_addr = 0;
 static inline void __mt_update_tracing_mark_write_addr(void)
 {
@@ -1023,7 +1092,9 @@ void ged_log_trace_begin(char *name)
 	if (ged_log_trace_enable) {
 			__mt_update_tracing_mark_write_addr();
 #ifdef ENABLE_GED_SYSTRACE_UTIL
+			preempt_disable();
 			event_trace_printk(tracing_mark_write_addr, "B|%d|%s\n", current->tgid, name);
+			preempt_enable();
 #endif
 	}
 }
@@ -1034,7 +1105,9 @@ void ged_log_trace_end(void)
 	{
 			__mt_update_tracing_mark_write_addr();
 #ifdef ENABLE_GED_SYSTRACE_UTIL
+			preempt_disable();
 			event_trace_printk(tracing_mark_write_addr, "E\n");
+			preempt_enable();
 #endif
 	}
 }
@@ -1045,11 +1118,23 @@ void ged_log_trace_counter(char *name, int count)
 	{
 			__mt_update_tracing_mark_write_addr();
 #ifdef ENABLE_GED_SYSTRACE_UTIL
+			preempt_disable();
 			event_trace_printk(tracing_mark_write_addr, "C|5566|%s|%d\n", name, count);
+			preempt_enable();
 #endif
 	}
 }
 EXPORT_SYMBOL(ged_log_trace_counter);
+void ged_log_perf_trace_counter(char *name, long long count, int pid, unsigned long frameID)
+{
+	if (ged_log_perf_trace_enable) {
+		__mt_update_tracing_mark_write_addr();
+		preempt_disable();
+		event_trace_printk(tracing_mark_write_addr, "C|%d|%lu|%s|%lld\n", pid, frameID, name, count);
+		preempt_enable();
+	}
+}
+EXPORT_SYMBOL(ged_log_perf_trace_counter);
 
 EXPORT_SYMBOL(ged_log_buf_alloc);
 EXPORT_SYMBOL(ged_log_buf_reset);
@@ -1060,3 +1145,4 @@ EXPORT_SYMBOL(ged_log_buf_print);
 EXPORT_SYMBOL(ged_log_buf_print2);
 
 module_param(ged_log_trace_enable, uint, 0644);
+module_param(ged_log_perf_trace_enable, uint, 0644);

@@ -33,6 +33,8 @@
 #include "m4u.h"
 #endif
 
+#include "ddp_gamma.h"
+
 /*#include "mt_idle.h"*/
 /*#include "mt_spm_idle.h"*/
 /*#include "mt_spm.h" *//* for sodi reg addr define */
@@ -699,7 +701,7 @@ static int _disp_primary_path_idle_detect_thread(void *data)
 			/* Dynamically allocate decouple buffer. */
 			if (primary_display_is_video_mode()) {
 				ret = 0;
-				if (decouple_buffer_info[0] == NULL)
+				if (dc_vAddr[0] == 0)
 					ret = allocate_idle_lp_dc_buffer();
 				if (ret < 0) {
 					DISPCHECK("[ddp_idle]allocate dc buffer fail\n");
@@ -900,7 +902,7 @@ int primary_display_set_secondary_display(int add, enum DISP_SESSION_TYPE type)
 
 #ifdef MTK_DISP_IDLE_LP
 		gSkipIdleDetect = 1;
-		_disp_primary_path_exit_idle(__func__, 0);
+		_disp_primary_path_exit_idle(__func__, 1);
 #endif
 	} else {
 		if (type == DISP_SESSION_MEMORY)
@@ -2035,6 +2037,10 @@ static int primary_display_is_secure_path(enum DISP_SESSION_TYPE session_type)
 		    (session_input->config[i].security == DISP_SECURE_BUFFER))
 			return 1;
 	}
+
+	if (force_ovl_sec)
+		return 1;
+
 	return 0;
 }
 
@@ -2105,7 +2111,7 @@ out:
 	cmdqRecDestroy(cmdq_wait_handle);
 }
 
-static KREE_SESSION_HANDLE secure_memory_session_handle(void)
+KREE_SESSION_HANDLE secure_memory_session_handle(void)
 {
 	static KREE_SESSION_HANDLE disp_secure_memory_session;
 
@@ -2169,10 +2175,10 @@ int free_sec_buffer(unsigned int handle)
 static int primary_alloc_sec_buffer(void)
 {
 	int i;
-	int height = 1080;
-	int width = 1920;
-	int bpp = 3;
-	int buffer_size = width * height * bpp;
+	int height = primary_display_get_height();
+	int width = primary_display_get_width();
+	int bpp = primary_display_get_dc_bpp();
+	int buffer_size = width * height * bpp/8;
 
 	if (pgc->session_buf[0])
 		return 0;
@@ -2203,14 +2209,10 @@ static int primary_free_sec_buffer(void)
 
 static unsigned int _get_switch_dc_buffer(void)
 {
-#ifdef CONFIG_MTK_GMO_RAM_OPTIMIZE
-	return pgc->dc_buf[0];
-#else
 	if (primary_display_is_secure_path(DISP_SESSION_PRIMARY))
 		return pgc->session_buf[pgc->session_buf_id];
 	else
 		return pgc->dc_buf[pgc->dc_buf_id];
-#endif
 }
 
 static int _update_ovl_from_wdma_info(struct OVL_CONFIG_STRUCT *ovl_config,
@@ -2618,12 +2620,18 @@ static int init_decouple_buffers(void)
 
 	int buffer_size = width * height * bpp / 8;
 
-	for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
-		decouple_buffer_info[i] = allocat_decouple_buffer(buffer_size);
-		if (decouple_buffer_info[i] != NULL) {
-			pgc->dc_buf[i] = decouple_buffer_info[i]->mva;
-			dc_vAddr[i] = (unsigned long)decouple_buffer_info[i]->va;
-			DISPMSG("primary alloc decouple buffer: 0x%x\n", pgc->dc_buf[i]);
+	if (DISP_INTERNAL_BUFFER_COUNT == 1) {
+		pgc->dc_buf[0] = primary_display_get_frame_buffer_mva_address();
+		dc_vAddr[0] = primary_display_get_frame_buffer_va_address();
+		DISPMSG("primary alloc decouple buffer: 0x%x\n", pgc->dc_buf[i]);
+	} else {
+		for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
+			decouple_buffer_info[i] = allocat_decouple_buffer(buffer_size);
+			if (decouple_buffer_info[i] != NULL) {
+				pgc->dc_buf[i] = decouple_buffer_info[i]->mva;
+				dc_vAddr[i] = (unsigned long)decouple_buffer_info[i]->va;
+				DISPMSG("primary alloc decouple buffer: 0x%x\n", pgc->dc_buf[i]);
+			}
 		}
 	}
 
@@ -2658,17 +2666,9 @@ static int allocate_idle_lp_dc_buffer(void)
 {
 	int height = primary_display_get_height();
 	int width = primary_display_get_width();
-	int bpp = primary_display_get_dc_bpp();
-	int buffer_size =  width * height * bpp / 8;
 
-
-	decouple_buffer_info[0] = allocat_decouple_buffer(buffer_size);
-	if (decouple_buffer_info[0] != NULL) {
-		pgc->dc_buf[0] = decouple_buffer_info[0]->mva;
-		dc_vAddr[0] = (unsigned long)decouple_buffer_info[0]->va;
-	} else {
-		return -1;
-	}
+	pgc->dc_buf[0] = pgc->framebuffer_mva;
+	dc_vAddr[0] = pgc->framebuffer_va;
 
 	/*initialize rdma config*/
 	decouple_rdma_config.height = height;
@@ -2696,18 +2696,6 @@ static int allocate_idle_lp_dc_buffer(void)
 
 static int release_idle_lp_dc_buffer(unsigned int need_primary_lock)
 {
-	if (need_primary_lock)
-		_primary_path_lock(__func__);
-
-	if (decouple_buffer_info[0]) {
-		ion_free(decouple_buffer_info[0]->client, decouple_buffer_info[0]->handle);
-		ion_client_destroy(decouple_buffer_info[0]->client);
-		kfree(decouple_buffer_info[0]);
-		decouple_buffer_info[0] = NULL;
-	}
-
-	if (need_primary_lock)
-		_primary_path_unlock(__func__);
 	return 0;
 }
 #endif
@@ -2738,9 +2726,7 @@ static int __build_path_direct_link(void)
 	config_display_m4u_port();
 #endif
 #endif
-#if !defined(CONFIG_MTK_GMO_RAM_OPTIMIZE)
 	init_decouple_buffers();
-#endif
 
 	dpmgr_set_lcm_utils(pgc->dpmgr_handle, pgc->plcm->drv);
 
@@ -4656,8 +4642,11 @@ static int _ovl_ext_fence_release_callback(uint32_t userdata)
 	int fence_idx, layer;
 	int i = 0;
 #endif
+	struct disp_ddp_path_config *data_config = NULL;
+
 	DISPMSG("primary ovl->wdma frame done - ext\n");
 	mmprofile_log_ex(ddp_mmp_get_events()->session_release, MMPROFILE_FLAG_START, 1, userdata);
+
 #ifndef MTK_FB_CMDQ_DISABLE
 	for (i = 0; i < PRIMARY_DISPLAY_SESSION_LAYER_COUNT; i++) {
 		int fence_idx  = 0;
@@ -4678,12 +4667,36 @@ static int _ovl_ext_fence_release_callback(uint32_t userdata)
 #ifndef MTK_FB_CMDQ_DISABLE
 		layer = disp_sync_get_output_timeline_id();
 		cmdqBackupReadSlot(pgc->cur_mem_config_fence, layer, &fence_idx);
+
+		data_config = dpmgr_path_get_last_config(pgc->ovl2mem_path_handle);
+		if (data_config) {
+			struct WDMA_CONFIG_STRUCT wdma_layer;
+
+			wdma_layer.dstAddress = mtkfb_query_buf_va(ext_session_id, 4, fence_idx);
+			wdma_layer.outputFormat = data_config->wdma_config.outputFormat;
+			wdma_layer.srcWidth = primary_display_get_width();
+			wdma_layer.srcHeight = primary_display_get_height();
+			wdma_layer.dstPitch = data_config->wdma_config.dstPitch;
+			dprec_mmp_dump_wdma_layer(&wdma_layer, 0);
+		}
 		mtkfb_release_fence(ext_session_id, layer, fence_idx);
 #endif
 	}
 
 	mmprofile_log_ex(ddp_mmp_get_events()->session_release, MMPROFILE_FLAG_END, 0, 0);
 	return ret;
+}
+
+unsigned long get_decouple_va_addr(unsigned int mva)
+{
+	int i;
+
+	for (i = 0; i < DISP_INTERNAL_BUFFER_COUNT; i++) {
+		if (pgc->dc_buf[i] == mva)
+			return dc_vAddr[i];
+	}
+
+	return 0;
 }
 
 static int _ovl_fence_release_callback(uint32_t userdata)
@@ -4764,7 +4777,6 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 		int fence_idx, subtractor, layer;
 
 		layer = disp_sync_get_output_timeline_id();
-
 		cmdqBackupReadSlot(pgc->cur_config_fence, layer, &fence_idx);
 		cmdqBackupReadSlot(pgc->subtractor_when_free, layer, &subtractor);
 		mtkfb_release_fence(primary_session_id, layer, fence_idx);
@@ -4775,6 +4787,7 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 	    && (userdata == DISP_SESSION_DECOUPLE_MODE || userdata == 5)) {
 		static struct cmdqRecStruct *cmdq_handle;
 		unsigned int rdma_pitch_sec, rdma_fmt;
+		struct disp_ddp_path_config *data_config = NULL;
 
 		if (cmdq_handle == NULL)
 			ret = cmdqRecCreate(CMDQ_SCENARIO_PRIMARY_DISP, &cmdq_handle);
@@ -4806,6 +4819,14 @@ static int _ovl_fence_release_callback(uint32_t userdata)
 				_primary_path_unlock(__func__);
 			mmprofile_log_ex(ddp_mmp_get_events()->primary_rdma_config,
 				       MMPROFILE_FLAG_PULSE, 0, decouple_rdma_config.address);
+
+			data_config = dpmgr_path_get_last_config(pgc->dpmgr_handle);
+			if (data_config) {
+				struct WDMA_CONFIG_STRUCT wdma_layer = decouple_wdma_config;
+
+				wdma_layer.dstAddress = get_decouple_va_addr(addr);
+				dprec_mmp_dump_wdma_layer(&wdma_layer, 0);
+			}
 			/* cmdqRecDestroy(cmdq_handle); */
 		} else {
 			/* ret = -1; */
@@ -5220,7 +5241,7 @@ unsigned long get_dim_layer_mva_addr(void)
 		int frame_buffer_size = ALIGN_TO(DISP_GetScreenWidth(),
 						 MTK_FB_ALIGNMENT) * DISP_GetScreenHeight() * 4;
 
-		dim_layer_mva = pgc->framebuffer_mva;
+		dim_layer_mva = pgc->framebuffer_mva + frame_buffer_size;
 		DISPMSG("init dim layer mva %lu, size %d", dim_layer_mva, frame_buffer_size);
 	}
 	return dim_layer_mva;
@@ -6356,6 +6377,12 @@ int primary_display_merge_session_cmd(struct disp_session_config *config)
 
 	pgc->dc_type = output_type;
 
+	if (config->type < DISP_SESSION_PRIMARY ||
+		config->type > DISP_SESSION_MEMORY) {
+		DISPERR("%s : config->type is invalid\n", __func__);
+		return 0;
+	}
+
 #ifdef CONFIG_ALL_IN_TRIGGER_STAGE
 	mutex_lock(&session_config_mutex);
 	session_input = &cached_session_input[config->type - 1];
@@ -6606,7 +6633,8 @@ int primary_display_memory_trigger(int blocking, void *callback, unsigned int us
 		} else {
 			_trigger_ovl_to_memory(pgc->ovl2mem_path_handle, pgc->cmdq_handle_ovl1to2_config,
 					       (fence_release_callback)_ovl_ext_fence_release_callback,
-					       DISP_SESSION_MEMORY, 0);
+					       DISP_SESSION_MEMORY, 1);
+			_ovl_ext_fence_release_callback(DISP_SESSION_MEMORY);
 		}
 	} else {
 		DISPMSG("Not support memory trigger using session_mode:%d\n", pgc->session_mode);
@@ -6965,8 +6993,6 @@ static int _config_ovl_input(struct disp_session_input_config *session_input,
 				   ovl_cfg->addr);
 		dprec_logger_done(DPREC_LOGGER_PRIMARY_CONFIG, ovl_cfg->src_x, ovl_cfg->src_y);
 
-		dprec_mmp_dump_ovl_layer(ovl_cfg, layer, 1);
-
 		if ((ovl_cfg->layer == 0) && (!_is_decouple_mode(pgc->session_mode)))
 			update_frm_seq_info(ovl_cfg->addr, ovl_cfg->src_x * 4 + ovl_cfg->src_y * ovl_cfg->src_pitch,
 					    mtkfb_query_frm_seq_by_addr(pgc->session_id, 0, 0), FRM_CONFIG);
@@ -6984,6 +7010,12 @@ static int _config_ovl_input(struct disp_session_input_config *session_input,
 		data_config->roi_dirty = 1;
 		data_config->dst_dirty = 1;
 #endif
+		if (gCapturePriLayerEnable) {
+			struct OVL_CONFIG_STRUCT cfg = *ovl_cfg;
+
+			cfg.addr = mtkfb_query_buf_va(primary_session_id, layer, cfg.buff_idx);
+			dprec_mmp_dump_ovl_layer(&cfg, layer, 1);
+		}
 	}
 
 	if (_should_wait_path_idle())
@@ -7011,8 +7043,7 @@ static int _config_ovl_input(struct disp_session_input_config *session_input,
 		/* for dim_layer/disable_layer/no_fence_layer, just release all fences configured */
 		/* for other layers, release current_fence-1 */
 		if (input_cfg->buffer_source == DISP_BUFFER_ALPHA || input_cfg->layer_enable == 0 ||
-		    cur_fence == -1 || DISP_SESSION_TYPE(session_input->session_id) == DISP_SESSION_MEMORY ||
-		    _is_decouple_mode(pgc->session_mode))
+		    cur_fence == -1 || DISP_SESSION_TYPE(session_input->session_id) == DISP_SESSION_MEMORY)
 			cmdqRecBackupUpdateSlot(cmdq_handle, *p_subtractor_when_free, layer, 0);
 		else
 			cmdqRecBackupUpdateSlot(cmdq_handle, *p_subtractor_when_free, layer, 1);
@@ -7093,6 +7124,9 @@ int primary_display_config_input_multiple(struct disp_session_input_config *sess
 	int ret = 0;
 	disp_path_handle disp_handle;
 	struct cmdqRecStruct *cmdq_handle;
+	struct disp_ccorr_config m_ccorr_config;
+
+	memcpy(&m_ccorr_config, &(session_input->ccorr_config), sizeof(m_ccorr_config));
 
 	if (gTriggerDispMode > 0)
 		return 0;
@@ -7128,6 +7162,13 @@ int primary_display_config_input_multiple(struct disp_session_input_config *sess
 		_config_ovl_input(session_input, disp_handle, cmdq_handle);
 	else
 		_config_rdma_input(session_input, disp_handle);
+
+	/* set ccorr matrix */
+	if (m_ccorr_config.is_dirty) {
+		disp_ccorr_set_color_matrix(cmdq_handle,
+			m_ccorr_config.color_matrix,
+			m_ccorr_config.mode);
+	}
 
 done:
 	_primary_path_unlock(__func__);
@@ -7282,7 +7323,7 @@ int init_ext_decouple_buffers(void)
 	if (pgc->state == DISP_SLEPT) {
 		ret = -1;
 	} else {
-		if (decouple_buffer_info[0] == NULL)
+		if (dc_vAddr[0] == 0)
 			ret = allocate_idle_lp_dc_buffer();
 	}
 
@@ -7380,7 +7421,7 @@ int primary_display_switch_mode(int sess_mode, unsigned int session, int force)
 		   && sess_mode == DISP_SESSION_DECOUPLE_MIRROR_MODE) {
 		/* dl to dc mirror  mirror */
 #ifdef CONFIG_MTK_GMO_RAM_OPTIMIZE
-		if (decouple_buffer_info[0] == NULL)
+		if (dc_vAddr[0] == 0)
 			allocate_idle_lp_dc_buffer();
 #endif
 		_DL_switch_to_DC_fast();

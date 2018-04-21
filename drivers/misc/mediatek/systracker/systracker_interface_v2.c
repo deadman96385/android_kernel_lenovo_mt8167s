@@ -35,6 +35,7 @@
 #define IOMEM(a)	((void __force __iomem *)((a)))
 #endif
 void __iomem *BUS_DBG_BASE;
+void __iomem *BUS_DBG_INFRA_BASE;
 int systracker_irq;
 struct systracker_config_t track_config;
 struct systracker_entry_t track_entry;
@@ -79,6 +80,9 @@ static struct mt_systracker_driver mt_systracker_drv = {
 
 static int systracker_platform_probe_default(struct platform_device *pdev)
 {
+	void __iomem *infra_ao_base;
+	unsigned int bus_dbg_con_offset;
+
 	pr_err("systracker probe\n");
 
 	/* iomap register */
@@ -89,6 +93,20 @@ static int systracker_platform_probe_default(struct platform_device *pdev)
 	}
 
 	pr_err("of_iomap for systracker @ 0x%p\n", BUS_DBG_BASE);
+
+	/* iomap register */
+	infra_ao_base = of_iomap(pdev->dev.of_node, 1);
+	if (!infra_ao_base) {
+		pr_err("[systracker] bus_dbg_con is in infra\n");
+		BUS_DBG_INFRA_BASE = BUS_DBG_BASE;
+	} else {
+		pr_err("[systracker] bus_dbg_con is in infra_ao\n");
+		if (of_property_read_u32(pdev->dev.of_node, "mediatek,bus_dbg_con_offset", &bus_dbg_con_offset)) {
+			pr_err("[systracker] cannot get bus_dbg_con_offset\n");
+			return -ENODEV;
+		}
+		BUS_DBG_INFRA_BASE = infra_ao_base + bus_dbg_con_offset;
+	}
 
 	/* get irq #  */
 	systracker_irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
@@ -171,6 +189,7 @@ void save_entry(void)
 	int i = 0;
 
 	track_entry.dbg_con =  readl(IOMEM(BUS_DBG_CON));
+	track_entry.dbg_con_infra =  readl(IOMEM(BUS_DBG_CON_INFRA));
 
 	for (i = 0; i < BUS_DBG_NUM_TRACKER; i++) {
 		track_entry.ar_track_l[i]   = readl(IOMEM(BUS_DBG_AR_TRACK_L(i)));
@@ -204,8 +223,8 @@ static void tracker_print(void)
 	for (i = 0; i < BUS_DBG_NUM_TRACKER; i++) {
 		entry_address       = track_entry.ar_track_l[i];
 		reg_value           = track_entry.ar_track_h[i];
-		entry_valid         = extract_n2mbits(reg_value, 19, 19);
-		entry_id            = extract_n2mbits(reg_value, 7, 18);
+		entry_valid         = extract_n2mbits(reg_value, 21, 21);
+		entry_id            = extract_n2mbits(reg_value, 8, 20);
 		entry_data_size     = extract_n2mbits(reg_value, 4, 6);
 		entry_burst_length  = extract_n2mbits(reg_value, 0, 3);
 		entry_tid           = track_entry.ar_trans_tid[i];
@@ -217,8 +236,8 @@ static void tracker_print(void)
 	for (i = 0; i < BUS_DBG_NUM_TRACKER; i++) {
 		entry_address       = track_entry.aw_track_l[i];
 		reg_value           = track_entry.aw_track_h[i];
-		entry_valid         = extract_n2mbits(reg_value, 19, 19);
-		entry_id            = extract_n2mbits(reg_value, 7, 18);
+		entry_valid         = extract_n2mbits(reg_value, 21, 21);
+		entry_id            = extract_n2mbits(reg_value, 8, 20);
 		entry_data_size     = extract_n2mbits(reg_value, 4, 6);
 		entry_burst_length  = extract_n2mbits(reg_value, 0, 3);
 		entry_tid           = track_entry.aw_trans_tid[i];
@@ -238,6 +257,7 @@ irqreturn_t systracker_isr(void)
 
 	save_entry();
 	pr_err("Sys Tracker ISR\n");
+
 	con = readl(IOMEM(BUS_DBG_CON));
 	writel(con | BUS_DBG_CON_IRQ_CLR, IOMEM(BUS_DBG_CON));
 	mb();
@@ -260,6 +280,7 @@ irqreturn_t systracker_isr(void)
 
 static int systracker_watchpoint_enable_default(void)
 {
+#if 0
 	if (!is_systracker_irq_registered) {
 		if (request_irq(systracker_irq, (irq_handler_t)systracker_isr, IRQF_TRIGGER_LOW, "SYSTRACKER", NULL)) {
 			pr_err("SYSTRACKER IRQ LINE NOT AVAILABLE!!\n");
@@ -269,11 +290,11 @@ static int systracker_watchpoint_enable_default(void)
 		is_systracker_irq_registered = 1;
 
 	}
-
+#endif
 	track_config.enable_wp = 1;
 	writel(track_config.wp_phy_address, IOMEM(BUS_DBG_WP));
-	writel(0x0000000F, IOMEM(BUS_DBG_WP_MASK));
-	writel(readl(IOMEM(BUS_DBG_CON)) | BUS_DBG_CON_WP_EN, IOMEM(BUS_DBG_CON));
+	/* writel(0x0000000F, IOMEM(BUS_DBG_WP_MASK)); */
+	writel(0x00000000, IOMEM(BUS_DBG_WP_MASK));
 	mb();
 
 	return 0;
@@ -290,7 +311,7 @@ int systracker_watchpoint_enable(void)
 static int systracker_watchpoint_disable_default(void)
 {
 	track_config.enable_wp = 0;
-	writel(readl(IOMEM(BUS_DBG_CON)) & ~BUS_DBG_CON_WP_EN, IOMEM(BUS_DBG_CON));
+	writel(readl(IOMEM(BUS_DBG_CON_INFRA)) & ~BUS_DBG_CON_WP_EN, IOMEM(BUS_DBG_CON_INFRA));
 	mb();
 
 	return 0;
@@ -373,10 +394,10 @@ void systracker_enable_default_ex(void)
 	}
 
 	con |= BUS_DBG_CON_HALT_ON_EN;
-	writel(con, IOMEM(BUS_DBG_CON));
+	writel(con, IOMEM(BUS_DBG_CON_INFRA));
 	mb();
 	con |= BUS_DBG_CON_IRQ_WP_EN;
-	writel(con, IOMEM(BUS_DBG_CON));
+	writel(con, IOMEM(BUS_DBG_CON_INFRA));
 	mb();
 }
 
@@ -413,10 +434,10 @@ void systracker_enable_default(void)
 	}
 
 	con |= BUS_DBG_CON_HALT_ON_EN;
-	writel(con, IOMEM(BUS_DBG_CON));
+	writel(con, IOMEM(BUS_DBG_CON_INFRA));
 	mb();
 	con |= BUS_DBG_CON_IRQ_WP_EN;
-	writel(con, IOMEM(BUS_DBG_CON));
+	writel(con, IOMEM(BUS_DBG_CON_INFRA));
 	mb();
 }
 
@@ -436,7 +457,7 @@ void enable_systracker(void)
 static void systracker_disable_default(void)
 {
 	track_config.state = 0;
-	writel(readl(IOMEM(BUS_DBG_CON)) & ~BUS_DBG_CON_BUS_DBG_EN, IOMEM(BUS_DBG_CON));
+	writel(readl(IOMEM(BUS_DBG_CON_INFRA)) & ~BUS_DBG_CON_BUS_DBG_EN, IOMEM(BUS_DBG_CON_INFRA));
 	mb();
 
 }
@@ -494,8 +515,8 @@ int tracker_dump(char *buf)
 		 */
 
 		/* BUS_DBG_AR_TRACK_H(__n)
-		 * [14] Valid:DBG read tracker entry valid
-		 * [13:7] ARID:DBG read tracker entry read ID
+		 * [21] Valid:DBG read tracker entry valid
+		 * [20:8] ARID:DBG read tracker entry read ID
 		 * [6:4] ARSIZE:DBG read tracker entry read data size
 		 * [3:0] ARLEN: DBG read tracker entry read burst length
 		 */
@@ -509,13 +530,18 @@ int tracker_dump(char *buf)
 #endif
 
 		ptr += sprintf(ptr, "[TRACKER] BUS_DBG_CON = (0x%x, 0x%x), T0= 0x%x, T1 = 0x%x\n",
-			track_entry.dbg_con, readl(IOMEM(BUS_DBG_CON)),
-				readl(IOMEM(BUS_DBG_TIMER_CON0)), readl(IOMEM(BUS_DBG_TIMER_CON1)));
+			       track_entry.dbg_con, readl(IOMEM(BUS_DBG_CON)),
+			       readl(IOMEM(BUS_DBG_TIMER_CON0)), readl(IOMEM(BUS_DBG_TIMER_CON1)));
+
+		ptr += sprintf(ptr, "BUS_DBG_CON_INFRA = (0x%x, 0x%x)\n",
+			       track_entry.dbg_con_infra,
+			       readl(IOMEM(BUS_DBG_CON_INFRA)));
+
 		for (i = 0; i < BUS_DBG_NUM_TRACKER; i++) {
 			entry_address       = track_entry.ar_track_l[i];
 			reg_value           = track_entry.ar_track_h[i];
-			entry_valid         = extract_n2mbits(reg_value, 19, 19);
-			entry_id            = extract_n2mbits(reg_value, 7, 18);
+			entry_valid         = extract_n2mbits(reg_value, 21, 21);
+			entry_id            = extract_n2mbits(reg_value, 8, 20);
 			entry_data_size     = extract_n2mbits(reg_value, 4, 6);
 			entry_burst_length  = extract_n2mbits(reg_value, 0, 3);
 			entry_tid           = track_entry.ar_trans_tid[i];
@@ -535,8 +561,8 @@ int tracker_dump(char *buf)
 		 */
 
 		/* BUS_DBG_AW_TRACK_H(__n)
-		 * [14] Valid:DBG   write tracker entry valid
-		 * [13:7] ARID:DBG  write tracker entry write ID
+		 * [21] Valid:DBG   write tracker entry valid
+		 * [20:8] ARID:DBG  write tracker entry write ID
 		 * [6:4] ARSIZE:DBG write tracker entry write data size
 		 * [3:0] ARLEN: DBG write tracker entry write burst length
 		 */
@@ -548,8 +574,8 @@ int tracker_dump(char *buf)
 		for (i = 0; i < BUS_DBG_NUM_TRACKER; i++) {
 			entry_address       = track_entry.aw_track_l[i];
 			reg_value           = track_entry.aw_track_h[i];
-			entry_valid         = extract_n2mbits(reg_value, 19, 19);
-			entry_id            = extract_n2mbits(reg_value, 7, 18);
+			entry_valid         = extract_n2mbits(reg_value, 21, 21);
+			entry_id            = extract_n2mbits(reg_value, 8, 20);
 			entry_data_size     = extract_n2mbits(reg_value, 4, 6);
 			entry_burst_length  = extract_n2mbits(reg_value, 0, 3);
 			entry_tid           = track_entry.aw_trans_tid[i];
@@ -572,7 +598,9 @@ int tracker_dump(char *buf)
 
 static ssize_t tracker_run_show(struct device_driver *driver, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%x\n", readl(IOMEM(BUS_DBG_CON)));
+	return snprintf(buf, PAGE_SIZE, "BUS_DBG_CON=0x%x, BUS_DBG_CON_INFRA=0x%x\n",
+			readl(IOMEM(BUS_DBG_CON)),
+			readl(IOMEM(BUS_DBG_CON_INFRA)));
 }
 
 static ssize_t tracker_run_store(struct device_driver *driver, const char *buf, size_t count)
@@ -789,6 +817,8 @@ static ssize_t tracker_last_status_show(struct device_driver *driver, char *buf)
 		return snprintf(buf, PAGE_SIZE, "0\n");
 }
 
+
+
 static ssize_t tracker_last_status_store(struct device_driver *driver, const char *buf, size_t count)
 {
 	return count;
@@ -838,5 +868,5 @@ static void __exit systracker_exit(void)
 {
 }
 
-module_init(systracker_init);
+arch_initcall_sync(systracker_init);
 module_exit(systracker_exit);

@@ -82,14 +82,22 @@ static struct musb_fifo_cfg fifo_cfg_host[] = {
 { .hw_ep_num =	8, .style = MUSB_FIFO_RX,   .maxpacket = 64,  .mode = MUSB_BUF_SINGLE},
 };
 
-u32 delay_time = 15;
-module_param(delay_time, int, 0644);
-u32 delay_time1 = 55;
-module_param(delay_time1, int, 0644);
+int delay_time = 15;
+module_param(delay_time, int, 0400);
+int delay_time1 = 55;
+module_param(delay_time1, int, 0400);
 
 void mt_usb_set_vbus(struct musb *musb, int is_on)
 {
 	DBG(0, "mt65xx_usb20_vbus++,is_on=%d\r\n", is_on);
+
+#if defined(CONFIG_MTK_DUAL_INPUT_CHARGER_SUPPORT)
+	if (is_on)
+		set_diso_otg(true);
+	else
+		set_diso_otg(false);
+#endif
+
 #ifndef FPGA_PLATFORM
 	if (is_on) {
 		/* power on VBUS, implement later... */
@@ -191,8 +199,8 @@ void mt_usb_init_drvvbus(void)
 #endif
 }
 
-u32 sw_deboun_time = 400;
-module_param(sw_deboun_time, int, 0644);
+int sw_deboun_time = 400;
+module_param(sw_deboun_time, int, 0400);
 struct switch_dev otg_state;
 
 static bool musb_is_host(void)
@@ -332,12 +340,20 @@ static void musb_id_pin_work(struct work_struct *data)
 	u8 devctl = 0;
 	unsigned long flags;
 
+	/* need prepare clock because  musb_generic_disable may call prepare clock in atomic context */
+	mt_usb_clock_prepare(mtk_musb);
+
 	spin_lock_irqsave(&mtk_musb->lock, flags);
 	musb_generic_disable(mtk_musb);
 	spin_unlock_irqrestore(&mtk_musb->lock, flags);
 
 	down(&mtk_musb->musb_lock);
 	DBG(0, "work start, is_host=%d\n", mtk_musb->is_host);
+	if (mtk_musb->in_ipo_off) {
+		DBG(0, "do nothing due to in_ipo_off\n");
+		goto out;
+	}
+
 	wake_lock(&mtk_musb->usb_lock);
 	mtk_musb->is_host = musb_is_host();
 	DBG(0, "musb is as %s, already lock\n", mtk_musb->is_host?"host":"device");
@@ -346,7 +362,7 @@ static void musb_id_pin_work(struct work_struct *data)
 	if (mtk_musb->is_host) {
 		/*setup fifo for host mode*/
 		ep_config_from_table_for_host(mtk_musb);
-		/*wake_lock(&mtk_musb->usb_lock);*/
+		/* wake_lock(&mtk_musb->usb_lock); */
 		musb_platform_set_vbus(mtk_musb, 1);
 
 		/* for no VBUS sensing IP*/
@@ -411,14 +427,19 @@ static void musb_id_pin_work(struct work_struct *data)
 #else
 		mt_usb_check_reconnect();/*ALPS01688604, IDDIG noise caused by MHL init*/
 #endif
+
 		if (wake_lock_active(&mtk_musb->usb_lock))
 			wake_unlock(&mtk_musb->usb_lock);
-		mtk_musb->state = OTG_STATE_B_IDLE;
+
+		mtk_musb->xceiv->otg->state = OTG_STATE_B_IDLE;
 		MUSB_DEV_MODE(mtk_musb);
 		switch_int_to_host(mtk_musb);
 	}
+out:
 	DBG(0, "work end, is_host=%d\n", mtk_musb->is_host);
 	up(&mtk_musb->musb_lock);
+
+	mt_usb_clock_unprepare(mtk_musb);
 }
 
 #ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE
@@ -433,6 +454,11 @@ void musb_id_pin_sw_work(bool host_mode)
 
 	down(&mtk_musb->musb_lock);
 	DBG(0, "work start, is_host=%d\n", mtk_musb->is_host);
+	if (mtk_musb->in_ipo_off) {
+		DBG(0, "do nothing due to in_ipo_off\n");
+		goto out;
+	}
+
 	mtk_musb->is_host = host_mode;
 	musb_platform_enable(mtk_musb);
 	DBG(0, "musb is as %s\n", mtk_musb->is_host?"host":"device");
@@ -508,12 +534,12 @@ void musb_id_pin_sw_work(bool host_mode)
 #else
 		mt_usb_check_reconnect();/*ALPS01688604, IDDIG noise caused by MHL init*/
 #endif
-		mtk_musb->state = OTG_STATE_B_IDLE;
 		mtk_musb->xceiv->otg->state = OTG_STATE_B_IDLE;
 
 		MUSB_DEV_MODE(mtk_musb);
 		switch_int_to_host(mtk_musb);
 	}
+out:
 	DBG(0, "work end, is_host=%d\n", mtk_musb->is_host);
 	up(&mtk_musb->musb_lock);
 }

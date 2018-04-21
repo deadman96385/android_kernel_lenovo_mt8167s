@@ -19,30 +19,19 @@
 #include <linux/proc_fs.h>
 
 #include <linux/slab.h>
-#include <linux/spinlock.h>
 
 #include <linux/delay.h>
 #include <linux/uaccess.h>
-#include <linux/compat.h>
-#include <linux/atomic.h>
-#include <linux/sched.h>
-#include <linux/mm.h>
-
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/printk.h>
-
-#include <mt-plat/sync_write.h>
-
-#include <linux/of_platform.h>
-#include <linux/of_irq.h>
-#include <linux/of_address.h>
 
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/io.h>
+
+#include <linux/of_platform.h>
+#include <linux/of_irq.h>
+#include <linux/of_address.h>
+
 #include <m4u.h>
 #include "vpu_drv.h"
 #include "vpu_cmn.h"
@@ -53,16 +42,9 @@
 ********************************************************************************/
 
 #define VPU_DEV_NAME            "vpu"
-#define IRQ_USER_NUM_MAX        32
-#define SUPPORT_MAX_IRQ         32
 
 static struct vpu_device *vpu_device;
-
-#ifdef CONFIG_PM_WAKELOCKS
-struct wakeup_source vpu_wake_lock;
-#else
-struct wake_lock vpu_wake_lock;
-#endif
+static struct wakeup_source vpu_wake_lock;
 
 static int vpu_probe(struct platform_device *dev);
 
@@ -94,14 +76,8 @@ int vpu_pm_resume(struct device *device)
 	return vpu_resume(pdev);
 }
 
-/* extern void mt_irq_set_sens(unsigned int irq, unsigned int sens); */
-/* extern void mt_irq_set_polarity(unsigned int irq, unsigned int polarity); */
 int vpu_pm_restore_noirq(struct device *device)
 {
-#ifndef CONFIG_OF
-	mt_irq_set_sens(CAM0_IRQ_BIT_ID, MT_LEVEL_SENSITIVE);
-	mt_irq_set_polarity(CAM0_IRQ_BIT_ID, MT_POLARITY_LOW);
-#endif
 	return 0;
 }
 #else
@@ -139,9 +115,7 @@ static struct platform_driver vpu_driver = {
 	.driver  = {
 		.name = VPU_DEV_NAME,
 		.owner = THIS_MODULE,
-#ifdef CONFIG_OF
 		.of_match_table = vpu_of_ids,
-#endif
 #ifdef CONFIG_PM
 		.pm = &vpu_pm_ops,
 #endif
@@ -202,20 +176,75 @@ int vpu_create_user(struct vpu_user **user)
 	INIT_LIST_HEAD(&u->deque_list);
 	init_waitqueue_head(&u->deque_wait);
 
+	u->power_mode = VPU_POWER_MODE_DYNAMIC;
+	u->power_opp = VPU_POWER_OPP_UNREQUEST;
+
 	mutex_lock(&vpu_device->user_mutex);
 	list_add_tail(vlist_link(u, struct vpu_user), &vpu_device->user_list);
 	mutex_unlock(&vpu_device->user_mutex);
 
+	LOG_DBG("created user[%d]\n", u->id);
 	*user = u;
 	return 0;
 }
 
+static int vpu_renew_power_operation(void)
+{
+	int ret;
+	struct vpu_user *u;
+	struct list_head *head;
+	uint8_t power_mode = VPU_POWER_MODE_DYNAMIC;
+	uint8_t power_opp = VPU_POWER_OPP_UNREQUEST;
+
+	mutex_lock(&vpu_device->user_mutex);
+	list_for_each(head, &vpu_device->user_list)
+	{
+		u = vlist_node_of(head, struct vpu_user);
+		if (u->power_mode == VPU_POWER_MODE_ON)
+			power_mode = VPU_POWER_MODE_ON;
+		if (u->power_opp < power_opp)
+			power_opp = u->power_opp;
+	}
+	mutex_unlock(&vpu_device->user_mutex);
+
+	ret = vpu_change_power_opp(power_opp);
+	CHECK_RET("fail to renew power opp:%d\n", power_opp);
+
+	ret = vpu_change_power_mode(power_mode);
+	CHECK_RET("fail to renew power mode:%d\n", power_mode);
+
+	LOG_DBG("changed power mode:%d opp:%d\n", power_mode, power_opp);
+out:
+	return ret;
+
+}
+int vpu_set_power(struct vpu_user *user, struct vpu_power *power)
+{
+	LOG_DBG("set power mode:%d opp:%d, pid=%d, tid=%d\n",
+			power->mode, power->opp,
+			user->open_pid, user->open_tgid);
+
+	user->power_mode = power->mode;
+	user->power_opp = power->opp;
+
+	return vpu_renew_power_operation();
+}
+
+static int vpu_write_register(struct vpu_reg_values *regs)
+{
+	return 0;
+}
 
 int vpu_push_request_to_queue(struct vpu_user *user, struct vpu_request *req)
 {
 	if (!user) {
-		LOG_ERR("empty user");
+		LOG_ERR("empty user\n");
 		return -EINVAL;
+	}
+
+	if (user->deleting) {
+		LOG_WRN("push a request while deleting the user\n");
+		return -ENONET;
 	}
 
 	mutex_lock(&user->data_mutex);
@@ -239,22 +268,27 @@ int vpu_flush_requests_from_queue(struct vpu_user *user)
 		return 0;
 	}
 
-	user->flush = true;
+	user->flushing = true;
 	mutex_unlock(&user->data_mutex);
 
 	/* the running request will add to the deque before interrupt */
 	wait_event_interruptible(user->deque_wait, !user->running);
+
+	while (user->running)
+		ndelay(1000);
 
 	mutex_lock(&user->data_mutex);
 	/* push the remaining enque to the deque */
 	list_for_each_safe(head, temp, &user->enque_list) {
 		req = vlist_node_of(head, struct vpu_request);
 		req->status = VPU_REQ_STATUS_FLUSH;
-		list_del_init(vlist_link(req, struct vpu_request));
-		list_add_tail(vlist_link(req, struct vpu_request), &user->deque_list);
+		list_del_init(head);
+		list_add_tail(head, &user->deque_list);
 	}
 
-	user->flush = false;
+	user->flushing = false;
+	LOG_DBG("flushed queue, user:%d\n", user->id);
+
 	mutex_unlock(&user->data_mutex);
 
 	return 0;
@@ -299,17 +333,37 @@ int vpu_pop_request_from_queue(struct vpu_user *user, struct vpu_request **rreq)
 
 int vpu_delete_user(struct vpu_user *user)
 {
+	struct list_head *head, *temp;
+	struct vpu_request *req;
+
 	if (!user) {
 		LOG_ERR("delete empty user!\n");
 		return -EINVAL;
 	}
 
+	user->deleting = true;
 	vpu_flush_requests_from_queue(user);
+
+	/* clear the list of deque */
+	mutex_lock(&user->data_mutex);
+	list_for_each_safe(head, temp, &user->deque_list) {
+		req = vlist_node_of(head, struct vpu_request);
+		list_del(head);
+		vpu_free_request(req);
+	}
+	mutex_unlock(&user->data_mutex);
+
+	/* confirm the lock has released */
+	if (user->locked)
+		vpu_hw_unlock(user);
 
 	mutex_lock(&vpu_device->user_mutex);
 	list_del(vlist_link(user, struct vpu_user));
 	mutex_unlock(&vpu_device->user_mutex);
 
+	vpu_renew_power_operation();
+
+	LOG_DBG("deleted user[%d]\n", user->id);
 	kfree(user);
 
 	return 0;
@@ -369,16 +423,6 @@ int vpu_dump_user(struct seq_file *s)
 /* IOCTL: implementation                                                     */
 /*---------------------------------------------------------------------------*/
 
-int vpu_set_power(struct vpu_power *power)
-{
-	return 0;
-}
-
-int vpu_write_register(struct vpu_reg_values regs)
-{
-	return 0;
-}
-
 static int vpu_open(struct inode *inode, struct file *flip)
 {
 	int ret = 0;
@@ -431,7 +475,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		ret = copy_from_user(&power, (void *) arg, sizeof(struct vpu_power));
 		CHECK_RET("[SET_POWER] copy 'struct power' failed, ret=%d\n", ret);
 
-		ret = vpu_set_power(&power);
+		ret = vpu_set_power(user, &power);
 		CHECK_RET("[SET_POWER] set power failed, ret=%d\n", ret);
 
 		break;
@@ -497,20 +541,20 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 	}
 	case VPU_IOCTL_GET_ALGO_INFO:
 	{
-		vpu_name_t name;
+		char name[VPU_NAME_SIZE];
 		struct vpu_algo *algo;
 		struct vpu_algo *u_algo;
 		uint64_t u_info_ptr;
 		uint32_t u_info_length;
 
 		u_algo = (struct vpu_algo *) arg;
-		ret = copy_from_user(name, u_algo->name, sizeof(vpu_name_t));
+		ret = copy_from_user(name, u_algo->name, sizeof(char[VPU_NAME_SIZE]));
 		CHECK_RET("[GET_ALGO] copy 'name' failed, ret=%d\n", ret);
-		name[sizeof(vpu_name_t) - 1] = '\0';
+		name[VPU_NAME_SIZE - 1] = '\0';
 
 		/* 1. find algo by name */
 		ret = vpu_find_algo_by_name(name, &algo);
-		CHECK_RET("[GET_ALGO] can not find algo, name=%s\n", u_algo->name);
+		CHECK_RET("[GET_ALGO] can not find algo, name=%s\n", name);
 
 		/* 2. write data to user */
 		/* 2-1. write port */
@@ -553,7 +597,7 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 		ret = copy_from_user(&regs, (void *) arg, sizeof(struct vpu_reg_values));
 		CHECK_RET("[REG] copy 'struct reg' failed,%d\n", ret);
 
-		ret = vpu_write_register(regs);
+		ret = vpu_write_register(&regs);
 		CHECK_RET("[REG] write reg failed,%d\n", ret);
 
 		break;
@@ -608,9 +652,6 @@ out:
 static int vpu_release(struct inode *inode, struct file *flip)
 {
 	struct vpu_user *user = flip->private_data;
-
-	if (user->locked)
-		vpu_hw_unlock(user);
 
 	vpu_delete_user(user);
 
@@ -704,7 +745,6 @@ static int vpu_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 
-#ifdef CONFIG_OF
 	struct device *dev;
 	struct device_node *node;
 
@@ -746,7 +786,6 @@ static int vpu_probe(struct platform_device *pdev)
 	vpu_init_hw(vpu_device);
 	vpu_init_reg(vpu_device);
 
-#endif
 	/* Only register char driver in the 1st time */
 	if (++vpu_num_devs == 1) {
 		/* Register char driver */
@@ -771,11 +810,7 @@ static int vpu_probe(struct platform_device *pdev)
 			goto out;
 		}
 
-#ifdef CONFIG_PM_WAKELOCKS
 		wakeup_source_init(&vpu_wake_lock, "vpu_lock_wakelock");
-#else
-		wake_lock_init(&vpu_wake_lock, WAKE_LOCK_SUSPEND, "vpu_lock_wakelock");
-#endif
 
 out:
 		if (ret < 0)

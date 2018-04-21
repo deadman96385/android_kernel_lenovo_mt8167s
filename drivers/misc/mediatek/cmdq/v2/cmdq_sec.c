@@ -310,7 +310,6 @@ int32_t cmdq_sec_fill_iwc_command_msg_unlocked(int32_t iwcCommand, void *_pTask,
 	const uint32_t reservedCommandSize = 4 * CMDQ_INST_SIZE;
 	struct CmdBufferStruct *cmd_buffer = NULL;
 
-
 	/* check task first */
 	if (!pTask) {
 		CMDQ_ERR("[SEC]SESSION_MSG: Unable to fill message by empty task.\n");
@@ -339,6 +338,7 @@ int32_t cmdq_sec_fill_iwc_command_msg_unlocked(int32_t iwcCommand, void *_pTask,
 
 	if (thread != CMDQ_INVALID_THREAD) {
 		uint8_t *current_va = (uint8_t *)pIwc->command.pVABase;
+
 		/* basic data */
 		pIwc->command.scenario = pTask->scenario;
 		pIwc->command.thread = thread;

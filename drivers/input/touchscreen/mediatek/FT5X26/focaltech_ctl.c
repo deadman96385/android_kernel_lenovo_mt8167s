@@ -34,7 +34,6 @@
 *******************************************************************************/
 #include "focaltech_core.h"
 
-extern int apk_debug_flag;
 /*******************************************************************************
 * Private constant and macro definitions using #define
 *******************************************************************************/
@@ -47,13 +46,13 @@ extern int apk_debug_flag;
 /*******************************************************************************
 * Private enumerations, structures and unions using typedef
 *******************************************************************************/
-typedef struct fts_rw_i2c {
+struct fts_rw_i2c {
 	u8 *buf;
 	u8 flag;			/* 0-write 1-read */
 	__u16 length;	/* the length of data */
 } *pfts_rw_i2c;
 
-typedef struct fts_rw_i2c_queue {
+struct fts_rw_i2c_queue {
 	struct fts_rw_i2c __user *i2c_queue;
 	int queuenum;
 } *pfts_rw_i2c_queue;
@@ -97,7 +96,7 @@ static int fts_rw_iic_drv_myread(struct i2c_client *client, u8 *buf, int length)
 	ret = fts_i2c_read(client, NULL, 0, buf, length);
 
 	if (ret < 0)
-		dev_err(&client->dev, "%s:IIC Read failed\n", __func__);
+		dev_notice(&client->dev, "%s:IIC Read failed\n", __func__);
 	return ret;
 }
 
@@ -114,7 +113,7 @@ static int fts_rw_iic_drv_mywrite(struct i2c_client *client, u8 *buf, int length
 
 	ret = fts_i2c_write(client, buf, length);
 	if (ret < 0)
-		dev_err(&client->dev, "%s:IIC Write failed\n", __func__);
+		dev_notice(&client->dev, "%s:IIC Write failed\n", __func__);
 	return ret;
 }
 
@@ -302,7 +301,7 @@ static void fts_rw_iic_drv_setup_cdev(struct fts_rw_i2c_dev *dev, int index)
 	dev->cdev.ops = &fts_rw_iic_drv_fops;
 	err = cdev_add(&dev->cdev, devno, 1);
 	if (err)
-		printk(KERN_NOTICE "Error %d adding LED%d", err, index);
+		FTS_ERR("Error %d adding LED%d", err, index);
 }
 
 /************************************************************************
@@ -324,7 +323,7 @@ static int fts_rw_iic_drv_myinitdev(struct i2c_client *client)
 		fts_rw_iic_drv_major = MAJOR(devno);
 	}
 	if (err < 0) {
-		dev_err(&client->dev, "%s:ft_rw_iic_drv failed  error code=%d---\n",
+		dev_notice(&client->dev, "%s:ft_rw_iic_drv failed  error code=%d---\n",
 			__func__, err);
 		return err;
 	}
@@ -333,7 +332,7 @@ static int fts_rw_iic_drv_myinitdev(struct i2c_client *client)
 	if (!fts_rw_i2c_dev_tt) {
 		err = -ENOMEM;
 		unregister_chrdev_region(devno, 1);
-		dev_err(&client->dev, "%s:ft_rw_iic_drv failed\n",
+		dev_notice(&client->dev, "%s:ft_rw_iic_drv failed\n",
 			__func__);
 		return err;
 	}
@@ -343,7 +342,7 @@ static int fts_rw_iic_drv_myinitdev(struct i2c_client *client)
 
 	fts_class = class_create(THIS_MODULE, "fts_class");
 	if (IS_ERR(fts_class)) {
-		dev_err(&client->dev, "%s:failed in creating class.\n",
+		dev_notice(&client->dev, "%s:failed in creating class.\n",
 			__func__);
 		return -1;
 	}

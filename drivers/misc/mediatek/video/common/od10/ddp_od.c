@@ -75,7 +75,7 @@
 
 
 /* ioctl */
-typedef enum {
+enum DISP_OD_CMD_TYPE {
 	OD_CTL_READ_REG,
 	OD_CTL_WRITE_REG,
 	OD_CTL_ENABLE_DEMO_MODE,
@@ -85,7 +85,7 @@ typedef enum {
 	OD_CTL_ENABLE
 } DISP_OD_CMD_TYPE;
 
-typedef enum {
+enum DISP_OD_ENABLE_STAGE {
 	OD_CTL_ENABLE_OFF,
 	OD_CTL_ENABLE_ON
 } DISP_OD_ENABLE_STAGE;
@@ -117,7 +117,7 @@ enum OD_LOG_LEVEL {
 	OD_LOG_VERBOSE,
 	OD_LOG_DEBUG
 };
-static int od_log_level = 2;
+static int od_log_level = 1;
 #define ODDBG(level, fmt, arg...) \
 	do { \
 		if (od_log_level >= (level)) \
@@ -132,16 +132,18 @@ enum OD_DEBUG_MODE {
 	DEBUG_MODE_INK = 0x2,
 	DEBUG_MODE_INK_OSD = (DEBUG_MODE_OSD | DEBUG_MODE_INK)
 };
-static unsigned int g_od_debug_mode = DEBUG_MODE_INK_OSD;
+static unsigned int g_od_debug_mode = DEBUG_MODE_NONE;
 
 static DEFINE_MUTEX(g_od_global_lock);
-static volatile int g_od_is_enabled; /* OD is disabled by default */
+static atomic_t g_od_is_enabled = ATOMIC_INIT(1); /* OD is enabled by default */
 
 enum OD_DISABLED_BIT_FLAGS {
 	DISABLED_BY_HWC = 0,
 	DISABLED_BY_MHL
 };
-static volatile unsigned long g_od_force_disabled; /* Initialized to 0 */
+static unsigned long g_od_force_disabled; /* Initialized to 0 */
+static DEFINE_SPINLOCK(g_od_force_lock);
+
 
 enum OD_DEBUG_ENABLE_ENUM {
 	DEBUG_ENABLE_NORMAL = 0,
@@ -150,18 +152,18 @@ enum OD_DEBUG_ENABLE_ENUM {
 };
 static enum OD_DEBUG_ENABLE_ENUM g_od_debug_enable = DEBUG_ENABLE_NORMAL;
 
-static volatile struct {
+static void od_dump_all(void);
+static ddp_module_notify g_od_ddp_notify;
+
+static atomic_t g_od_need_reset = ATOMIC_INIT(0);
+
+#if defined(CONFIG_MTK_OD_SUPPORT)
+
+static struct {
 	unsigned int frame;
 	unsigned int rdma_error;
 	unsigned int rdma_normal;
 } g_od_debug_cnt = { 0 };
-
-static void od_dump_all(void);
-static ddp_module_notify g_od_ddp_notify;
-
-static volatile int g_od_need_reset;
-
-#if defined(CONFIG_MTK_OD_SUPPORT)
 
 static int od_start(enum DISP_MODULE_ENUM module, void *cmdq);
 
@@ -215,7 +217,8 @@ static void _od_reg_init(void *cmdq)
 	DISP_REG_SET(cmdq, OD_BASE+0x100, 0x1FD3D9C6);
 	DISP_REG_SET(cmdq, OD_BASE+0x014, 0x00000001);
 	DISP_REG_SET(cmdq, OD_BASE+0x708, 0x00000000);
-	DISP_REG_SET(cmdq, OD_BASE+0x300, 0x39C83C1B);
+	DISP_REG_SET(cmdq, OD_BASE+0x300, 0x00000000);
+	/* DISP_REG_SET(cmdq, OD_BASE+0x300, 0x39C83C1B); */
 	DISP_REG_SET(cmdq, OD_BASE+0x79C, 0x00000001);
 	DISP_REG_SET(cmdq, OD_BASE+0x7E0, 0x74000000);
 	DISP_REG_SET(cmdq, OD_BASE+0x7C4, 0x0706B16A);
@@ -345,19 +348,6 @@ void disp_od_irq_handler(void)
 #endif
 
 	DISP_REG_SET(NULL, DISP_REG_OD_INTSTA, 0);
-}
-
-
-int disp_rdma_notify(unsigned int reg)
-{
-#if defined(CONFIG_MTK_OD_SUPPORT)
-	if ((reg & (1 << 4)) != 0)
-		g_od_debug_cnt.rdma_error++;
-	else if ((reg & (1 << 1)) != 0)
-		g_od_debug_cnt.rdma_normal++;
-#endif
-
-	return 0;
 }
 
 
@@ -688,29 +678,37 @@ void disp_config_od(unsigned int width, unsigned int height, void *cmdq, unsigne
 
 int disp_od_get_enabled(void)
 {
-	return g_od_is_enabled;
+	return atomic_read(&g_od_is_enabled);
 }
 
 
 void disp_od_mhl_force(int allow_enabled)
 {
+	unsigned long flags;
+
 	ODDBG(OD_LOG_ALWAYS, "disp_od_mhl_force(allow = %d)", allow_enabled);
 
+	spin_lock_irqsave(&g_od_force_lock, flags);
 	if (!allow_enabled)
 		set_bit(DISABLED_BY_MHL, &g_od_force_disabled);
 	else
 		clear_bit(DISABLED_BY_MHL, &g_od_force_disabled);
+	spin_unlock_irqrestore(&g_od_force_lock, flags);
 }
 
 
 void disp_od_hwc_force(int allow_enabled)
 {
+	unsigned long flags;
+
 	ODDBG(OD_LOG_ALWAYS, "disp_od_hwc_force(allow = %d)", allow_enabled);
 
+	spin_lock_irqsave(&g_od_force_lock, flags);
 	if (!allow_enabled)
 		set_bit(DISABLED_BY_HWC, &g_od_force_disabled);
 	else
 		clear_bit(DISABLED_BY_HWC, &g_od_force_disabled);
+	spin_unlock_irqrestore(&g_od_force_lock, flags);
 }
 
 
@@ -719,7 +717,8 @@ void disp_od_set_smi_clock(int enabled)
 #ifndef CONFIG_MTK_CLKMGR
 	enum DDP_CLK_ID larb_clk;
 
-	ODDBG(OD_LOG_ALWAYS, "disp_od_set_smi_clock(%d), od_enabled=%d", enabled, g_od_is_enabled);
+	ODDBG(OD_LOG_ALWAYS, "disp_od_set_smi_clock(%d), od_enabled=%d",
+		enabled, atomic_read(&g_od_is_enabled));
 
 #if defined(CONFIG_MACH_MT6757) || defined(CONFIG_MACH_KIBOPLUS) || defined(CONFIG_MACH_ELBRUS)
 	larb_clk = DISP0_SMI_LARB4;
@@ -762,6 +761,7 @@ void disp_od_set_smi_clock(int enabled)
 void disp_od_set_enabled(void *cmdq, int enabled)
 {
 #if defined(CONFIG_MTK_OD_SUPPORT)
+	int od_is_enabled = atomic_read(&g_od_is_enabled);
 	int to_enable = 0;
 
 	mutex_lock(&g_od_global_lock);
@@ -775,12 +775,13 @@ void disp_od_set_enabled(void *cmdq, int enabled)
 	else
 		to_enable = 0;
 
-	if (to_enable != g_od_is_enabled) {
-		g_od_is_enabled = to_enable;
-		disp_od_set_smi_clock(g_od_is_enabled);
+	if (to_enable != od_is_enabled) {
+		od_is_enabled = to_enable;
+		atomic_set(&g_od_is_enabled, od_is_enabled);
+		disp_od_set_smi_clock(od_is_enabled);
 	}
 
-	_od_core_set_enabled(cmdq, g_od_is_enabled);
+	_od_core_set_enabled(cmdq, od_is_enabled);
 	mutex_unlock(&g_od_global_lock);
 
 	if (!to_enable)
@@ -801,7 +802,7 @@ void disp_od_start_read(void *cmdq)
 #if defined(CONFIG_MTK_OD_SUPPORT)
 	mutex_lock(&g_od_global_lock);
 	OD_REG_SET_FIELD(cmdq, OD_REG37, 0xf, ODT_MAX_RATIO);
-	ODDBG(OD_LOG_ALWAYS, "disp_od_start_read(): enabled = %d", g_od_is_enabled);
+	ODDBG(OD_LOG_ALWAYS, "disp_od_start_read(): enabled = %d", atomic_read(&g_od_is_enabled));
 	mutex_unlock(&g_od_global_lock);
 #endif
 }
@@ -811,8 +812,10 @@ static int disp_od_ioctl_ctlcmd(enum DISP_MODULE_ENUM module, int msg, unsigned 
 {
 	struct DISP_OD_CMD cmd;
 
-	if (copy_from_user((void *)&cmd, (void *)arg, sizeof(struct DISP_OD_CMD)))
+	if (copy_from_user((void *)&cmd, (void *)arg, sizeof(struct DISP_OD_CMD))) {
+		ODERR("disp_od_ioctl_ctlcmd fail");
 		return -EFAULT;
+	}
 
 	ODDBG(OD_LOG_ALWAYS, "OD ioctl cmdq %lx", (unsigned long)cmdq);
 
@@ -824,6 +827,7 @@ static int disp_od_ioctl_ctlcmd(enum DISP_MODULE_ENUM module, int msg, unsigned 
 		} else if (cmd.param0 == OD_CTL_ENABLE_ON) {
 			disp_od_hwc_force(1);
 			disp_od_set_enabled(cmdq, 1);
+			disp_od_start_read(cmdq);
 		} else {
 			ODDBG(OD_LOG_ALWAYS, "unknown enable type command");
 		}
@@ -936,13 +940,13 @@ static int disp_od_ioctl(enum DISP_MODULE_ENUM module, int msg, unsigned long ar
 
 static void ddp_bypass_od(unsigned int width, unsigned int height, void *handle)
 {
-	ODNOTICE("ddp_bypass_od");
+	ODDBG(OD_LOG_DEBUG, "ddp_bypass_od");
 	DISP_REG_SET(handle, DISP_REG_OD_SIZE, (width << 16) | height);
 	DISP_REG_SET(handle, DISP_REG_OD_CFG, 0x1);
 	DISP_REG_SET(handle, DISP_REG_OD_EN, 0x0);
 }
 
-
+/* #define OD_ALWAYS_ON */
 static int od_config_od(enum DISP_MODULE_ENUM module, struct disp_ddp_path_config *pConfig, void *cmdq)
 {
 #if defined(CONFIG_MTK_OD_SUPPORT)
@@ -974,7 +978,7 @@ static int od_config_od(enum DISP_MODULE_ENUM module, struct disp_ddp_path_confi
 
 	#if defined(OD_ALLOW_DEFAULT_TABLE) /* only support 17x17 table */
 		od_table_size = 17 * 17;
-		od_table = (void *)OD_Table_zero_17x17;
+		od_table = (void *)OD_Table_17x17;
 		ODDBG(OD_LOG_ALWAYS, "od_config_od: Use default 17x17 table");
 	#endif
 
@@ -999,9 +1003,14 @@ static int od_config_od(enum DISP_MODULE_ENUM module, struct disp_ddp_path_confi
 			ODDBG(OD_LOG_ALWAYS, "od_config_od: No od table bypass");
 		}
 
+	#if defined(OD_ALWAYS_ON)
+		disp_od_set_enabled(cmdq, 1);
+		disp_od_start_read(cmdq);
+	#endif
+
 #else /* Not support OD */
 		ddp_bypass_od(pConfig->dst_w, pConfig->dst_h, cmdq);
-		ODDBG(OD_LOG_ALWAYS, "od_config_od: Not support od bypass");
+		ODDBG(OD_LOG_DEBUG, "od_config_od: Not support od bypass");
 #endif
 	}
 
@@ -1012,9 +1021,9 @@ static int od_config_od(enum DISP_MODULE_ENUM module, struct disp_ddp_path_confi
 			od_refresh_screen();
 	}
 #endif
-	if (g_od_need_reset == 1) {
+	if (atomic_read(&g_od_need_reset) == 1) {
 		_od_reset(cmdq);
-		g_od_need_reset = 0;
+		atomic_set(&g_od_need_reset, 0);
 	}
 	return 0;
 }
@@ -1118,7 +1127,7 @@ static int od_start(enum DISP_MODULE_ENUM module, void *cmdq)
 	OD_REG_SET_FIELD(cmdq, OD_REG72, 1, RG_RDRAM_LEN_X8);
 #endif
 	/* DMA settings */
-	DISP_REG_SET(cmdq, OD_BASE + 0x100, (620 << 20) | (65 << 10) | 440);
+	DISP_REG_SET(cmdq, OD_BASE + 0x100, (620 << 20) | (110 << 10) | 440);
 	DISP_REG_SET(cmdq, OD_BASE + 0x104, (6 << 20) | (6 << 10) | 6);
 	DISP_REG_SET(cmdq, OD_BASE + 0x108, (16 << 26) | (8 << 20) | (600 << 10) | 10);
 	DISP_REG_SET(cmdq, OD_BASE + 0x10c, (60 << 20) | (32 << 10) | 16);
@@ -1130,7 +1139,7 @@ static int od_start(enum DISP_MODULE_ENUM module, void *cmdq)
 	od_set_debug_function(cmdq);
 
 	mutex_lock(&g_od_global_lock);
-	_od_core_set_enabled(cmdq, g_od_is_enabled);
+	_od_core_set_enabled(cmdq, atomic_read(&g_od_is_enabled));
 	mutex_unlock(&g_od_global_lock);
 
 	return 0;
@@ -1155,7 +1164,7 @@ static int od_clock_on(enum DISP_MODULE_ENUM module, void *handle)
 
 #ifdef CONFIG_MTK_OD_SUPPORT
 	mutex_lock(&g_od_global_lock);
-	if (g_od_is_enabled)
+	if (atomic_read(&g_od_is_enabled))
 		disp_od_set_smi_clock(1);
 	mutex_unlock(&g_od_global_lock);
 #endif /* CONFIG_MTK_OD_SUPPORT */
@@ -1173,7 +1182,7 @@ static int od_clock_on(enum DISP_MODULE_ENUM module, void *handle)
 #endif /* CONFIG_MTK_M4U */
 
 	_od_reset(handle);
-	g_od_need_reset = 1;
+	atomic_set(&g_od_need_reset, 1);
 
 	return 0;
 }
@@ -1192,7 +1201,7 @@ static int od_clock_off(enum DISP_MODULE_ENUM module, void *handle)
 
 #ifdef CONFIG_MTK_OD_SUPPORT
 	mutex_lock(&g_od_global_lock);
-	if (g_od_is_enabled)
+	if (atomic_read(&g_od_is_enabled))
 		disp_od_set_smi_clock(0);
 	mutex_unlock(&g_od_global_lock);
 #endif /* CONFIG_MTK_OD_SUPPORT */
@@ -1498,7 +1507,7 @@ void od_test(const char *cmd, char *debug_output)
 			break;
 		}
 	} else if (strncmp(cmd, "reset", 5) == 0) {
-		g_od_need_reset = 1;
+		atomic_set(&g_od_need_reset, 1);
 	} else if (strncmp(cmd, "rdma", 4) == 0) {
 		OD_TLOG("dma0:%lx dma1:%lx size:%d", g_od_buf.pa_of_dma0, g_od_buf.pa_of_dma1, g_od_buf.size);
 		for (i = 0; i <= g_od_buf.size; i += 1024)

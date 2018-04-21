@@ -37,6 +37,7 @@ config SCSI_UFSHCD
 	depends on SCSI && SCSI_DMA
 	# select PM_DEVFREQ
 	# select DEVFREQ_GOV_SIMPLE_ONDEMAND
+	select RPMB
 	---help---
 	This selects the support for UFS devices in Linux, say Y and make
 	  sure that you know the name of your UFS host adapter (the card
@@ -97,7 +98,7 @@ config MTK_UFS_BOOTING
 
 config MTK_UFS_BLOCK_IO_LOG
 	bool "UFS Block IO log"
-	depends on MTK_UFS_BOOTING
+	depends on MTK_BLOCK_TAG && MTK_UFS_BOOTING
 	default y
 	---help---
 	  Enable IO trace for performance analysis and application access

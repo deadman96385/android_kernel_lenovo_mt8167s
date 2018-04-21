@@ -371,7 +371,9 @@ static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	/* allocate a bunch of read buffers and queue them all at once. */
 	for (i = 0; i < midi->qlen && err == 0; i++) {
 		struct usb_request *req =
-			midi_alloc_ep_req(midi->out_ep, midi->buflen);
+			midi_alloc_ep_req(midi->out_ep,
+				max_t(unsigned, midi->buflen,
+					bulk_out_desc.wMaxPacketSize));
 		if (req == NULL)
 			return -ENOMEM;
 
@@ -402,7 +404,7 @@ static void f_midi_disable(struct usb_function *f)
 	usb_ep_disable(midi->out_ep);
 }
 
-static void f_midi_unbind(struct usb_configuration *c, struct usb_function *f)
+static void f_midi_old_unbind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct usb_composite_dev *cdev = f->config->cdev;
 	struct f_midi *midi = func_to_midi(f);
@@ -1016,7 +1018,7 @@ int /* __init */ f_midi_bind_config(struct usb_configuration *c,
 	midi->func.name        = "gmidi function";
 	midi->func.strings     = midi_strings;
 	midi->func.bind        = f_midi_bind;
-	midi->func.unbind      = f_midi_unbind;
+	midi->func.unbind      = f_midi_old_unbind;
 	midi->func.set_alt     = f_midi_set_alt;
 	midi->func.disable     = f_midi_disable;
 
@@ -1191,7 +1193,7 @@ static ssize_t alsa_show(struct device *dev,
 	struct usb_function_instance *fi_midi = dev_get_drvdata(dev);
 	struct f_midi *midi;
 
-	if (!fi_midi->f)
+	if (!fi_midi || !fi_midi->f)
 		dev_warn(dev, "f_midi: function not set\n");
 
 	if (fi_midi && fi_midi->f) {
@@ -1287,7 +1289,7 @@ static void f_midi_free(struct usb_function *f)
 	--opts->refcnt;
 	mutex_unlock(&opts->lock);
 }
-#if 0
+
 static void f_midi_unbind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct usb_composite_dev *cdev = f->config->cdev;
@@ -1306,7 +1308,7 @@ static void f_midi_unbind(struct usb_configuration *c, struct usb_function *f)
 
 	usb_free_all_descriptors(f);
 }
-#endif
+
 static struct usb_function *f_midi_alloc(struct usb_function_instance *fi)
 {
 	struct f_midi *midi;

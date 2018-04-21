@@ -429,6 +429,7 @@ static int wdma_check_input_param(struct WDMA_CONFIG_STRUCT *config)
 	if (config->dstAddress == 0 || config->srcWidth == 0 || config->srcHeight == 0) {
 		DDPERR("wdma parameter invalidate, addr=0x%lx, w=%d, h=%d\n",
 		       config->dstAddress, config->srcWidth, config->srcHeight);
+		dump_stack();
 		return -1;
 	}
 	return 0;
@@ -476,12 +477,15 @@ static int wdma_config_l(enum DISP_MODULE_ENUM module, struct disp_ddp_path_conf
 			struct cmdqRecStruct *nonsec_switch_handle;
 			int ret;
 
-			/* because always de-couple, */
 			/* ovl->wdma use CMDQ_SCENARIO_PRIMARY_MEMOUT, */
 			/* the secure hw thread will be CMDQ_THREAD_SEC_SUB_DISP, */
 			/* disable secure path should use the same hw thread. */
-			ret = cmdqRecCreate(CMDQ_SCENARIO_DISP_SUB_DISABLE_SECURE_PATH,
-					  &(nonsec_switch_handle));
+			if (primary_display_is_decouple_mode())
+				ret = cmdqRecCreate(CMDQ_SCENARIO_DISP_SUB_DISABLE_SECURE_PATH,
+						&(nonsec_switch_handle));
+			else
+				ret = cmdqRecCreate(CMDQ_SCENARIO_DISP_PRIMARY_DISABLE_SECURE_PATH,
+						&(nonsec_switch_handle));
 			if (ret)
 				DDPAEE("[SVP]fail to create disable handle %s ret=%d\n",
 				       __func__, ret);

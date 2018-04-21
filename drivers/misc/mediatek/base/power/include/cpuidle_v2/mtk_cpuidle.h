@@ -18,10 +18,14 @@
 
 #if defined(CONFIG_MACH_MT6757)
 #include "mtk_cpuidle_mt6757.h"
-#endif
-
-#if defined(CONFIG_MACH_MT6799)
+#elif defined(CONFIG_MACH_MT6799)
 #include "mtk_cpuidle_mt6799.h"
+#elif defined(CONFIG_MACH_MT6759)
+#include "mtk_cpuidle_mt6759.h"
+#elif defined(CONFIG_MACH_MT6763)
+#include "mtk_cpuidle_mt6763.h"
+#elif defined(CONFIG_MACH_MT6758)
+#include "mtk_cpuidle_mt6758.h"
 #endif
 
 enum mtk_cpuidle_mode {
@@ -30,7 +34,8 @@ enum mtk_cpuidle_mode {
 	MTK_LEGACY_SODI3_MODE,
 	MTK_LEGACY_DPIDLE_MODE,
 	MTK_LEGACY_SUSPEND_MODE,
-	MTK_MCDI_MODE,
+	MTK_MCDI_CPU_MODE,
+	MTK_MCDI_CLUSTER_MODE,
 	MTK_SODI_MODE,
 	MTK_SODI3_MODE,
 	MTK_DPIDLE_MODE,
@@ -143,5 +148,12 @@ extern unsigned long *aee_rr_rec_mtk_cpuidle_footprint_pa(void);
 unsigned long * __weak mt_save_dbg_regs(unsigned long *p, unsigned int cpuid) { return 0; }
 void __weak mt_restore_dbg_regs(unsigned long *p, unsigned int cpuid) { }
 void __weak mt_copy_dbg_regs(int to, int from) { }
+
+void __weak dpm_mcsi_mtcmos_on_flow(int on) { }
+
+extern char *irq_match[];
+extern unsigned int irq_nr[];
+extern int wake_src_irq[];
+extern int irq_offset[];
 
 #endif

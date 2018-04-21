@@ -72,6 +72,12 @@ extern int hps_del_timer(void);
 extern int hps_restart_timer(void);
 extern int vcorefs_get_curr_ddr(void);
 
+/* MCSODI */
+#if SPM_AEE_RR_REC
+extern void aee_rr_rec_mcsodi_val(u32 val);
+extern u32 aee_rr_curr_mcsodi_val(void);
+#endif
+
 /* Deepidle */
 #if SPM_AEE_RR_REC
 extern void aee_rr_rec_deepidle_val(u32 val);
@@ -100,6 +106,7 @@ extern bool is_already_snap_shot;
 extern void mt_power_gs_dump_suspend(void);
 extern void mt_power_gs_dump_dpidle(void);
 extern void mt_power_gs_dump_sodi3(void);
+extern bool slp_dump_golden_setting;
 extern bool slp_chk_golden;
 int __attribute__((weak)) snapshot_golden_setting(const char *func, const unsigned int line)
 {

@@ -24,10 +24,11 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/sched.h>
+#include <mt-plat/mtk_chip.h>
 
 /* local include */
 #include "mtk_unified_power_internal.h"
-#include "mtk_unified_power.h"
+#include "mtk_upower.h"
 #include "mtk_unified_power_data.h"
 #include "mtk_devinfo.h"
 
@@ -54,26 +55,49 @@ int degree_set[NR_UPOWER_DEGREE] = {
 
 /* collect all the raw tables */
 #define INIT_UPOWER_TBL_INFOS(name, tbl) {__stringify(name), &tbl}
+/* v1 FY */
 struct upower_tbl_info upower_tbl_infos_FY[NR_UPOWER_BANK] = {
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_LL, upower_tbl_ll_FY),
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_L, upower_tbl_l_FY),
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_B, upower_tbl_b_FY),
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_LL, upower_tbl_cluster_ll_FY),
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_L, upower_tbl_cluster_l_FY),
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_B, upower_tbl_cluster_b_FY),
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CCI, upower_tbl_cci_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_LL, upower_tbl_ll_1_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_L, upower_tbl_l_1_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_B, upower_tbl_b_1_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_LL, upower_tbl_cluster_ll_1_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_L, upower_tbl_cluster_l_1_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_B, upower_tbl_cluster_b_1_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CCI, upower_tbl_cci_1_FY),
 };
 
+/* v1 SB */
 struct upower_tbl_info upower_tbl_infos_SB[NR_UPOWER_BANK] = {
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_LL, upower_tbl_ll_SB),
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_L, upower_tbl_l_SB),
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_B, upower_tbl_b_SB),
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_LL, upower_tbl_cluster_ll_SB),
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_L, upower_tbl_cluster_l_SB),
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_B, upower_tbl_cluster_b_SB),
-	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CCI, upower_tbl_cci_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_LL, upower_tbl_ll_1_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_L, upower_tbl_l_1_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_B, upower_tbl_b_1_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_LL, upower_tbl_cluster_ll_1_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_L, upower_tbl_cluster_l_1_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_B, upower_tbl_cluster_b_1_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CCI, upower_tbl_cci_1_SB),
 };
 
+/* v2 FY */
+struct upower_tbl_info upower_tbl_infos_2_FY[NR_UPOWER_BANK] = {
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_LL, upower_tbl_ll_2_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_L, upower_tbl_l_2_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_B, upower_tbl_b_2_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_LL, upower_tbl_cluster_ll_2_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_L, upower_tbl_cluster_l_2_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_B, upower_tbl_cluster_b_2_FY),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CCI, upower_tbl_cci_2_FY),
+};
+
+/* v2 SB */
+struct upower_tbl_info upower_tbl_infos_2_SB[NR_UPOWER_BANK] = {
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_LL, upower_tbl_ll_2_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_L, upower_tbl_l_2_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_B, upower_tbl_b_2_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_LL, upower_tbl_cluster_ll_2_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_L, upower_tbl_cluster_l_2_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CLS_B, upower_tbl_cluster_b_2_SB),
+	INIT_UPOWER_TBL_INFOS(UPOWER_BANK_CCI, upower_tbl_cci_2_SB),
+};
 /* points to all the raw tables */
 struct upower_tbl_info *p_upower_tbl_infos = &upower_tbl_infos_FY[0];
 struct upower_tbl_info *new_p_tbl_infos;
@@ -352,7 +376,22 @@ static void upower_init_rownum(void)
 		upower_tbl_ref[i].row_num = UPOWER_OPP_NUM;
 }
 
-#ifdef EARLY_PORTING_EEM
+static unsigned int eem_is_enabled(void)
+{
+	unsigned int ret = 1;
+	struct upower_tbl *tbl;
+	int i;
+
+	/* if volt is 0, means ptp is not enabled, return 0 */
+	for (i = 0; i < NR_UPOWER_BANK; i++) {
+		tbl = upower_tbl_infos[i].p_upower_tbl;
+		ret = upower_tbl_ref[i].row[0].volt > 0 ? 1 : 0;
+		if (!ret)
+			break;
+	}
+	return ret;
+}
+
 static void upower_init_lkgidx(void)
 {
 	int i;
@@ -376,7 +415,6 @@ static void upower_init_volt(void)
 			upower_tbl_ref[i].row[j].volt = tbl->row[j].volt;
 	}
 }
-#endif
 
 static int upower_update_tbl_ref(void)
 {
@@ -422,9 +460,6 @@ static int __init upower_get_tbl_ref(void)
 	/* UPOWER_TBL_LIMIT is the bottom address of unified power table */
 	unsigned long long upower_tbl_base = UPOWER_TBL_LIMIT - size;
 
-	upower_debug("upower table size=%llu\n", size);
-	upower_debug("upower table start=0x%llx\n", upower_tbl_base);
-
 	/* get table address on sram */
 	upower_tbl_ref = ioremap_nocache(upower_tbl_base, size);
 	if (upower_tbl_ref == NULL)
@@ -467,7 +502,7 @@ static int upower_debug_proc_show(struct seq_file *m, void *v)
 	addr_ptr_tbl_info = upower_get_tbl();
 	/* get ptr which points to upower_tbl_infos[] */
 	ptr_tbl_info = *addr_ptr_tbl_info;
-	upower_debug("get upower tbl location = %p\n", ptr_tbl_info[0].p_upower_tbl);
+	/* upower_debug("get upower tbl location = %p\n", ptr_tbl_info[0].p_upower_tbl); */
 
 	/* print all the tables that record in upower_tbl_infos[]*/
 	for (i = 0; i < NR_UPOWER_BANK; i++) {
@@ -560,31 +595,46 @@ static int create_procfs(void)
 
 static void get_original_table(void)
 {
-	binLevel = GET_BITS_VAL(7:0, get_devinfo_with_index(UPOWER_FUNC_CODE_EFUSE_INDEX));
+	unsigned int upower_chip_ver = 0;
 
-	if (binLevel == 0) /* 1.6G */
-		upower_tbl_infos = &upower_tbl_infos_FY[0];
-	else if (binLevel == 1) /* 2G */
-		upower_tbl_infos = &upower_tbl_infos_SB[0];
-	else if (binLevel == 2) /* 2.2 G */
-		upower_tbl_infos = &upower_tbl_infos_FY[0]; /* should be FYA */
-	else /* 1.6G */
-		upower_tbl_infos = &upower_tbl_infos_FY[0];
-
-	upower_error("binLevel=%d\n", binLevel);
+	upower_chip_ver = mt_get_chip_sw_ver();
+	if (upower_chip_ver == CHIP_SW_VER_01) {
+		upower_enable = 1;
+		binLevel = GET_BITS_VAL(7:0, get_devinfo_with_index(UPOWER_FUNC_CODE_EFUSE_INDEX));
+		if (binLevel == 0) /* 1.6G */
+			upower_tbl_infos = &upower_tbl_infos_FY[0];
+		else if (binLevel == 1) /* 2G */
+			upower_tbl_infos = &upower_tbl_infos_SB[0];
+		else if (binLevel == 2) /* 2.2 G */
+			upower_tbl_infos = &upower_tbl_infos_FY[0]; /* should be FYA */
+		else /* 1.6G */
+			upower_tbl_infos = &upower_tbl_infos_FY[0];
+	} else {
+		upower_enable = 1;
+		binLevel = GET_BITS_VAL(7:0, get_devinfo_with_index(UPOWER_FUNC_CODE_EFUSE_INDEX));
+		if (binLevel == 0) /* 1.6G */
+			upower_tbl_infos = &upower_tbl_infos_2_FY[0];
+		else if (binLevel == 1) /* 2G */
+			upower_tbl_infos = &upower_tbl_infos_2_SB[0];
+		else if (binLevel == 2) /* 2.2 G */
+			upower_tbl_infos = &upower_tbl_infos_2_FY[0]; /* should be FYA */
+		else /* 1.6G */
+			upower_tbl_infos = &upower_tbl_infos_2_FY[0];
+	}
+	upower_error("chipver, binLevel=%d, %d\n", upower_chip_ver, binLevel);
 }
 
 static int __init upower_init(void)
 {
-	if (upower_enable == 0) {
-		upower_error("upower is disabled\n");
-		return 0;
-	}
 	/* PTP has no efuse, so volt will be set to orig data */
 	/* before upower_init_volt(), PTP has called upower_update_volt_by_eem() */
 	get_original_table();
 	upower_debug("upower tbl orig location([0](%p)= %p\n",
 					upower_tbl_infos, upower_tbl_infos[0].p_upower_tbl);
+	if (upower_enable == 0) {
+		upower_error("upower is disabled\n");
+		return 0;
+	}
 
 	#ifdef UPOWER_UT
 	upower_debug("--------- (UT)before tbl ready--------------\n");
@@ -596,11 +646,12 @@ static int __init upower_init(void)
 
 	upower_init_cap();
 
-	#ifdef EARLY_PORTING_EEM
-	/* apply orig volt and lkgidx, due to ptp not ready*/
-	upower_init_lkgidx();
-	upower_init_volt();
-	#endif
+	/* apply orig volt and lkgidx, if eem is not enabled*/
+	if (!eem_is_enabled()) {
+		upower_error("eem is not enabled\n");
+		upower_init_lkgidx();
+		upower_init_volt();
+	}
 
 	upower_update_dyn_pwr();
 	upower_update_lkg_pwr();

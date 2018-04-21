@@ -18,9 +18,16 @@
 #ifdef CMDQ_PROFILE_MMP
 #include "cmdq_mmp.h"
 #endif
+#ifdef CMDQ_COMMON_ENG_SUPPORT
+#include "cmdq_engine_common.h"
+#else
+#include "cmdq_engine.h"
+#endif
+#include "smi_public.h"
 
 static struct cmdqMDPTaskStruct gCmdqMDPTask[MDP_MAX_TASK_NUM];
 static int gCmdqMDPTaskIndex;
+static long g_cmdq_mmsys_base;
 
 /**************************************************************************************/
 /*******************                    Platform dependent function                    ********************/
@@ -192,13 +199,18 @@ const char *cmdq_mdp_dispatch_virtual(uint64_t engineFlag)
 
 void cmdq_mdp_trackTask_virtual(const struct TaskStruct *pTask)
 {
-	memcpy(gCmdqMDPTask[gCmdqMDPTaskIndex].callerName,
-		pTask->callerName, sizeof(pTask->callerName));
-	if (pTask->userDebugStr)
-		memcpy(gCmdqMDPTask[gCmdqMDPTaskIndex].userDebugStr,
-			pTask->userDebugStr, (uint32_t)strlen(pTask->userDebugStr) + 1);
-	else
+	if (pTask) {
+		memcpy(gCmdqMDPTask[gCmdqMDPTaskIndex].callerName,
+			pTask->callerName, sizeof(pTask->callerName));
+		if (pTask->userDebugStr)
+			memcpy(gCmdqMDPTask[gCmdqMDPTaskIndex].userDebugStr,
+				pTask->userDebugStr, (uint32_t)strlen(pTask->userDebugStr) + 1);
+		else
+			gCmdqMDPTask[gCmdqMDPTaskIndex].userDebugStr[0] = '\0';
+	} else {
+		gCmdqMDPTask[gCmdqMDPTaskIndex].callerName[0] = '\0';
 		gCmdqMDPTask[gCmdqMDPTaskIndex].userDebugStr[0] = '\0';
+	}
 
 	CMDQ_MSG("cmdq_mdp_trackTask: caller: %s\n",
 		gCmdqMDPTask[gCmdqMDPTaskIndex].callerName);
@@ -210,10 +222,93 @@ void cmdq_mdp_trackTask_virtual(const struct TaskStruct *pTask)
 	gCmdqMDPTaskIndex = (gCmdqMDPTaskIndex + 1) % MDP_MAX_TASK_NUM;
 }
 
+const char *cmdq_mdp_parse_error_module_by_hwflag_virtual(const struct TaskStruct *task)
+{
+	const char *module = NULL;
+	const uint32_t ISP_ONLY[2] = {
+		((1LL << CMDQ_ENG_ISP_IMGI) | (1LL << CMDQ_ENG_ISP_IMG2O)),
+		((1LL << CMDQ_ENG_ISP_IMGI) | (1LL << CMDQ_ENG_ISP_IMG2O) |
+		 (1LL << CMDQ_ENG_ISP_IMGO))
+	};
+
+	/* common part for both normal and secure path */
+	/* for JPEG scenario, use HW flag is sufficient */
+	if (task->engineFlag & (1LL << CMDQ_ENG_JPEG_ENC))
+		module = "JPGENC";
+	else if (task->engineFlag & (1LL << CMDQ_ENG_JPEG_DEC))
+		module = "JPGDEC";
+	else if ((ISP_ONLY[0] == task->engineFlag) || (ISP_ONLY[1] == task->engineFlag))
+		module = "DIP_ONLY";
+
+	/* for secure path, use HW flag is sufficient */
+	do {
+		if (module != NULL)
+			break;
+
+		if (!task->secData.is_secure) {
+			/* normal path, need parse current running instruciton for more detail */
+			break;
+		} else if (CMDQ_ENG_MDP_GROUP_FLAG(task->engineFlag)) {
+			module = "MDP";
+			break;
+		} else if (CMDQ_ENG_DPE_GROUP_FLAG(task->engineFlag)) {
+			module = "DPE";
+			break;
+		} else if (CMDQ_ENG_RSC_GROUP_FLAG(task->engineFlag)) {
+			module = "RSC";
+			break;
+		} else if (CMDQ_ENG_GEPF_GROUP_FLAG(task->engineFlag)) {
+			module = "GEPF";
+			break;
+		}
+
+		module = "CMDQ";
+	} while (0);
+
+	return module;
+}
+
+u64 cmdq_mdp_get_engine_group_bits_virtual(u32 engine_group)
+{
+	return 0;
+}
+
+void cmdq_mdp_error_reset_virtual(u64 engineFlag)
+{
+}
+
+long cmdq_mdp_get_module_base_VA_MMSYS_CONFIG(void)
+{
+	return g_cmdq_mmsys_base;
+}
+
+static void cmdq_mdp_enable_common_clock_virtual(bool enable)
+{
+#ifdef CMDQ_PWR_AWARE
+	if (enable) {
+		/* Use SMI clock API */
+		smi_bus_enable(SMI_LARB_MMSYS0, "CMDQ");
+	} else {
+		/* disable, reverse the sequence */
+		smi_bus_disable(SMI_LARB_MMSYS0, "CMDQ");
+	}
+#endif	/* CMDQ_PWR_AWARE */
+}
+
 /**************************************************************************************/
 /************************                      Common Code                      ************************/
 /**************************************************************************************/
 static struct cmdqMDPFuncStruct gMDPFunctionPointer;
+
+void cmdq_mdp_map_mmsys_VA(void)
+{
+	g_cmdq_mmsys_base = cmdq_dev_alloc_reference_VA_by_name("mmsys_config");
+}
+
+void cmdq_mdp_unmap_mmsys_VA(void)
+{
+	cmdq_dev_free_module_base_VA(g_cmdq_mmsys_base);
+}
 
 void cmdq_mdp_virtual_function_setting(void)
 {
@@ -250,6 +345,10 @@ void cmdq_mdp_virtual_function_setting(void)
 	pFunc->dispatchModule = cmdq_mdp_dispatch_virtual;
 
 	pFunc->trackTask = cmdq_mdp_trackTask_virtual;
+	pFunc->parseErrModByEngFlag = cmdq_mdp_parse_error_module_by_hwflag_virtual;
+	pFunc->getEngineGroupBits = cmdq_mdp_get_engine_group_bits_virtual;
+	pFunc->errorReset = cmdq_mdp_error_reset_virtual;
+	pFunc->mdpEnableCommonClock = cmdq_mdp_enable_common_clock_virtual;
 }
 
 struct cmdqMDPFuncStruct *cmdq_mdp_get_func(void)
@@ -429,7 +528,7 @@ const char *cmdq_mdp_get_rdma_state(uint32_t state)
 
 void cmdq_mdp_dump_rdma(const unsigned long base, const char *label)
 {
-	uint32_t value[15] = { 0 };
+	uint32_t value[17] = { 0 };
 	uint32_t state = 0;
 	uint32_t grep = 0;
 
@@ -447,7 +546,9 @@ void cmdq_mdp_dump_rdma(const unsigned long base, const char *label)
 	value[11] = CMDQ_REG_GET32(base + 0x410);
 	value[12] = CMDQ_REG_GET32(base + 0x420);
 	value[13] = CMDQ_REG_GET32(base + 0x430);
-	value[14] = CMDQ_REG_GET32(base + 0x4D0);
+	value[14] = CMDQ_REG_GET32(base + 0x440);
+	value[15] = CMDQ_REG_GET32(base + 0x4D0);
+	value[16] = CMDQ_REG_GET32(base + 0x0);
 
 	CMDQ_ERR("=============== [CMDQ] %s Status ====================================\n", label);
 	CMDQ_ERR
@@ -459,8 +560,12 @@ void cmdq_mdp_dump_rdma(const unsigned long base, const char *label)
 		 value[6], value[7], value[8]);
 	CMDQ_ERR("RDMA_MON_STA_0: 0x%08x, RDMA_MON_STA_1: 0x%08x, RDMA_MON_STA_2: 0x%08x\n",
 		 value[9], value[10], value[11]);
-	CMDQ_ERR("RDMA_MON_STA_4: 0x%08x, RDMA_MON_STA_6: 0x%08x, RDMA_MON_STA_26: 0x%08x\n",
+	CMDQ_ERR("RDMA_MON_STA_4: 0x%08x, RDMA_MON_STA_6: 0x%08x, RDMA_MON_STA_8: 0x%08x\n",
 		 value[12], value[13], value[14]);
+	CMDQ_ERR("RDMA_MON_STA_26: 0x%08x\n",
+		 value[15]);
+	CMDQ_ERR("RDMA_EN: 0x%08x\n",
+		 value[16]);
 
 	/* parse state */
 	CMDQ_ERR("RDMA ack:%d req:%d\n", (value[9] & (1 << 11)) >> 11,
@@ -468,7 +573,7 @@ void cmdq_mdp_dump_rdma(const unsigned long base, const char *label)
 	state = (value[10] >> 8) & 0x7FF;
 	grep = (value[10] >> 20) & 0x1;
 	CMDQ_ERR("RDMA state: 0x%x (%s)\n", state, cmdq_mdp_get_rdma_state(state));
-	CMDQ_ERR("RDMA horz_cnt: %d vert_cnt:%d\n", value[14] & 0xFFF, (value[14] >> 16) & 0xFFF);
+	CMDQ_ERR("RDMA horz_cnt: %d vert_cnt:%d\n", value[15] & 0xFFF, (value[15] >> 16) & 0xFFF);
 
 	CMDQ_ERR("RDMA grep:%d => suggest to ask SMI help:%d\n", grep, grep);
 }
@@ -487,7 +592,7 @@ const char *cmdq_mdp_get_rsz_state(const uint32_t state)
 
 void cmdq_mdp_dump_rot(const unsigned long base, const char *label)
 {
-	uint32_t value[32] = { 0 };
+	uint32_t value[47] = { 0 };
 
 	value[0] = CMDQ_REG_GET32(base + 0x000);
 	value[1] = CMDQ_REG_GET32(base + 0x008);
@@ -539,7 +644,36 @@ void cmdq_mdp_dump_rot(const unsigned long base, const char *label)
 	value[28] = CMDQ_REG_GET32(base + 0x0D0);
 	CMDQ_REG_SET32(base + 0x018, 0x00001400);
 	value[29] = CMDQ_REG_GET32(base + 0x0D0);
-	value[30] = CMDQ_REG_GET32(base + 0x01C);
+	CMDQ_REG_SET32(base + 0x018, 0x00001500);
+	value[30] = CMDQ_REG_GET32(base + 0x0D0);
+	CMDQ_REG_SET32(base + 0x018, 0x00001600);
+	value[31] = CMDQ_REG_GET32(base + 0x0D0);
+	CMDQ_REG_SET32(base + 0x018, 0x00001700);
+	value[32] = CMDQ_REG_GET32(base + 0x0D0);
+	CMDQ_REG_SET32(base + 0x018, 0x00001800);
+	value[33] = CMDQ_REG_GET32(base + 0x0D0);
+	CMDQ_REG_SET32(base + 0x018, 0x00001900);
+	value[34] = CMDQ_REG_GET32(base + 0x0D0);
+	CMDQ_REG_SET32(base + 0x018, 0x00001A00);
+	value[35] = CMDQ_REG_GET32(base + 0x0D0);
+	CMDQ_REG_SET32(base + 0x018, 0x00001B00);
+	value[36] = CMDQ_REG_GET32(base + 0x0D0);
+	CMDQ_REG_SET32(base + 0x018, 0x00001C00);
+	value[37] = CMDQ_REG_GET32(base + 0x0D0);
+	CMDQ_REG_SET32(base + 0x018, 0x00001D00);
+	value[38] = CMDQ_REG_GET32(base + 0x0D0);
+	CMDQ_REG_SET32(base + 0x018, 0x00001E00);
+	value[39] = CMDQ_REG_GET32(base + 0x0D0);
+	CMDQ_REG_SET32(base + 0x018, 0x00001F00);
+	value[40] = CMDQ_REG_GET32(base + 0x0D0);
+	CMDQ_REG_SET32(base + 0x018, 0x00002000);
+	value[41] = CMDQ_REG_GET32(base + 0x0D0);
+	CMDQ_REG_SET32(base + 0x018, 0x00002100);
+	value[42] = CMDQ_REG_GET32(base + 0x0D0);
+	value[43] = CMDQ_REG_GET32(base + 0x01C);
+	value[44] = CMDQ_REG_GET32(base + 0x07C);
+	value[45] = CMDQ_REG_GET32(base + 0x010);
+	value[46] = CMDQ_REG_GET32(base + 0x014);
 
 	CMDQ_ERR("=============== [CMDQ] %s Status ====================================\n", label);
 	CMDQ_ERR("ROT_CTRL: 0x%08x, ROT_MAIN_BUF_SIZE: 0x%08x, ROT_SUB_BUF_SIZE: 0x%08x\n",
@@ -562,7 +696,18 @@ void cmdq_mdp_dump_rot(const unsigned long base, const char *label)
 		 value[24], value[25], value[26]);
 	CMDQ_ERR("ROT_DEBUG_12: 0x%08x, ROT_DBUGG_13: 0x%08x, ROT_DBUGG_14: 0x%08x\n",
 		 value[27], value[28], value[29]);
-	CMDQ_ERR("VIDO_INT: 0x%08x\n", value[30]);
+	CMDQ_ERR("ROT_DEBUG_15: 0x%08x, ROT_DBUGG_16: 0x%08x, ROT_DBUGG_17: 0x%08x\n",
+		 value[30], value[31], value[32]);
+	CMDQ_ERR("ROT_DEBUG_18: 0x%08x, ROT_DBUGG_19: 0x%08x, ROT_DBUGG_1A: 0x%08x\n",
+		 value[33], value[34], value[35]);
+	CMDQ_ERR("ROT_DEBUG_1B: 0x%08x, ROT_DBUGG_1C: 0x%08x, ROT_DBUGG_1D: 0x%08x\n",
+		 value[36], value[37], value[38]);
+	CMDQ_ERR("ROT_DEBUG_1E: 0x%08x, ROT_DBUGG_1F: 0x%08x, ROT_DBUGG_20: 0x%08x\n",
+		 value[39], value[40], value[41]);
+	CMDQ_ERR("ROT_DEBUG_21: 0x%08x\n",
+		 value[42]);
+	CMDQ_ERR("VIDO_INT: 0x%08x, VIDO_ROT_EN: 0x%08x\n", value[43], value[44]);
+	CMDQ_ERR("VIDO_SOFT_RST: 0x%08x, VIDO_SOFT_RST_STAT: 0x%08x\n", value[45], value[46]);
 }
 
 void cmdq_mdp_dump_color(const unsigned long base, const char *label)
@@ -624,7 +769,7 @@ const char *cmdq_mdp_get_wdma_state(uint32_t state)
 
 void cmdq_mdp_dump_wdma(const unsigned long base, const char *label)
 {
-	uint32_t value[40] = { 0 };
+	uint32_t value[56] = { 0 };
 	uint32_t state = 0;
 	uint32_t grep = 0;	/* grep bit = 1, WDMA has sent request to SMI, and not receive done yet */
 	uint32_t isFIFOFull = 0;	/* 1 for WDMA FIFO full */
@@ -641,51 +786,67 @@ void cmdq_mdp_dump_wdma(const unsigned long base, const char *label)
 	CMDQ_REG_SET32(base + 0x014, (value[0] & (0x0FFFFFFF)));
 	value[8] = CMDQ_REG_GET32(base + 0x014);
 	value[9] = CMDQ_REG_GET32(base + 0x0AC);
+	value[40] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0x10000000 | (value[0] & (0x0FFFFFFF)));
 	value[10] = CMDQ_REG_GET32(base + 0x014);
 	value[11] = CMDQ_REG_GET32(base + 0x0AC);
+	value[41] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0x20000000 | (value[0] & (0x0FFFFFFF)));
 	value[12] = CMDQ_REG_GET32(base + 0x014);
 	value[13] = CMDQ_REG_GET32(base + 0x0AC);
+	value[42] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0x30000000 | (value[0] & (0x0FFFFFFF)));
 	value[14] = CMDQ_REG_GET32(base + 0x014);
 	value[15] = CMDQ_REG_GET32(base + 0x0AC);
+	value[43] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0x40000000 | (value[0] & (0x0FFFFFFF)));
 	value[16] = CMDQ_REG_GET32(base + 0x014);
 	value[17] = CMDQ_REG_GET32(base + 0x0AC);
+	value[44] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0x50000000 | (value[0] & (0x0FFFFFFF)));
 	value[18] = CMDQ_REG_GET32(base + 0x014);
 	value[19] = CMDQ_REG_GET32(base + 0x0AC);
+	value[45] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0x60000000 | (value[0] & (0x0FFFFFFF)));
 	value[20] = CMDQ_REG_GET32(base + 0x014);
 	value[21] = CMDQ_REG_GET32(base + 0x0AC);
+	value[46] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0x70000000 | (value[0] & (0x0FFFFFFF)));
 	value[22] = CMDQ_REG_GET32(base + 0x014);
 	value[23] = CMDQ_REG_GET32(base + 0x0AC);
+	value[47] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0x80000000 | (value[0] & (0x0FFFFFFF)));
 	value[24] = CMDQ_REG_GET32(base + 0x014);
 	value[25] = CMDQ_REG_GET32(base + 0x0AC);
+	value[48] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0x90000000 | (value[0] & (0x0FFFFFFF)));
 	value[26] = CMDQ_REG_GET32(base + 0x014);
 	value[27] = CMDQ_REG_GET32(base + 0x0AC);
+	value[49] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0xA0000000 | (value[0] & (0x0FFFFFFF)));
 	value[28] = CMDQ_REG_GET32(base + 0x014);
 	value[29] = CMDQ_REG_GET32(base + 0x0AC);
+	value[50] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0xB0000000 | (value[0] & (0x0FFFFFFF)));
 	value[30] = CMDQ_REG_GET32(base + 0x014);
 	value[31] = CMDQ_REG_GET32(base + 0x0AC);
+	value[51] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0xC0000000 | (value[0] & (0x0FFFFFFF)));
 	value[32] = CMDQ_REG_GET32(base + 0x014);
 	value[33] = CMDQ_REG_GET32(base + 0x0AC);
+	value[52] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0xD0000000 | (value[0] & (0x0FFFFFFF)));
 	value[34] = CMDQ_REG_GET32(base + 0x014);
 	value[35] = CMDQ_REG_GET32(base + 0x0AC);
+	value[53] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0xE0000000 | (value[0] & (0x0FFFFFFF)));
 	value[36] = CMDQ_REG_GET32(base + 0x014);
 	value[37] = CMDQ_REG_GET32(base + 0x0AC);
+	value[54] = CMDQ_REG_GET32(base + 0x0B8);
 	CMDQ_REG_SET32(base + 0x014, 0xF0000000 | (value[0] & (0x0FFFFFFF)));
 	value[38] = CMDQ_REG_GET32(base + 0x014);
 	value[39] = CMDQ_REG_GET32(base + 0x0AC);
+	value[55] = CMDQ_REG_GET32(base + 0x0B8);
 
 	CMDQ_ERR("=============== [CMDQ] %s Status ====================================\n", label);
 	CMDQ_ERR("[CMDQ]WDMA_CFG: 0x%08x, WDMA_SRC_SIZE: 0x%08x, WDMA_DST_W_IN_BYTE = 0x%08x\n",
@@ -696,22 +857,22 @@ void cmdq_mdp_dump_wdma(const unsigned long base, const char *label)
 	CMDQ_ERR("[CMDQ]WDMA_STATUS: 0x%08x, WDMA_INPUT_CNT: 0x%08x\n", value[6], value[7]);
 
 	/* Dump Addtional WDMA debug info */
-	CMDQ_ERR("WDMA_DEBUG_0 +014: 0x%08x , +0ac: 0x%08x\n", value[8], value[9]);
-	CMDQ_ERR("WDMA_DEBUG_1 +014: 0x%08x , +0ac: 0x%08x\n", value[10], value[11]);
-	CMDQ_ERR("WDMA_DEBUG_2 +014: 0x%08x , +0ac: 0x%08x\n", value[12], value[13]);
-	CMDQ_ERR("WDMA_DEBUG_3 +014: 0x%08x , +0ac: 0x%08x\n", value[14], value[15]);
-	CMDQ_ERR("WDMA_DEBUG_4 +014: 0x%08x , +0ac: 0x%08x\n", value[16], value[17]);
-	CMDQ_ERR("WDMA_DEBUG_5 +014: 0x%08x , +0ac: 0x%08x\n", value[18], value[19]);
-	CMDQ_ERR("WDMA_DEBUG_6 +014: 0x%08x , +0ac: 0x%08x\n", value[20], value[21]);
-	CMDQ_ERR("WDMA_DEBUG_7 +014: 0x%08x , +0ac: 0x%08x\n", value[22], value[23]);
-	CMDQ_ERR("WDMA_DEBUG_8 +014: 0x%08x , +0ac: 0x%08x\n", value[24], value[25]);
-	CMDQ_ERR("WDMA_DEBUG_9 +014: 0x%08x , +0ac: 0x%08x\n", value[26], value[27]);
-	CMDQ_ERR("WDMA_DEBUG_A +014: 0x%08x , +0ac: 0x%08x\n", value[28], value[29]);
-	CMDQ_ERR("WDMA_DEBUG_B +014: 0x%08x , +0ac: 0x%08x\n", value[30], value[31]);
-	CMDQ_ERR("WDMA_DEBUG_C +014: 0x%08x , +0ac: 0x%08x\n", value[32], value[33]);
-	CMDQ_ERR("WDMA_DEBUG_D +014: 0x%08x , +0ac: 0x%08x\n", value[34], value[35]);
-	CMDQ_ERR("WDMA_DEBUG_E +014: 0x%08x , +0ac: 0x%08x\n", value[36], value[37]);
-	CMDQ_ERR("WDMA_DEBUG_F +014: 0x%08x , +0ac: 0x%08x\n", value[38], value[39]);
+	CMDQ_ERR("WDMA_DEBUG_0 +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[8], value[9], value[40]);
+	CMDQ_ERR("WDMA_DEBUG_1 +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[10], value[11], value[41]);
+	CMDQ_ERR("WDMA_DEBUG_2 +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[12], value[13], value[42]);
+	CMDQ_ERR("WDMA_DEBUG_3 +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[14], value[15], value[43]);
+	CMDQ_ERR("WDMA_DEBUG_4 +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[16], value[17], value[44]);
+	CMDQ_ERR("WDMA_DEBUG_5 +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[18], value[19], value[45]);
+	CMDQ_ERR("WDMA_DEBUG_6 +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[20], value[21], value[46]);
+	CMDQ_ERR("WDMA_DEBUG_7 +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[22], value[23], value[47]);
+	CMDQ_ERR("WDMA_DEBUG_8 +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[24], value[25], value[48]);
+	CMDQ_ERR("WDMA_DEBUG_9 +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[26], value[27], value[49]);
+	CMDQ_ERR("WDMA_DEBUG_A +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[28], value[29], value[50]);
+	CMDQ_ERR("WDMA_DEBUG_B +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[30], value[31], value[51]);
+	CMDQ_ERR("WDMA_DEBUG_C +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[32], value[33], value[52]);
+	CMDQ_ERR("WDMA_DEBUG_D +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[34], value[35], value[53]);
+	CMDQ_ERR("WDMA_DEBUG_E +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[36], value[37], value[54]);
+	CMDQ_ERR("WDMA_DEBUG_F +014: 0x%08x , +0ac: 0x%08x , +0b8: 0x%08x\n", value[38], value[39], value[55]);
 
 	/* parse WDMA state */
 	state = value[6] & 0x3FF;
@@ -811,3 +972,15 @@ void cmdq_mdp_check_TF_address(unsigned int mva, char *module)
 		}
 	}
 }
+
+const char *cmdq_mdp_parse_error_module_by_hwflag(const struct TaskStruct *task)
+{
+	return cmdq_mdp_get_func()->parseErrModByEngFlag(task);
+}
+
+#ifdef CMDQ_COMMON_ENG_SUPPORT
+void cmdq_mdp_platform_function_setting(void)
+{
+}
+#endif
+

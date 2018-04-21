@@ -44,26 +44,18 @@
  * LOG
  */
 #ifdef __KERNEL__
-#define EEM_TAG	 "[EEM] "
+#define EEM_TAG	 "[xxxxEEM] "
 #ifdef USING_XLOG
 	#include <linux/xlog.h>
-	#define eem_emerg(fmt, args...)	 pr_err(ANDROID_LOG_ERROR, EEM_TAG, fmt, ##args)
-	#define eem_alert(fmt, args...)	 pr_err(ANDROID_LOG_ERROR, EEM_TAG, fmt, ##args)
-	#define eem_crit(fmt, args...)	  pr_err(ANDROID_LOG_ERROR, EEM_TAG, fmt, ##args)
-	#define eem_error(fmt, args...)	 pr_err(ANDROID_LOG_ERROR, EEM_TAG, fmt, ##args)
-	#define eem_warning(fmt, args...)   pr_warn(ANDROID_LOG_WARN, EEM_TAG, fmt, ##args)
+	#define eem_error(fmt, args...)	 pr_debug(ANDROID_LOG_ERROR, EEM_TAG, fmt, ##args)
 	#define eem_notice(fmt, args...)	pr_info(ANDROID_LOG_INFO, EEM_TAG, fmt, ##args)
 	#define eem_info(fmt, args...)	  pr_info(ANDROID_LOG_INFO, EEM_TAG, fmt, ##args)
 	#define eem_debug(fmt, args...)	 pr_debug(ANDROID_LOG_DEBUG, EEM_TAG, fmt, ##args)
 #else
-	#define eem_emerg(fmt, args...)	 pr_emerg(EEM_TAG fmt, ##args)
-	#define eem_alert(fmt, args...)	 pr_alert(EEM_TAG fmt, ##args)
-	#define eem_crit(fmt, args...)	  pr_crit(EEM_TAG fmt, ##args)
-	#define eem_error(fmt, args...)	 pr_err(EEM_TAG fmt, ##args)
-	#define eem_warning(fmt, args...)   pr_warn(EEM_TAG fmt, ##args)
+	#define eem_error(fmt, args...)	 pr_debug(EEM_TAG fmt, ##args)
 	#define eem_notice(fmt, args...)	pr_notice(EEM_TAG fmt, ##args)
 	#define eem_info(fmt, args...)	  pr_info(EEM_TAG fmt, ##args)
-	#define eem_debug(fmt, args...)	 pr_err(EEM_TAG"(%d)" fmt, __LINE__, ##args)
+	#define eem_debug(fmt, args...)	 pr_debug(EEM_TAG"(%d)" fmt, __LINE__, ##args)
 									/* pr_debug(EEM_TAG fmt, ##args) */
 #endif
 
@@ -73,29 +65,28 @@
 		#define eem_isr_info(fmt, args...)
 	#endif
 #endif /* #ifdef __KERNEL__ */
-
-#define FUNC_LV_MODULE		  BIT(0)  /* module, platform driver interface */
-#define FUNC_LV_CPUFREQ		 BIT(1)  /* cpufreq driver interface		  */
-#define FUNC_LV_API			 BIT(2)  /* mt_cpufreq driver global function */
-#define FUNC_LV_LOCAL		   BIT(3)  /* mt_cpufreq driver lcaol function  */
-#define FUNC_LV_HELP			BIT(4)  /* mt_cpufreq driver help function   */
+#define EEM_FUNC_LV_MODULE		  BIT(0)  /* module, platform driver interface */
+#define EEM_FUNC_LV_CPUFREQ		 BIT(1)  /* cpufreq driver interface		  */
+#define EEM_FUNC_LV_API			 BIT(2)  /* mt_cpufreq driver global function */
+#define EEM_FUNC_LV_LOCAL		   BIT(3)  /* mt_cpufreq driver lcaol function  */
+#define EEM_FUNC_LV_HELP			BIT(4)  /* mt_cpufreq driver help function   */
 
 
 #if CONFIG_EEM_SHOWLOG
 	static unsigned int func_lv_mask = (
-		FUNC_LV_MODULE |
-		FUNC_LV_CPUFREQ |
-		FUNC_LV_API |
-		FUNC_LV_LOCAL |
-		FUNC_LV_HELP
+		EEM_FUNC_LV_MODULE |
+		EEM_FUNC_LV_CPUFREQ |
+		EEM_FUNC_LV_API |
+		EEM_FUNC_LV_LOCAL |
+		EEM_FUNC_LV_HELP
 		);
-	#define FUNC_ENTER(lv)	\
+	#define EEM_FUNC_ENTER(lv)	\
 		do { if ((lv) & func_lv_mask) eem_debug(">> %s()\n", __func__); } while (0)
-	#define FUNC_EXIT(lv)	\
+	#define EEM_FUNC_EXIT(lv)	\
 		do { if ((lv) & func_lv_mask) eem_debug("<< %s():%d\n", __func__, __LINE__); } while (0)
 #else
-	#define FUNC_ENTER(lv)
-	#define FUNC_EXIT(lv)
+	#define EEM_FUNC_ENTER(lv)
+	#define EEM_FUNC_EXIT(lv)
 #endif /* CONFIG_CPU_DVFS_SHOWLOG */
 
 #define TIME_TH_US 3000

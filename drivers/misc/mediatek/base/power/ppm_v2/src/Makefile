@@ -15,6 +15,7 @@ ccflags-y += \
 	-I$(PPM_ROOT_DIR)/inc \
 	-I$(PPM_ROOT_DIR)/src/mach/$(CONFIG_MTK_PLATFORM) \
 	-I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(CONFIG_MTK_PLATFORM)/include	\
+	-I$(srctree)/drivers/misc/mediatek/base/power/include	\
 	-I$(srctree)/drivers/misc/mediatek/base/power/$(CONFIG_MTK_PLATFORM)	\
 
 ifeq ($(CONFIG_MTK_TINYSYS_SSPM_SUPPORT), y)
@@ -55,3 +56,4 @@ else
 # dummy driver to avoid build error
 obj-y := mtk_ppm_dummy.o
 endif
+

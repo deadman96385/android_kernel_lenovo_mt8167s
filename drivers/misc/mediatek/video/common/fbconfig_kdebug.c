@@ -92,7 +92,7 @@ bool fbconfig_start_LCM_config;
 #else
 #define DP_COLOR_BITS_PER_PIXEL(color)    ((0x0003FF00 & color) >>  8)
 #endif
-static int global_layer_id = -1;
+
 
 struct dentry *ConfigPara_dbgfs;
 struct CONFIG_RECORD_LIST head_list;
@@ -117,6 +117,7 @@ static struct PM_TOOL_S pm_params = {
 	.pLcm_params = NULL,
 	.pLcm_drv = NULL,
 };
+static struct mutex fb_config_lock;
 
 static void *pm_get_handle(void)
 {
@@ -164,7 +165,7 @@ void Panel_Master_DDIC_config(void)
 
 	struct list_head *p;
 	struct CONFIG_RECORD_LIST *node;
-
+	mutex_lock(&fb_config_lock);
 	list_for_each_prev(p, &head_list.list) {
 		node = list_entry(p, struct CONFIG_RECORD_LIST, list);
 		switch (node->record.type) {
@@ -182,32 +183,14 @@ void Panel_Master_DDIC_config(void)
 		}
 
 	}
-
+	mutex_unlock(&fb_config_lock);
 }
-
-/*static void print_from_head_to_tail(void)*/
-/*{*/
-/*	int i;*/
-/*	struct list_head *p;*/
-/*	CONFIG_RECORD_LIST *print;*/
-/*	pr_debug("DDIC=====>:print_from_head_to_tail  START\n");*/
-
-/*	list_for_each_prev(p, &head_list.list) {*/
-/*		print = list_entry(p, CONFIG_RECORD_LIST, list);*/
-/*		pr_debug("type:%d num %d value:\r\n", print->record.type, print->record.ins_num);*/
-/*		for (i = 0; i < print->record.ins_num; i++)*/
-/*			pr_debug("0x%x\t", print->record.ins_array[i]);*/
-/*		pr_debug("\r\n");*/
-/*	}*/
-/*	pr_debug("DDIC=====>:print_from_head_to_tail  END\n");*/
-
-/*}*/
 
 static void free_list_memory(void)
 {
 	struct list_head *p, *n;
 	struct CONFIG_RECORD_LIST *print;
-
+	mutex_lock(&fb_config_lock);
 	list_for_each_safe(p, n, &head_list.list) {
 		print = list_entry(p, struct CONFIG_RECORD_LIST, list);
 		list_del(&print->list);
@@ -218,15 +201,20 @@ static void free_list_memory(void)
 		pr_debug("*****list is empty!!\n");
 	else
 		pr_debug("*****list is NOT empty!!\n");
+	mutex_unlock(&fb_config_lock);
 
 }
 
 static int fbconfig_open(struct inode *inode, struct file *file)
 {
-	struct PM_TOOL_S *pm_params;
+	struct PM_TOOL_S *pm_params = NULL;
 
 	file->private_data = inode->i_private;
 	pm_params = (struct PM_TOOL_S *) pm_get_handle();
+	if (pm_params == NULL) {
+		pr_debug("fbconfig_open=>pm_params is empty!!\n");
+		return -EFAULT;
+	}
 	PanelMaster_set_PM_enable(1);
 	pm_params->pLcm_drv = DISP_GetLcmDrv();
 	pm_params->pLcm_params = DISP_GetLcmPara();
@@ -279,9 +267,16 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	}
 	case SET_DSI_ID:
 	{
-		if (arg > PM_DSI_DUAL)
+		uint32_t set_dsi_id = 0;
+
+		if (copy_from_user(&set_dsi_id, (void __user *)arg, sizeof(set_dsi_id))) {
+			pr_debug("[SET_DSI_ID]: copy_from_user failed! line:%d\n", __LINE__);
+			return -EFAULT;
+		}
+
+		if (set_dsi_id > PM_DSI_DUAL)
 			return -EINVAL;
-		pm->dsi_id = arg;
+		pm->dsi_id = set_dsi_id;
 		pr_debug("fbconfig=>SET_DSI_ID:%d\n", dsi_id);
 
 		return 0;
@@ -313,13 +308,18 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	{
 		struct CONFIG_RECORD_LIST *record_tmp_list = kmalloc(sizeof(*record_tmp_list), GFP_KERNEL);
 
+		if (!record_tmp_list)
+			return -ENOMEM;
+
 		if (copy_from_user(&record_tmp_list->record, (void __user *)arg, sizeof(struct CONFIG_RECORD))) {
 			pr_debug("list_add: copy_from_user failed! line:%d\n", __LINE__);
 			kfree(record_tmp_list);
 			record_tmp_list = NULL;
 			return -EFAULT;
 		}
+		mutex_lock(&fb_config_lock);
 		list_add(&record_tmp_list->list, &head_list.list);
+		mutex_unlock(&fb_config_lock);
 		return 0;
 	}
 	case DRIVER_IC_CONFIG_DONE:
@@ -339,8 +339,8 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 				 __LINE__);
 			return -EFAULT;
 		}
-
-		PanelMaster_set_CC(dsi_id, enable);
+		if ((enable == 0) || (enable == 1))
+			PanelMaster_set_CC(dsi_id, enable);
 		return 0;
 	}
 	case LCM_GET_DSI_CONTINU:
@@ -361,7 +361,13 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 		}
 
 		pr_debug("LCM_GET_DSI_CLK=>dsi:%d\n", clk);
-		Panel_Master_dsi_config_entry("PM_CLK", &clk);
+
+		if ((clk >= 5) && (clk <= 625)) {
+			Panel_Master_dsi_config_entry("PM_CLK", &clk);
+		} else {
+			pr_debug("MIPI_SET_CLK=>dsi:%d is wrong, the value should be 25~625!line:%d\n", clk, __LINE__);
+			return -EFAULT;
+		}
 		return 0;
 	}
 	case LCM_GET_DSI_CLK:
@@ -373,7 +379,8 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	}
 	case MIPI_SET_SSC:
 	{
-		struct DSI_RET dsi_ssc;
+		/*struct DSI_RET dsi_ssc;*/
+		uint32_t dsi_ssc;
 
 		if (copy_from_user(&dsi_ssc, (void __user *)argp, sizeof(dsi_ssc))) {
 			pr_debug("[MIPI_SET_SSC]: copy_from_user failed! line:%d\n",
@@ -382,7 +389,13 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 		}
 
 		pr_debug("Pmaster:set mipi ssc line:%d\n", __LINE__);
-		Panel_Master_dsi_config_entry("PM_SSC", &dsi_ssc);
+		if ((dsi_ssc >= 1) && (dsi_ssc <= 8)) {
+			Panel_Master_dsi_config_entry("PM_SSC", &dsi_ssc);
+		} else {
+			pr_debug("MIPI_SET_SSC=>dsi_ssc:%d is wrong, the value should be 1~8!line:%d\n",
+				dsi_ssc, __LINE__);
+			return -EFAULT;
+		}
 		return 0;
 	}
 	case LCM_GET_DSI_SSC:
@@ -440,144 +453,22 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 	}
 	case FB_LAYER_GET_EN:
 	{
-		struct PM_LAYER_EN layers;
-		struct OVL_BASIC_STRUCT ovl_all[TOTAL_OVL_LAYER_NUM];
-		int i = 0;
-
-		memset(ovl_all, 0, sizeof(ovl_all));
-
-#ifdef PRIMARY_OVL0_OVL0_2L_CASCADE
-				ovl_get_info(DISP_MODULE_OVL0, ovl_all);
-				ovl_get_info(DISP_MODULE_OVL0_2L, &ovl_all[4]);
-				for (i = 0; i < TOTAL_OVL_LAYER_NUM; i++)
-					layers.layer_en[i] = (ovl_all[i].layer_en ? 1 : 0);
-
-#else
-
-#ifdef PRIMARY_THREE_OVL_CASCADE
-		ovl_get_info(DISP_MODULE_OVL0_2L, ovl_all);
-		ovl_get_info(DISP_MODULE_OVL0, &ovl_all[2]);
-		ovl_get_info(DISP_MODULE_OVL1_2L, &ovl_all[6]);
-		for (i = 0; i < TOTAL_OVL_LAYER_NUM; i++)
-			layers.layer_en[i] = (ovl_all[i].layer_en ? 1 : 0);
-#else
-		ovl_get_info(DISP_MODULE_OVL0, ovl_all);
-		layers.layer_en[i + 0] = (ovl_all[0].layer_en ? 1 : 0);
-		layers.layer_en[i + 1] = (ovl_all[1].layer_en ? 1 : 0);
-		layers.layer_en[i + 2] = (ovl_all[2].layer_en ? 1 : 0);
-		layers.layer_en[i + 3] = (ovl_all[3].layer_en ? 1 : 0);
-#ifdef OVL_CASCADE_SUPPORT
-		layers.layer_en[i + 4] = (ovl_all[4].layer_en ? 1 : 0);
-		layers.layer_en[i + 5] = (ovl_all[5].layer_en ? 1 : 0);
-		layers.layer_en[i + 6] = (ovl_all[6].layer_en ? 1 : 0);
-		layers.layer_en[i + 7] = (ovl_all[7].layer_en ? 1 : 0);
-#endif
-#endif
-#endif
-		pr_debug("[FB_LAYER_GET_EN] L0:%d L1:%d L2:%d L3:%d\n",
-			ovl_all[0].layer_en, ovl_all[1].layer_en, ovl_all[2].layer_en, ovl_all[3].layer_en);
-		return copy_to_user(argp, &layers, sizeof(layers)) ? -EFAULT : 0;
+		pr_debug("[FB_LAYER_GET_EN] not support any more\n");
+		return  0;
 	}
+
 	case FB_LAYER_GET_INFO:
 	{
-		struct PM_LAYER_INFO layer_info;
-		struct OVL_BASIC_STRUCT ovl_all[TOTAL_OVL_LAYER_NUM];
-
-		memset(ovl_all, 0, sizeof(ovl_all));
-		if (copy_from_user(&layer_info, (void __user *)argp, sizeof(layer_info))) {
-			pr_debug("[FB_LAYER_GET_INFO]: copy_from_user failed! line:%d\n", __LINE__);
-			return -EFAULT;
-		}
-		global_layer_id = layer_info.index;
-#ifdef PRIMARY_OVL0_OVL0_2L_CASCADE
-				ovl_get_info(DISP_MODULE_OVL0, ovl_all);
-				ovl_get_info(DISP_MODULE_OVL0_2L, &ovl_all[4]);
-#else
-
-#ifdef PRIMARY_THREE_OVL_CASCADE
-		ovl_get_info(DISP_MODULE_OVL0_2L, ovl_all);
-		ovl_get_info(DISP_MODULE_OVL0, &ovl_all[2]);
-		ovl_get_info(DISP_MODULE_OVL1_2L, &ovl_all[6]);
-#else
-		ovl_get_info(DISP_MODULE_OVL0, ovl_all);
-#endif
-#endif
-		layer_info.height = ovl_all[layer_info.index].src_h;
-		layer_info.width = ovl_all[layer_info.index].src_w;
-		layer_info.fmt = DP_COLOR_BITS_PER_PIXEL(ovl_all[layer_info.index].fmt);
-		layer_info.layer_size = ovl_all[layer_info.index].src_pitch * ovl_all[layer_info.index].src_h;
-		pr_debug("===>: layer_size:0x%x height:%d\n", layer_info.layer_size, layer_info.height);
-		pr_debug("===>: width:%d src_pitch:%d\n", layer_info.width, ovl_all[layer_info.index].src_pitch);
-		pr_debug("===>: layer_id:%d fmt:%d\n", global_layer_id, layer_info.fmt);
-		pr_debug("===>: layer_en:%d\n", (ovl_all[layer_info.index].layer_en));
-		if ((layer_info.height == 0) || (layer_info.width == 0) || (ovl_all[layer_info.index].layer_en == 0)) {
-			pr_debug("===> Error, height/width is 0 or layer_en == 0!!\n");
-			return -2;
-		} else
-			return copy_to_user(argp, &layer_info, sizeof(layer_info)) ? -EFAULT : 0;
+		pr_debug("[FB_LAYER_GET_INFO] not support any more\n");
+		return  0;
 	}
+
 	case FB_LAYER_DUMP:
 	{
-#ifdef CONFIG_MTK_M4U
-		int layer_size;
-		int ret = 0;
-		unsigned long kva = 0;
-		unsigned int mva;
-		unsigned int mapped_size = 0;
-		unsigned int real_mva = 0;
-		unsigned int real_size = 0;
-		struct OVL_BASIC_STRUCT ovl_all[TOTAL_OVL_LAYER_NUM];
-
-		memset(ovl_all, 0, sizeof(ovl_all));
-
-#ifdef PRIMARY_OVL0_OVL0_2L_CASCADE
-				ovl_get_info(DISP_MODULE_OVL0, ovl_all);
-				ovl_get_info(DISP_MODULE_OVL0_2L, &ovl_all[4]);
-#else
-
-#ifdef PRIMARY_THREE_OVL_CASCADE
-		ovl_get_info(DISP_MODULE_OVL0_2L, ovl_all);
-		ovl_get_info(DISP_MODULE_OVL0, &ovl_all[2]);
-		ovl_get_info(DISP_MODULE_OVL1_2L, &ovl_all[6]);
-#else
-		ovl_get_info(DISP_MODULE_OVL0, ovl_all);
-#endif
-#endif
-		layer_size = ovl_all[global_layer_id].src_pitch * ovl_all[global_layer_id].src_h;
-		mva = ovl_all[global_layer_id].addr;
-		pr_debug("layer_size=%d, src_pitch=%d, h=%d, mva=0x%x,\n",
-			 layer_size, ovl_all[global_layer_id].src_pitch, ovl_all[global_layer_id].src_h, mva);
-
-		if ((layer_size != 0) && (ovl_all[global_layer_id].layer_en != 0)) {
-			ret = m4u_query_mva_info(mva, layer_size, &real_mva, &real_size);
-			if (ret < 0) {
-				pr_debug("m4u_query_mva_info error: ret=%d mva=0x%x layer_size=%d\n",
-					ret, mva, layer_size);
-				return ret;
-			}
-			ret = m4u_mva_map_kernel(real_mva, real_size, &kva, &mapped_size);
-			if (ret < 0) {
-				pr_debug("m4u_mva_map_kernel error: ret=%d real_mva=0x%x real_size=%d\n",
-					ret, real_mva, real_size);
-				return ret;
-			}
-			if (layer_size > mapped_size) {
-				pr_debug("==>layer size(0x%x)>mapped size(0x%x)!!!\n", layer_size, mapped_size);
-				return -EFAULT;
-			}
-			pr_debug("==> addr from user space is 0x%p\n", argp);
-			pr_debug("==> kva=0x%lx real_mva=%x mva=%x mmaped_size=%d layer_size=%d\n",
-				kva, real_mva, mva, mapped_size, layer_size);
-			ret = copy_to_user(argp,
-				(void *)kva + (mva - real_mva), layer_size - (mva - real_mva)) ? -EFAULT : 0;
-			m4u_mva_unmap_kernel(real_mva, real_size, kva);
-			return ret;
-		} else
-			return -2;
-#else
-		return -2;
-#endif
+		pr_debug("[FB_LAYER_DUMP] not support any more\n");
+		return  0;
 	}
+
 	case LCM_GET_ESD:
 	{
 		struct ESD_PARA esd_para;
@@ -588,6 +479,14 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 				 __LINE__);
 			return -EFAULT;
 		}
+
+		if (esd_para.para_num < 0 || esd_para.para_num > 0x30) {
+
+			pr_debug("[LCM_GET_ESD]: wrong esd_para.para_num= %d! line:%d\n",
+						 esd_para.para_num, __LINE__);
+			return -EFAULT;
+		}
+
 		buffer = kzalloc(esd_para.para_num + 6, GFP_KERNEL);
 		if (!buffer)
 			return -ENOMEM;
@@ -1401,10 +1300,13 @@ static const struct file_operations fbconfig_fops = {
 
 void PanelMaster_Init(void)
 {
+#if defined(CONFIG_MT_ENG_BUILD)
 	ConfigPara_dbgfs = debugfs_create_file("fbconfig",
 					       S_IFREG | S_IRUGO, NULL, (void *)0, &fbconfig_fops);
+#endif
 
 	INIT_LIST_HEAD(&head_list.list);
+	mutex_init(&fb_config_lock);
 }
 
 void PanelMaster_Deinit(void)

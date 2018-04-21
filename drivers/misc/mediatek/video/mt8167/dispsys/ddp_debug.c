@@ -140,6 +140,8 @@ unsigned int gEnableIRQ = 1;
 #endif
 unsigned int gDisableSODIForTriggerLoop = 1;
 unsigned int force_sec;
+unsigned int force_ovl_sec;
+unsigned int force_ovl_en;
 
 static char STR_HELP[] =
 	"USAGE:\n"
@@ -244,15 +246,15 @@ static void process_dbg_opt(const char *opt)
 		p = (char *)opt + 7;
 		tmp = strsep(&p, ",");
 		ret = kstrtoul(tmp, 0, &reg_pa);
-		if (reg_pa == 0) {
+		if (reg_pa < 0x10000000 || reg_pa > 0x20000000) {
 			sprintf(buf, "g_regr, invalid pa=0x%lx\n", reg_pa);
 		} else {
 			reg_va = (unsigned long)ioremap_nocache(reg_pa, sizeof(unsigned long));
 			reg_va_before = DISP_REG_GET(reg_va);
 			pr_debug("g_regr, pa=%lx, va=0x%lx, reg_val=0x%x\n",
 				 reg_pa, reg_va, reg_va_before);
-			sprintf(buf, "g_regr, pa=%lx, va=0x%lx, reg_val=0x%x\n",
-				reg_pa, reg_va, reg_va_before);
+			sprintf(buf, "g_regr, pa=%lx, reg_val=0x%x\n",
+				reg_pa, reg_va_before);
 
 			iounmap((void *)reg_va);
 		}
@@ -266,7 +268,7 @@ static void process_dbg_opt(const char *opt)
 		p = (char *)opt + 7;
 		tmp = strsep(&p, ",");
 		ret = kstrtoul(tmp, 0, &reg_pa);
-		if (reg_pa == 0) {
+		if (reg_pa < 0x10000000 || reg_pa > 0x20000000) {
 			sprintf(buf, "g_regw, invalid pa=0x%lx\n", reg_pa);
 		} else {
 			tmp = strsep(&p, ",");
@@ -280,8 +282,8 @@ static void process_dbg_opt(const char *opt)
 			    ("g_regw, pa=%lx, va=0x%lx, value=0x%x, reg_val_before=0x%x, reg_val_after=0x%x\n",
 			     reg_pa, reg_va, (unsigned int)val, reg_va_before, reg_va_after);
 			sprintf(buf,
-				"g_regw, pa=%lx, va=0x%lx, value=0x%x, reg_val_before=0x%x, reg_val_after=0x%x\n",
-				reg_pa, reg_va, (unsigned int)val, reg_va_before, reg_va_after);
+				"g_regw, pa=%lx, value=0x%x, reg_val_before=0x%x, reg_val_after=0x%x\n",
+				reg_pa, (unsigned int)val, reg_va_before, reg_va_after);
 
 			iounmap((void *)reg_va);
 		}
@@ -342,7 +344,7 @@ static void process_dbg_opt(const char *opt)
 		tmp = strsep(&p, ",");
 		ret = kstrtoul(tmp, 0, &level);
 		if (level) {
-			disp_pwm_id_t pwm_id = DISP_PWM0;
+			enum disp_pwm_id_t pwm_id = DISP_PWM0;
 
 			if (opt[3] == '1')
 				pwm_id = DISP_PWM1;
@@ -385,6 +387,16 @@ static void process_dbg_opt(const char *opt)
 		dpmgr_debug_path_status((unsigned int)mutex_idx);
 		sprintf(buf, "dump_path: %d\n", (unsigned int)mutex_idx);
 
+	} else if (strncmp(opt, "ovl_en:", 7) == 0) {
+		unsigned long int ovl_en = 0;
+
+		p = (char *)opt + 7;
+		tmp = strsep(&p, ",");
+		ret = kstrtoul(tmp, 0, &ovl_en);
+		DDPMSG("process_dbg_opt, ovl_en=0x%x\n", (unsigned int)ovl_en);
+		force_ovl_en = ovl_en;
+		sprintf(buf, "ovl_en: 0x%x\n", (unsigned int)ovl_en);
+
 	} else if (strncmp(opt, "debug:", 6) == 0) {
 		char *p = (char *)opt + 6;
 		unsigned int enable;
@@ -424,6 +436,13 @@ static void process_dbg_opt(const char *opt)
 				gSkipIdleDetect = 0;
 			pr_err("gSkipIdleDetect: %d\n", gSkipIdleDetect);
 			sprintf(buf, "gSkipIdleDetect: %d\n", gSkipIdleDetect);
+		} else if (enable == 15) {
+			if (force_ovl_sec == 0)
+				force_ovl_sec = 1;
+			else
+				force_ovl_sec = 0;
+			DDPMSG("force_ovl_sec: %d\n", force_ovl_sec);
+			sprintf(buf, "force_ovl_sec: %d\n", force_ovl_sec);
 		}
 	} else if (strncmp(opt, "mmp", 3) == 0) {
 		init_ddp_mmp_events();
