@@ -1571,11 +1571,13 @@ inline int hmp_fork_balance(struct task_struct *p, int prev_cpu)
 
 static int __init hmp_cpu_mask_setup(void) { return 1; }
 inline int hmp_fork_balance(struct task_struct *p, int prev_cpu) { return prev_cpu; }
+#ifdef CONFIG_SMP
 static void hmp_force_up_migration(int this_cpu) {}
 static int hmp_select_task_rq_fair(int sd_flag, struct task_struct *p,
 		int prev_cpu, int new_cpu) { return new_cpu; }
 static void hmp_online_cpu(int cpu) {}
 static void hmp_offline_cpu(int cpu) {}
+#endif
 #endif /* CONFIG_SCHED_HMP */
 
 #ifdef CONFIG_HMP_FREQUENCY_INVARIANT_SCALE

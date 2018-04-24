@@ -1393,7 +1393,9 @@ extern void cal_cpu_load(int cpu);
 int vip_task_force_migrate(void);
 #endif
 
+#ifdef CONFIG_SMP
 extern void init_max_cpu_capacity(struct max_cpu_capacity *mcc);
+#endif
 
 static inline void add_nr_running(struct rq *rq, unsigned count)
 {
@@ -1665,6 +1667,19 @@ static inline void sched_dl_avg_update(struct rq *rq, u64 dl_delta)
 	rq->dl_avg += dl_delta * arch_scale_freq_capacity(NULL, cpu_of(rq));
 }
 #else
+static inline bool sched_freq(void) { return false; }
+static inline void set_cfs_cpu_capacity(int cpu, bool request,
+					unsigned long capacity,
+					int type)
+{}
+static inline void set_rt_cpu_capacity(int cpu, bool request,
+				       unsigned long capacity,
+				       int type)
+{}
+static inline void set_dl_cpu_capacity(int cpu, bool request,
+				       unsigned long capacity,
+				       int type)
+{}
 static inline void sched_rt_avg_update(struct rq *rq, u64 rt_delta) { }
 static inline void sched_dl_avg_update(struct rq *rq, u64 dl_delta) { }
 static inline void sched_avg_update(struct rq *rq) { }

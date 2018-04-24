@@ -835,8 +835,8 @@ int raw_spin_trylock_n_irqsave(raw_spinlock_t *lock, unsigned long *flags, struc
 			   lock->owner_cpu, lock->raw_lock.slock);
 #endif
 #else
-		SEQ_printf_at_AEE(m, " lock: %x, .magic: %08x, .owner: %s/%d",
-			   (int)lock, lock->magic,
+		SEQ_printf_at_AEE(m, " lock: %p, .magic: %08x, .owner: %s/%d",
+				lock, lock->magic,
 				owner ? owner->comm : "<<none>>",
 				owner ? task_pid_nr(owner) : -1);
 		SEQ_printf_at_AEE(m, ".owner_cpu: %d, value: %d\n",
@@ -886,8 +886,8 @@ int spin_trylock_n_irqsave(spinlock_t *lock, unsigned long *flags, struct seq_fi
 			   rlock.owner_cpu, rlock.raw_lock.slock);
 #endif
 #else
-		SEQ_printf_at_AEE(m, " lock: %x, .magic: %08x, .owner: %s/%d",
-			   (int)&rlock, rlock.magic,
+		SEQ_printf_at_AEE(m, " lock: %p, .magic: %08x, .owner: %s/%d",
+			   &rlock, rlock.magic,
 			   owner ? owner->comm : "<<none>>",
 			   owner ? task_pid_nr(owner) : -1);
 		SEQ_printf_at_AEE(m, ".owner_cpu: %d, value: %d\n",

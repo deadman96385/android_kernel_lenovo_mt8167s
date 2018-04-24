@@ -80,7 +80,7 @@ static void spin_bug(raw_spinlock_t *lock, const char *msg)
 
 	if (!debug_locks_off())
 		return;
-	*/
+
 	spin_dump(lock, msg);
 	snprintf(aee_str, 50, "Spinlock %s :%s\n", current->comm, msg);
 	if ((!strcmp(msg, "bad magic")) || (!strcmp(msg, "already unlocked"))
@@ -92,8 +92,10 @@ static void spin_bug(raw_spinlock_t *lock, const char *msg)
 		pr_emerg(">>>>>>>>>>>>>> Let's KE <<<<<<<<<<<<<<\n");
 		BUG_ON(1);
 	}
+#ifdef CONFIG_MEDIATEK_SOLUTION
 	aee_kernel_warning_api(__FILE__, __LINE__, DB_OPT_DUMMY_DUMP | DB_OPT_FTRACE,
 	aee_str, "spinlock debugger\n");
+#endif
 }
 
 #define SPIN_BUG_ON(cond, lock, msg) if (unlikely(cond)) spin_bug(lock, msg)
@@ -209,8 +211,10 @@ static void __spin_lock_debug(raw_spinlock_t *lock)
 			if (debug_locks) {
 				debug_show_all_locks();
 				snprintf(aee_str, 50, "Spinlock lockup:%s\n", current->comm);
+#ifdef CONFIG_MEDIATEK_SOLUTION
 				aee_kernel_warning_api(__FILE__, __LINE__, DB_OPT_DUMMY_DUMP | DB_OPT_FTRACE,
 							aee_str, "spinlock debugger\n");
+#endif
 			}
 		}
 	}

@@ -869,6 +869,7 @@ void rebuild_sched_domains(void)
 	mutex_unlock(&cpuset_mutex);
 }
 
+#ifdef CONFIG_SMP
 void rebuild_sched_domains_unlocked(void)
 {
 	struct sched_domain_attr *attr;
@@ -885,6 +886,11 @@ void rebuild_sched_domains_unlocked(void)
 	partition_sched_domains(ndoms, doms, attr);
 }
 
+#else
+void rebuild_sched_domains_unlocked(void)
+{
+}
+#endif /* CONFIG_SMP */
 /**
  * update_tasks_cpumask - Update the cpumasks of tasks in the cpuset.
  * @cs: the cpuset in which each task's cpus_allowed mask needs to be changed

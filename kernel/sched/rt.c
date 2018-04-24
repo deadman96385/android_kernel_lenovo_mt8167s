@@ -1117,7 +1117,9 @@ static void update_curr_rt(struct rq *rq)
 	if (curr->sched_class != &rt_sched_class)
 		return;
 
+#ifdef CONFIG_SMP
 	per_cpu(update_exec_start, rq->cpu) = curr->se.exec_start;
+#endif
 	delta_exec = rq_clock_task(rq) - curr->se.exec_start;
 	if (unlikely((s64)delta_exec <= 0))
 		return;
@@ -1141,8 +1143,10 @@ static void update_curr_rt(struct rq *rq)
 
 	sched_rt_avg_update(rq, delta_exec);
 
+#ifdef CONFIG_SMP
 	per_cpu(sched_update_exec_start, rq->cpu) = per_cpu(update_curr_exec_start, rq->cpu);
 	per_cpu(update_curr_exec_start, rq->cpu) = sched_clock_cpu(rq->cpu);
+#endif
 
 	if (!rt_bandwidth_enabled())
 		return;
@@ -1709,8 +1713,10 @@ static struct task_struct *_pick_next_task_rt(struct rq *rq)
 
 	p = rt_task_of(rt_se);
 	p->se.exec_start = rq_clock_task(rq);
+#ifdef CONFIG_SMP
 	per_cpu(pick_exec_start, rq->cpu) = p->se.exec_start;
 	per_cpu(sched_pick_exec_start, rq->cpu) = sched_clock_cpu(rq->cpu);
+#endif
 
 	return p;
 }
@@ -2600,8 +2606,10 @@ static void set_curr_task_rt(struct rq *rq)
 	struct task_struct *p = rq->curr;
 
 	p->se.exec_start = rq_clock_task(rq);
+#ifdef CONFIG_SMP
 	per_cpu(set_curr_exec_start, rq->cpu) = p->se.exec_start;
 	per_cpu(sched_set_curr_exec_start, rq->cpu) = sched_clock_cpu(rq->cpu);
+#endif
 	/* The running task is never eligible for pushing */
 	dequeue_pushable_task(rq, p);
 }

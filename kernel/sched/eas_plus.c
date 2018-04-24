@@ -11,11 +11,13 @@
  * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
+#ifdef CONFIG_SMP
 static bool is_intra_domain(int prev, int target);
 static int select_prefer_idle_cpu(struct task_struct *p);
 static int select_max_spare_capacity_cpu(struct task_struct *p, int target);
 static int select_energy_cpu_plus(struct task_struct *p, int target);
 static int __energy_diff(struct energy_env *eenv);
+#endif
 #ifdef CONFIG_SCHED_TUNE
 static inline int energy_diff(struct energy_env *eenv);
 #else
@@ -23,6 +25,7 @@ static inline int energy_diff(struct energy_env *eenv);
 #endif
 
 
+#ifdef CONFIG_SMP
 static bool is_intra_domain(int prev, int target)
 {
 #ifdef CONFIG_ARM64
@@ -275,3 +278,9 @@ static int select_energy_cpu_plus(struct task_struct *p, int target)
 	trace_energy_aware_wake_cpu(p, task_cpu(p), target_cpu, (int)task_util(p), nrg_diff, false, is_tiny);
 	return target_cpu;
 }
+#else
+int find_best_idle_cpu(struct task_struct *p, bool prefer_idle)
+{
+	return 0;
+}
+#endif /* CONFIG_SMP */

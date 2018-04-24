@@ -2797,7 +2797,9 @@ void remove_set_exclusive_task(int pid, bool task_exit)
 	spin_unlock_irqrestore(&set_excl_st_lock, irq_flags);
 
 	if (unplug == 1) {
+#ifdef CONFIG_MEDIATEK_SOLUTION
 		perfmgr_forcelimit_cpuset_cancel();
+#endif
 		printk_deferred("sched: exclusive core unplug\n");
 	}
 }

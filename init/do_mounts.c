@@ -418,7 +418,9 @@ retry:
 		printk("DEBUG_BLOCK_EXT_DEVT is enabled, you need to specify "
 		       "explicit textual name for \"root=\" boot option.\n");
 #endif
+#ifdef CONFIG_MEDIATEK_WATCHDOG
 		mark_rootfs_corrupted();
+#endif
 		panic("VFS: Unable to mount root fs on %s", b);
 	}
 	if (!(flags & MS_RDONLY)) {
@@ -435,7 +437,9 @@ retry:
 #ifdef CONFIG_BLOCK
 	__bdevname(ROOT_DEV, b);
 #endif
+#ifdef CONFIG_MEDIATEK_WATCHDOG
 	mark_rootfs_corrupted();
+#endif
 	panic("VFS: Unable to mount root fs on %s", b);
 out:
 	put_page(page);

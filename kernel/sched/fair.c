@@ -40,6 +40,7 @@
 #include "walt.h"
 
 
+#ifdef CONFIG_SMP
 #ifndef CONFIG_MTK_SCHED_EAS_POWER_SUPPORT
 /* L+ cpu is defined in power.c */
 static int l_plus_cpu = -1;
@@ -49,6 +50,7 @@ static inline unsigned long boosted_task_util(struct task_struct *task);
 static inline unsigned long task_util(struct task_struct *p);
 static inline bool task_fits_max(struct task_struct *p, int cpu);
 static bool cpu_overutilized(int cpu);
+#endif
 int stune_task_threshold;
 
 #include "hmp.c"
@@ -147,8 +149,10 @@ unsigned long __weak arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
 
 unsigned long __weak arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
 {
+#ifdef CONFIG_SMP
 	if (sd && (sd->flags & SD_SHARE_CPUCAPACITY) && (sd->span_weight > 1))
 		return sd->smt_gain / sd->span_weight;
+#endif
 
 	return SCHED_CAPACITY_SCALE;
 }
@@ -4342,6 +4346,7 @@ static inline void hrtick_update(struct rq *rq)
 }
 #endif
 
+#ifdef CONFIG_SMP
 static void update_capacity_of(int cpu, int type)
 {
 	unsigned long req_cap;
@@ -4354,6 +4359,7 @@ static void update_capacity_of(int cpu, int type)
 	req_cap = req_cap * SCHED_CAPACITY_SCALE / capacity_orig_of(cpu);
 	set_cfs_cpu_capacity(cpu, true, req_cap, type);
 }
+#endif
 
 /*
  * The enqueue_task method is called before nr_running is
@@ -4365,8 +4371,10 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
+#ifdef CONFIG_SMP
 	int task_new = flags & ENQUEUE_WAKEUP_NEW;
 	int task_wakeup = flags & ENQUEUE_WAKEUP;
+#endif
 
 	for_each_sched_entity(se) {
 		if (se->on_rq)
@@ -4424,6 +4432,7 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	if (!se) {
 		walt_inc_cumulative_runnable_avg(rq, p);
+#ifdef CONFIG_SMP
 		if (!task_new && !rq->rd->overutilized &&
 				cpu_overutilized(rq->cpu)) {
 			rq->rd->overutilized = true;
@@ -4451,6 +4460,7 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 			else
 				update_capacity_of(cpu_of(rq), SCHE_VALID);
 		}
+#endif
 
 #ifndef CONFIG_CFS_BANDWIDTH
 		BUG_ON(rq->cfs.nr_running > rq->cfs.h_nr_running);
@@ -4543,6 +4553,7 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	if (!se) {
 		walt_dec_cumulative_runnable_avg(rq, p);
 
+#ifdef CONFIG_SMP
 		/*
 		 * We want to potentially trigger a freq switch
 		 * request only for tasks that are going to sleep;
@@ -4557,6 +4568,7 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 			else if (sched_freq())
 				set_cfs_cpu_capacity(cpu_of(rq), false, 0, SCHE_ONESHOT);
 		}
+#endif
 
 #ifndef CONFIG_CFS_BANDWIDTH
 		BUG_ON(rq->cfs.nr_running > rq->cfs.h_nr_running);
@@ -9300,6 +9312,7 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 	if (static_branch_unlikely(&sched_numa_balancing))
 		task_tick_numa(rq, curr);
 
+#ifdef CONFIG_SMP
 	if (!rq->rd->overutilized && cpu_overutilized(task_cpu(curr))) {
 		rq->rd->overutilized = true;
 
@@ -9307,6 +9320,7 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 		if (capacity_orig_of(cpu_of(rq)) < (rq->rd->max_cpu_capacity.val))
 			system_overutil = true;
 	}
+#endif
 }
 
 /*
@@ -9776,8 +9790,8 @@ __init void init_sched_fair_class(void)
 	zalloc_cpumask_var(&nohz.idle_cpus_mask, GFP_NOWAIT);
 	cpu_notifier(sched_ilb_notifier, 0);
 #endif
-#endif /* SMP */
 	cmp_cputopo_domain_setup();
+#endif /* SMP */
 
 	if (sched_feat(SCHED_HMP))
 		hmp_cpu_mask_setup();

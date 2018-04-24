@@ -1362,6 +1362,10 @@ static inline bool cpus_share_cache(int this_cpu, int that_cpu)
 	return true;
 }
 
+static inline bool sched_boost(void)
+{
+	return false;
+}
 #endif	/* !CONFIG_SMP */
 
 
@@ -3671,9 +3675,11 @@ extern inline int throttled_lb_pair(struct task_group *tg,
 extern int task_hot(struct task_struct *p, struct lb_env *env);
 
 /* for EAS */
+#ifdef CONFIG_SMP
 extern int calc_util_delta(struct energy_env *eenv, int cpu);
 extern unsigned long __get_cpu_usage(int cpu, int delta);
 extern int calc_usage_delta(struct energy_env *eenv, int cpu);
+#endif
 
 /* runqueue "owned" by this group */
 extern inline struct cfs_rq *group_cfs_rq(struct sched_entity *grp);

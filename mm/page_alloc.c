@@ -7102,11 +7102,13 @@ int free_reserved_memory(phys_addr_t start_phys,
 		 return -1;
 	}
 
+#ifdef CONFIG_HAVE_MEMBLOCK
 	if (!memblock_is_region_reserved(start_phys, end_phys - start_phys)) {
 		pr_alert("%s:not reserved memory phys_start:0x%pa phys_end:0x%pa\n"
 			, __func__, &start_phys, &end_phys);
 		return -1;
 	}
+#endif
 	for (pos = start_phys; pos < end_phys; pos += PAGE_SIZE, pages++)
 		free_reserved_page(phys_to_page(pos));
 
