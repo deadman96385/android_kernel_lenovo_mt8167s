@@ -1480,8 +1480,8 @@ static void android_work(struct work_struct *data)
 	unsigned long flags;
 	bool uevent_sent = false;
 
-#if 0 // FIXME
 	/* be aware this could not be used in non-sleep context */
+#ifdef CONFIG_USB_MTK_HDRC
 	if (!usb_cable_connected())
 		status[3] = true;
 #endif
