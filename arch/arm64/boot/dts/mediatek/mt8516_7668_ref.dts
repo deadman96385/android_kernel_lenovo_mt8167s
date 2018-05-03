@@ -630,14 +630,14 @@ pwm_goio_def_cfg: pwmdefault {
 /* USB GPIO start */
 	usb0_drvvbus: drvvbus_init {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_49_SPI_CK__FUNC_GPIO49>;
+			pins = <MT8167_PIN_18_EINT18__FUNC_USB_DRVVBUS>;
 			output-low;
 		};
 	};
 
 	usb0_drvvbus_high: drvvbus_high {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_49_SPI_CK__FUNC_GPIO49>;
+			pins = <MT8167_PIN_18_EINT18__FUNC_USB_DRVVBUS>;
 			slew-rate = <1>;
 			output-high;
 		};
@@ -645,7 +645,7 @@ pwm_goio_def_cfg: pwmdefault {
 
 	usb0_drvvbus_low: drvvbus_low {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_49_SPI_CK__FUNC_GPIO49>;
+			pins = <MT8167_PIN_18_EINT18__FUNC_USB_DRVVBUS>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -653,7 +653,7 @@ pwm_goio_def_cfg: pwmdefault {
 
 	usb0_iddig: iddig_irq_init {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_41_KPROW1__FUNC_IDDIG>;
+			pins = <MT8167_PIN_19_EINT19__FUNC_IDDIG>;
 			slew-rate = <0>;
 			bias-pull-up = <00>;
 		};
@@ -700,7 +700,8 @@ pwm_goio_def_cfg: pwmdefault {
 	pinctrl-2 = <&usb0_drvvbus_low>;
 	pinctrl-3 = <&usb0_drvvbus_high>;
 	status = "okay";
-	drvvbus_gpio = <&pio 49 2>;
+	drvvbus_gpio = <&pio 18 2>;
+	iddig_gpio = <&pio 19 2>;
 };
 
 &pwm {
