@@ -51,7 +51,7 @@
 		clocks = <&topckgen CLK_TOP_MSDC1>,
 			 <&topckgen CLK_TOP_AHB_INFRA_SEL>,
 			 <&topckgen CLK_TOP_MSDC1_INFRA>;
-		clock-names = "sdio-bus", "sdio-src", "sdio-src-cg";
+		clock-names = "source", "hclk", "source_cg";
 		status = "disabled";
 	};
 
@@ -252,15 +252,12 @@
 	pinctrl-0 = <&mmc1_pins_default>;
 	pinctrl-1 = <&mmc1_pins_uhs>;
 	status = "okay";
-	clk_src = <2>;  /*<MSDC30_CLKSRC_200MHZ>*/
-	host_function = <2>;
 	bus-width = <4>;
 	max-frequency = <200000000>;
 	cap-sd-highspeed;
 	sd-uhs-sdr50;
 	sd-uhs-sdr104;
-	vmmc-supply = <&mt6392_vmch_reg>;
-	vqmmc-supply = <&mt6392_vmc_reg>;
+	keep-power-in-suspend;
 };
 
 &mt6392_vcamaf_reg {
