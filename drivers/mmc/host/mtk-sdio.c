@@ -214,6 +214,7 @@ static void msdc_set_timeout(struct msdc_host *host, u32 ns, u32 clks)
 
 static void msdc_gate_clock(struct msdc_host *host)
 {
+	clk_disable_unprepare(host->src_clk_cg);
 	clk_disable_unprepare(host->src_clk);
 	clk_disable_unprepare(host->h_clk);
 
@@ -226,6 +227,7 @@ static void msdc_ungate_clock(struct msdc_host *host)
 {
 	clk_prepare_enable(host->h_clk);
 	clk_prepare_enable(host->src_clk);
+	clk_prepare_enable(host->src_clk_cg);
 	while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
 		cpu_relax();
 
@@ -3199,6 +3201,16 @@ static void msdc_enable_sdio_irq(struct mmc_host *mmc, int enable)
 	struct msdc_host *host = mmc_priv(mmc);
 
 	host->irq_thread_alive = true;
+
+#ifdef SUPPORT_LEGACY_SDIO
+	if (host->cap_eirq) {
+		if (enable)
+			host->enable_sdio_eirq(); /* combo_sdio_enable_eirq */
+		else
+			host->disable_sdio_eirq(); /* combo_sdio_disable_eirq */
+	}
+#endif
+
 	if (enable) {
 		msdc_recheck_sdio_irq(host);
 
@@ -3275,8 +3287,8 @@ static void msdc_pm(pm_message_t state, void *data)
 		host->suspend = 0;
 		host->mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;
 		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
-		mmc_add_host(host->mmc);
 		host->mmc->rescan_entered = 0;
+		mmc_add_host(host->mmc);
 	}
 }
 #endif
@@ -3325,6 +3337,10 @@ static int msdc_drv_probe(struct platform_device *pdev)
 		goto host_free;
 	}
 
+	host->src_clk_cg = devm_clk_get(&pdev->dev, "source_cg");
+	if (IS_ERR(host->src_clk_cg))
+		host->src_clk_cg = NULL;
+
 	host->irq = platform_get_irq(pdev, 0);
 	if (host->irq < 0) {
 		ret = -EINVAL;
@@ -3358,12 +3374,23 @@ static int msdc_drv_probe(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "hs400-ds-delay: %x\n",
 			host->hs400_ds_delay);
 
+#ifdef SUPPORT_LEGACY_SDIO
+	if (of_property_read_bool(pdev->dev.of_node, "cap-sdio-irq"))
+		host->cap_eirq = false;
+	else
+		host->cap_eirq = true;
+#endif
+
 	host->dev = &pdev->dev;
 	host->mmc = mmc;
 	host->src_clk_freq = clk_get_rate(host->src_clk);
 	if (host->src_clk_freq > 200000000)
 		host->src_clk_freq = 200000000;
 	/* Set host parameters to mmc */
+#ifdef SUPPORT_LEGACY_SDIO
+	if (host->cap_eirq)
+		mmc->caps |= MMC_CAP_SDIO_IRQ;
+#endif
 	mmc->ops = &mt_msdc_ops;
 	mmc->f_min = host->src_clk_freq / (4 * 255);
 	mmc->ocr_avail = MMC_VDD_28_29 | MMC_VDD_29_30 | MMC_VDD_30_31 |

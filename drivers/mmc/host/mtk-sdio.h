@@ -644,6 +644,7 @@ struct msdc_host {
 	int autok_error;
 
 #ifdef SUPPORT_LEGACY_SDIO
+	bool cap_eirq;
 	int suspend;
 	/* external sdio irq operations */
 	void (*request_sdio_eirq)(sdio_irq_handler_t sdio_irq_handler,
