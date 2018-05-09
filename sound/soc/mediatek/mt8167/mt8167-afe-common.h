@@ -95,6 +95,7 @@ enum mt8167_afe_irq_mode {
 	MT8167_AFE_IRQ_6, /* dedicated for SPDIF */
 	MT8167_AFE_IRQ_7,
 	MT8167_AFE_IRQ_10,/* dedicated for TDM IN */
+	MT8167_AFE_IRQ_11,
 	MT8167_AFE_IRQ_NUM
 };
 
@@ -244,6 +245,7 @@ struct mtk_afe {
 	unsigned int tdm_out_mode;
 	unsigned int i2s_clk_modes[MT8167_AFE_I2S_SETS];
 	unsigned int awb_irq_mode;
+	unsigned int dl2_irq_mode;
 	unsigned int dai_irq_mode;
 	/* locks */
 	spinlock_t afe_ctrl_lock;

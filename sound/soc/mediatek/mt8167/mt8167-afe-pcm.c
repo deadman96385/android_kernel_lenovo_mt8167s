@@ -740,6 +740,17 @@ static int mt8167_afe_enable_irq(struct mtk_afe *afe, struct mt8167_afe_memif *m
 	case MT8167_AFE_IRQ_10:
 		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 4, 1 << 4);
 		break;
+	case MT8167_AFE_IRQ_11:
+		regmap_update_bits(afe->regmap, AFE_TSF_CON,
+		    AFE_TSF_CON_HDMIOUT_AUTO_EN |
+		    AFE_TSF_CON_HDMIOUT_HW_DIS |
+		    AFE_TSF_CON_DL2_AUTO_EN |
+		    AFE_TSF_CON_DL1_AUTO_EN |
+		    AFE_TSF_CON_DL_HW_DIS,
+		    AFE_TSF_CON_HDMIOUT_HW_DIS |
+		    AFE_TSF_CON_DL_HW_DIS);
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 5, 1 << 5);
+		break;
 	default:
 		break;
 	}
@@ -786,6 +797,10 @@ static int mt8167_afe_disable_irq(struct mtk_afe *afe, struct mt8167_afe_memif *
 	case MT8167_AFE_IRQ_10:
 		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 4, 0 << 4);
 		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 9);
+		break;
+	case MT8167_AFE_IRQ_11:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 5, 0 << 5);
+		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 10);
 		break;
 	default:
 		break;
@@ -2750,6 +2765,14 @@ static int mt8167_afe_set_memif_irq_by_mode(struct mt8167_afe_memif_data *data,
 		data->irq_fs_shift = 24;
 		data->irq_clr_shift = 6;
 		break;
+	case MT8167_AFE_IRQ_11:
+		data->irq_reg_cnt = AFE_IRQ_CNT11;
+		data->irq_cnt_shift = 0;
+		data->irq_mode = MT8167_AFE_IRQ_11;
+		data->irq_fs_reg = AFE_IRQ_MCU_CON2;
+		data->irq_fs_shift = 20;
+		data->irq_clr_shift = 10;
+		break;
 	default:
 		ret = -EINVAL;
 	}
@@ -3543,14 +3566,21 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 	}
 
 	if (of_property_read_u32(np, "mediatek,awb-irq-mode", &afe->awb_irq_mode))
-		afe->awb_irq_mode = MT8167_AFE_IRQ_2;
+		afe->awb_irq_mode = memif_data[MT8167_AFE_MEMIF_AWB].irq_mode;
 
 	if (afe->awb_irq_mode != memif_data[MT8167_AFE_MEMIF_AWB].irq_mode)
 		mt8167_afe_set_memif_irq_by_mode(&memif_data[MT8167_AFE_MEMIF_AWB],
 						 afe->awb_irq_mode);
 
+	if (of_property_read_u32(np, "mediatek,dl2-irq-mode", &afe->dl2_irq_mode))
+		afe->dl2_irq_mode = memif_data[MT8167_AFE_MEMIF_DL2].irq_mode;
+
+	if (afe->dl2_irq_mode != memif_data[MT8167_AFE_MEMIF_DL2].irq_mode)
+		mt8167_afe_set_memif_irq_by_mode(&memif_data[MT8167_AFE_MEMIF_DL2],
+						 afe->dl2_irq_mode);
+
 	if (of_property_read_u32(np, "mediatek,dai-irq-mode", &afe->dai_irq_mode))
-		afe->dai_irq_mode = MT8167_AFE_IRQ_2;
+		afe->dai_irq_mode = memif_data[MT8167_AFE_MEMIF_DAI].irq_mode;
 
 	if (afe->dai_irq_mode != memif_data[MT8167_AFE_MEMIF_DAI].irq_mode)
 		mt8167_afe_set_memif_irq_by_mode(&memif_data[MT8167_AFE_MEMIF_DAI],
