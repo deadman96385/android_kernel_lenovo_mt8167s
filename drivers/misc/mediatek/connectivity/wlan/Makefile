@@ -8,6 +8,7 @@ endif
 #########################################################
 # Wi-Fi character device driver
 
+ifeq ($(CONFIG_MTK_COMBO_COMM), y)
 ccflags-y += -D CREATE_NODE_DYNAMIC=1
 
 ifeq ($(CONFIG_MTK_TC1_FEATURE), y)
@@ -21,6 +22,7 @@ ccflags-y += \
 	-I$(src)/../common/common_main/linux/include
 
 obj-$(CONFIG_MTK_COMBO_WIFI) += wmt_chrdev_wifi.o
+endif
 
 #########################################################
 # WLAN driver
@@ -39,4 +41,8 @@ endif
 
 ifneq ($(filter "MT6632",$(CONFIG_MTK_COMBO_CHIP)),)
 	obj-y   +=  gen4/
+endif
+
+ifneq ($(filter "MT7668",$(CONFIG_MTK_COMBO_CHIP)),)
+	obj-y   +=  gen4-mt7668/
 endif
