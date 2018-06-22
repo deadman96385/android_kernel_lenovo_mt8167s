@@ -213,6 +213,15 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c0_pins_a>;
 	status = "okay";
+
+	cap_touch@5d {
+		compatible = "mediatek,cap_touch";
+		reg = <0x5d>;
+		interrupt-parent = <&pio>;
+		interrupts = <8 IRQ_TYPE_EDGE_FALLING>;
+		int-gpio = <&pio 8 0>;
+		rst-gpio = <&pio 9 0>;
+	};
 };
 
 &i2c1 {
@@ -306,6 +315,53 @@
 	state_default:pinconf_default {
 	};
 
+	CTP_pins_default: eint0default {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_8_EINT8__FUNC_GPIO8>;
+			slew-rate = <0>;
+			bias-disable;
+		};
+	};
+
+	CTP_pins_eint_as_int: eint@0 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_8_EINT8__FUNC_GPIO8>;
+			slew-rate = <0>;
+			bias-disable;
+		};
+	};
+
+	CTP_pins_eint_output0: eintoutput0 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_8_EINT8__FUNC_GPIO8>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+
+	CTP_pins_eint_output1: eintoutput1 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_8_EINT8__FUNC_GPIO8>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+
+	CTP_pins_rst_output0: rstoutput0 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_9_EINT9__FUNC_GPIO9>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+
+	CTP_pins_rst_output1: rstoutput1 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_9_EINT9__FUNC_GPIO9>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
 
 pwm_goio_def_cfg: pwmdefault {
 		pins_cmd_dat {
@@ -687,6 +743,29 @@ pwm_goio_def_cfg: pwmdefault {
 		reg = <0>;
 		spi-max-frequency = <1000000>;
 	};
+};
+
+&touch {
+	vtouch-supply = <&mt6392_vmc_reg>;
+	tpd-resolution = <720 1280>;
+	use-tpd-button = <0>;
+	tpd-key-num = <4>;
+	tpd-key-local= <139 172 158 0>;
+	tpd-key-dim-local = <60 850 50 30 180 850 50 30 300 850 50 30 420 850 50 30>;
+	tpd-max-touch-num = <5>;
+	tpd-filter-enable = <1>;
+	tpd-filter-pixel-density = <124>;
+	tpd-filter-custom-prameters = <0 0 0 0 0 0 0 0 0 0 0 0>;
+	tpd-filter-custom-speed = <0 0 0>;
+	pinctrl-names = "default", "state_eint_as_int", "state_eint_output0", "state_eint_output1",
+		"state_rst_output0", "state_rst_output1";
+	pinctrl-0 = <&CTP_pins_default>;
+	pinctrl-1 = <&CTP_pins_eint_as_int>;
+	pinctrl-2 = <&CTP_pins_eint_output0>;
+	pinctrl-3 = <&CTP_pins_eint_output1>;
+	pinctrl-4 = <&CTP_pins_rst_output0>;
+	pinctrl-5 = <&CTP_pins_rst_output1>;
+	status = "okay";
 };
 
 &uart0 {
