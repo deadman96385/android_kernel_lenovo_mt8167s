@@ -117,6 +117,19 @@ static struct snd_soc_dai_link mt8516_mt7668_ref_dais[] = {
 		.dynamic = 1,
 		.dpcm_capture = 1,
 	},
+	{
+		.name = "DL2 Playback",
+		.stream_name = "MultiMedia2_PLayback",
+		.cpu_dai_name = "DL2",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.trigger = {
+			SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST
+		},
+		.dynamic = 1,
+		.dpcm_playback = 1,
+	},
 	/* Backend End DAI links */
 	{
 		.name = "HDMI BE",
@@ -136,6 +149,7 @@ static struct snd_soc_dai_link mt8516_mt7668_ref_dais[] = {
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
 			   SND_SOC_DAIFMT_CBS_CFS,
+		.dpcm_playback = 1,
 		.dpcm_capture = 1,
 	},
 	{
@@ -157,7 +171,7 @@ static struct snd_soc_dai_link mt8516_mt7668_ref_dais[] = {
 		.dpcm_capture = 1,
 	},
 	{
-		.name = "EXT DAC",
+		.name = "EXT Codec",
 		.cpu_dai_name = "I2S",
 		.no_pcm = 1,
 		.codec_name = "snd-soc-dummy",
@@ -165,6 +179,7 @@ static struct snd_soc_dai_link mt8516_mt7668_ref_dais[] = {
 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
 			   SND_SOC_DAIFMT_CBS_CFS,
 		.dpcm_playback = 1,
+		.dpcm_capture = 1,
 	},
 	{
 		.name = "MRG BT BE",
@@ -178,13 +193,17 @@ static struct snd_soc_dai_link mt8516_mt7668_ref_dais[] = {
 };
 
 static const struct snd_soc_dapm_widget mt8516_mt7668_ref_dapm_widgets[] = {
-	SND_SOC_DAPM_INPUT("External Line In"),
-	SND_SOC_DAPM_OUTPUT("Virtual SPK Out"),
+	SND_SOC_DAPM_INPUT("External Line In1"),
+	SND_SOC_DAPM_INPUT("External Line In2"),
+	SND_SOC_DAPM_OUTPUT("Virtual SPK Out1"),
+	SND_SOC_DAPM_OUTPUT("Virtual SPK Out2"),
 };
 
 static const struct snd_soc_dapm_route mt8516_mt7668_ref_audio_map[] = {
-	{"I2S Capture", NULL, "External Line In"},
-	{"Virtual SPK Out", NULL, "I2S Playback"},
+	{"I2S Capture", NULL, "External Line In1"},
+	{"2ND I2S Capture", NULL, "External Line In2"},
+	{"Virtual SPK Out1", NULL, "I2S Playback"},
+	{"Virtual SPK Out2", NULL, "2ND I2S Playback"},
 
 	/* ADDA clock - Uplink */
 	{"AIF TX", NULL, "AFE_CLK"},
