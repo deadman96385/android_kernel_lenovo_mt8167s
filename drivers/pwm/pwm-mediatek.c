@@ -65,7 +65,7 @@ static const unsigned long mt8167_pwm_register[PWM_NUM_MAX] = {
 
 static struct mtk_com_pwm_data mt8167_pwm_data = {
 	.pwm_register = &mt8167_pwm_register[0],
-	.pwm_nums = 3,
+	.pwm_nums = 5,
 };
 
 static const struct of_device_id pwm_of_match[] = {
@@ -203,10 +203,27 @@ static void mtk_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 	mtk_pwm_clk_disable(chip, pwm);
 }
 
+#ifdef CONFIG_DEBUG_FS
+static void mtk_pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
+{
+	struct mtk_com_pwm *mt_pwm = to_mtk_pwm(chip);
+	u32 value;
+	int i;
+
+	for(i = 0; i < mt_pwm->data->pwm_nums; ++i) {
+		value = mtk_pwm_readl(mt_pwm, i, PWM_SEND_WAVENUM);
+		pr_info("pwm%d: send wavenum:%u\n", i, value);
+	}
+}
+#endif
+
 static const struct pwm_ops mtk_pwm_ops = {
 	.config = mtk_pwm_config,
 	.enable = mtk_pwm_enable,
 	.disable = mtk_pwm_disable,
+#ifdef CONFIG_DEBUG_FS
+	.dbg_show = mtk_pwm_dbg_show,
+#endif
 	.owner = THIS_MODULE,
 };
 
