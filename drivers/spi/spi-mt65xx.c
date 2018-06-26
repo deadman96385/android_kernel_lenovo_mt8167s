@@ -84,6 +84,8 @@
 
 #define MTK_SPI_MAX_FIFO_SIZE 32
 #define MTK_SPI_PACKET_SIZE 1024
+#define SPI_CFG0_COUNT_SIZE 256U
+#define SPI_CFG0_COUNT_SIZE_ADJUST 65536U
 #define SPI_1G_SIZE         (0x40000000)
 #define ADDRSHIFT_R_OFFSET  (6)
 #define ADDRSHIFT_R_MASK    (0xFFFFF03F)
@@ -301,6 +303,8 @@ static void mtk_spi_prepare_transfer(struct spi_master *master,
 	cs_time = sck_time * 2;
 
 	if (mdata->dev_comp->adjust_reg) {
+		sck_time = min(sck_time, SPI_CFG0_COUNT_SIZE_ADJUST);
+		cs_time = min(cs_time, SPI_CFG0_COUNT_SIZE_ADJUST);
 		reg_val |= (((sck_time - 1) & 0xffff) << SPI_CFG0_SCK_HIGH_OFFSET);
 		reg_val |= (((sck_time - 1) & 0xffff)
 			   << SPI_ADJUST_CFG0_SCK_LOW_OFFSET);
@@ -311,6 +315,8 @@ static void mtk_spi_prepare_transfer(struct spi_master *master,
 			   << SPI_ADJUST_CFG0_CS_SETUP_OFFSET);
 		writel(reg_val, mdata->base + SPI_CFG0_REG);
 	} else {
+		sck_time = min(sck_time, SPI_CFG0_COUNT_SIZE);
+		cs_time = min(cs_time, SPI_CFG0_COUNT_SIZE);
 		reg_val |= (((sck_time - 1) & 0xff) << SPI_CFG0_SCK_HIGH_OFFSET);
 		reg_val |= (((sck_time - 1) & 0xff) << SPI_CFG0_SCK_LOW_OFFSET);
 		reg_val |= (((cs_time - 1) & 0xff) << SPI_CFG0_CS_HOLD_OFFSET);
@@ -318,6 +324,7 @@ static void mtk_spi_prepare_transfer(struct spi_master *master,
 		writel(reg_val, mdata->base + SPI_CFG0_REG);
 	}
 
+	cs_time = min(cs_time, SPI_CFG0_COUNT_SIZE);
 	reg_val = readl(mdata->base + SPI_CFG1_REG);
 	reg_val &= ~SPI_CFG1_CS_IDLE_MASK;
 	reg_val |= (((cs_time - 1) & 0xff) << SPI_CFG1_CS_IDLE_OFFSET);
