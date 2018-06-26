@@ -623,10 +623,10 @@ pwm_goio_def_cfg: pwmdefault {
 
 	spi_pins_a: spi {
 		pins_spi {
-			pinmux = <MT8167_PIN_3_EINT3__FUNC_SPI_MI>,
-				 <MT8167_PIN_51_SPI_MO__FUNC_SPI_MO>,
-				 <MT8167_PIN_5_EINT5__FUNC_SPI_CSB>,
-				 <MT8167_PIN_6_EINT6__FUNC_SPI_CLK>;
+			pinmux = <MT8167_PIN_48_SPI_CS__FUNC_SPI_CSB>,
+				 <MT8167_PIN_49_SPI_CK__FUNC_SPI_CLK>,
+				 <MT8167_PIN_50_SPI_MI__FUNC_SPI_MI>,
+				 <MT8167_PIN_51_SPI_MO__FUNC_SPI_MO>;
 			bias-disable;
 		};
 	};
