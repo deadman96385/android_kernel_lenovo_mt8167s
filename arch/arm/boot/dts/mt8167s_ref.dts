@@ -17,20 +17,24 @@
 #include "mt8167s_ref_bat_setting.dtsi"
 
 / {
-	dummy1v8: fixedregulator@0 {
-		compatible = "regulator-fixed";
-		regulator-name = "mmc_io";
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <1800000>;
-		regulator-always-on;
+	memory@00000000 {
+		device_type = "memory";
+		reg = <0 0x40000000 0 0x40000000>;
 	};
 
-	dummy3v3: fixedregulator@1 {
-		compatible = "regulator-fixed";
-		regulator-name = "mmc_power";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		regulator-always-on;
+	/* chosen */
+	chosen {
+		bootargs = "console=ttyS0,921600n1 root=/dev/ram initrd=0x44000200,0x200000";
+	};
+
+	msdc2: sdio@11170000 {
+		compatible = "mediatek,mt8167-sdio";
+		reg = <0 0x11170000 0 0x1000>;
+		interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_LOW>;
+		clocks = <&topckgen CLK_TOP_MSDC2>,
+			 <&topckgen CLK_TOP_MSDC2_INFRA>;
+		clock-names = "source", "hclk";
+		status = "disabled";
 	};
 
 	mtcpufreq {
@@ -57,29 +61,21 @@
 	};
 
 	sound: sound {
-		compatible = "mediatek,mt8167s-som";
+		compatible = "mediatek,mt8516-mt7668-ref";
 		mediatek,platform = <&afe>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&aud_pins_default>;
-		tdmadc-1p8v-supply = <&mt6392_vcn18_reg>;
-		tdmadc-3p3v-supply = <&mt6392_vmch_reg>;
-		mediatek,audio-codec = <&tas5782m>;
 		status = "okay";
-	};
-
-	vibrator0:vibrator@0 {
-		compatible = "mediatek,vibrator";
-		vib_timer = <25>;
-		vib_limit = <9>;
-		vib_vol= <5>;
 	};
 };
 
 &afe {
 	/* 0(HDMI) 1(I2S) 2(TDM) */
-	mediatek,tdm-out-mode = <0>;
-	/*0(Spearated Mode) 1(Share Mode)*/
-	mediatek,i2s-clock-modes = <1 0>;
+	mediatek,tdm-out-mode = <1>;
+	/* 0(IRQ1) 1(IRQ2) 4(IRQ7) */
+	mediatek,awb-irq-mode = <4>;
+	/* 0(seperate clock) 1(shared clock) */
+	mediatek,i2s-clock-modes = <1 1>;
 };
 
 &bat_comm {
@@ -153,24 +149,6 @@
 		compatible = "mediatek,camera_main";
 		reg = <0x36>;
 	};
-
-	gsensor_mtk: gsensor@4c {
-		compatible = "mediatek,gsensor";
-		reg = <0x4c>;
-		i2c_num	= <2>;
-		i2c_addr = <0x4c 0 0 0>;
-		direction = <5>;
-		power_id = <0xffff>;
-		power_vol = <0>;
-		firlen = <0>;
-		is_batch_supported = <0>;
-	};
-
-	tlv320aic3101@1b{
-		compatible = "ti,tlv320aic3101";
-		reg = <0x1b>;
-		rst-gpio = <&pio 24 0>;
-	};
 };
 
 &i2c2 {
@@ -178,13 +156,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c2_pins_a>;
 	status = "okay";
-
-	tas5782m: tas5782m@48 {
-		compatible = "ti,tas5782m";
-		reg = <0x48>;
-		rst-gpio = <&pio 107 0>;
-		mute-gpio = <&pio 108 0>;
-	};
 };
 
 /* Main Cam */
@@ -212,20 +183,16 @@
 	status = "okay";
 };
 
-/* Sub Cam */
 &keypad {
-	pinctrl-names = "default";
-	pinctrl-0 = <&kpd_pins_default>;
-	status = "okay";
 	mediatek,kpd-key-debounce = <1024>;
 	mediatek,kpd-sw-pwrkey = <116>;
 	mediatek,kpd-hw-pwrkey = <8>;
-	mediatek,kpd-sw-rstkey  = <0>;
+	mediatek,kpd-sw-rstkey  = <114>;
 	mediatek,kpd-hw-rstkey = <17>;
 	mediatek,kpd-use-extend-type = <0>;
 	/*HW Keycode [0~71] -> Linux Keycode*/
 	mediatek,kpd-hw-map-num = <72>;
-	mediatek,kpd-hw-init-map = <115 50 0 0 0 0 0 0 0 30 164 0 0 0 0 0 0 0 0 0 0 0 0 0
+	mediatek,kpd-hw-init-map = <115 113 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 			0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 			0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 >;
 	mediatek,kpd-pwrkey-eint-gpio = <0>;
@@ -256,7 +223,7 @@
 	non-removable;
 };
 
-&mmc2 {
+&msdc2 {
 	pinctrl-names = "default", "state_uhs";
 	pinctrl-0 = <&mmc2_pins_default>;
 	pinctrl-1 = <&mmc2_pins_uhs>;
@@ -272,14 +239,12 @@
 	non-removable;
 };
 
-&mt6392_audio_codec {
-	mediatek,speaker-mode = <0>; /* 0(CLASSD) 1(CLASSAB) */
-	status = "okay";
+&mt6392_vcn18_reg {
+	regulator-always-on;
 };
 
-&mt6392_vm_reg {
+&mt6392_vmch_reg {
 	regulator-always-on;
-	regulator-boot-on;
 };
 
 &pio {
@@ -413,6 +378,34 @@
 		};
 	};
 
+	dpi_pins_default: dpi_pins_default {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_0_EINT0__FUNC_DPI_CK>,
+			<MT8167_PIN_24_EINT24__FUNC_DPI_DE>,
+			<MT8167_PIN_25_EINT25__FUNC_DPI_VSYNC>,
+			<MT8167_PIN_35_UTXD2__FUNC_DPI_HSYNC>,
+			<MT8167_PIN_13_EINT13__FUNC_DPI_D0>,
+			<MT8167_PIN_38_MRG_DI__FUNC_DPI_D1>,
+			<MT8167_PIN_39_MRG_DO__FUNC_DPI_D2>,
+			<MT8167_PIN_37_MRG_SYNC__FUNC_DPI_D3>,
+			<MT8167_PIN_36_MRG_CLK__FUNC_DPI_D4>,
+			<MT8167_PIN_34_URXD2__FUNC_DPI_D5>,
+			<MT8167_PIN_7_EINT7__FUNC_DPI_D6>,
+			<MT8167_PIN_8_EINT8__FUNC_DPI_D7>,
+			<MT8167_PIN_9_EINT9__FUNC_DPI_D8>,
+			<MT8167_PIN_10_EINT10__FUNC_DPI_D9>,
+			<MT8167_PIN_11_EINT11__FUNC_DPI_D10>,
+			<MT8167_PIN_12_EINT12__FUNC_DPI_D11>,
+			<MT8167_PIN_1_EINT1__FUNC_DPI_D12>,
+			<MT8167_PIN_2_EINT2__FUNC_DPI_D13>,
+			<MT8167_PIN_3_EINT3__FUNC_DPI_D14>,
+			<MT8167_PIN_4_EINT4__FUNC_DPI_D15>,
+			<MT8167_PIN_5_EINT5__FUNC_DPI_D16>,
+			<MT8167_PIN_6_EINT6__FUNC_DPI_D17>;
+			drive-strength = <MTK_DRIVE_8mA>;
+		};
+	};
+
 	/* CONSYS GPIO Settings - Start */
 	gpslna_pins_init: gpslna@0 {
 	};
@@ -470,34 +463,6 @@
 		};
 	};
 
-	dpi_pins_default: dpi_pins_default {
-		pins_cmd_dat {
-			pins = <MT8167_PIN_0_EINT0__FUNC_DPI_CK>,
-			<MT8167_PIN_24_EINT24__FUNC_DPI_DE>,
-			<MT8167_PIN_25_EINT25__FUNC_DPI_VSYNC>,
-			<MT8167_PIN_35_UTXD2__FUNC_DPI_HSYNC>,
-			<MT8167_PIN_13_EINT13__FUNC_DPI_D0>,
-			<MT8167_PIN_38_MRG_DI__FUNC_DPI_D1>,
-			<MT8167_PIN_39_MRG_DO__FUNC_DPI_D2>,
-			<MT8167_PIN_37_MRG_SYNC__FUNC_DPI_D3>,
-			<MT8167_PIN_36_MRG_CLK__FUNC_DPI_D4>,
-			<MT8167_PIN_34_URXD2__FUNC_DPI_D5>,
-			<MT8167_PIN_7_EINT7__FUNC_DPI_D6>,
-			<MT8167_PIN_8_EINT8__FUNC_DPI_D7>,
-			<MT8167_PIN_9_EINT9__FUNC_DPI_D8>,
-			<MT8167_PIN_10_EINT10__FUNC_DPI_D9>,
-			<MT8167_PIN_11_EINT11__FUNC_DPI_D10>,
-			<MT8167_PIN_12_EINT12__FUNC_DPI_D11>,
-			<MT8167_PIN_1_EINT1__FUNC_DPI_D12>,
-			<MT8167_PIN_2_EINT2__FUNC_DPI_D13>,
-			<MT8167_PIN_3_EINT3__FUNC_DPI_D14>,
-			<MT8167_PIN_4_EINT4__FUNC_DPI_D15>,
-			<MT8167_PIN_5_EINT5__FUNC_DPI_D16>,
-			<MT8167_PIN_6_EINT6__FUNC_DPI_D17>;
-			drive-strength = <MTK_DRIVE_8mA>;
-		};
-	};
-
 	mmc0_pins_default: mmc0default {
 		pins_cmd_dat {
 			pinmux = <MT8167_PIN_120_MSDC0_DAT0__FUNC_MSDC0_DAT0>,
@@ -552,56 +517,13 @@
 		};
 	};
 
-	mmc1_pins_default: mmc1default {
-		pins_cmd_dat {
-			pinmux = <MT8167_PIN_106_MSDC1_DAT0__FUNC_MSDC1_DAT0>,
-				<MT8167_PIN_107_MSDC1_DAT1__FUNC_MSDC1_DAT1>,
-				<MT8167_PIN_108_MSDC1_DAT2__FUNC_MSDC1_DAT2>,
-				<MT8167_PIN_109_MSDC1_DAT3__FUNC_MSDC1_DAT3>,
-				<MT8167_PIN_104_MSDC1_CMD__FUNC_MSDC1_CMD>;
-			input-enable;
-			drive-strength = <MTK_DRIVE_6mA>;
-			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
-		};
-
-		pins_clk {
-			pinmux = <MT8167_PIN_105_MSDC1_CLK__FUNC_MSDC1_CLK>;
-			drive-strength = <MTK_DRIVE_6mA>;
-			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
-		};
-
-		pins_insert {
-			pinmux = <MT8167_PIN_20_EINT20__FUNC_GPIO20>;
-			bias-pull-up;
-		};
-	};
-
-	mmc1_pins_uhs: mmc1@0 {
-		pins_cmd_dat {
-			pinmux = <MT8167_PIN_106_MSDC1_DAT0__FUNC_MSDC1_DAT0>,
-				<MT8167_PIN_107_MSDC1_DAT1__FUNC_MSDC1_DAT1>,
-				<MT8167_PIN_108_MSDC1_DAT2__FUNC_MSDC1_DAT2>,
-				<MT8167_PIN_109_MSDC1_DAT3__FUNC_MSDC1_DAT3>,
-				<MT8167_PIN_104_MSDC1_CMD__FUNC_MSDC1_CMD>;
-			input-enable;
-			drive-strength = <MTK_DRIVE_6mA>;
-			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
-		};
-
-		pins_clk {
-			pinmux = <MT8167_PIN_105_MSDC1_CLK__FUNC_MSDC1_CLK>;
-			drive-strength = <MTK_DRIVE_8mA>;
-			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
-		};
-	};
-
 	mmc2_pins_default: mmc2default {
 		pins_cmd_dat {
 			pinmux = <MT8167_PIN_70_MSDC2_DAT0__FUNC_MSDC2_DAT0>,
-			       <MT8167_PIN_71_MSDC2_DAT1__FUNC_MSDC2_DAT1>,
-			       <MT8167_PIN_72_MSDC2_DAT2__FUNC_MSDC2_DAT2>,
-			       <MT8167_PIN_73_MSDC2_DAT3__FUNC_MSDC2_DAT3>,
-			       <MT8167_PIN_68_MSDC2_CMD__FUNC_MSDC2_CMD>;
+				<MT8167_PIN_71_MSDC2_DAT1__FUNC_MSDC2_DAT1>,
+				<MT8167_PIN_72_MSDC2_DAT2__FUNC_MSDC2_DAT2>,
+				<MT8167_PIN_73_MSDC2_DAT3__FUNC_MSDC2_DAT3>,
+				<MT8167_PIN_68_MSDC2_CMD__FUNC_MSDC2_CMD>;
 			input-enable;
 			drive-strength = <MTK_DRIVE_6mA>;
 			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
@@ -622,10 +544,10 @@
 	mmc2_pins_uhs: mmc2@0 {
 		pins_cmd_dat {
 			pinmux = <MT8167_PIN_70_MSDC2_DAT0__FUNC_MSDC2_DAT0>,
-			       <MT8167_PIN_71_MSDC2_DAT1__FUNC_MSDC2_DAT1>,
-			       <MT8167_PIN_72_MSDC2_DAT2__FUNC_MSDC2_DAT2>,
-			       <MT8167_PIN_73_MSDC2_DAT3__FUNC_MSDC2_DAT3>,
-			       <MT8167_PIN_68_MSDC2_CMD__FUNC_MSDC2_CMD>;
+				<MT8167_PIN_71_MSDC2_DAT1__FUNC_MSDC2_DAT1>,
+				<MT8167_PIN_72_MSDC2_DAT2__FUNC_MSDC2_DAT2>,
+				<MT8167_PIN_73_MSDC2_DAT3__FUNC_MSDC2_DAT3>,
+				<MT8167_PIN_68_MSDC2_CMD__FUNC_MSDC2_CMD>;
 			input-enable;
 			drive-strength = <MTK_DRIVE_6mA>;
 			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
@@ -682,19 +604,6 @@
 &ptp_od {
 	vproc-supply = <&mt6392_vproc_reg>;
 	vcore-supply = <&mt6392_vcore_reg>;
-};
-
-&reserved_memory {
-	#address-cells = <2>;
-	#size-cells = <2>;
-	ranges;
-
-	consys-reserve-memory {
-		compatible = "mediatek,consys-reserve-memory";
-		no-map;
-		size = <0 0x200000>;
-		alignment = <0 0x200000>;
-	};
 };
 
 &touch {
