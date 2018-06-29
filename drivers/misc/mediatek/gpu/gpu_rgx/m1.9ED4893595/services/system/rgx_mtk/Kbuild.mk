@@ -31,7 +31,7 @@ $(PVRSRVKM_NAME)-y += \
 
 ifeq ($(MTK_PLATFORM),mt6739)
 $(PVRSRVKM_NAME)-y += \
-	services/system/$(MTK_PLATFORM)/mtk_mfg_counter.o
+	services/system/$(PVR_SYSTEM)/$(MTK_PLATFORM)/mtk_mfg_counter.o
 endif
 
 ccflags-y += \

@@ -50,7 +50,7 @@
 
 #define RGX_HW_SYSTEM_NAME "RGX HW"
 
-#if defined(CONFIG_MACH_MT8173)
+#if defined(CONFIG_ARCH_MT8173)
 #define RGX_HW_CORE_CLOCK_SPEED			(455000000)
 #define SYS_RGX_ACTIVE_POWER_LATENCY_MS (30)
 #elif defined(CONFIG_MACH_MT8167)
@@ -78,7 +78,7 @@ int MTKSysGetIRQ(void);
 #define SYS_MTK_RGX_REGS_SYS_PHYS_BASE      0x13000000
 #define SYS_MTK_RGX_REGS_SIZE               0x80000
 
-#if defined(CONFIG_MACH_MT8173)
+#if defined(CONFIG_ARCH_MT8173)
 #define SYS_MTK_RGX_IRQ                     0x102
 #elif defined(CONFIG_MACH_MT8167)
 #define SYS_MTK_RGX_IRQ                     0xDB

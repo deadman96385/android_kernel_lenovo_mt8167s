@@ -61,7 +61,7 @@
 
 #define SYS_PHYS_HEAP_COUNT		1
 
-#if defined(CONFIG_MACH_MT8173)
+#if defined(CONFIG_ARCH_MT8173)
 #define SYS_RGX_OF_COMPATIBLE	"mediatek,mt8173-han"
 #elif defined(CONFIG_MACH_MT8167)
 #define SYS_RGX_OF_COMPATIBLE	"mediatek,mt8167-clark"

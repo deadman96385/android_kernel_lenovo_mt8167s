@@ -2533,9 +2533,11 @@ _FreeOSPages_MemStats(PMR_OSPAGEARRAY_DATA *psPageArrayData,
 			IMG_UINT32 uiArrayIndex = (pai32FreeIndices) ?
 					pai32FreeIndices[ui32PageIndex] : ui32PageIndex;
 
-			sCPUPhysAddr.uiAddr = page_to_phys(ppsPageArray[uiArrayIndex]);
-			PVRSRVStatsRemoveMemAllocRecord(PVRSRV_MEM_ALLOC_TYPE_ALLOC_UMA_PAGES,
-			                                sCPUPhysAddr.uiAddr);
+			if (ppsPageArray[uiArrayIndex]) {
+				sCPUPhysAddr.uiAddr = page_to_phys(ppsPageArray[uiArrayIndex]);
+				PVRSRVStatsRemoveMemAllocRecord(PVRSRV_MEM_ALLOC_TYPE_ALLOC_UMA_PAGES,
+						sCPUPhysAddr.uiAddr);
+			}
 		}
 #endif
 #endif
@@ -2783,7 +2785,7 @@ _FreeOSPages(PMR_OSPAGEARRAY_DATA *psPageArrayData,
 	/* Check how many pages do we have to free */
 	if(pai32FreeIndices == NULL)
 	{
-		uiNumPages = psPageArrayData->iNumOSPagesAllocated >>
+		uiNumPages = psPageArrayData->uiTotalNumOSPages >>
 						(psPageArrayData->uiLog2AllocPageSize - PAGE_SHIFT);
 	}
 	else

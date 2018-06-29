@@ -28,7 +28,7 @@
 
 #if defined(ENABLE_AEE_WHEN_LOCKUP)
 #include <linux/workqueue.h>
-#include <mt-plat/aee.h>
+#include <aee.h>
 #endif
 
 static struct proc_dir_entry *g_MTKPP_proc;

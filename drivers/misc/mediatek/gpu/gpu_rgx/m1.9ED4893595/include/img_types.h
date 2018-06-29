@@ -127,9 +127,12 @@ typedef	enum tag_img_bool
 	IMG_FORCE_ALIGN = 0x7FFFFFFF
 } IMG_BOOL, *IMG_PBOOL;
 
-#if defined(UNDER_WDDM) || defined(WINDOWS_WDF)
-typedef void            IMG_VOID, *IMG_PVOID;
 
+#if defined(UNDER_WDDM) || defined(WINDOWS_WDF) || defined(CONFIG_ARCH_MT8173)
+typedef void            IMG_VOID, *IMG_PVOID;
+#endif
+
+#if defined(UNDER_WDDM) || defined(WINDOWS_WDF)
 typedef uintptr_t		IMG_UINTPTR_T;
 typedef size_t			IMG_SIZE_T;
 
