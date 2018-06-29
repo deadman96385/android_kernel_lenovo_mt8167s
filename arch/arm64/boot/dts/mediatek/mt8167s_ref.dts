@@ -12,14 +12,14 @@
 
 /dts-v1/;
 
-#include "mt8516.dtsi"
+#include "mt8167.dtsi"
 #include "mt6392.dtsi"
 #include "mt8167s_ref_bat_setting.dtsi"
 
 / {
 	memory@00000000 {
 		device_type = "memory";
-		reg = <0 0x40000000 0 0x20000000>;
+		reg = <0 0x40000000 0 0x40000000>;
 	};
 
 	/* chosen */
@@ -43,22 +43,6 @@
 		mac-address = [00 00 00 00 00 00];
 		/*local-mac-address = [00 0C E7 06 00 00];*/
 		status = "disabled";
-	};
-
-	gpio-keys {
-		compatible = "gpio-keys";
-		pinctrl-names = "default";
-		pinctrl-0 = <&blth_key>;
-
-		button@0 {
-			debounce_interval = <50>;
-			wakeup-source;
-			gpio-key,wakeup = <1>;
-			gpios = <&pio 60 1>;
-			label = "Bluetooth";
-			linux,input-type = <0x1>;
-			linux,code = <237>;
-		};
 	};
 
 	msdc2: sdio@11170000 {
@@ -88,9 +72,8 @@
 	};
 
 	panel: panel@0 {
-		compatible = "kd,kd070d5450nha6";
-		pinctrl-names = "default";
-		gpio_lcd_pwr = <&pio 50 0>;
+		compatible = "ili9881c,td_tchd5031_6b";
+		gpio_lcd_rst = <&pio 66 0>;
 		reg-lcm-supply = <&mt6392_vgp2_reg>;
 		status = "okay";
 	};
@@ -102,62 +85,6 @@
 		pinctrl-0 = <&aud_pins_default>;
 		status = "okay";
 	};
-
-	/* Connectivity */
-	mediatek,connectivity-combo {
-		compatible = "mediatek,connectivity-combo";
-		gpio_combo_pmu_en_pin = <&pio 48 0>;	/* GPIO_COMBO_PMU_EN_PIN */
-		gpio_combo_rst_pin = <&pio 18 0>;	/* GPIO_COMBO_RST_PIN pin */
-		gpio_wifi_eint_pin = <&pio 20 0>;	/* GPIO_WIFI_EINT_PIN */
-		gpio_gps_sync_pin = <&pio 4 0>;		/* GPIO_GPS_SYNC_PIN */
-		gpio_gps_lna_pin = <&pio 3 0>;		/* GPIO_GPS_LNA_PIN */
-		gpio_combo_urxd_pin = <&pio 64 0>;	/* GPIO_COMBO_URXD_PIN */
-		gpio_combo_utxd_pin = <&pio 65 0>;	/* GPIO_COMBO_UTXD_PIN */
-		pinctrl-names = "gpio_pmu_en_pull_dis",
-			"gpio_pmu_en_in_pulldown",
-			"gpio_rst_pull_dis",
-			"gpio_wifi_eint_in_pull_dis",
-			"gpio_wifi_eint_in_pullup",
-			"gpio_gps_lna_pull_dis",
-			"gpio_gps_sync_pull_dis",
-			"gpio_urxd_uart_pull_dis",
-			"gpio_urxd_gpio_in_pullup",
-			"gpio_urxd_uart_out_low",
-			"gpio_urxd_gpio_in_pull_dis",
-			"gpio_utxd_uart_pull_dis";
-		pinctrl-0 = <&pcfg_combo_pmu_en_pull_dis_cfgs>;
-		pinctrl-1 = <&pcfg_combo_pmu_en_in_pulldown_cfgs>;
-		pinctrl-2 = <&pcfg_combo_rst_pull_dis_cfgs>;
-		pinctrl-3 = <&pcfg_combo_wifi_eint_in_pull_dis_cfgs>;
-		pinctrl-4 = <&pcfg_combo_wifi_eint_in_pullup_cfgs>;
-		pinctrl-5 = <&pcfg_combo_gps_lna_pull_dis_cfgs>;
-		pinctrl-6 = <&pcfg_combo_gps_sync_pull_dis_cfgs>;
-		pinctrl-7 = <&pcfg_combo_urxd_uart_pull_dis_cfgs>;
-		pinctrl-8 = <&pcfg_combo_urxd_gpio_in_pullup_cfgs>;
-		pinctrl-9 = <&pcfg_combo_urxd_uart_out_low_cfgs>;
-		pinctrl-10 = <&pcfg_combo_urxd_gpio_in_pull_dis_cfgs>;
-		pinctrl-11 = <&pcfg_combo_utxd_uart_pull_dis_cfgs>;
-		interrupt-parent = <&pio>;
-		interrupts = < 20 IRQ_TYPE_LEVEL_LOW >;	/* WIFI EINT num is 1 active low level-sensitive */
-		status = "okay";
-	};
-};
-
-&accdet {
-	interrupts-extended = <&sysirq GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>,
-			<&pio 16 IRQ_TYPE_LEVEL_HIGH>;
-	eint-debounce = <256000>;
-	accdet-gpio = <&pio 16 0>;
-	accdet-mic-vol = <7>;
-	headset-mode-setting = <0x500 0x500 1 0x1f0 0x800 0x800 0x20>;
-	accdet-plugout-debounce = <20>;
-	/*1:ACC mode, 2:low cost without in bias, 6:low cost with in bias*/
-	accdet-mic-mode = <1>;
-	/*0--MD_MAX--UP_MAX--DW_MAX*/
-	headset-three-key-threshold = <0 80 220 500>;
-	/*0--MD_MAX--VOICE_MAX--UP_MAX--DW_MAX*/
-	headset-four-key-threshold = <0 58 121 192 450>;
-	status = "okay";
 };
 
 &afe {
@@ -222,6 +149,11 @@
 		int-gpio = <&pio 8 0>;
 		rst-gpio = <&pio 9 0>;
 	};
+
+	strobe_main@63 {
+		compatible = "mediatek,strobe_main";
+		reg = <0x63>;
+	};
 };
 
 &i2c1 {
@@ -229,6 +161,12 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c1_pins_a>;
 	status = "okay";
+	clock-frequency = <400000>;
+
+	kd_camera_hw1@36 {
+		compatible = "mediatek,camera_main";
+		reg = <0x36>;
+	};
 };
 
 &i2c2 {
@@ -242,6 +180,31 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&irrx_pins_ir_input>;
 	status = "disabled";
+};
+
+/* Main Cam */
+&kd_camera_hw1 {
+	reg-vcama-supply = <&mt6392_vcama_reg>;		/* AVDD */
+	reg-vcamd-supply = <&mt6392_vcamd_reg>;		/* DVDD */
+	reg-vcamio-supply = <&mt6392_vcamio_reg>;	/* DOVDD */
+	reg-vcamaf-supply = <&mt6392_vcamaf_reg>;	/* AFVDD */
+
+	pinctrl-names = "default",
+		"cam_mclk", "cam_gpio84", "cam_gpio85",
+		"cam_gpio86", "cam_gpio87", "cam_gpio88",  "cam_gpio89";
+
+	pinctrl-0 = <&camera_pins_default>;
+	pinctrl-1 = <&camera_pins_cam_mclk>;
+	pinctrl-2 = <&camera_pins_gpio84>;
+	pinctrl-3 = <&camera_pins_gpio85>;
+	pinctrl-4 = <&camera_pins_gpio86>;
+	pinctrl-5 = <&camera_pins_gpio87>;
+	pinctrl-6 = <&camera_pins_gpio88>;
+	pinctrl-7 = <&camera_pins_gpio89>;
+
+	cam0_rst = <&pio 10 0>;
+	cam0_pdn = <&pio 7 0>;
+	status = "okay";
 };
 
 &keypad {
@@ -315,6 +278,82 @@
 	state_default:pinconf_default {
 	};
 
+	aud_pins_default: audiodefault {
+		pins_cmd_dat {
+			pinmux = <MT8167_PIN_25_EINT25__FUNC_I2S_8CH_MCK>,
+				 <MT8167_PIN_55_I2S_DATA_IN__FUNC_I2S_8CH_DO1>,
+				 <MT8167_PIN_56_I2S_LRCK__FUNC_I2S_8CH_LRCK>,
+				 <MT8167_PIN_57_I2S_BCK__FUNC_I2S_8CH_BCK>,
+				 <MT8167_PIN_100_CMDAT0__FUNC_TDM_RX_MCK>,
+				 <MT8167_PIN_101_CMDAT1__FUNC_TDM_RX_BCK>,
+				 <MT8167_PIN_16_EINT16__FUNC_TDM_RX_LRCK>,
+				 <MT8167_PIN_103_CMPCLK__FUNC_TDM_RX_DI>,
+				 <MT8167_PIN_1_EINT1__FUNC_I2S2_DI>;
+				 drive-strength = <MTK_DRIVE_4mA>;
+		};
+	};
+
+	/* CAMERA GPIO standardization */
+	/* default mode */
+	camera_pins_default: camdefault {
+		pins_cmd_dat {
+			pinmux = <MT8167_PIN_84_RDN0__FUNC_RDN0>,
+				<MT8167_PIN_85_RDP0__FUNC_RDP0>,
+				<MT8167_PIN_86_RDN1__FUNC_RDN1>,
+				<MT8167_PIN_87_RDP1__FUNC_RDP1>,
+				<MT8167_PIN_88_RCN__FUNC_RCN>,
+				<MT8167_PIN_89_RCP__FUNC_RCP>;
+		};
+	};
+
+	camera_pins_cam_mclk: cam_pin_mclk {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_102_CMMCLK__FUNC_CMMCLK>;
+		};
+	};
+
+	camera_pins_gpio88: cam_pin_gpio88 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_88_RCN__FUNC_RCN>;
+		};
+	};
+
+	camera_pins_gpio89: cam_pin_gpio89 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_89_RCP__FUNC_RCP>;
+		};
+	};
+
+	camera_pins_gpio86: cam_pin_gpio86 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_86_RDN1__FUNC_RDN1>;
+		};
+	};
+
+	camera_pins_gpio87: cam_pin_gpio87 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_87_RDP1__FUNC_RDP1>;
+		};
+	};
+
+	camera_pins_gpio84: cam_pin_gpio84 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_84_RDN0__FUNC_RDN0>;
+		};
+	};
+
+	camera_pins_gpio85: cam_pin_gpio85 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_85_RDP0__FUNC_RDP0>;
+		};
+	};
+
+	/* CONSYS GPIO Settings - Start */
+	consys_pins_default: default {
+
+	};
+	/* CONSYS GPIO Settings - End */
+
 	CTP_pins_default: eint0default {
 		pins_cmd_dat {
 			pins = <MT8167_PIN_8_EINT8__FUNC_GPIO8>;
@@ -363,57 +402,33 @@
 		};
 	};
 
-pwm_goio_def_cfg: pwmdefault {
+	dpi_pins_default: dpi_pins_default {
 		pins_cmd_dat {
-			pinmux = <MT8167_PIN_54_DISP_PWM__FUNC_PWM_B>;
-			};
-};
-
-
-	aud_pins_default: audiodefault {
-		pins_cmd_dat {
-			pinmux = <MT8167_PIN_36_MRG_CLK__FUNC_I2S0_BCK>,
-				<MT8167_PIN_37_MRG_SYNC__FUNC_I2S0_LRCK>,
-				<MT8167_PIN_38_MRG_DI__FUNC_I2S0_DI>,
-				<MT8167_PIN_20_EINT20__FUNC_I2S3_DO>,
-				<MT8167_PIN_25_EINT25__FUNC_I2S_8CH_MCK>,
-				<MT8167_PIN_55_I2S_DATA_IN__FUNC_I2S_8CH_DO1>,
-				<MT8167_PIN_56_I2S_LRCK__FUNC_I2S_8CH_LRCK>,
-				<MT8167_PIN_57_I2S_BCK__FUNC_I2S_8CH_BCK>,
-				<MT8167_PIN_1_EINT1__FUNC_I2S2_DI>,
-				<MT8167_PIN_100_CMDAT0__FUNC_TDM_RX_MCK>,
-				<MT8167_PIN_101_CMDAT1__FUNC_TDM_RX_BCK>,
-				<MT8167_PIN_16_EINT16__FUNC_TDM_RX_LRCK>,
-				<MT8167_PIN_103_CMPCLK__FUNC_TDM_RX_DI>;
-			drive-strength = <MTK_DRIVE_4mA>;
-		};
-
-		pins_tas5782m_reset_mute {
-			pinmux = <MT8167_PIN_107_MSDC1_DAT1__FUNC_GPIO107>,
-				<MT8167_PIN_108_MSDC1_DAT2__FUNC_GPIO108>;
-			output-high;
-		};
-
-		pins_tlv320adc3101_reset {
-			pinmux = <MT8167_PIN_24_EINT24__FUNC_GPIO24>;
-			output-high;
+			pins = <MT8167_PIN_0_EINT0__FUNC_DPI_CK>,
+			<MT8167_PIN_24_EINT24__FUNC_DPI_DE>,
+			<MT8167_PIN_25_EINT25__FUNC_DPI_VSYNC>,
+			<MT8167_PIN_35_UTXD2__FUNC_DPI_HSYNC>,
+			<MT8167_PIN_13_EINT13__FUNC_DPI_D0>,
+			<MT8167_PIN_38_MRG_DI__FUNC_DPI_D1>,
+			<MT8167_PIN_39_MRG_DO__FUNC_DPI_D2>,
+			<MT8167_PIN_37_MRG_SYNC__FUNC_DPI_D3>,
+			<MT8167_PIN_36_MRG_CLK__FUNC_DPI_D4>,
+			<MT8167_PIN_34_URXD2__FUNC_DPI_D5>,
+			<MT8167_PIN_7_EINT7__FUNC_DPI_D6>,
+			<MT8167_PIN_8_EINT8__FUNC_DPI_D7>,
+			<MT8167_PIN_9_EINT9__FUNC_DPI_D8>,
+			<MT8167_PIN_10_EINT10__FUNC_DPI_D9>,
+			<MT8167_PIN_11_EINT11__FUNC_DPI_D10>,
+			<MT8167_PIN_12_EINT12__FUNC_DPI_D11>,
+			<MT8167_PIN_1_EINT1__FUNC_DPI_D12>,
+			<MT8167_PIN_2_EINT2__FUNC_DPI_D13>,
+			<MT8167_PIN_3_EINT3__FUNC_DPI_D14>,
+			<MT8167_PIN_4_EINT4__FUNC_DPI_D15>,
+			<MT8167_PIN_5_EINT5__FUNC_DPI_D16>,
+			<MT8167_PIN_6_EINT6__FUNC_DPI_D17>;
+			drive-strength = <MTK_DRIVE_8mA>;
 		};
 	};
-
-	blth_key: eint60default {
-		pins_cmd_dat {
-			pins = <MT8167_PIN_60_SDA2__FUNC_GPIO60>;
-			slew-rate = <0>;
-			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
-			input-enable;
-		};
-	};
-
-	/* CONSYS GPIO Settings - Start */
-	consys_pins_default: default {
-
-	};
-	/* CONSYS GPIO Settings - End */
 
 	ethernet_pins_default: ethernet {
 		pins_ethernet {
@@ -485,6 +500,22 @@ pwm_goio_def_cfg: pwmdefault {
 	irrx_pins_ir_input: irrx_pin_ir {
 		pins_cmd_dat {
 			pinmux = <MT8167_PIN_36_MRG_CLK__FUNC_IR>;
+			bias-disable;
+		};
+	};
+
+	kpd_pins_default: kpddefault {
+		pins_cols {
+			pinmux = <MT8167_PIN_42_KPCOL0__FUNC_KPCOL0>,
+				 <MT8167_PIN_43_KPCOL1__FUNC_KPCOL1>;
+			input-enable;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
+		};
+
+		pins_rows {
+			pinmux = <MT8167_PIN_40_KPROW0__FUNC_KPROW0>,
+				 <MT8167_PIN_41_KPROW1__FUNC_KPROW1>;
+			output-low;
 			bias-disable;
 		};
 	};
@@ -585,97 +616,6 @@ pwm_goio_def_cfg: pwmdefault {
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
 		};
 	};
-
-/* Connectivity GPIO start */
-	pcfg_combo_pmu_en_pull_dis_cfgs:cfg_pmu_en_pull_dis {
-		combo_pins {
-			pins = <MT8167_PIN_48_SPI_CS__FUNC_GPIO48>;
-			bias-disable;
-		};
-	};
-
-	pcfg_combo_pmu_en_in_pulldown_cfgs:cfg_pmu_en_in_pulldown {
-		combo_pins {
-			pins = <MT8167_PIN_48_SPI_CS__FUNC_GPIO48>;
-			bias-pull-down;
-		};
-	};
-
-	pcfg_combo_rst_pull_dis_cfgs:cfg_rst_pull_dis {
-		combo_pins {
-			pins = <MT8167_PIN_18_EINT18__FUNC_GPIO18>;
-			bias-disable;
-		};
-	};
-
-	pcfg_combo_wifi_eint_in_pull_dis_cfgs:cfg_wifi_eint_in_pull_dis {
-		combo_pins {
-			pins = <MT8167_PIN_20_EINT20__FUNC_GPIO20>;
-			slew-rate = <0>;
-			bias-disable;
-		};
-	};
-
-	pcfg_combo_wifi_eint_in_pullup_cfgs:cfg_wifi_eint_in_pullup {
-		combo_pins {
-			pins = <MT8167_PIN_20_EINT20__FUNC_GPIO20>;
-			slew-rate = <0>;
-			bias-pull-up = <00>;
-		};
-	};
-
-	pcfg_combo_gps_lna_pull_dis_cfgs:cfg_gps_lna_pull_dis {
-		combo_pins {
-			pins = <MT8167_PIN_3_EINT3__FUNC_GPIO3>;
-			bias-disable;
-		};
-	};
-
-	pcfg_combo_gps_sync_pull_dis_cfgs:cfg_gps_sync_pull_dis {
-		combo_pins {
-			pins = <MT8167_PIN_4_EINT4__FUNC_GPIO4>;
-			bias-disable;
-		};
-	};
-
-	pcfg_combo_urxd_uart_pull_dis_cfgs:cfg_urxd_pull_dis {
-		combo_pins {
-			pinmux = <MT8167_PIN_64_URXD1__FUNC_URXD1>;
-			bias-disable;
-		};
-	};
-
-	pcfg_combo_urxd_uart_out_low_cfgs:cfg_urxd_out_low {
-		combo_pins {
-			pinmux = <MT8167_PIN_64_URXD1__FUNC_GPIO64>;
-			slew-rate = <1>;
-			output-low;
-		};
-	};
-
-	pcfg_combo_urxd_gpio_in_pullup_cfgs:cfg_urxd_in_pullup {
-		combo_pins {
-			pinmux = <MT8167_PIN_64_URXD1__FUNC_URXD1>;
-			input-enable;
-			bias-pull-up;
-		};
-	};
-
-	pcfg_combo_urxd_gpio_in_pull_dis_cfgs:cfg_urxd_in_pull_dis {
-		combo_pins {
-			pinmux = <MT8167_PIN_64_URXD1__FUNC_URXD1>;
-			input-enable;
-			bias-disable;
-		};
-	};
-
-	pcfg_combo_utxd_uart_pull_dis_cfgs:cfg_utxd_pull_dis {
-		combo_pins {
-			pinmux = <MT8167_PIN_65_UTXD1__FUNC_UTXD1>;
-			bias-disable;
-		};
-	};
-/* Connectivity GPIO end */
 
 	spi_pins_a: spi {
 		pins_spi {
@@ -782,13 +722,10 @@ pwm_goio_def_cfg: pwmdefault {
 	pinctrl-1 = <&usb0_drvvbus>;
 	pinctrl-2 = <&usb0_drvvbus_low>;
 	pinctrl-3 = <&usb0_drvvbus_high>;
-	status = "okay";
+	usb-power-supply = <&mt6392_vusb_reg>;
+
 	drvvbus_gpio = <&pio 18 2>;
 	iddig_gpio = <&pio 19 2>;
-};
 
-&pwm {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pwm_goio_def_cfg>;
 	status = "okay";
 };
