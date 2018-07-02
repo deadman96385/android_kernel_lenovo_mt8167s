@@ -1452,25 +1452,6 @@ static int allocate_cmdlines_buffer(unsigned int val,
 	}
 #endif
 
-#ifdef CONFIG_MTK_EXTMEM
-	if (saved_tgids)
-		extmem_free((void *)saved_tgids);
-	saved_tgids = extmem_malloc(val * sizeof(*saved_tgids));
-	if (!saved_tgids) {
-		extmem_free((void *)s->map_cmdline_to_pid);
-		extmem_free((void *)s->saved_cmdlines);
-		return -ENOMEM;
-	}
-#else
-	kfree(saved_tgids);
-	saved_tgids = kmalloc_array(val, sizeof(*saved_tgids), GFP_KERNEL);
-	if (!saved_tgids) {
-		kfree(s->map_cmdline_to_pid);
-		kfree(s->saved_cmdlines);
-		return -ENOMEM;
-	}
-#endif
-
 	s->cmdline_idx = 0;
 	s->cmdline_num = val;
 	memset(&s->map_pid_to_cmdline, NO_CMDLINE_MAP,
