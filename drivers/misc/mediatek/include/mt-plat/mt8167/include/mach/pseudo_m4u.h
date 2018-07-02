@@ -290,7 +290,7 @@ extern void dmac_unmap_area(const void *, size_t, int);
 #define IOVA_PFN(addr)		((addr) >> PAGE_SHIFT)
 #endif
 
-#if defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT) && defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
+#if defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT)
 #define M4U_TEE_SERVICE_ENABLE
 #endif
 
