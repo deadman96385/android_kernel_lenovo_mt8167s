@@ -2046,7 +2046,7 @@ static void musbfsh_restore_context(struct musbfsh *musbfsh)
 #ifdef CONFIG_MTK_MUSBFSH_QMU_SUPPORT
 	musbfsh_writel(musbfsh->mregs, USB11_L1INTM, 0x002f);
 #else
-	musbfsh_writel(musbfsh->mregs, USB_L1INTM, 0x000f);
+	musbfsh_writel(musbfsh->mregs, USB11_L1INTM, 0x000f);
 #endif
 	reg32 = musbfsh_readl(musbfsh_base, USB11_L1INTM);
 	DBG(5, "USB_L1INTM:0x%x\n", reg32);
