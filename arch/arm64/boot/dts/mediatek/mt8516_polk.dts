@@ -626,7 +626,7 @@ pwm_goio_def_cfg: pwmdefault {
 };
 
 &usb1 {
-	status = "disabled";
+	status = "okay";
 };
 
 &pwm {

@@ -708,6 +708,10 @@ pwm_goio_def_cfg: pwmdefault {
 	iddig_gpio = <&pio 19 2>;
 };
 
+&usb1 {
+	status = "okay";
+};
+
 &pwm {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pwm_goio_def_cfg>;
