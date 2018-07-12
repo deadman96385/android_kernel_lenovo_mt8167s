@@ -45,4 +45,5 @@ endif
 
 ifneq ($(filter "MT7668",$(CONFIG_MTK_COMBO_CHIP)),)
 	obj-y   +=  gen4-mt7668/
+	obj-y   +=  gen4-mt7668-usb/
 endif
