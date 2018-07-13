@@ -61,6 +61,7 @@ struct keypad_dts_data {
 	u32 kpd_hw_dl_key3;
 	u32 kpd_hw_recovery_key;
 	u32 kpd_hw_factory_key;
+	u32 kpd_double_keys;
 };
 extern struct keypad_dts_data kpd_dts_data;
 #define KPD_NO 0

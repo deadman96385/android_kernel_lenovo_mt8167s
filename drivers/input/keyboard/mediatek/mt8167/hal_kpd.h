@@ -46,6 +46,8 @@ void kpd_init_keymap_state(u16 keymap_state[]);
 void kpd_pmic_rstkey_hal(unsigned long pressed);
 void kpd_pmic_pwrkey_hal(unsigned long pressed);
 int kpd_init_pmic_regmap(struct platform_device *pdev);
+void kpd_enable_double_keys(void);
+void kpd_enable_single_keys(void);
 
 extern struct input_dev *kpd_input_dev;
 

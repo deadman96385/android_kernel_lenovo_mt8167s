@@ -262,6 +262,19 @@ void kpd_set_debounce(u16 val)
 	mt_reg_sync_writew((u16) (val & KPD_DEBOUNCE_MASK), KP_DEBOUNCE);
 }
 
+void kpd_enable_double_keys()
+{
+	kpd_info("Enable double keys.\n");
+	mt_reg_sync_writew(0xC31, KP_SEL);
+	mt_reg_sync_writew(0x11, KP_SCAN_TIMING);
+}
+
+void kpd_enable_single_keys()
+{
+	kpd_info("Enable single keys.\n");
+	mt_reg_sync_writew(0, KP_SEL);
+}
+
 /********************************************************************/
 void kpd_pmic_rstkey_hal(unsigned long pressed)
 {

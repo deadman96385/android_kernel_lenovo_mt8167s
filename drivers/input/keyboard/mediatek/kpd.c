@@ -152,10 +152,32 @@ static ssize_t kpd_show_call_state(struct device_driver *ddri, char *buf)
 	return res;
 }
 
-static DRIVER_ATTR(kpd_call_state, S_IWUSR | S_IRUGO, kpd_show_call_state, kpd_store_call_state);
+static DRIVER_ATTR(kpd_call_state, 0644, kpd_show_call_state, kpd_store_call_state);
+
+static ssize_t kpd_show_get_state(struct device_driver *ddri, char *buf)
+{
+	u16 new_state[KPD_NUM_MEMS];
+	int i = 0;
+
+	kpd_get_keymap_state(new_state);
+
+	kpd_print("KP_STA[0x%x]\n", readw(KP_STA));
+	kpd_print("KP_DEBOUNCE[0x%x]\n", readw(KP_DEBOUNCE));
+	kpd_print("KP_SEL[0x%x]\n", readw(KP_SEL));
+	kpd_print("KP_SCAN_TIMING[0x%x]\n", readw(KP_SCAN_TIMING));
+	kpd_print("KP_EN[0x%x]\n", readw(KP_EN));
+	for(i = 0; i < KPD_NUM_MEMS; i++) {
+		kpd_print("KP_MEM%d, status[0x%x]\n", (i+1), new_state[i]);
+	}
+
+	return 0;
+}
+
+static DRIVER_ATTR(kpd_status, 0644, kpd_show_get_state, NULL);
 
 static struct driver_attribute *kpd_attr_list[] = {
 	&driver_attr_kpd_call_state,
+	&driver_attr_kpd_status,
 };
 
 /*----------------------------------------------------------------------------*/
@@ -782,6 +804,9 @@ void kpd_get_dts_info(struct device_node *node)
 	of_property_read_u32(node, "mediatek,kpd-hw-recovery-key", &kpd_dts_data.kpd_hw_recovery_key);
 	of_property_read_u32(node, "mediatek,kpd-hw-factory-key", &kpd_dts_data.kpd_hw_factory_key);
 	of_property_read_u32(node, "mediatek,kpd-hw-map-num", &kpd_dts_data.kpd_hw_map_num);
+	if (of_property_read_bool(node, "mediatek,kpd-double-keys"))
+		kpd_dts_data.kpd_double_keys = 1;
+
 	ret = of_property_read_u32_array(node, "mediatek,kpd-hw-init-map", kpd_dts_data.kpd_hw_init_map,
 		kpd_dts_data.kpd_hw_map_num);
 
@@ -908,6 +933,11 @@ static int kpd_pdrv_probe(struct platform_device *pdev)
 
 	/* register IRQ and EINT */
 	kpd_set_debounce(kpd_dts_data.kpd_key_debounce);
+	if (kpd_dts_data.kpd_double_keys)
+		kpd_enable_double_keys();
+	else
+		kpd_enable_single_keys();
+
 	r = request_irq(kp_irqnr, kpd_irq_handler, IRQF_TRIGGER_NONE, KPD_NAME, NULL);
 	if (r) {
 		kpd_info("register IRQ failed (%d)\n", r);
