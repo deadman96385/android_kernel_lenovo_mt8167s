@@ -102,11 +102,17 @@ struct compat_disp_output_config {
 	compat_uint_t frm_sequence;
 };
 
+struct compat_disp_ccorr_config {
+	compat_int_t is_dirty;
+	compat_int_t mode;
+	compat_int_t color_matrix[16];
+};
 struct compat_disp_session_input_config {
 	compat_uint_t setter;
 	compat_uint_t session_id;
 	compat_uint_t config_layer_num;
 	struct compat_disp_input_config config[12];
+	struct compat_disp_ccorr_config ccorr_config;
 };
 
 struct compat_disp_present_fence_info {
@@ -199,6 +205,7 @@ struct compat_disp_session_info {
 	compat_uint_t physicalHeight;
 	compat_uint_t physicalWidthUm;
 	compat_uint_t physicalHeightUm;
+	compat_uint_t density;
 	compat_uint_t isConnected;
 	compat_uint_t isHDCPSupported;
 	compat_uint_t isOVLDisabled;
