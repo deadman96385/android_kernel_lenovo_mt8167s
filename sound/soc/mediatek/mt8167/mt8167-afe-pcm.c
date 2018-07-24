@@ -2792,6 +2792,8 @@ static const struct snd_kcontrol_new mt8167_afe_o01_mix[] = {
 static const struct snd_kcontrol_new mt8167_afe_o02_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("I05 Switch", AFE_CONN1, 5, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I06 Switch", AFE_CONN1, 6, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I07 Switch", AFE_CONN1, 7, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I08 Switch", AFE_CONN1, 8, 1, 0),
 };
 
 static const struct snd_kcontrol_new mt8167_afe_o03_mix[] = {
@@ -3041,6 +3043,8 @@ static const struct snd_soc_dapm_route mt8167_afe_pcm_routes[] = {
 	{"O04", "I08 Switch", "I08"},
 	{"O00", "I07 Switch", "I07"},
 	{"O01", "I08 Switch", "I08"},
+	{"O02", "I07 Switch", "I07"},
+	{"O02", "I08 Switch", "I08"},
 	{"I2S O03_O04", "Switch", "O03"},
 	{"I2S O03_O04", "Switch", "O04"},
 	{"I2S Playback", NULL, "I2S O03_O04"},
