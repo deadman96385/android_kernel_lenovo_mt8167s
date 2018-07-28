@@ -82,31 +82,14 @@ typedef enum _VAL_CHIP_NAME_T {
 	VAL_CHIP_NAME_MT6589,                       /* /< MT6589 */
 	VAL_CHIP_NAME_MT6582,                       /* /< MT6582 */
 	VAL_CHIP_NAME_MT8135,                       /* /< MT8135 */
-	VAL_CHIP_NAME_ROME,                         /* /< ROME */
 	VAL_CHIP_NAME_MT6592,                       /* /< MT6592 */
 	VAL_CHIP_NAME_MT8127,                       /* /< MT8127 */
 	VAL_CHIP_NAME_MT6752,                       /* /< MT6752 */
 	VAL_CHIP_NAME_MT6795,                       /* /< MT6795 */
-	VAL_CHIP_NAME_DENALI_1,                     /* /< Denali-1 */
-	VAL_CHIP_NAME_DENALI_2,                     /* /< Denali-2 */
-	VAL_CHIP_NAME_DENALI_3,                     /* /< Denali-3 */
-	VAL_CHIP_NAME_MT6570,                       /* /< Rainier (2 core) */
-	VAL_CHIP_NAME_MT6580,                       /* /< Rainier (4 core) */
 	VAL_CHIP_NAME_MT8163,
 	VAL_CHIP_NAME_MT8173,                       /* / <8173 */
-	VAL_CHIP_NAME_MT6755,                       /* / <Jade */
-	VAL_CHIP_NAME_MT6757,                       /* / <Olympus */
-	VAL_CHIP_NAME_MT6797,                       /* / <Everest */
 	VAL_CHIP_NAME_MT7623,                       /* / <MT7623 */
 	VAL_CHIP_NAME_MT8167,                       /* / <MT8167 */
-	VAL_CHIP_NAME_ELBRUS,                       /* /< ELBRUS */
-	VAL_CHIP_NAME_MT6799,                       /* /< WHITNEY */
-	VAL_CHIP_NAME_MT6759,                       /* /< ALASKA */
-	VAL_CHIP_NAME_MT6758,                       /* / <KIBOPLUS */
-	VAL_CHIP_NAME_MT6763,                       /* /< BIANCO */
-	VAL_CHIP_NAME_MT6739,                       /* /< ZION */
-	VAL_CHIP_NAME_MT6771,                       /* /< SYLVIA */
-	VAL_CHIP_NAME_MT6775,                       /* /< CANON */
 	VAL_CHIP_NAME_MAX = 0xFFFFFFFF              /* /< Max Value */
 } VAL_CHIP_NAME_T;
 
