@@ -14,7 +14,7 @@
 
 #include "mt8516.dtsi"
 #include "mt6392.dtsi"
-#include "mt8516_7668_ref_bat_setting.dtsi"
+#include "mt8516_som_bat_setting.dtsi"
 
 / {
 	memory@00000000 {
