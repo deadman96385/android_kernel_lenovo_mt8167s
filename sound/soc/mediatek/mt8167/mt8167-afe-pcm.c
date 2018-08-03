@@ -970,7 +970,7 @@ static int mt8167_afe_i2s_prepare(struct snd_pcm_substream *substream,
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = substream->runtime->rate;
-	const int bit_width = snd_pcm_format_width(substream->runtime->format);
+	int bit_width = snd_pcm_format_width(substream->runtime->format);
 	const unsigned int stream = substream->stream;
 	const unsigned int clk_mode = afe->i2s_clk_modes[MT8167_AFE_1ST_I2S];
 	const bool apply_i2s_out_change = (stream == SNDRV_PCM_STREAM_PLAYBACK) ||
@@ -993,6 +993,9 @@ static int mt8167_afe_i2s_prepare(struct snd_pcm_substream *substream,
 			 __func__, snd_pcm_stream_str(substream));
 		return 0;
 	}
+
+	if (be->bck_fixed_64fs[stream])
+		bit_width = 32;
 
 	if (apply_i2s_out_change) {
 		ret = mt8167_afe_set_i2s_out(afe, rate, bit_width);
@@ -1136,7 +1139,7 @@ static int mt8167_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
 	struct mt8167_afe_be_dai_data *be = &afe->be_data[dai->id - MT8167_AFE_BACKEND_BASE];
 	const unsigned int rate = substream->runtime->rate;
-	const int bit_width = snd_pcm_format_width(substream->runtime->format);
+	int bit_width = snd_pcm_format_width(substream->runtime->format);
 	const unsigned int stream = substream->stream;
 	const unsigned int clk_mode = afe->i2s_clk_modes[MT8167_AFE_2ND_I2S];
 	const bool apply_i2s_out_change = (stream == SNDRV_PCM_STREAM_PLAYBACK) ||
@@ -1159,6 +1162,9 @@ static int mt8167_afe_2nd_i2s_prepare(struct snd_pcm_substream *substream,
 			 __func__, snd_pcm_stream_str(substream));
 		return 0;
 	}
+
+	if (be->bck_fixed_64fs[stream])
+		bit_width = 32;
 
 	if (apply_i2s_out_change) {
 		ret = mt8167_afe_set_2nd_i2s_out(afe, rate, bit_width);
@@ -1578,7 +1584,7 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 	const unsigned int out_channels_per_sdata =
 		mt8167_afe_tdm_out_ch_per_sdata(tdm_out_mode, runtime->channels);
 	const int phy_width = snd_pcm_format_physical_width(runtime->format);
-	const int out_bit_width = mt8167_afe_tdm_out_bitwidth_fixup(tdm_out_mode, phy_width);
+	int out_bit_width = mt8167_afe_tdm_out_bitwidth_fixup(tdm_out_mode, phy_width);
 	const unsigned int stream = substream->stream;
 	unsigned int val;
 	unsigned int bck_inverse = 0;
@@ -1587,6 +1593,9 @@ static int mt8167_afe_hdmi_prepare(struct snd_pcm_substream *substream,
 		dev_info(afe->dev, "%s prepared already\n", __func__);
 		return 0;
 	}
+
+	if (be->bck_fixed_64fs[stream])
+		out_bit_width = 32;
 
 	if (rate % 8000) {
 		mt8167_afe_enable_apll_associated_cfg(afe, MT8167_AFE_APLL1);
@@ -1825,6 +1834,9 @@ static int mt8167_afe_tdm_in_prepare(struct snd_pcm_substream *substream,
 	dev_info(afe->dev, "%s bit_width = %d\n", __func__, phy_width);
 	/*support S24_LE*/
 	if (phy_width > 16)
+		phy_width = 32;
+
+	if (be->bck_fixed_64fs[stream])
 		phy_width = 32;
 
 	if (rate % 8000) {
@@ -3474,6 +3486,7 @@ static int mt8167_afe_init_audio_clk(struct mtk_afe *afe)
 static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 {
 	int ret, i;
+	unsigned int dai_idx;
 	unsigned int irq_id;
 	struct mtk_afe *afe;
 	struct resource *res;
@@ -3589,6 +3602,26 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 	if (afe->dai_irq_mode != memif_data[MT8167_AFE_MEMIF_DAI].irq_mode)
 		mt8167_afe_set_memif_irq_by_mode(&memif_data[MT8167_AFE_MEMIF_DAI],
 						 afe->dai_irq_mode);
+
+	dai_idx = MT8167_AFE_IO_I2S - MT8167_AFE_BACKEND_BASE;
+	afe->be_data[dai_idx].bck_fixed_64fs[SNDRV_PCM_STREAM_PLAYBACK] =
+		of_property_read_bool(np, "mediatek,i2s1-bck-fixed-64fs");
+	afe->be_data[dai_idx].bck_fixed_64fs[SNDRV_PCM_STREAM_CAPTURE] =
+		of_property_read_bool(np, "mediatek,i2s2-bck-fixed-64fs");
+
+	dai_idx = MT8167_AFE_IO_2ND_I2S - MT8167_AFE_BACKEND_BASE;
+	afe->be_data[dai_idx].bck_fixed_64fs[SNDRV_PCM_STREAM_PLAYBACK] =
+		of_property_read_bool(np, "mediatek,i2s3-bck-fixed-64fs");
+	afe->be_data[dai_idx].bck_fixed_64fs[SNDRV_PCM_STREAM_CAPTURE] =
+		of_property_read_bool(np, "mediatek,i2s0-bck-fixed-64fs");
+
+	dai_idx = MT8167_AFE_IO_HDMI - MT8167_AFE_BACKEND_BASE;
+	afe->be_data[dai_idx].bck_fixed_64fs[SNDRV_PCM_STREAM_PLAYBACK] =
+		of_property_read_bool(np, "mediatek,tdmo-bck-fixed-64fs");
+
+	dai_idx = MT8167_AFE_IO_TDM_IN - MT8167_AFE_BACKEND_BASE;
+	afe->be_data[dai_idx].bck_fixed_64fs[SNDRV_PCM_STREAM_CAPTURE] =
+		of_property_read_bool(np, "mediatek,tdmi-bck-fixed-64fs");
 
 	ret = snd_soc_register_platform(&pdev->dev, &mt8167_afe_pcm_platform);
 	if (ret)
