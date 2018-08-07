@@ -1,0 +1,298 @@
+/*
+ * Copyright (c) 2018 MediaTek Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include "mt8516_som_base.dtsi"
+
+/ {
+	msdc1: sdio@11130000 {
+		compatible = "mediatek,mt8167-sdio";
+		reg = <0 0x11130000 0 0x1000>;
+		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_LOW>;
+		clocks = <&topckgen CLK_TOP_MSDC1>,
+			 <&topckgen CLK_TOP_MSDC1_INFRA>;
+		clock-names = "source", "hclk";
+		status = "disabled";
+	};
+};
+
+&accdet {
+	status = "okay";
+};
+
+&afe {
+	/* 0(HDMI) 1(I2S) 2(TDM) */
+	mediatek,tdm-out-mode = <1>;
+	/* 0(IRQ1) 1(IRQ2) 4(IRQ7) 6(IRQ11) */
+	mediatek,awb-irq-mode = <6>;
+	/* 0(seperate clock) 1(shared clock) */
+	mediatek,i2s-clock-modes = <0 0>;
+};
+
+&ethernet {
+	status = "okay";
+};
+
+&hdmi0 {
+	pinctrl-names = "default", "hdmi_hpd";
+	pinctrl-0 = <&hdmi_pins_default>;
+	pinctrl-1 = <&hdmi_pins_hpd>;
+	status = "okay";
+};
+
+&i2c0 {
+	clock-frequency = <70000>;
+	status = "okay";
+};
+
+&i2c1 {
+	clock-frequency = <50000>;
+	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+};
+
+&irrx {
+	pinctrl-names = "default";
+	pinctrl-0 = <&irrx_pins_ir_input>;
+	status = "okay";
+};
+
+&keypad {
+	pinctrl-names = "default";
+	pinctrl-0 = <&kpd_pins_default>;
+	status = "okay";
+	mediatek,kpd-double-keys;
+	mediatek,kpd-key-debounce = <1024>;
+	mediatek,kpd-sw-pwrkey = <0>;
+	mediatek,kpd-hw-pwrkey = <0>;
+	mediatek,kpd-sw-rstkey  = <0>;
+	mediatek,kpd-hw-rstkey = <0>;
+	mediatek,kpd-use-extend-type = <0>;
+	/*HW Keycode [0~71] -> Linux Keycode*/
+	mediatek,kpd-hw-map-num = <72>;
+	/*8 rows * 9 columns  */
+	mediatek,kpd-hw-init-map = <115 353 113 237 0 0 0 0 0
+				    0 0 0 0 0 0 0 0 0
+				    0 0 0 0 0 0 0 0 0
+				    0 0 0 0 0 0 0 0 0
+				    0 0 0 0 0 0 0 0 0
+				    0 0 0 0 0 0 0 0 0
+				    0 0 0 0 0 0 0 0 0
+				    0 0 0 0 0 0 0 0 0>;
+	mediatek,kpd-pwrkey-eint-gpio = <0>;
+	mediatek,kpd-pwkey-gpio-din  = <0>;
+	mediatek,kpd-hw-dl-key0 = <0>;
+	mediatek,kpd-hw-dl-key1 = <17>;
+	mediatek,kpd-hw-dl-key2 = <8>;
+	mediatek,kpd-hw-recovery-key = <17>;
+	mediatek,kpd-hw-factory-key  = <0>;
+};
+
+&msdc1 {
+	pinctrl-names = "default", "state_uhs";
+	pinctrl-0 = <&mmc1_pins_default>;
+	pinctrl-1 = <&mmc1_pins_uhs>;
+	status = "okay";
+	bus-width = <4>;
+	max-frequency = <200000000>;
+	cap-sd-highspeed;
+	sd-uhs-sdr50;
+	sd-uhs-sdr104;
+	keep-power-in-suspend;
+	enable-sdio-wakeup;
+	cap-sdio-irq;
+	non-removable;
+};
+
+&msdc2 {
+	status = "disabled";
+};
+
+&pio {
+	pinctrl-names = "default";
+	pinctrl-0 = <&state_default>;
+
+	state_default:pinconf_default {
+		pins_cmd_dat0 {
+			pinmux = <MT8167_PIN_25_EINT25__FUNC_GPIO25>;
+					bias-pull-down;
+					input-enable;
+			};
+
+		pins_cmd_dat1 {
+			pinmux = <MT8167_PIN_21_EINT21__FUNC_GPIO21>,
+					<MT8167_PIN_22_EINT22__FUNC_GPIO22>;
+					input-enable;
+					bias-pull-down = <MTK_PUPD_SET_R1R0_00>;
+			};
+	};
+
+	aud_pins_default: audiodefault {
+		pins_cmd_dat {
+			pinmux = <MT8167_PIN_66_LCM_RST__FUNC_I2S0_MCK>,
+				<MT8167_PIN_55_I2S_DATA_IN__FUNC_I2S0_DI>,
+				<MT8167_PIN_56_I2S_LRCK__FUNC_I2S0_LRCK>,
+				<MT8167_PIN_57_I2S_BCK__FUNC_I2S0_BCK>,
+				<MT8167_PIN_68_MSDC2_CMD__FUNC_I2S3_BCK>,
+				<MT8167_PIN_69_MSDC2_CLK__FUNC_I2S3_LRCK>,
+				<MT8167_PIN_70_MSDC2_DAT0__FUNC_I2S3_DO>,
+				<MT8167_PIN_71_MSDC2_DAT1__FUNC_I2S_8CH_DO1>,
+				<MT8167_PIN_72_MSDC2_DAT2__FUNC_I2S_8CH_LRCK>,
+				<MT8167_PIN_73_MSDC2_DAT3__FUNC_I2S_8CH_BCK>,
+				<MT8167_PIN_14_EINT14__FUNC_TDM_RX_MCK>,
+				<MT8167_PIN_15_EINT15__FUNC_TDM_RX_BCK>,
+				<MT8167_PIN_16_EINT16__FUNC_TDM_RX_LRCK>,
+				<MT8167_PIN_17_EINT17__FUNC_TDM_RX_DI>;
+		};
+	};
+
+	irrx_pins_ir_input: irrx_pin_ir {
+		pins_cmd_dat {
+			pinmux = <MT8167_PIN_23_EINT23__FUNC_IR>;
+			bias-disable;
+		};
+	};
+
+	kpd_pins_default: kpddefault {
+		pins_cols {
+			pinmux = <MT8167_PIN_42_KPCOL0__FUNC_KPCOL0>,
+				 <MT8167_PIN_43_KPCOL1__FUNC_KPCOL1>;
+			input-enable;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
+		};
+
+		pins_rows {
+			pinmux = <MT8167_PIN_40_KPROW0__FUNC_KPROW0>,
+				 <MT8167_PIN_41_KPROW1__FUNC_KPROW1>;
+			output-low;
+			bias-disable;
+		};
+	};
+
+	mmc1_pins_default: mmc1default {
+		pins_cmd_dat {
+			pinmux = <MT8167_PIN_106_MSDC1_DAT0__FUNC_MSDC1_DAT0>,
+				<MT8167_PIN_107_MSDC1_DAT1__FUNC_MSDC1_DAT1>,
+				<MT8167_PIN_108_MSDC1_DAT2__FUNC_MSDC1_DAT2>,
+				<MT8167_PIN_109_MSDC1_DAT3__FUNC_MSDC1_DAT3>,
+				<MT8167_PIN_104_MSDC1_CMD__FUNC_MSDC1_CMD>;
+			input-enable;
+			drive-strength = <MTK_DRIVE_6mA>;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
+		};
+
+		pins_clk {
+			pinmux = <MT8167_PIN_105_MSDC1_CLK__FUNC_MSDC1_CLK>;
+			drive-strength = <MTK_DRIVE_6mA>;
+			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
+		};
+
+		pins_pmu_en {
+			pinmux = <MT8167_PIN_2_EINT2__FUNC_GPIO2>;
+			output-high;
+		};
+	};
+
+	mmc1_pins_uhs: mmc1@0 {
+		pins_cmd_dat {
+			pinmux = <MT8167_PIN_106_MSDC1_DAT0__FUNC_MSDC1_DAT0>,
+				<MT8167_PIN_107_MSDC1_DAT1__FUNC_MSDC1_DAT1>,
+				<MT8167_PIN_108_MSDC1_DAT2__FUNC_MSDC1_DAT2>,
+				<MT8167_PIN_109_MSDC1_DAT3__FUNC_MSDC1_DAT3>,
+				<MT8167_PIN_104_MSDC1_CMD__FUNC_MSDC1_CMD>;
+			input-enable;
+			drive-strength = <MTK_DRIVE_6mA>;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
+		};
+
+		pins_clk {
+			pinmux = <MT8167_PIN_105_MSDC1_CLK__FUNC_MSDC1_CLK>;
+			drive-strength = <MTK_DRIVE_8mA>;
+			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
+		};
+	};
+
+	spi_pins_a: spi {
+		pins_spi {
+			pinmux = <MT8167_PIN_3_EINT3__FUNC_SPI_MI>,
+				 <MT8167_PIN_51_SPI_MO__FUNC_SPI_MO>,
+				 <MT8167_PIN_5_EINT5__FUNC_SPI_CSB>,
+				 <MT8167_PIN_6_EINT6__FUNC_SPI_CLK>;
+			bias-disable;
+		};
+	};
+
+	usb0_default_pin: usb0_default_pin {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_35_UTXD2__FUNC_GPIO35>;
+			slew-rate = <0>;
+			bias-disable;
+		};
+	};
+
+	usb0_drvvbus: drvvbus_init {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_18_EINT18__FUNC_USB_DRVVBUS>;
+			output-low;
+		};
+	};
+
+	usb0_drvvbus_high: drvvbus_high {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_18_EINT18__FUNC_USB_DRVVBUS>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+
+	usb0_drvvbus_low: drvvbus_low {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_18_EINT18__FUNC_USB_DRVVBUS>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+
+	usb0_iddig: iddig_irq_init {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_19_EINT19__FUNC_IDDIG>;
+			slew-rate = <0>;
+			bias-pull-up = <00>;
+		};
+	};
+};
+
+&spi {
+	status = "okay";
+};
+
+&uart0 {
+	status="okay";
+};
+
+&usb0 {
+	pinctrl-names = "default", "iddig_irq_init", "drvvbus_init", "drvvbus_low", "drvvbus_high";
+	pinctrl-0 = <&usb0_default_pin>;
+	pinctrl-1 = <&usb0_iddig>;
+	pinctrl-2 = <&usb0_drvvbus>;
+	pinctrl-3 = <&usb0_drvvbus_low>;
+	pinctrl-4 = <&usb0_drvvbus_high>;
+
+	drvvbus_gpio = <&pio 18 2>;
+	iddig_gpio = <&pio 19 2>;
+
+	status = "okay";
+};

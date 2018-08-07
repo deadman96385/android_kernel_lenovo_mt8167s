@@ -1,0 +1,88 @@
+/*
+ * Copyright (c) 2018 MediaTek Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include "mt8516_som_base.dtsi"
+
+/ {
+	mt8167_audio_codec: mt8167_audio_codec {
+		compatible = "mediatek,mt8167-codec";
+		clocks = <&topckgen CLK_TOP_AUDIO>;
+		clock-names = "bus";
+		mediatek,afe-regmap = <&afe>;
+		mediatek,apmixedsys-regmap = <&apmixedsys>;
+		mediatek,pwrap-regmap = <&pwrap>;
+		mediatek,speaker-mode = <0>; /* 0(CLASSD) 1(CLASSAB) */
+		mediatek,dmic-wire-mode = <0>; /* 0(ONE_WIRE) 1(TWO_WIRE) */
+		mediatek,headphone-cap-sel = <1>; /* 0(10UF) 1(22UF) 2(33UF) 3(47UF) */
+	};
+};
+
+&afe {
+	/* 0(HDMI) 1(I2S) 2(TDM) */
+	mediatek,tdm-out-mode = <1>;
+	/* 0(IRQ1) 1(IRQ2) 4(IRQ7) */
+	mediatek,awb-irq-mode = <4>;
+	/* 0(seperate clock) 1(shared clock) */
+	mediatek,i2s-clock-modes = <0 0>;
+};
+
+&hdmi0 {
+	pinctrl-names = "default", "hdmi_hpd";
+	pinctrl-0 = <&hdmi_pins_default>;
+	pinctrl-1 = <&hdmi_pins_hpd>;
+	status = "okay";
+};
+
+&msdc2 {
+	status = "disabled";
+};
+
+&mt6392_vm25_reg{
+	regulator-always-on;
+	regulator-boot-on;
+};
+
+&pio {
+	pinctrl-names = "default";
+	pinctrl-0 = <&state_default>;
+
+	state_default:pinconf_default {
+	};
+
+	aud_pins_default: audiodefault {
+		pins_cmd_dat {
+			pinmux = <MT8167_PIN_25_EINT25__FUNC_I2S_8CH_MCK>,
+				<MT8167_PIN_55_I2S_DATA_IN__FUNC_I2S_8CH_DO1>,
+				<MT8167_PIN_56_I2S_LRCK__FUNC_I2S_8CH_LRCK>,
+				<MT8167_PIN_57_I2S_BCK__FUNC_I2S_8CH_BCK>,
+				<MT8167_PIN_48_SPI_CS__FUNC_I2S0_DI>,
+				<MT8167_PIN_49_SPI_CK__FUNC_I2S0_LRCK>,
+				<MT8167_PIN_50_SPI_MI__FUNC_I2S0_BCK>,
+				<MT8167_PIN_13_EINT13__FUNC_SPDIF_IN>;
+			drive-strength = <MTK_DRIVE_4mA>;
+		};
+	};
+};
+
+&uart0 {
+	status="okay";
+};
+
+&uart2 {
+	status="okay";
+};
+
+&usb1 {
+	status = "okay";
+};
