@@ -312,6 +312,7 @@
 				};
 				pins_tx {
 					pinmux = <MT8167_PIN_63_UTXD0__FUNC_UTXD0>;
+					output-high;
 				};
 			};
 			uart0_rx_set_cfg:uart0_rx_set {
@@ -343,6 +344,15 @@
 
 			/* UART1: rx set, rx clear, tx clear, tx clear*/
 			uart1_gpio_def_cfg:uart1gpiodefault {
+				pins_rx {
+					pinmux = <MT8167_PIN_64_URXD1__FUNC_URXD1>;
+					input-enable;
+					bias-pull-up;
+				};
+				pins_tx {
+					pinmux = <MT8167_PIN_65_UTXD1__FUNC_UTXD1>;
+					output-high;
+				};
 			};
 			uart1_rx_set_cfg:uart1_rx_set {
 				pins_cmd_dat {
@@ -371,6 +381,15 @@
 
 			/* UART2: rx set, rx clear, tx clear, tx clear*/
 			uart2_gpio_def_cfg:uart2gpiodefault {
+				pins_rx {
+					pinmux = <MT8167_PIN_34_URXD2__FUNC_URXD2>;
+					input-enable;
+					bias-pull-up;
+				};
+				pins_tx {
+					pinmux = <MT8167_PIN_35_UTXD2__FUNC_UTXD2>;
+					output-high;
+				};
 			};
 			uart2_rx_set_cfg:uart2_rx_set {
 				pins_cmd_dat {
