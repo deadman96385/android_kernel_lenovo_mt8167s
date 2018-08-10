@@ -114,6 +114,54 @@
 *                              F U N C T I O N S
 ********************************************************************************
 */
+struct wireless_dev *
+mtk_cfg80211_add_iface(struct wiphy *wiphy,
+			   const char *name, unsigned char name_assign_type,
+			   enum nl80211_iftype type, u32 *flags, struct vif_params *params)
+{
+	P_GLUE_INFO_T prGlueInfo;
+	WLAN_STATUS rStatus = WLAN_STATUS_SUCCESS;
+
+	prGlueInfo = (P_GLUE_INFO_T) wiphy_priv(wiphy);
+	ASSERT(prGlueInfo);
+	if (prGlueInfo->prAdapter->fgIsP2PRegistered)
+	{
+		return gprP2pRoleWdev[1];
+	}
+	
+	if (kalIsResetting() == FALSE){
+		p2pNetUnregister(prGlueInfo, FALSE);
+	}
+	
+	if (prGlueInfo->prAdapter->fgIsP2PRegistered){
+		p2pRemove(prGlueInfo->prAdapter->prGlueInfo);
+	}
+	
+	p2pSetMode(3);
+	if (p2pLaunch(prGlueInfo->prAdapter->prGlueInfo)) {
+		ASSERT(prGlueInfo->prAdapter->fgIsP2PRegistered);
+		rStatus = WLAN_STATUS_SUCCESS;
+	} else
+		rStatus = WLAN_STATUS_FAILURE;
+	
+	if (rStatus != WLAN_STATUS_SUCCESS) {
+		DBGLOG(INIT, ERROR, "kalIoctl failed: 0x%08lx\n", (UINT_32) rStatus);
+		return gprP2pWdev;
+	}
+	
+	if (kalIsResetting() == FALSE){
+		p2pNetRegister(prGlueInfo, FALSE);
+	}
+	
+	return gprP2pWdev;
+}
+	
+int mtk_cfg80211_del_iface(struct wiphy *wiphy,
+			struct wireless_dev *wdev)
+{
+	/* TODO: */
+	return 0;
+}
 
 /*----------------------------------------------------------------------------*/
 /*!

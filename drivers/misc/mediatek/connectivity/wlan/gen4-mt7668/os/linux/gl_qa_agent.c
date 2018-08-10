@@ -7621,6 +7621,9 @@ int priv_qa_agent(IN struct net_device *prNetDev,
 	HQA_CMD_FRAME *HqaCmdFrame;
 	UINT_32 u4ATEMagicNum, u4ATEId, u4ATEData;
 
+	/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
+
 	HqaCmdFrame = kmalloc(sizeof(*HqaCmdFrame), GFP_KERNEL);
 
 	if (!HqaCmdFrame) {
