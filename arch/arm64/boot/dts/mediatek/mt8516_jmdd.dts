@@ -37,6 +37,8 @@
 	mediatek,awb-irq-mode = <6>;
 	/* 0(seperate clock) 1(shared clock) */
 	mediatek,i2s-clock-modes = <0 0>;
+	mediatek,i2s1-bck-fixed-64fs;
+	mediatek,i2s3-bck-fixed-64fs;
 };
 
 &ethernet {
@@ -240,6 +242,7 @@
 			pins = <MT8167_PIN_35_UTXD2__FUNC_GPIO35>;
 			slew-rate = <0>;
 			bias-disable;
+			output-high;
 		};
 	};
 
