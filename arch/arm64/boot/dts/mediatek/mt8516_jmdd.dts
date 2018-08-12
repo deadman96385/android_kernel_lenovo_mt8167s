@@ -30,6 +30,12 @@
 	status = "okay";
 };
 
+
+&mt6392_vmc_reg {
+  regulator-always-on;
+};
+
+
 &afe {
 	/* 0(HDMI) 1(I2S) 2(TDM) */
 	mediatek,tdm-out-mode = <1>;
@@ -130,7 +136,6 @@
 	state_default:pinconf_default {
 		pins_cmd_dat0 {
 			pinmux = <MT8167_PIN_25_EINT25__FUNC_GPIO25>;
-					bias-pull-down;
 					input-enable;
 			};
 
