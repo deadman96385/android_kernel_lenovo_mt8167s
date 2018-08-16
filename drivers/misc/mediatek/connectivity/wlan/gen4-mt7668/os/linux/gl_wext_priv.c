@@ -674,6 +674,9 @@ priv_set_int(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+	/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
+
 	u4SubCmd = (UINT_32) prIwReqData->mode;
 	pu4IntBuf = (PUINT_32) pcExtra;
 
@@ -953,6 +956,9 @@ priv_get_int(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+	/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
+
 	u4SubCmd = (UINT_32) prIwReqData->mode;
 	pu4IntBuf = (PUINT_32) pcExtra;
 
@@ -1149,6 +1155,9 @@ priv_set_ints(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+		/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
+
 	u4SubCmd = (UINT_32) prIwReqData->data.flags;
 
 	switch (u4SubCmd) {
@@ -1253,6 +1262,9 @@ priv_get_ints(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+		/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
+
 	u4SubCmd = (UINT_32) prIwReqData->data.flags;
 
 	switch (u4SubCmd) {
@@ -1320,6 +1332,9 @@ priv_set_struct(IN struct net_device *prNetDev,
 	if (GLUE_CHK_PR2(prNetDev, prIwReqData) == FALSE)
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
+
+	/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
 
 	u4SubCmd = (UINT_32) prIwReqData->data.flags;
 
@@ -1486,6 +1501,9 @@ priv_get_struct(IN struct net_device *prNetDev,
 		DBGLOG(REQ, INFO, "priv_get_struct(): invalid param(0x%p, 0x%p)\n", prNetDev, prIwReqData);
 		return -EINVAL;
 	}
+
+	/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
 
 	u4SubCmd = (UINT_32) prIwReqData->data.flags;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
@@ -11220,3 +11238,26 @@ FREE:
 	return ret;
 }
 #endif /* CFG_ANDROID_AOSP_PRIV_CMD */
+
+#ifdef CONFIG_COMPAT
+/*
+* CONFIG_COMPAT, kernel support 32/64COMPAT
+* IW_REQUEST_FLAG_COMPAT means ioctl from 32 bit userspace program
+*/
+void convert_compat_fromuser(IN struct iw_request_info *prIwReqInfo, IN OUT union iwreq_data *prIwReqData)
+{
+	struct compat_iw_point *iwp_compat;
+	struct iw_point *iwp = &prIwReqData->data;
+	if (prIwReqInfo->flags == IW_REQUEST_FLAG_COMPAT) {
+		DBGLOG(REQ, INFO,
+			"%s: convert to 32bit userspace compat\n", __func__);
+		iwp_compat = (struct compat_iw_point *) &prIwReqData->data;
+		iwp->length = iwp_compat->length;
+		iwp->flags = iwp_compat->flags;
+		iwp->pointer = compat_ptr(iwp_compat->pointer);
+		DBGLOG(REQ, INFO,
+			"%s: flags 0x%x\n", __func__, iwp->flags);
+	}
+}
+#endif
+
