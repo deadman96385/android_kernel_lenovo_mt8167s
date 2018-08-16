@@ -77,6 +77,8 @@ enum {
 	MT8167_CLK_I2S4_M_SEL,
 	MT8167_CLK_I2S5_M_SEL,
 	MT8167_CLK_SPDIF_B_SEL,
+	MT8167_CLK_SPDIFIN_SEL,
+	MT8167_CLK_TOP_UNIVPLL_D2,
 	MT8167_CLK_NUM
 };
 
@@ -94,6 +96,7 @@ enum mt8167_afe_irq_mode {
 	MT8167_AFE_IRQ_5, /* dedicated for HDMI */
 	MT8167_AFE_IRQ_6, /* dedicated for SPDIF */
 	MT8167_AFE_IRQ_7,
+	MT8167_AFE_IRQ_9, /* dedicated for SPDIF IN DETECT */
 	MT8167_AFE_IRQ_10,/* dedicated for TDM IN */
 	MT8167_AFE_IRQ_11,
 	MT8167_AFE_IRQ_NUM
@@ -119,6 +122,7 @@ enum {
 	MT8167_AFE_DEBUGFS_AFE,
 	MT8167_AFE_DEBUGFS_HDMI,
 	MT8167_AFE_DEBUGFS_TDM_IN,
+	MT8167_AFE_DEBUGFS_SPDIF_IN,
 	MT8167_AFE_DEBUGFS_NUM,
 };
 
@@ -164,6 +168,13 @@ enum mt8167_afe_i2s_sample_rate {
 	MT_AFE_I2S_SAMPLERATE_96K = 12,
 	MT_AFE_I2S_SAMPLERATE_174K = 13,
 	MT_AFE_I2S_SAMPLERATE_192K = 14,
+};
+
+enum mt8167_afe_spdif_in_port {
+	SPDIF_IN_PORT_NONE = 0,
+	SPDIF_IN_PORT_OPT,
+	SPDIF_IN_PORT_COAXIAL,
+	SPDIF_IN_PORT_ARC
 };
 
 struct snd_pcm_substream;
@@ -220,6 +231,13 @@ struct mt8167_pcm_mrgrx_priv {
 	bool prepare_done;
 };
 
+struct mt8167_spdif_in_state {
+	bool detect_en;
+	unsigned int port;
+	unsigned int rate;
+	unsigned int ch_status[6];
+};
+
 struct mtk_afe {
 	/* address for ioremap audio hardware register */
 	void __iomem *base_addr;
@@ -248,6 +266,7 @@ struct mtk_afe {
 	unsigned int awb_irq_mode;
 	unsigned int dl2_irq_mode;
 	unsigned int dai_irq_mode;
+	struct mt8167_spdif_in_state spdif_in_state;
 	/* locks */
 	spinlock_t afe_ctrl_lock;
 	struct mutex afe_clk_mutex;

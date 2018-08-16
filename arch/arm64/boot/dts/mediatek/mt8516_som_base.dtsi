@@ -110,6 +110,8 @@
 	mediatek,awb-irq-mode = <4>;
 	/* 0(seperate clock) 1(shared clock) */
 	mediatek,i2s-clock-modes = <1 1>;
+	/* 1(optical) 2(coaxial) 3(arc) */
+	mediatek,spdif-in-port = <1>;
 };
 
 &bat_comm {

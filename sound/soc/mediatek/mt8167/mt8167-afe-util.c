@@ -268,3 +268,391 @@ int mt8167_afe_disable_apll_associated_cfg(struct mtk_afe *afe, unsigned int apl
 	return 0;
 }
 
+int mt8167_afe_enable_irq_by_mode(struct mtk_afe *afe, unsigned int mode)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&afe->afe_ctrl_lock, flags);
+
+	afe->irq_mode_ref_cnt[mode]++;
+	if (afe->irq_mode_ref_cnt[mode] > 1) {
+		spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
+		return 0;
+	}
+
+	switch (mode) {
+	case MT8167_AFE_IRQ_1:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 0, 1 << 0);
+		break;
+	case MT8167_AFE_IRQ_2:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 1, 1 << 1);
+		break;
+	case MT8167_AFE_IRQ_5:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 3, 1 << 3);
+		break;
+	case MT8167_AFE_IRQ_7:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 14, 1 << 14);
+		break;
+	case MT8167_AFE_IRQ_9:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 2, 1 << 2);
+		break;
+	case MT8167_AFE_IRQ_10:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 4, 1 << 4);
+		break;
+	case MT8167_AFE_IRQ_11:
+		regmap_update_bits(afe->regmap, AFE_TSF_CON,
+		    AFE_TSF_CON_HDMIOUT_AUTO_EN |
+		    AFE_TSF_CON_HDMIOUT_HW_DIS |
+		    AFE_TSF_CON_DL2_AUTO_EN |
+		    AFE_TSF_CON_DL1_AUTO_EN |
+		    AFE_TSF_CON_DL_HW_DIS,
+		    AFE_TSF_CON_HDMIOUT_HW_DIS |
+		    AFE_TSF_CON_DL_HW_DIS);
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 5, 1 << 5);
+		break;
+	default:
+		break;
+	}
+
+	spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
+
+	return 0;
+}
+
+int mt8167_afe_disable_irq_by_mode(struct mtk_afe *afe, unsigned int mode)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&afe->afe_ctrl_lock, flags);
+
+	afe->irq_mode_ref_cnt[mode]--;
+	if (afe->irq_mode_ref_cnt[mode] > 0) {
+		spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
+		return 0;
+	} else if (afe->irq_mode_ref_cnt[mode] < 0) {
+		afe->irq_mode_ref_cnt[mode] = 0;
+		spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
+		return 0;
+	}
+
+	switch (mode) {
+	case MT8167_AFE_IRQ_1:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 0, 0 << 0);
+		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 0);
+		break;
+	case MT8167_AFE_IRQ_2:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 1, 0 << 1);
+		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 1);
+		break;
+	case MT8167_AFE_IRQ_5:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 3, 0 << 3);
+		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 4);
+		break;
+	case MT8167_AFE_IRQ_7:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 14, 0 << 14);
+		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 6);
+		break;
+	case MT8167_AFE_IRQ_9:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 2, 0 << 2);
+		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 8);
+		break;
+	case MT8167_AFE_IRQ_10:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 4, 0 << 4);
+		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 9);
+		break;
+	case MT8167_AFE_IRQ_11:
+		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 5, 0 << 5);
+		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 10);
+		break;
+	default:
+		break;
+	}
+
+	spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
+
+	return 0;
+}
+
+int mt8167_afe_enable_spdif_in_clk(struct mtk_afe *afe)
+{
+	int ret = 0;
+
+#ifdef COMMON_CLOCK_FRAMEWORK_API
+	ret = clk_prepare_enable(afe->clocks[MT8167_CLK_SPDIFIN_SEL]);
+	if (ret)
+		pr_err("%s clk_prepare_enable %s fail %d\n",
+		       __func__, "spdifin_sel", ret);
+
+	ret = clk_set_parent(afe->clocks[MT8167_CLK_SPDIFIN_SEL],
+			     afe->clocks[MT8167_CLK_TOP_UNIVPLL_D2]);
+	if (ret)
+		pr_err("%s clk_set_parent %s-%s fail %d\n",
+		       __func__, "spdifin_sel", "univpll_div2", ret);
+
+	ret = clk_prepare_enable(afe->clocks[MT8167_CLK_SPDIF_IN]);
+	if (ret)
+		pr_err("%s clk_prepare_enable %s fail %d\n",
+		       __func__, "spdif_in", ret);
+#endif
+
+	return ret;
+}
+
+int mt8167_afe_disable_spdif_in_clk(struct mtk_afe *afe)
+{
+#ifdef COMMON_CLOCK_FRAMEWORK_API
+	clk_disable_unprepare(afe->clocks[MT8167_CLK_SPDIF_IN]);
+	clk_disable_unprepare(afe->clocks[MT8167_CLK_SPDIFIN_SEL]);
+#endif
+	return 0;
+}
+
+int mt8167_afe_enable_spdif_in_detect(struct mtk_afe *afe)
+{
+	unsigned int port_sel;
+
+	if (afe->spdif_in_state.detect_en)
+		return 0;
+
+	switch (afe->spdif_in_state.port) {
+	case SPDIF_IN_PORT_OPT:
+		port_sel = AFE_SPDIFIN_INT_EXT_SEL_OPTICAL;
+		break;
+	case SPDIF_IN_PORT_COAXIAL:
+		port_sel = AFE_SPDIFIN_INT_EXT_SEL_COAXIAL;
+		break;
+	case SPDIF_IN_PORT_ARC:
+		port_sel = AFE_SPDIFIN_INT_EXT_SEL_ARC;
+		break;
+	case SPDIF_IN_PORT_NONE:
+	default:
+		dev_err(afe->dev, "%s unexpected port %u\n", __func__,
+			afe->spdif_in_state.port);
+		return 0;
+	}
+
+	mt8167_afe_enable_main_clk(afe);
+
+	mt8167_afe_enable_spdif_in_clk(afe);
+
+	mt8167_afe_enable_top_cg(afe, MT8167_AFE_CG_INTDIR_CK);
+
+	mt8167_afe_enable_afe_on(afe);
+
+	regmap_write(afe->regmap, SPDIFIN_FREQ_INFO, 0x00877986);
+	regmap_write(afe->regmap, SPDIFIN_FREQ_INFO_2, 0x006596e8);
+	regmap_write(afe->regmap, SPDIFIN_FREQ_INFO_3, 0x000005a5);
+	regmap_write(afe->regmap, AFE_SPDIFIN_BR, 0x00039000);
+
+	regmap_update_bits(afe->regmap,
+			   AFE_SPDIFIN_INT_EXT2,
+			   SPDIFIN_594MODE_MASK,
+			   SPDIFIN_594MODE_EN);
+
+	regmap_update_bits(afe->regmap,
+			   AFE_SPDIFIN_CFG1,
+			   AFE_SPDIFIN_CFG1_SET_MASK,
+			   AFE_SPDIFIN_CFG1_INT_BITS |
+			   AFE_SPDIFIN_CFG1_SEL_BCK_SPDIFIN |
+			   AFE_SPDIFIN_CFG1_FIFOSTART_5POINTS);
+
+	regmap_update_bits(afe->regmap,
+			   AFE_SPDIFIN_INT_EXT,
+			   AFE_SPDIFIN_INT_EXT_SET_MASK,
+			   AFE_SPDIFIN_INT_EXT_DATALAT_ERR_EN |
+			   port_sel);
+
+	regmap_update_bits(afe->regmap,
+			   AFE_SPDIFIN_CFG0,
+			   AFE_SPDIFIN_CFG0_SET_MASK,
+			   AFE_SPDIFIN_CFG0_GMAT_BC_256_CYCLES |
+			   AFE_SPDIFIN_CFG0_INT_EN |
+			   AFE_SPDIFIN_CFG0_DE_CNT(4) |
+			   AFE_SPDIFIN_CFG0_DE_SEL_CNT |
+			   AFE_SPDIFIN_CFG0_MAX_LEN_NUM(237));
+
+	mt8167_afe_enable_irq_by_mode(afe, MT8167_AFE_IRQ_9);
+
+	regmap_update_bits(afe->regmap,
+			   AFE_SPDIFIN_CFG0,
+			   AFE_SPDIFIN_CFG0_EN,
+			   AFE_SPDIFIN_CFG0_EN);
+
+	afe->spdif_in_state.detect_en = true;
+
+	return 0;
+}
+
+int mt8167_afe_disable_spdif_in_detect(struct mtk_afe *afe)
+{
+	if (!afe->spdif_in_state.detect_en)
+		return 0;
+
+	regmap_update_bits(afe->regmap,
+			   AFE_SPDIFIN_CFG0,
+			   AFE_SPDIFIN_CFG0_EN,
+			   0x0);
+
+	mt8167_afe_disable_irq_by_mode(afe, MT8167_AFE_IRQ_9);
+
+	mt8167_afe_disable_afe_on(afe);
+
+	mt8167_afe_disable_top_cg(afe, MT8167_AFE_CG_INTDIR_CK);
+
+	mt8167_afe_disable_spdif_in_clk(afe);
+
+	mt8167_afe_disable_main_clk(afe);
+
+	afe->spdif_in_state.detect_en = false;
+
+	return 0;
+}
+
+static unsigned int get_spdif_in_clear_bits(unsigned int v)
+{
+	unsigned int bits = 0;
+
+	if (v & AFE_SPDIFIN_DEBUG3_PRE_ERR_NON_STS)
+		bits |= AFE_SPDIFIN_EC_PRE_ERR_CLEAR;
+	if (v & AFE_SPDIFIN_DEBUG3_PRE_ERR_B_STS)
+		bits |= AFE_SPDIFIN_EC_PRE_ERR_B_CLEAR;
+	if (v & AFE_SPDIFIN_DEBUG3_PRE_ERR_M_STS)
+		bits |= AFE_SPDIFIN_EC_PRE_ERR_M_CLEAR;
+	if (v & AFE_SPDIFIN_DEBUG3_PRE_ERR_W_STS)
+		bits |= AFE_SPDIFIN_EC_PRE_ERR_W_CLEAR;
+	if (v & AFE_SPDIFIN_DEBUG3_PRE_ERR_BITCNT_STS)
+		bits |= AFE_SPDIFIN_EC_PRE_ERR_BITCNT_CLEAR;
+	if (v & AFE_SPDIFIN_DEBUG3_PRE_ERR_PARITY_STS)
+		bits |= AFE_SPDIFIN_EC_PRE_ERR_PARITY_CLEAR;
+	if (v & AFE_SPDIFIN_DEBUG3_TIMEOUT_ERR_STS)
+		bits |= AFE_SPDIFIN_EC_TIMEOUT_INT_CLEAR;
+	if (v & AFE_SPDIFIN_INT_EXT2_LRCK_CHANGE)
+		bits |= AFE_SPDIFIN_EC_DATA_LRCK_CHANGE_CLEAR;
+	if (v & AFE_SPDIFIN_DEBUG1_DATALAT_ERR)
+		bits |= AFE_SPDIFIN_EC_DATA_LATCH_CLEAR;
+	if (v & AFE_SPDIFIN_DEBUG3_CHSTS_PREAMPHASIS_STS)
+		bits |= AFE_SPDIFIN_EC_CHSTS_PREAMPHASIS_CLEAR;
+	if (v & AFE_SPDIFIN_DEBUG2_FIFO_ERR)
+		bits |= AFE_SPDIFIN_EC_FIFO_ERR_CLEAR;
+	if (v & AFE_SPDIFIN_DEBUG2_CHSTS_INT_FLAG)
+		bits |= AFE_SPDIFIN_EC_CHSTS_COLLECTION_CLEAR;
+	if (v & AFE_SPDIFIN_DEBUG2_PERR_9TIMES_FLAG)
+		bits |= AFE_SPDIFIN_EC_USECODE_COLLECTION_CLEAR;
+
+	return bits;
+}
+
+static unsigned int get_spdif_in_sample_rate(struct mtk_afe *afe)
+{
+	unsigned int val, fs;
+
+	regmap_read(afe->regmap, AFE_SPDIFIN_INT_EXT2, &val);
+
+	val &= AFE_SPDIFIN_INT_EXT2_ROUGH_FS_MASK;
+
+	switch (val) {
+	case AFE_SPDIFIN_INT_EXT2_FS_32K:
+		fs = 32000;
+		break;
+	case AFE_SPDIFIN_INT_EXT2_FS_44D1K:
+		fs = 44100;
+		break;
+	case AFE_SPDIFIN_INT_EXT2_FS_48K:
+		fs = 48000;
+		break;
+	case AFE_SPDIFIN_INT_EXT2_FS_88D2K:
+		fs = 88200;
+		break;
+	case AFE_SPDIFIN_INT_EXT2_FS_96K:
+		fs = 96000;
+		break;
+	case AFE_SPDIFIN_INT_EXT2_FS_176D4K:
+		fs = 176400;
+		break;
+	case AFE_SPDIFIN_INT_EXT2_FS_192K:
+		fs = 192000;
+		break;
+	default:
+		fs = 0;
+		break;
+	}
+
+	return fs;
+}
+
+int mt8167_afe_spdif_in_isr(struct mtk_afe *afe)
+{
+	unsigned int debug1, debug2, debug3, int_ext2;
+	unsigned int err;
+	unsigned int rate;
+
+	regmap_read(afe->regmap, AFE_SPDIFIN_INT_EXT2, &int_ext2);
+	regmap_read(afe->regmap, AFE_SPDIFIN_DEBUG1, &debug1);
+	regmap_read(afe->regmap, AFE_SPDIFIN_DEBUG2, &debug2);
+	regmap_read(afe->regmap, AFE_SPDIFIN_DEBUG3, &debug3);
+
+	err = (int_ext2 & AFE_SPDIFIN_INT_EXT2_LRCK_CHANGE) |
+	      (debug1 & AFE_SPDIFIN_DEBUG1_DATALAT_ERR) |
+	      (debug2 & AFE_SPDIFIN_DEBUG2_FIFO_ERR) |
+	      (debug3 & AFE_SPDIFIN_DEBUG3_ALL_ERR);
+
+	dev_dbg(afe->dev,
+		"%s int_ext2(0x%x) debug(0x%x,0x%x,0x%x) err(0x%x)\n",
+		__func__, int_ext2, debug1, debug2, debug3, err);
+
+	if (err != 0) {
+		if (afe->spdif_in_state.rate > 0)
+			afe->spdif_in_state.rate = 0;
+
+		regmap_update_bits(afe->regmap,
+				   AFE_SPDIFIN_CFG0,
+				   AFE_SPDIFIN_CFG0_INT_EN |
+				   AFE_SPDIFIN_CFG0_EN,
+				   0x0);
+
+		regmap_write(afe->regmap,
+			     AFE_SPDIFIN_EC,
+			     get_spdif_in_clear_bits(err));
+
+		regmap_update_bits(afe->regmap,
+				   AFE_SPDIFIN_CFG0,
+				   AFE_SPDIFIN_CFG0_INT_EN |
+				   AFE_SPDIFIN_CFG0_EN,
+				   AFE_SPDIFIN_CFG0_INT_EN |
+				   AFE_SPDIFIN_CFG0_EN);
+
+		return 0;
+	}
+
+	rate = get_spdif_in_sample_rate(afe);
+	if (rate == 0) {
+		regmap_update_bits(afe->regmap,
+				   AFE_SPDIFIN_CFG0,
+				   AFE_SPDIFIN_CFG0_INT_EN |
+				   AFE_SPDIFIN_CFG0_EN,
+				   0x0);
+
+		regmap_write(afe->regmap,
+			     AFE_SPDIFIN_EC,
+			     AFE_SPDIFIN_EC_CLEAR_ALL);
+
+		regmap_update_bits(afe->regmap,
+				   AFE_SPDIFIN_CFG0,
+				   AFE_SPDIFIN_CFG0_INT_EN |
+				   AFE_SPDIFIN_CFG0_EN,
+				   AFE_SPDIFIN_CFG0_INT_EN |
+				   AFE_SPDIFIN_CFG0_EN);
+
+		return 0;
+	}
+
+	afe->spdif_in_state.rate = rate;
+
+	/* clear all interrupt bits */
+	regmap_write(afe->regmap,
+		     AFE_SPDIFIN_EC,
+		     AFE_SPDIFIN_EC_CLEAR_ALL);
+
+	return 0;
+}
+

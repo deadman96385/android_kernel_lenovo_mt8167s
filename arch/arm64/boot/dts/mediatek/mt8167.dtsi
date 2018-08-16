@@ -980,7 +980,9 @@
 				<&topckgen CLK_TOP_AUD_I2S3_M_SEL>,
 				<&topckgen CLK_TOP_AUD_I2S4_M_SEL>,
 				<&topckgen CLK_TOP_AUD_I2S5_M_SEL>,
-				<&topckgen CLK_TOP_AUD_SPDIF_B_SEL>;
+				<&topckgen CLK_TOP_AUD_SPDIF_B_SEL>,
+				<&topckgen CLK_TOP_AUD_SPDIFIN_SEL>,
+				<&topckgen CLK_TOP_UNIVPLL_D2>;
 			clock-names = "top_pdn_audio",
 				"apll12_div0",
 				"apll12_div1",
@@ -1002,7 +1004,9 @@
 				"i2s3_m_sel",
 				"i2s4_m_sel",
 				"i2s5_m_sel",
-				"spdif_b_sel";
+				"spdif_b_sel",
+				"spdifin_sel",
+				"univpll_div2";
 			assigned-clocks = <&topckgen CLK_TOP_AUD1_SEL>,
 				<&topckgen CLK_TOP_AUD2_SEL>,
 				<&topckgen CLK_TOP_AUD_ENGEN1_SEL>,
