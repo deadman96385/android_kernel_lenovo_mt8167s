@@ -206,6 +206,7 @@ MODULE_LICENSE("GPL");
 #define LCM_DSI_CMD_MODE								0
 #define FRAME_WIDTH                                     (720)
 #define FRAME_HEIGHT                                    (1280)
+#define LCM_DENSITY					(320)
 
 #define GPIO_OUT_ONE 1
 #define GPIO_OUT_ZERO 0
@@ -570,6 +571,7 @@ static void lcm_get_params(LCM_PARAMS *params)
 
 	params->width = FRAME_WIDTH;
 	params->height = FRAME_HEIGHT;
+	params->density = LCM_DENSITY;
 	/* params->density = 213; */
 #if (LCM_DSI_CMD_MODE)
 	params->dsi.mode = CMD_MODE;
