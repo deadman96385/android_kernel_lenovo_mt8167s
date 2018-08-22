@@ -335,8 +335,6 @@ const UINT_32 mtk_cipher_suites[5] = {
 };
 
 static struct cfg80211_ops mtk_wlan_ops = {
-	.add_virtual_intf = mtk_cfg80211_add_iface,
-	.del_virtual_intf = mtk_cfg80211_del_iface,
 	.change_virtual_intf = mtk_cfg80211_change_iface,
 	.add_key = mtk_cfg80211_add_key,
 	.get_key = mtk_cfg80211_get_key,
