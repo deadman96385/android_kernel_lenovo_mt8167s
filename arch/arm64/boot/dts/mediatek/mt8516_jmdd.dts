@@ -92,8 +92,8 @@
 	/*HW Keycode [0~71] -> Linux Keycode*/
 	mediatek,kpd-hw-map-num = <72>;
 	/*8 rows * 9 columns  */
-	mediatek,kpd-hw-init-map = <115 353 116 237 0 0 0 0 0
-				    0 0 0 0 353 0 237 0 0
+	mediatek,kpd-hw-init-map = <2 3 4 5 31 30 29 28 27
+				    26 25 24 23 6 7 8 9 22
 				    0 0 0 0 0 0 0 0 0
 				    0 0 0 0 0 0 0 0 0
 				    0 0 0 0 0 0 0 0 0
@@ -229,16 +229,6 @@
 			pinmux = <MT8167_PIN_105_MSDC1_CLK__FUNC_MSDC1_CLK>;
 			drive-strength = <MTK_DRIVE_8mA>;
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
-		};
-	};
-
-	spi_pins_a: spi {
-		pins_spi {
-			pinmux = <MT8167_PIN_3_EINT3__FUNC_SPI_MI>,
-				 <MT8167_PIN_51_SPI_MO__FUNC_SPI_MO>,
-				 <MT8167_PIN_5_EINT5__FUNC_SPI_CSB>,
-				 <MT8167_PIN_6_EINT6__FUNC_SPI_CLK>;
-			bias-disable;
 		};
 	};
 
