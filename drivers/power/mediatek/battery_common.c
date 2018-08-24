@@ -561,7 +561,10 @@ static int ac_get_property(struct power_supply *psy,
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
+#if defined(CONFIG_POWER_EXT)
+		data->AC_ONLINE = 1;
 		val->intval = data->AC_ONLINE;
+#endif
 		break;
 	default:
 		ret = -EINVAL;
@@ -579,8 +582,6 @@ static int usb_get_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
 #if defined(CONFIG_POWER_EXT)
-		/* #if 0 */
-		data->USB_ONLINE = 1;
 		val->intval = data->USB_ONLINE;
 #else
 #if defined(CONFIG_MTK_POWER_EXT_DETECT)
@@ -740,7 +741,7 @@ static struct battery_data battery_main = {
 #if defined(CONFIG_POWER_EXT)
 	.BAT_STATUS = POWER_SUPPLY_STATUS_FULL,
 	.BAT_HEALTH = POWER_SUPPLY_HEALTH_GOOD,
-	.BAT_PRESENT = 1,
+	.BAT_PRESENT = 0,
 	.BAT_TECHNOLOGY = POWER_SUPPLY_TECHNOLOGY_LION,
 	.BAT_CAPACITY = 100,
 	.BAT_batt_vol = 4200,
