@@ -222,6 +222,10 @@
 	non-removable;
 };
 
+&mt6392keys {
+	mediatek,long-press-mode = <0>;
+};
+
 &mt6392_vcn18_reg {
 	regulator-always-on;
 };
