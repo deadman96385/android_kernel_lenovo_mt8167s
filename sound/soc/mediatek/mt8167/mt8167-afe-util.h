@@ -42,4 +42,18 @@ int mt8167_afe_enable_apll_associated_cfg(struct mtk_afe *afe, unsigned int apll
 
 int mt8167_afe_disable_apll_associated_cfg(struct mtk_afe *afe, unsigned int apll);
 
+int mt8167_afe_enable_irq_by_mode(struct mtk_afe *afe, unsigned int mode);
+
+int mt8167_afe_disable_irq_by_mode(struct mtk_afe *afe, unsigned int mode);
+
+int mt8167_afe_enable_spdif_in_clk(struct mtk_afe *afe);
+
+int mt8167_afe_disable_spdif_in_clk(struct mtk_afe *afe);
+
+int mt8167_afe_enable_spdif_in_detect(struct mtk_afe *afe);
+
+int mt8167_afe_disable_spdif_in_detect(struct mtk_afe *afe);
+
+int mt8167_afe_spdif_in_isr(struct mtk_afe *afe);
+
 #endif

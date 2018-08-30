@@ -714,101 +714,15 @@ static void mt8167_afe_disable_pcm0(struct mtk_afe *afe)
 static int mt8167_afe_enable_irq(struct mtk_afe *afe, struct mt8167_afe_memif *memif)
 {
 	int irq_mode = memif->data->irq_mode;
-	unsigned long flags;
 
-	spin_lock_irqsave(&afe->afe_ctrl_lock, flags);
-
-	afe->irq_mode_ref_cnt[irq_mode]++;
-	if (afe->irq_mode_ref_cnt[irq_mode] > 1) {
-		spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
-		return 0;
-	}
-
-	switch (irq_mode) {
-	case MT8167_AFE_IRQ_1:
-		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 0, 1 << 0);
-		break;
-	case MT8167_AFE_IRQ_2:
-		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 1, 1 << 1);
-		break;
-	case MT8167_AFE_IRQ_5:
-		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 3, 1 << 3);
-		break;
-	case MT8167_AFE_IRQ_7:
-		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 14, 1 << 14);
-		break;
-	case MT8167_AFE_IRQ_10:
-		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 4, 1 << 4);
-		break;
-	case MT8167_AFE_IRQ_11:
-		regmap_update_bits(afe->regmap, AFE_TSF_CON,
-		    AFE_TSF_CON_HDMIOUT_AUTO_EN |
-		    AFE_TSF_CON_HDMIOUT_HW_DIS |
-		    AFE_TSF_CON_DL2_AUTO_EN |
-		    AFE_TSF_CON_DL1_AUTO_EN |
-		    AFE_TSF_CON_DL_HW_DIS,
-		    AFE_TSF_CON_HDMIOUT_HW_DIS |
-		    AFE_TSF_CON_DL_HW_DIS);
-		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 5, 1 << 5);
-		break;
-	default:
-		break;
-	}
-
-	spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
-
-	return 0;
+	return mt8167_afe_enable_irq_by_mode(afe, irq_mode);
 }
 
 static int mt8167_afe_disable_irq(struct mtk_afe *afe, struct mt8167_afe_memif *memif)
 {
 	int irq_mode = memif->data->irq_mode;
-	unsigned long flags;
 
-	spin_lock_irqsave(&afe->afe_ctrl_lock, flags);
-
-	afe->irq_mode_ref_cnt[irq_mode]--;
-	if (afe->irq_mode_ref_cnt[irq_mode] > 0) {
-		spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
-		return 0;
-	} else if (afe->irq_mode_ref_cnt[irq_mode] < 0) {
-		afe->irq_mode_ref_cnt[irq_mode] = 0;
-		spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
-		return 0;
-	}
-
-	switch (irq_mode) {
-	case MT8167_AFE_IRQ_1:
-		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 0, 0 << 0);
-		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 0);
-		break;
-	case MT8167_AFE_IRQ_2:
-		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 1, 0 << 1);
-		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 1);
-		break;
-	case MT8167_AFE_IRQ_5:
-		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 3, 0 << 3);
-		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 4);
-		break;
-	case MT8167_AFE_IRQ_7:
-		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON, 1 << 14, 0 << 14);
-		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 6);
-		break;
-	case MT8167_AFE_IRQ_10:
-		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 4, 0 << 4);
-		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 9);
-		break;
-	case MT8167_AFE_IRQ_11:
-		regmap_update_bits(afe->regmap, AFE_IRQ_MCU_CON2, 1 << 5, 0 << 5);
-		regmap_write(afe->regmap, AFE_IRQ_CLR, 1 << 10);
-		break;
-	default:
-		break;
-	}
-
-	spin_unlock_irqrestore(&afe->afe_ctrl_lock, flags);
-
-	return 0;
+	return mt8167_afe_disable_irq_by_mode(afe, irq_mode);
 }
 
 static int mt8167_afe_dais_enable_clks(struct mtk_afe *afe,
@@ -3164,6 +3078,8 @@ static const char *aud_clks[MT8167_CLK_NUM] = {
 	[MT8167_CLK_I2S4_M_SEL] =  "i2s4_m_sel",
 	[MT8167_CLK_I2S5_M_SEL] =  "i2s5_m_sel",
 	[MT8167_CLK_SPDIF_B_SEL] =  "spdif_b_sel",
+	[MT8167_CLK_SPDIFIN_SEL] =  "spdifin_sel",
+	[MT8167_CLK_TOP_UNIVPLL_D2] = "univpll_div2",
 };
 #endif
 
@@ -3412,6 +3328,9 @@ static irqreturn_t mt8167_afe_irq_handler(int irq, void *dev_id)
 		snd_pcm_period_elapsed(substream);
 	}
 
+	if (reg_value & 0x100)
+		mt8167_afe_spdif_in_isr(afe);
+
 err_irq:
 	/* clear irq */
 	regmap_write(afe->regmap, AFE_IRQ_CLR, reg_value & AFE_IRQ_STATUS_BITS);
@@ -3451,7 +3370,7 @@ static int mt8167_afe_resume(struct device *dev)
 	mt8167_afe_enable_main_clk(afe);
 
 	/* unmask all IRQs */
-	regmap_update_bits(afe->regmap, AFE_IRQ_MCU_EN, 0xff, 0xff);
+	regmap_update_bits(afe->regmap, AFE_IRQ_MCU_EN, 0x1fff, 0x1fff);
 
 	for (i = 0; i < ARRAY_SIZE(mt8167_afe_backup_list); i++)
 		regmap_write(afe->regmap, mt8167_afe_backup_list[i],
@@ -3622,6 +3541,9 @@ static int mt8167_afe_pcm_dev_probe(struct platform_device *pdev)
 	dai_idx = MT8167_AFE_IO_TDM_IN - MT8167_AFE_BACKEND_BASE;
 	afe->be_data[dai_idx].bck_fixed_64fs[SNDRV_PCM_STREAM_CAPTURE] =
 		of_property_read_bool(np, "mediatek,tdmi-bck-fixed-64fs");
+
+	of_property_read_u32(np, "mediatek,spdif-in-port",
+			     &afe->spdif_in_state.port);
 
 	ret = snd_soc_register_platform(&pdev->dev, &mt8167_afe_pcm_platform);
 	if (ret)

@@ -142,6 +142,34 @@ static const struct afe_dump_reg_attr tdmi_in_dump_regs[] = {
 	DUMP_REG_ENTRY(AFE_APLL2_TUNER_CFG),
 };
 
+static const struct afe_dump_reg_attr spdif_in_dump_regs[] = {
+	DUMP_REG_ENTRY(AUDIO_TOP_CON0),
+	DUMP_REG_ENTRY(AFE_DAC_CON0),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_CFG0),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_CFG1),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_CHSTS1),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_CHSTS2),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_CHSTS3),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_CHSTS4),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_CHSTS5),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_CHSTS6),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_DEBUG1),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_DEBUG2),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_DEBUG3),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_DEBUG4),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_EC),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_BR),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_CKLOCK_CFG),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_INT_EXT),
+	DUMP_REG_ENTRY(AFE_SPDIFIN_INT_EXT2),
+	DUMP_REG_ENTRY(SPDIFIN_FREQ_INFO),
+	DUMP_REG_ENTRY(SPDIFIN_FREQ_INFO_2),
+	DUMP_REG_ENTRY(SPDIFIN_FREQ_INFO_3),
+	DUMP_REG_ENTRY(AFE_IRQ_MCU_CON),
+	DUMP_REG_ENTRY(AFE_IRQ_MCU_CON2),
+	DUMP_REG_ENTRY(AFE_IRQ_MCU_EN),
+};
+
 static ssize_t mt8167_afe_read_file(struct file *file, char __user *user_buf,
 	size_t count, loff_t *pos)
 {
@@ -291,6 +319,42 @@ static ssize_t mt8167_afe_tdm_in_read_file(struct file *file, char __user *user_
 	return ret;
 }
 
+static ssize_t mt8167_afe_spdif_in_read_file(struct file *file,
+	char __user *user_buf, size_t count, loff_t *pos)
+{
+	struct mtk_afe *afe = file->private_data;
+	ssize_t ret, i;
+	char *buf;
+	unsigned int reg_value;
+	int n = 0;
+
+	if (*pos < 0 || !count)
+		return -EINVAL;
+
+	buf = kmalloc(count, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	mt8167_afe_enable_main_clk(afe);
+
+	for (i = 0; i < ARRAY_SIZE(spdif_in_dump_regs); i++) {
+		if (regmap_read(afe->regmap, spdif_in_dump_regs[i].offset, &reg_value))
+			n += scnprintf(buf + n, count - n, "%s = N/A\n",
+				       spdif_in_dump_regs[i].name);
+		else
+			n += scnprintf(buf + n, count - n, "%s = 0x%x\n",
+				       spdif_in_dump_regs[i].name, reg_value);
+	}
+
+	mt8167_afe_disable_main_clk(afe);
+
+	ret = simple_read_from_buffer(user_buf, count, pos, buf, n);
+
+	kfree(buf);
+
+	return ret;
+}
+
 static const struct file_operations mt8167_afe_fops = {
 	.open = simple_open,
 	.read = mt8167_afe_read_file,
@@ -310,10 +374,17 @@ static const struct file_operations mt8167_afe_tdm_in_fops = {
 	.llseek = default_llseek,
 };
 
+static const struct file_operations mt8167_afe_spdif_in_fops = {
+	.open = simple_open,
+	.read = mt8167_afe_spdif_in_read_file,
+	.llseek = default_llseek,
+};
+
 static const struct mt8167_afe_debug_fs afe_debug_fs[MT8167_AFE_DEBUGFS_NUM] = {
 	{"mtksocaudio", &mt8167_afe_fops},
 	{"mtksochdmiaudio", &mt8167_afe_hdmi_fops},
 	{"mtksoctdminaudio", &mt8167_afe_tdm_in_fops},
+	{"mtksocspdifinaudio", &mt8167_afe_spdif_in_fops},
 };
 
 #endif

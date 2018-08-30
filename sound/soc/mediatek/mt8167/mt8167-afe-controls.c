@@ -602,6 +602,68 @@ static int mt8167_mrgrx_volume_set(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int mt8167_afe_spdif_in_detect_get(struct snd_kcontrol *kcontrol,
+					  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
+
+	ucontrol->value.integer.value[0] = afe->spdif_in_state.detect_en;
+
+	return 0;
+}
+
+static int mt8167_afe_spdif_in_detect_put(struct snd_kcontrol *kcontrol,
+					  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
+
+	if (ucontrol->value.integer.value[0] &&
+	    !afe->spdif_in_state.detect_en)
+		mt8167_afe_enable_spdif_in_detect(afe);
+	else if (!ucontrol->value.integer.value[0] &&
+		 afe->spdif_in_state.detect_en)
+		mt8167_afe_disable_spdif_in_detect(afe);
+
+	return 0;
+}
+
+static int mt8167_afe_spdif_in_chs_data_info(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BYTES;
+	uinfo->count = 24;
+	return 0;
+}
+
+static int mt8167_afe_spdif_in_chs_data_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_soc_kcontrol_platform(kcontrol);
+	struct mtk_afe *afe = snd_soc_platform_get_drvdata(platform);
+	int i;
+
+	if (afe->spdif_in_state.detect_en) {
+		mt8167_afe_enable_main_clk(afe);
+
+		for (i = 0; i < 6; i++)
+			regmap_read(afe->regmap,
+				    AFE_SPDIFIN_CHSTS1 + i * 4,
+				    &afe->spdif_in_state.ch_status[i]);
+
+		mt8167_afe_disable_main_clk(afe);
+	} else {
+		memset((void *)afe->spdif_in_state.ch_status,
+		       0xff, sizeof(afe->spdif_in_state.ch_status));
+	}
+
+	memcpy((void *)ucontrol->value.bytes.data,
+	       afe->spdif_in_state.ch_status,
+	       sizeof(afe->spdif_in_state.ch_status));
+
+	return 0;
+}
 
 static const struct soc_enum mt8167_afe_soc_enums[] = {
 	[CTRL_SGEN_EN] = SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(sgen_func),
@@ -642,6 +704,18 @@ static const struct snd_kcontrol_new mt8167_afe_controls[] = {
 			SND_SOC_NOPM, 0, 0x80000, 0,
 			mt8167_mrgrx_volume_get,
 			mt8167_mrgrx_volume_set),
+	SOC_SINGLE_BOOL_EXT("Spdif_In_Detect_Switch",
+			    0,
+			    mt8167_afe_spdif_in_detect_get,
+			    mt8167_afe_spdif_in_detect_put),
+	{
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Spdif_In_Channel_Status_Data",
+	.access = SNDRV_CTL_ELEM_ACCESS_READ |
+		  SNDRV_CTL_ELEM_ACCESS_VOLATILE,
+	.info = mt8167_afe_spdif_in_chs_data_info,
+	.get = mt8167_afe_spdif_in_chs_data_get,
+	},
 };
 
 
