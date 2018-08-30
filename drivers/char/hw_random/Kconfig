@@ -381,6 +381,19 @@ config HW_RANDOM_STM32
 
 	  If unsure, say N.
 
+config TEE_RANDOM_MTK
+	tristate "Mediatek Random Number Generator support"
+	depends on HW_RANDOM
+	depends on MTK_IN_HOUSE_TEE_SUPPORT
+	help
+	  This driver provides kernel-side support for the Random Number
+	  Generator hardware found on Mediatek SoCs.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mtk-rng.
+
+	  If unsure, say N.
+
 endif # HW_RANDOM
 
 config UML_RANDOM

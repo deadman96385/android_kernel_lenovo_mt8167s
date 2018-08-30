@@ -20,7 +20,7 @@
 
 #if defined(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT) || defined(CONFIG_TRUSTY)
 
-#include "trustzone/tz_cross/trustzone.h"
+#include "mt-plat/trustzone/tz_cross/trustzone.h"
 
 /* / KREE session handle type. */
 typedef uint32_t KREE_SESSION_HANDLE;
