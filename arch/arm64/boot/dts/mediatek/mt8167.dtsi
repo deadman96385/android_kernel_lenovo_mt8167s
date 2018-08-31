@@ -675,6 +675,10 @@
 				      "MT_CG_DISP0_MDP_WDMA";
 		};
 
+		rng: rng@1020c000 {
+			compatible = "mediatek,mt8167-tee-rng";
+		};
+
 		gic: interrupt-controller@10310000 {
 			compatible = "arm,gic-400";
 			interrupt-controller;
