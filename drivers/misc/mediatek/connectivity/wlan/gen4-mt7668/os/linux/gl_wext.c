@@ -211,6 +211,7 @@ static const iw_handler rIwPrivHandler[] = {
 	[IOCTL_GET_DRIVER - SIOCIWFIRSTPRIV] = priv_set_driver,
 
 #if CFG_SUPPORT_QA_TOOL
+	[IOCTL_QA_TOOL_DAEMON - SIOCIWFIRSTPRIV] = priv_qa_agent,
 	[IOCTL_IWPRIV_ATE - SIOCIWFIRSTPRIV] = priv_ate_set
 #endif
 };
