@@ -376,13 +376,13 @@ WLAN_STATUS wlanAdapterStart(IN P_ADAPTER_T prAdapter, IN P_REG_INFO_T prRegInfo
 
 #if (CFG_ENABLE_FULL_PM == 0)
 		nicpmSetDriverOwn(prAdapter);
-#endif
 
 		if (prAdapter->fgIsFwOwn == TRUE) {
 			DBGLOG(INIT, ERROR, "nicpmSetDriverOwn() failed!\n");
 			u4Status = WLAN_STATUS_FAILURE;
 			break;
 		}
+#endif
 		/* 4 <1> Initialize the Adapter */
 		u4Status = nicInitializeAdapter(prAdapter);
 		if (u4Status != WLAN_STATUS_SUCCESS) {
@@ -415,6 +415,32 @@ WLAN_STATUS wlanAdapterStart(IN P_ADAPTER_T prAdapter, IN P_REG_INFO_T prRegInfo
 
 		/* 4 <5> HIF SW info initialize */
 		halHifSwInfoInit(prAdapter);
+
+		{
+			BOOLEAN fgReady;
+
+			HAL_WIFI_FUNC_READY_CHECK(prAdapter,
+						  WIFI_FUNC_READY_BITS,
+						  &fgReady);
+
+			if (fgReady) {
+				DBGLOG(INIT, INFO, "Wi-Fi is already ON!\n");
+				DBGLOG(INIT, INFO, "turn off before FW DL!\n");
+
+#if defined(_HIF_USB)
+				wlanSendDummyCmd(prAdapter, FALSE);
+				nicEnableInterrupt(prAdapter);
+#endif
+
+				if (wlanPowerOffWifi(prAdapter)
+				    != WLAN_STATUS_SUCCESS)
+					return WLAN_STATUS_FAILURE;
+
+			}
+			nicpmWakeUpWiFi(prAdapter);
+			HAL_HIF_INIT(prAdapter);
+		}
+
 
 		/* 4 <6> Enable HIF cut-through to N9 mode, not visiting CR4 */
 		HAL_ENABLE_FWDL(prAdapter, TRUE);

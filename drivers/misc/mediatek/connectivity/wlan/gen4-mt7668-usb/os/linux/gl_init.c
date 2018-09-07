@@ -2318,7 +2318,9 @@ static INT_32 wlanProbe(PVOID pvData, PVOID pvDriverData)
 		/* Trigger the action of switching Pwr state to drv_own */
 		prAdapter->fgIsFwOwn = TRUE;
 
+#if 0
 		nicpmWakeUpWiFi(prAdapter);
+#endif
 
 		/* Load NVRAM content to REG_INFO_T */
 		glLoadNvram(prGlueInfo, prRegInfo);

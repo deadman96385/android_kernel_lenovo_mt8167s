@@ -1100,6 +1100,7 @@ VOID halSetFWOwn(IN P_ADAPTER_T prAdapter, IN BOOLEAN fgEnableGlobalInt)
 
 VOID halWakeUpWiFi(IN P_ADAPTER_T prAdapter)
 {
+	P_GL_HIF_INFO_T prHifInfo;
 	BOOLEAN fgResult;
 	UINT_8 ucCount = 0;
 
@@ -1114,6 +1115,7 @@ VOID halWakeUpWiFi(IN P_ADAPTER_T prAdapter)
 	DBGLOG(INIT, INFO, "PMIC SPI clock switch = %s\n",
 		(TOP_CKGEN2_CR_PMIC_CK_MANUAL_MASK&u4Value) ? "SUCCESS" : "FAIL");
 #endif
+	prHifInfo = &prAdapter->prGlueInfo->rHifInfo;
 
 	DBGLOG(INIT, INFO, "Power on Wi-Fi....\n");
 
@@ -1133,6 +1135,10 @@ VOID halWakeUpWiFi(IN P_ADAPTER_T prAdapter)
 	}
 
 	prAdapter->fgIsFwOwn = FALSE;
+
+	if (prHifInfo->state == USB_STATE_WIFI_OFF)
+		glUsbSetState(&prAdapter->prGlueInfo->rHifInfo,
+			      USB_STATE_LINK_UP);
 }
 
 VOID halEnableFWDownload(IN P_ADAPTER_T prAdapter, IN BOOL fgEnable)
