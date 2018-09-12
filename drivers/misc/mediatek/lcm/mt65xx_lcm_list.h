@@ -294,6 +294,7 @@ extern LCM_DRIVER oppo_tianma_td4310_fhdp_dsi_vdo_nt50358_lcm_drv;
 extern LCM_DRIVER nt36672_fhdp_dsi_vdo_tianma_nt50358_lcm_drv;
 extern LCM_DRIVER jd9365_hd720_dsi_lcm_drv;
 extern LCM_DRIVER ili9881c_hd720_td_tchd5031_6b_dsi_vdo_lcm_drv;
+extern LCM_DRIVER st7701s_t400_wvga_dsi_vdo_lcm_drv;
 #ifdef BUILD_LK
 extern void mdelay(unsigned long msec);
 #endif

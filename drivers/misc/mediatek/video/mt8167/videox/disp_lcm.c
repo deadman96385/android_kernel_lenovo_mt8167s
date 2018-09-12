@@ -20,7 +20,7 @@
 #include "disp_drv_platform.h"
 #include "ddp_manager.h"
 #include "mtkfb.h"
-
+#include <linux/of.h>
 #include "disp_lcm.h"
 
 #if defined(MTK_LCM_DEVICE_TREE_SUPPORT)
@@ -792,9 +792,10 @@ struct disp_lcm_handle *disp_lcm_probe(char *plcm_name, LCM_INTERFACE_ID lcm_id)
 	LCM_DRIVER *lcm_drv = NULL;
 	LCM_PARAMS *lcm_param = NULL;
 	struct disp_lcm_handle *plcm = NULL;
+	struct device_node *node;
 
 	DISPPRINT("%s\n", __func__);
-	DISPCHECK("plcm_name=%s\n", plcm_name);
+	DISPCHECK("plcm_name=%s, %d\n", plcm_name, _lcm_count());
 	if (_lcm_count() == 0) {
 		DISPERR("no lcm driver defined in linux kernel driver\n");
 		return NULL;
@@ -822,7 +823,18 @@ struct disp_lcm_handle *disp_lcm_probe(char *plcm_name, LCM_INTERFACE_ID lcm_id)
 	} else {
 		if (plcm_name == NULL) {
 			/* TODO: we need to detect all the lcm driver */
-		} else {
+			node = of_find_node_by_name(NULL, "panel");
+
+			if (!node) {
+				isLCMFound = false;
+				DISPERR("FATAL ERROR!!!No LCM Driver defined\n");
+				return NULL;
+			}
+
+			plcm_name = strchr((char *)node->properties->value, ',');
+			plcm_name++;
+			DISPERR("plcm_name is %s from device tree.\n", plcm_name);
+		}	/* else */{
 			int i = 0;
 
 			for (i = 0; i < _lcm_count(); i++) {

@@ -1125,6 +1125,10 @@ LCM_DRIVER *lcm_driver_list[] = {
 #if defined(ILI9881C_HD720_TD_TCHD5031_6B_DSI_VDO)
 	&ili9881c_hd720_td_tchd5031_6b_dsi_vdo_lcm_drv,
 #endif
+
+#if defined(ST7701S_T400_WVGA_DSI_VDO)
+	&st7701s_t400_wvga_dsi_vdo_lcm_drv,
+#endif
 };
 
 unsigned char lcm_name_list[][128] = {
