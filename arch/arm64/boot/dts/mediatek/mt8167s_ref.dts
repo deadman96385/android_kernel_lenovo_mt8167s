@@ -16,7 +16,7 @@
 
 / {
 	panel: panel@0 {
-		compatible = "ili9881c,td_tchd5031_6b";
+		compatible = "ili9881c,ili9881c_hd720_td_tchd5031_6b_dsi_vdo";
 		gpio_lcd_rst = <&pio 66 0>;
 		reg-lcm-supply = <&mt6392_vgp2_reg>;
 		status = "okay";
