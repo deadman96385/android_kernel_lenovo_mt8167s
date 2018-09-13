@@ -141,7 +141,6 @@ static int lcm_driver_probe(struct device *dev, void const *data)
 {
 	lcm_request_gpio_control(dev);
 	lcm_get_vgp_supply(dev);
-	lcm_vgp_supply_enable();
 
 	return 0;
 }
@@ -614,10 +613,12 @@ static void lcm_get_params(LCM_PARAMS *params)
 	params->dsi.PLL_CLOCK = 270;
 }
 
+static void lcm_resume(void);
 static void lcm_init_lcm(void)
 {
 #ifndef BUILD_LK
 	pr_notice("[Kernel/LCM] lcm_init() enter\n");
+	lcm_resume();
 #endif
 }
 

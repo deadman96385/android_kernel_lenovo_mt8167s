@@ -42,6 +42,7 @@
 #ifndef BUILD_LK
 static struct regulator *lcm_vgp;
 static unsigned int GPIO_LCD_RST_PIN;
+static unsigned int GPIO_LCD_BL_EN_PIN;
 
 /* get LDO supply */
 static int lcm_get_vgp_supply(struct device *dev)
@@ -135,20 +136,22 @@ static void lcm_request_gpio_control(struct device *dev)
 {
 	GPIO_LCD_RST_PIN = of_get_named_gpio(dev->of_node, "gpio_lcd_rst", 0);
 	gpio_request(GPIO_LCD_RST_PIN, "GPIO_LCD_RST_PIN");
+
+	GPIO_LCD_BL_EN_PIN = of_get_named_gpio(dev->of_node, "gpio_lcd_bl_en", 0);
+	gpio_request(GPIO_LCD_BL_EN_PIN, "GPIO_LCD_BL_EN_PIN");
 }
 
 static int lcm_driver_probe(struct device *dev, void const *data)
 {
 	lcm_request_gpio_control(dev);
 	lcm_get_vgp_supply(dev);
-	lcm_vgp_supply_enable();
 
 	return 0;
 }
 
 static const struct of_device_id lcm_platform_of_match[] = {
 	{
-	 .compatible = "st7701s,t400",
+	 .compatible = "st7701s,st7701s_t400_wvga_dsi_vdo",
 	 .data = 0,
 	 }, {
 	     /* sentinel */
@@ -203,7 +206,7 @@ MODULE_LICENSE("GPL");
 /* --------------------------------------------------------------------------- */
 /* Local Constants */
 /* --------------------------------------------------------------------------- */
-#define LCM_DSI_CMD_MODE								0
+#define LCM_DSI_CMD_MODE	0
 #define FRAME_WIDTH	(480)
 #define FRAME_HEIGHT	(800)
 #define LCM_DENSITY	(240)
@@ -249,6 +252,7 @@ static void lcm_set_gpio_output(unsigned int GPIO, unsigned int output)
 	if (GPIO == 0xFFFFFFFF) {
 #ifndef BUILD_LK
 		pr_debug("[Kernel/LCM] GPIO_LCM_RST =   0x%x\n", GPIO_LCD_RST_PIN);
+		pr_debug("[Kernel/LCM] GPIO_LCM_BL_EN =   0x%x\n", GPIO_LCD_BL_EN_PIN);
 #endif
 		return;
 	}
@@ -447,10 +451,12 @@ static void lcm_get_params(LCM_PARAMS *params)
 	params->dsi.PLL_CLOCK = 228;
 }
 
+static void lcm_resume(void);
 static void lcm_init_lcm(void)
 {
 #ifndef BUILD_LK
 	pr_notice("[Kernel/LCM] lcm_init() enter\n");
+	lcm_resume();
 #endif
 }
 
@@ -458,6 +464,9 @@ static void lcm_suspend(void)
 {
 #ifndef BUILD_LK
 	pr_notice("[Kernel/LCM] lcm_suspend() enter\n");
+
+	lcm_set_gpio_output(GPIO_LCD_BL_EN_PIN, GPIO_OUT_ZERO);
+	MDELAY(10);
 
 	push_table(lcm_suspend_setting,
 		   sizeof(lcm_suspend_setting) / sizeof(struct LCM_setting_table), 1);
@@ -484,6 +493,9 @@ static void lcm_resume(void)
 	MDELAY(120);
 
 	init_lcm_registers();
+	MDELAY(20);
+
+	lcm_set_gpio_output(GPIO_LCD_BL_EN_PIN, GPIO_OUT_ONE);
 #endif
 }
 
