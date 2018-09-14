@@ -94,4 +94,11 @@ config TOUCHSCREEN_MTK_GSLX680
 	  Say Y here if you have gslX680 touch panel.
 
 	  If unsure, say N.
+
+config TOUCHSCREEN_MTK_GSL2338
+	bool "gsl2338 for Mediatek package"
+	help
+	  Say Y here if you have gsl2338 touch panel.
+
+	  If unsure, say N.
 endif

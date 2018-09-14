@@ -27,9 +27,9 @@
 &i2c0 {
 	status = "okay";
 
-	cap_touch@38 {
-		compatible = "mediatek,FT6336";
-		reg = <0x38>;
+	cap_touch@20 {
+		compatible = "mediatek,GSL2338";
+		reg = <0x20>;
 		interrupt-parent = <&pio>;
 		interrupts = <12 IRQ_TYPE_EDGE_FALLING>;
 		int-gpio = <&pio 12 0>;
