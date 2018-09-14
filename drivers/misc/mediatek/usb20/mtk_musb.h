@@ -69,6 +69,9 @@ extern void usb_rev6_setting(int value);
 extern bool mt_usb_is_device(void);
 extern void mt_usb_connect(void);
 extern void mt_usb_disconnect(void);
+extern void mt_usb_connect_c(void);
+extern void mt_usb_disconnect_c(void);
+
 /* ALPS00775710 */
 /* extern bool usb_iddig_state(void); */
 /* ALPS00775710 */
@@ -83,7 +86,9 @@ extern bool is_saving_mode(void);
 extern bool is_switch_charger(void);
 
 /* host and otg */
+extern void mtk_typec_host_init(void);
 extern void mt_usb_otg_init(struct musb *musb);
+extern int mt_typec_enable(void);
 extern void mt_usb_otg_exit(struct musb *musb);
 extern void mt_usb_init_drvvbus(void);
 extern void mt_usb_set_vbus(struct musb *musb, int is_on);

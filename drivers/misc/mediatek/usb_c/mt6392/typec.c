@@ -67,6 +67,7 @@ static struct usbtypc g_typec;
 static bool g_host_connected;
 static bool g_device_connected;
 static uint16_t g_cc_is0;
+static int mt6392_typec_support = 0;
 static void typec_platform_handler_work(struct work_struct *work)
 {
 	if (g_cc_is0 & TYPE_C_CC_ENT_UNATTACH_SNK_INTR) {
@@ -213,6 +214,7 @@ static void typec_drive_vbus_init(struct typec_hba *hba)
 	if (IS_ERR(hba->typec_drvvbus)) {
 		ret = PTR_ERR(hba->typec_drvvbus);
 		dev_err(hba->dev, "Cannot find typec pinctrl drvvbus\n");
+		return;
 	}
 
 	hba->typec_drvvbus_low = pinctrl_lookup_state(hba->pinctrl, "drvvbus_low");
@@ -235,11 +237,13 @@ static void typec_drive_vbus_work(struct work_struct *work)
 {
 	struct typec_hba *hba = container_of(work, struct typec_hba, drive_vbus_work);
 
+#if 0
+/*set vbus in usb driver*/
 	if (hba->vbus_en)
 		pinctrl_select_state(hba->pinctrl, hba->typec_drvvbus_high);
 	else
 		pinctrl_select_state(hba->pinctrl, hba->typec_drvvbus_low);
-
+#endif
 	typec_sw_probe(hba, DBG_VBUS_EN, (hba->vbus_en << DBG_VBUS_EN_OFST));
 }
 
@@ -849,6 +853,7 @@ int typec_init(struct device *dev, struct typec_hba *hba,
 
 	typec_set_mode(hba, hba->support_role, hba->rp_val, 0);
 	typec_enable(hba, 1);
+	mt6392_typec_support = 1;
 
 	return 0;
 
@@ -858,6 +863,13 @@ out_error:
 	return err;
 }
 EXPORT_SYMBOL_GPL(typec_init);
+
+
+int typec_support(void)
+{
+	return mt6392_typec_support;
+}
+EXPORT_SYMBOL_GPL(typec_support);
 
 /**
  * typec_remove - de-allocate data structure memory

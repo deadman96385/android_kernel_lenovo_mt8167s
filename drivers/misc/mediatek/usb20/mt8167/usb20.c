@@ -461,6 +461,42 @@ void do_connection_work(struct work_struct *data)
 
 void mt_usb_connect(void)
 {
+	if (mt_typec_enable())
+		return;
+
+#ifndef CONFIG_MTK_MUSB_SW_WITCH_MODE
+	if (!mtk_musb) {
+		DBG(0, "mtk_musb = NULL\n");
+		return;
+	}
+	/* issue connection work */
+	DBG(0, "issue work\n");
+	queue_delayed_work(mtk_musb->st_wq, &connection_work, 0);
+	DBG(0, "[MUSB] USB connect\n");
+#endif
+
+}
+
+void mt_usb_disconnect(void)
+{
+	if (mt_typec_enable())
+		return;
+
+#ifndef CONFIG_MTK_MUSB_SW_WITCH_MODE
+	if (!mtk_musb) {
+		DBG(0, "mtk_musb = NULL\n");
+		return;
+	}
+	/* issue connection work */
+	DBG(0, "issue work\n");
+	queue_delayed_work(mtk_musb->st_wq, &connection_work, 0);
+	DBG(0, "[MUSB] USB disconnect\n");
+#endif
+
+}
+
+void mt_usb_connect_c(void)
+{
 #ifndef CONFIG_MTK_MUSB_SW_WITCH_MODE
 	if (!mtk_musb) {
 		DBG(0, "mtk_musb = NULL\n");
@@ -473,7 +509,7 @@ void mt_usb_connect(void)
 #endif
 }
 
-void mt_usb_disconnect(void)
+void mt_usb_disconnect_c(void)
 {
 #ifndef CONFIG_MTK_MUSB_SW_WITCH_MODE
 	if (!mtk_musb) {
@@ -1303,6 +1339,9 @@ static int __init mt_usb_init(struct musb *musb)
 		return -EPROBE_DEFER;
 	}
 
+	musb->xceiv->io_priv = musb->phy_base;
+	DBG(0, "usb_phy_base:0x%p", musb->xceiv->io_priv);
+
 	musb->dma_irq = (int)SHARE_IRQ;
 	musb->fifo_cfg = fifo_cfg;
 	musb->fifo_cfg_size = ARRAY_SIZE(fifo_cfg);
@@ -1358,12 +1397,17 @@ static int __init mt_usb_init(struct musb *musb)
 	INIT_WORK(&musb_do_idle_work, musb_idle_work_func);
 	setup_timer(&musb_idle_timer, musb_do_idle, (unsigned long) musb);
 
+	DBG(0, "init connection_work\n");
+	INIT_DELAYED_WORK(&connection_work, do_connection_work);
+
 	DBG(0, "%s, init_otg before\n", __func__);
 
 #ifdef CONFIG_USB_MTK_OTG
 	DBG(0, "%s, init_otg\n", __func__);
 	mt_usb_otg_init(musb);
 #endif
+	if (mt_typec_enable())
+		mtk_typec_host_init();
 
 	return 0;
 }
@@ -1409,6 +1453,7 @@ static int mt_usb_probe(struct platform_device *pdev)
 
 	struct musb_hdrc_config		*config;
 	struct device_node		*np = pdev->dev.of_node;
+	void  __iomem 	*pbase;
 	/*u32 temp_id = 0; */
 	/*unsigned long usb_mac;*/
 
@@ -1508,7 +1553,9 @@ static int mt_usb_probe(struct platform_device *pdev)
 
 	/*usb_irq_number1 = irq_of_parse_and_map(pdev->dev.of_node, 0);*/
 	/*usb_mac = (unsigned long)of_iomap(pdev->dev.of_node, 0);*/
+	pbase = of_iomap(pdev->dev.of_node, 1);
 	usb_phy_base = of_iomap(np, 1);
+	pr_info("pdev:%p, pdev->dev.of_node:%p, pbase:%p, usb_phy_base:%p\n", pdev, pdev->dev.of_node, pbase, usb_phy_base);
 
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {

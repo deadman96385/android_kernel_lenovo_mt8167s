@@ -188,5 +188,6 @@ extern int unregister_typec_switch_callback(struct typec_switch_data *new_driver
 extern int usb_redriver_config(struct usbtypc *typec, int ctrl_pin, int stat);
 extern int usb_redriver_enter_dps(struct usbtypc *typec);
 extern int usb_redriver_exit_dps(struct usbtypc *typec);
+extern int typec_support(void);
 
 #endif	/* USB_TYPEC_H */

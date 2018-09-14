@@ -41,6 +41,11 @@
 #include <linux/of_gpio.h>
 #endif
 
+
+#include "../../usb_c/inc/typec.h"
+
+
+
 #ifdef CONFIG_USB_MTK_OTG
 
 #ifdef CONFIG_OF
@@ -86,6 +91,13 @@ int delay_time = 15;
 module_param(delay_time, int, 0400);
 int delay_time1 = 55;
 module_param(delay_time1, int, 0400);
+
+int mt_typec_enable(void)
+{
+	int ret;
+	ret = typec_support();
+	return ret;
+}
 
 void mt_usb_set_vbus(struct musb *musb, int is_on)
 {
@@ -335,6 +347,185 @@ void switch_int_to_host_and_mask(struct musb *musb)
 	DBG(0, "swtich_int_to_host_and_mask is done\n");
 }
 
+static int typec_host_enable(void *data)
+{
+	u8 devctl = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&mtk_musb->lock, flags);
+	musb_generic_disable(mtk_musb);
+	spin_unlock_irqrestore(&mtk_musb->lock, flags);
+
+	down(&mtk_musb->musb_lock);
+	DBG(0, "work start, is_host=%d\n", mtk_musb->is_host);
+	if (mtk_musb->in_ipo_off) {
+		DBG(0, "do nothing due to in_ipo_off\n");
+		goto out;
+	}
+
+	mtk_musb->is_host = true;
+	if (!mtk_musb->is_ready)
+		mdelay(5000);
+	musb_platform_enable(mtk_musb);
+	DBG(0, "musb is as %s\n", mtk_musb->is_host?"host":"device");
+
+	if (mtk_musb->is_host) {
+		/*setup fifo for host mode*/
+		ep_config_from_table_for_host(mtk_musb);
+		wake_lock(&mtk_musb->usb_lock);
+		musb_platform_set_vbus(mtk_musb, 1);
+
+		/* for no VBUS sensing IP*/
+#if 1
+		/* wait VBUS ready */
+		msleep(100);
+		/* clear session*/
+		devctl = musb_readb(mtk_musb->mregs, MUSB_DEVCTL);
+		musb_writeb(mtk_musb->mregs, MUSB_DEVCTL, (devctl&(~MUSB_DEVCTL_SESSION)));
+		/* USB MAC OFF*/
+		/* VBUSVALID=0, AVALID=0, BVALID=0, SESSEND=1, IDDIG=X */
+		USBPHY_SET8(0x6c, 0x10);
+		USBPHY_CLR8(0x6c, 0x2e);
+		USBPHY_SET8(0x6d, 0x3e);
+		DBG(0, "force PHY to idle, 0x6d=%x, 0x6c=%x\n", USBPHY_READ8(0x6d), USBPHY_READ8(0x6c));
+		/* wait */
+		mdelay(5);
+
+		/* remove babble: NOISE_STILL_SOF:1, BABBLE_CLR_EN:0 */
+		devctl = musb_readb(mtk_musb->mregs, MUSB_ULPI_REG_DATA);
+		devctl = devctl | 0x80;
+		devctl = devctl & 0xbf;
+		musb_writeb(mtk_musb->mregs, MUSB_ULPI_REG_DATA, devctl);
+		mdelay(5);
+
+		/* restart session */
+		devctl = musb_readb(mtk_musb->mregs, MUSB_DEVCTL);
+		musb_writeb(mtk_musb->mregs, MUSB_DEVCTL, (devctl | MUSB_DEVCTL_SESSION));
+		/* USB MAC ONand Host Mode*/
+		/* VBUSVALID=1, AVALID=1, BVALID=1, SESSEND=0, IDDIG=0 */
+		USBPHY_CLR8(0x6c, 0x10);
+		USBPHY_SET8(0x6c, 0x2c);
+		USBPHY_SET8(0x6d, 0x3e);
+		DBG(0, "force PHY to host mode, 0x6d=%x, 0x6c=%x\n", USBPHY_READ8(0x6d), USBPHY_READ8(0x6c));
+#endif
+
+		musb_start(mtk_musb);
+		MUSB_HST_MODE(mtk_musb);
+
+#ifdef CONFIG_PM_RUNTIME
+		mtk_musb->is_active = 0;
+		DBG(0, "set active to 0 in Pm runtime issue\n");
+#endif
+	}
+	out:
+		DBG(0, "work end, is_host=%d\n", mtk_musb->is_host);
+		up(&mtk_musb->musb_lock);
+	return 0;
+}
+
+
+
+static int typec_host_disable(void *data)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&mtk_musb->lock, flags);
+	musb_generic_disable(mtk_musb);
+	spin_unlock_irqrestore(&mtk_musb->lock, flags);
+
+	down(&mtk_musb->musb_lock);
+	DBG(0, "work start, is_host=%d\n", mtk_musb->is_host);
+	if (mtk_musb->in_ipo_off) {
+		DBG(0, "do nothing due to in_ipo_off\n");
+		goto out;
+	}
+
+	mtk_musb->is_host = false;
+	musb_platform_enable(mtk_musb);
+	DBG(0, "musb is as %s\n", mtk_musb->is_host?"host":"device");
+
+	if (!mtk_musb->is_host) {
+		DBG(0, "devctl is %x\n", musb_readb(mtk_musb->mregs, MUSB_DEVCTL));
+		musb_writeb(mtk_musb->mregs, MUSB_DEVCTL, 0);
+		if (wake_lock_active(&mtk_musb->usb_lock))
+			wake_unlock(&mtk_musb->usb_lock);
+		musb_platform_set_vbus(mtk_musb, 0);
+
+	/* for no VBUS sensing IP */
+#if 1
+		/* USB MAC OFF*/
+		/* VBUSVALID=0, AVALID=0, BVALID=0, SESSEND=1, IDDIG=X */
+		USBPHY_SET8(0x6c, 0x10);
+		USBPHY_CLR8(0x6c, 0x2e);
+		USBPHY_SET8(0x6d, 0x3e);
+		DBG(0, "force PHY to idle, 0x6d=%x, 0x6c=%x\n", USBPHY_READ8(0x6d), USBPHY_READ8(0x6c));
+#endif
+
+#if !defined(MTK_HDMI_SUPPORT)
+		musb_stop(mtk_musb);
+#else
+		mt_usb_check_reconnect();/*ALPS01688604, IDDIG noise caused by MHL init*/
+#endif
+		mtk_musb->xceiv->otg->state = OTG_STATE_B_IDLE;
+
+		MUSB_DEV_MODE(mtk_musb);
+		}
+	out:
+		DBG(0, "work end, is_host=%d\n", mtk_musb->is_host);
+		up(&mtk_musb->musb_lock);
+	return 0;
+}
+
+struct typec_switch_data typec_host_driver = {
+	.name = "mt_usb",
+	.type = HOST_TYPE,
+	.enable = typec_host_enable,
+	.disable = typec_host_disable,
+	.priv_data = NULL,
+};
+
+static int typec_switch_usb_connect(void *data)
+{
+	mt_usb_connect_c();
+	DBG(0, "typec_switch_usb_connect \n");
+	return 0;
+}
+
+static int typec_switch_usb_disconnect(void *data)
+{
+	mt_usb_disconnect_c();
+	DBG(0, "typec_switch_usb_disconnect \n");
+	return 0;
+}
+
+struct typec_switch_data typec_device_driver = {
+	.name = (char*)musb_driver_name,
+	.type = DEVICE_TYPE,
+	.enable = typec_switch_usb_connect,
+	.disable = typec_switch_usb_disconnect,
+	.priv_data = NULL,
+};
+
+
+void mtk_typec_host_init(void)
+{
+
+	mtk_musb->fifo_cfg_host = fifo_cfg_host;
+	mtk_musb->fifo_cfg_host_size = ARRAY_SIZE(fifo_cfg_host);
+	otg_state.name = "otg_state";
+	otg_state.index = 0;
+	otg_state.state = 0;
+
+	if (switch_dev_register(&otg_state))
+		DBG(0, "switch_dev_register fail\n");
+	else
+		DBG(0, "switch_dev_register success\n");
+	register_typec_switch_callback(&typec_host_driver);
+	register_typec_switch_callback(&typec_device_driver);
+
+}
+
+
 static void musb_id_pin_work(struct work_struct *data)
 {
 	u8 devctl = 0;
@@ -545,9 +736,11 @@ out:
 }
 #endif
 
+
 /*static void mt_usb_ext_iddig_int(void)*/
 static irqreturn_t mt_usb_ext_iddig_int(int irq, void *dev_id)
 {
+
 #ifndef CONFIG_MTK_MUSB_SW_WITCH_MODE
 	if (!mtk_musb->is_ready) {
 		/* dealy 5 sec if usb function is not ready */
@@ -561,6 +754,7 @@ static irqreturn_t mt_usb_ext_iddig_int(int irq, void *dev_id)
 	DBG(0, "id pin interrupt assert\n");
 	return IRQ_HANDLED;
 }
+
 
 void mt_usb_iddig_int(struct musb *musb)
 {
@@ -585,8 +779,10 @@ void mt_usb_iddig_int(struct musb *musb)
 	DBG(0, "id pin mt_usb_iddig_int interrupt assert\n");
 }
 
+
 static void otg_int_init(void)
 {
+
 #if CONFIG_OF
 #if defined(CONFIG_MTK_LEGACY)
 	mt_set_gpio_mode(iddig_pin, GPIO_MODE_00);
@@ -689,6 +885,10 @@ void mt_usb_otg_init(struct musb *musb)
 
 	/* init idpin interrupt */
 	INIT_DELAYED_WORK(&musb->id_pin_work, musb_id_pin_work);
+
+	if (mt_typec_enable())
+		return;
+
 	otg_int_init();
 
 	/* EP table */
@@ -705,6 +905,7 @@ void mt_usb_otg_init(struct musb *musb)
 		DBG(0, "switch_dev register success\n");
 
 }
+
 #else
 
 /* for not define CONFIG_USB_MTK_OTG */
@@ -717,5 +918,6 @@ void switch_int_to_device(struct musb *musb) {}
 void switch_int_to_host(struct musb *musb) {}
 void switch_int_to_host_and_mask(struct musb *musb) {}
 void musb_session_restart(struct musb *musb) {}
+int mt_typec_enable(void) {}
 
 #endif

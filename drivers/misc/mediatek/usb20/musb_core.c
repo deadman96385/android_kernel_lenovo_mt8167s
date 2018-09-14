@@ -2280,6 +2280,7 @@ static int musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl
 		status = -ENOMEM;
 		goto fail0;
 	}
+	musb->phy_base = ctrlp;
 
 	mtk_musb = musb;
 	sema_init(&musb->musb_lock, 1);
@@ -2317,9 +2318,7 @@ static int musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl
 
 	status = musb_platform_init(musb);
 	/* pr_info("musb init controller after allocate\n"); */
-#ifdef CONFIG_OF
-	musb->xceiv->io_priv = ctrlp;
-#endif
+
 	musb_platform_enable(musb);
 #ifdef CONFIG_MTK_MUSB_QMU_SUPPORT
 	musb_qmu_init(musb);
@@ -2506,7 +2505,7 @@ static int musb_probe(struct platform_device *pdev)
 	if (irq <= 0)
 		return -ENODEV;
 
-	pr_info("%s mac=0x%lx, phy=0x%lx, irq=%d\n", __func__, (unsigned long)base, (unsigned long)pbase, irq);
+	pr_info("%s mac=0x%lx, phy=0x%lx, irq=%d, pdev->of_node:%p\n", __func__, (unsigned long)base, (unsigned long)pbase, irq, pdev->dev.of_node);
 	status = musb_init_controller(dev, irq, base, pbase);
 
 	return status;

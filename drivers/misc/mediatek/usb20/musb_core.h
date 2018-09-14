@@ -403,6 +403,7 @@ struct musb {
 
 	struct device *controller;
 	void __iomem *ctrl_base;
+	void __iomem *phy_base;
 	void __iomem *mregs;
 
 	/* passed down from chip/board specific irq handlers */
