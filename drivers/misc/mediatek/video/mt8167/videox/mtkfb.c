@@ -2112,6 +2112,9 @@ int _parse_tag_videolfb(void)
 {
 	struct tag_videolfb *videolfb_tag = NULL;
 	struct device_node *chosen_node;
+#ifdef MTK_ONLY_KERNEL_DISP
+	const char* lcmname = NULL;
+#endif
 	/* not necessary */
 	/* DISPCHECK("[DT][videolfb]isvideofb_parse_done = %d\n",is_videofb_parse_done); */
 
@@ -2144,14 +2147,29 @@ int _parse_tag_videolfb(void)
 			is_videofb_parse_done = 1;
 			DISPPRINT("[DT][videolfb] lcmfound=%d, fps=%d, fb_base=%p, vram=%d, lcmname=%s\n",
 			     islcmconnected, lcd_fps, (void *)fb_base, vramsize, mtkfb_lcm_name);
-#if 0
-			DISPCHECK("[DT][videolfb] islcmfound = %d\n", islcmconnected);
-			DISPCHECK("[DT][videolfb] fps        = %d\n", lcd_fps);
-			DISPCHECK("[DT][videolfb] fb_base    = %p\n", (void *)fb_base);
-			DISPCHECK("[DT][videolfb] vram       = %d\n", vramsize);
-			DISPCHECK("[DT][videolfb] lcmname    = %s\n", mtkfb_lcm_name);
-#endif
 			return 0;
+		} else {
+#ifdef MTK_ONLY_KERNEL_DISP
+			if (!primary_display_init_lcm())
+				DISPCHECK("[DT] init lcm failed\n");
+			lcmname = primary_display_get_lcm_name();
+			memset((void *)mtkfb_lcm_name, 0, sizeof(mtkfb_lcm_name));
+			strcpy((char *)mtkfb_lcm_name, lcmname);
+			mtkfb_lcm_name[strlen(lcmname)] = '\0';
+			lcd_fps = 0;
+			islcmconnected = 1;
+			vramsize = DISP_GetFBRamSize();
+			vramsize += DAL_GetLayerSize();
+#ifdef CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE
+			vramsize = ALIGN_TO(vramsize, 0x400000);
+#else
+			vramsize = ALIGN_TO(vramsize, 0x100000);
+#endif
+			is_videofb_parse_done = 1;
+			DISPPRINT("[DT][videolfb] lcmfound=%d, fps=%d, fb_base=tobe, vram=%d, lcmname=%s\n",
+			     islcmconnected, lcd_fps, vramsize, mtkfb_lcm_name);
+			return 0;
+#endif
 		}
 
 		DISPCHECK("[DT][videolfb] videolfb_tag not found\n");
@@ -2226,6 +2244,9 @@ static int mtkfb_probe(struct platform_device *pdev)
 	struct device_node *larb_node;
 	struct platform_device *larb_pdev;
 #endif
+#ifdef MTK_ONLY_KERNEL_DISP
+	void *fb_virtual_address = NULL;
+#endif
 
 	DISPPRINT("mtkfb_probe name [%s]  = [%s][%p]\n",
 		pdev->name, pdev->dev.init_name, (void *)&pdev->dev);
@@ -2245,7 +2266,10 @@ static int mtkfb_probe(struct platform_device *pdev)
 	}
 
 #endif
-
+#ifdef MTK_ONLY_KERNEL_DISP
+	if (IS_ERR_OR_NULL(g_ion_device))
+		return -EPROBE_DEFER;
+#endif
 #ifdef CONFIG_OF
 	_parse_tag_videolfb();
 #else
@@ -2267,7 +2291,15 @@ static int mtkfb_probe(struct platform_device *pdev)
 		}
 	}
 #endif
-
+#ifdef MTK_ONLY_KERNEL_DISP
+	fb_virtual_address = primary_display_alloc_hw_buffer(vramsize, &fb_base);
+	if (fb_virtual_address == NULL) {
+		DISPERR("dma allocate framebuffer of size %u failed\n", (uint32_t)vramsize);
+		r = ENOMEM;
+		goto cleanup;
+	}
+	DISPPRINT("fb_base %p fb_virtual_address %p\n", (void *)fb_base, fb_virtual_address);
+#endif
 	init_state = 0;
 
 #ifdef DISP_GPIO_DTS

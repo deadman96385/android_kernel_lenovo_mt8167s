@@ -2802,13 +2802,9 @@ static int _build_path_rdma_to_dsi(void)
 
 	dpmgr_path_set_video_mode(pgc->dpmgr_handle, primary_display_is_video_mode());
 
-	if (primary_display_is_video_mode())
-		_cmdq_insert_wait_frame_done_token();
 #if 0 /*ndef CONFIG_MTK_CLKMGR*/
 	ddp_clk_prepare(DISP_MTCMOS_CLK);
 #endif
-	dpmgr_path_init(pgc->dpmgr_handle, CMDQ_ENABLE);
-
 	writing_mva = pgc->dc_buf[pgc->dc_buf_id];
 	DISPMSG("writing_mva = 0x%08x\n", writing_mva);
 	pgc->dc_buf_id++;
@@ -2823,7 +2819,6 @@ static int _build_path_rdma_to_dsi(void)
 	decouple_rdma_config.pitch = primary_display_get_width() * DP_COLOR_BITS_PER_PIXEL(eRGB888) / 8;
 
 	_config_rdma_input_data(&decouple_rdma_config, pgc->dpmgr_handle, pgc->cmdq_handle_config);
-	cmdqRecFlush(pgc->cmdq_handle_config);
 	DISPCHECK("dpmgr set dst module FINISHED(%s)\n", ddp_get_module_name(dst_module));
 
 	return 0;
@@ -5261,6 +5256,113 @@ int init_cmdq_slots(cmdqBackupSlotHandle *pSlot, int count, int init_val)
 }
 #endif
 
+#ifdef MTK_ONLY_KERNEL_DISP
+int primary_display_init_lcm(void)
+{
+	pgc->plcm = disp_lcm_probe(NULL, LCM_INTERFACE_NOTDEFINED);
+	if (pgc->plcm == NULL)
+		return 0;
+
+	return 1;
+}
+
+const char* primary_display_get_lcm_name(void)
+{
+	return disp_lcm_get_name(pgc->plcm);
+}
+
+extern struct m4u_client_t *m4u_create_client(void);
+extern int m4u_destroy_client(struct m4u_client_t *client);
+void *primary_display_alloc_hw_buffer(size_t size, phys_addr_t *fb_handle)
+{
+#if 0
+	int ret = 0;
+        void *pVA[1] = { NULL };
+        unsigned int PA[1] = { 0 };
+	struct m4u_client_t *m4uClient = NULL;
+
+	pVA[0] = vmalloc(size);
+	if (pVA[0] == NULL) {
+		DISPERR("alloc hw buffer:Fail to alloc vmalloc\n");
+		goto out;
+	}
+	m4uClient = m4u_create_client();
+	if (m4uClient == NULL) {
+		DISPERR("alloc hw buffer:Fail to alloc m4uClient\n");
+		goto out;
+	}
+	ret = pseudo_alloc_mva(m4uClient, M4U_PORT_DISP_WDMA0, (unsigned long)pVA[0], NULL, (unsigned int)size,
+			0, 0, (unsigned int *)&PA[0]);
+	if (ret != 0) {
+		DISPERR("alloc hw buffer:Fail to alloc mva\n");
+		goto out;
+	}
+        *fb_handle = (phys_addr_t)PA[0];
+
+        DISPPRINT("%s, pVA:0x%p, PA:0x%p, PAout:0x%p\n", __func__, pVA[0], &PA[0], &(*fb_handle));
+
+        return pVA[0];
+out:
+	if (PA[0] > 0)
+		pseudo_dealloc_mva(m4uClient, M4U_PORT_DISP_WDMA0, PA[0]);
+	if (pVA[0] != NULL)
+		vfree(pVA[0]);
+	if (m4uClient != 0)
+		m4u_destroy_client(m4uClient);
+
+	DISPMSG("alloc hw buffer failed\n");
+	return NULL;
+#endif
+	struct disp_internal_buffer_info *framebuffer_info;
+	framebuffer_info = allocat_decouple_buffer(size);
+	if (framebuffer_info != NULL)
+		*fb_handle = (phys_addr_t)framebuffer_info->mva;
+	else
+		return NULL;
+
+	return framebuffer_info->va;
+}
+
+int _primary_display_get_vsync_interval(void)
+{
+        int ret = 0;
+        unsigned int time0 = 0;
+        unsigned int time1 = 0;
+        unsigned int lcd_time = 0;
+
+        ret = dpmgr_wait_event_timeout(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC,1000);
+        if (ret <= 0)
+                goto fail;
+
+        ret = dpmgr_wait_event_timeout(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC,1000);
+        if (ret <= 0)
+                goto fail;
+
+        // because we are polling irq status, so the first event should be ignored
+	time0 = get_current_time_us();
+
+	ret = dpmgr_wait_event_timeout(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC,1000);
+	if (ret <= 0)
+		goto fail;
+
+	ret = dpmgr_wait_event_timeout(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC,1000);
+	if (ret > 0)
+		time1 = get_current_time_us();
+	else
+		goto fail;
+
+	lcd_time = (time1 - time0)/2;
+
+	if (0 != lcd_time)
+		return (100000000/lcd_time);
+	else
+		return (6000);
+fail:
+	DISPERR("wait event fail\n");
+	return 0;
+}
+#endif
+
 int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 {
 	enum DISP_STATUS ret = DISP_STATUS_OK;
@@ -5330,6 +5432,7 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 		ret = DISP_STATUS_ERROR;
 		goto done;
 	}
+	primary_display_mode = DECOUPLE_MODE;
 #ifndef MTK_FB_CMDQ_DISABLE
 	ret = cmdqCoreRegisterCB(CMDQ_GROUP_DISP, (CmdqClockOnCB)cmdqDdpClockOn, (CmdqDumpInfoCB)cmdqDdpDumpInfo,
 				 (CmdqResetEngCB)cmdqDdpResetEng, (CmdqClockOffCB)cmdqDdpClockOff);
@@ -5386,48 +5489,14 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 	primary_display_use_cmdq = CMDQ_DISABLE;
 #endif
 
-	/* dpmgr_path_init(pgc->dpmgr_handle, CMDQ_DISABLE); */
-	dpmgr_path_set_video_mode(pgc->dpmgr_handle, primary_display_is_video_mode());
-	/* dpmgr_path_init(pgc->dpmgr_handle, CMDQ_DISABLE); */
-
-	/* use fake timer to generate vsync signal for cmd mode w/o LCM(originally using LCM TE Signal as VSYNC) */
-	/* so we don't need to modify display driver's behavior. */
-	if (disp_helper_get_option
-	    (DISP_HELPER_OPTION_NO_LCM_FOR_LOW_POWER_MEASUREMENT)) {
-		/* only for low power measurement */
-		DISPCHECK("WARNING!!!!!! FORCE NO LCM MODE!!!\n");
-		islcmconnected = 0;
-
-		/* no need to change video mode vsync behavior */
-		if (!primary_display_is_video_mode()) {
-			_init_vsync_fake_monitor(lcm_fps);
-
-			dpmgr_map_event_to_irq(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC,
-					       DDP_IRQ_UNKNOWN);
-		}
-	}
-
 	/* For DEBUG: Reset OVL here if without CMDQ and DDP hang */
 
 	if (primary_display_use_cmdq == CMDQ_ENABLE) {
 		_cmdq_build_trigger_loop();
 		_cmdq_start_trigger_loop();
-		_cmdq_reset_config_handle();
-		_cmdq_insert_wait_frame_done_token();
 	}
-
 
 	data_config = dpmgr_path_get_last_config(pgc->dpmgr_handle);
-
-#ifdef OVL_CASCADE_SUPPORT
-	if (ovl_get_status() == DDP_OVL1_STATUS_IDLE || ovl_get_status() == DDP_OVL1_STATUS_PRIMARY) {
-		if (primary_display_mode == DECOUPLE_MODE)
-			dpmgr_path_enable_cascade(pgc->ovl2mem_path_handle,
-						  pgc->cmdq_handle_config);
-		else
-			dpmgr_path_enable_cascade(pgc->dpmgr_handle, pgc->cmdq_handle_config);
-	}
-#endif
 	memcpy(&(data_config->dispif_config), lcm_param, sizeof(LCM_PARAMS));
 
 	data_config->dst_w = lcm_param->width;
@@ -5451,35 +5520,46 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 	data_config->fps = lcm_fps;
 	data_config->dst_dirty = 1;
 
+	dpmgr_path_set_video_mode(pgc->dpmgr_handle, primary_display_is_video_mode());
+	dpmgr_path_init(pgc->dpmgr_handle, CMDQ_DISABLE);
+	dpmgr_path_config(pgc->dpmgr_handle, data_config, NULL);
+	disp_lcm_init(pgc->plcm, 1);
+	dpmgr_path_start(pgc->dpmgr_handle, CMDQ_DISABLE);
+	dpmgr_path_trigger(pgc->dpmgr_handle, NULL, CMDQ_DISABLE);
+	if (primary_display_use_cmdq == CMDQ_ENABLE)
+		 _cmdq_reset_config_handle();
+
+	/* use fake timer to generate vsync signal for cmd mode w/o LCM(originally using LCM TE Signal as VSYNC) */
+	/* so we don't need to modify display driver's behavior. */
+	if (disp_helper_get_option
+	    (DISP_HELPER_OPTION_NO_LCM_FOR_LOW_POWER_MEASUREMENT)) {
+		/* only for low power measurement */
+		DISPCHECK("WARNING!!!!!! FORCE NO LCM MODE!!!\n");
+		islcmconnected = 0;
+
+		/* no need to change video mode vsync behavior */
+		if (!primary_display_is_video_mode()) {
+			_init_vsync_fake_monitor(lcm_fps);
+
+			dpmgr_map_event_to_irq(pgc->dpmgr_handle, DISP_PATH_EVENT_IF_VSYNC,
+					       DDP_IRQ_UNKNOWN);
+		}
+	}
+
 	rdma_set_target_line(DISP_MODULE_RDMA0, primary_display_get_height() * 1 / 2,
 			     pgc->cmdq_handle_config);
 	rdma_set_target_line(DISP_MODULE_RDMA0, primary_display_get_height() * 1 / 2, NULL);
 
 	dpmgr_path_enable_irq(pgc->dpmgr_handle, NULL, DDP_IRQ_LEVEL_ALL);
 
-	if (primary_display_use_cmdq == CMDQ_ENABLE) {
-		ret = dpmgr_path_config(pgc->dpmgr_handle, data_config, pgc->cmdq_handle_config);
-
-		/* should we set dirty here???????? */
-		_cmdq_flush_config_handle(0, NULL, 0);
-
-		_cmdq_reset_config_handle();
-		_cmdq_insert_wait_frame_done_token();
-	} else
-		ret = dpmgr_path_config(pgc->dpmgr_handle, data_config, NULL);
-
-#ifdef MTK_NO_DISP_IN_LK
-		ret = disp_lcm_init(pgc->plcm, 1);
-#else
-		ret = disp_lcm_init(pgc->plcm, 0);
-#endif
-
-#ifndef MTK_NO_DISP_IN_LK
-	if (_is_decouple_mode(pgc->session_mode))
-#endif
-		/* this should remove? for video mode when LK has start path */
-		dpmgr_path_start(pgc->dpmgr_handle, CMDQ_DISABLE);
-		/* dpmgr_path_flush(pgc->dpmgr_handle, 0);	considering revising */
+/*
+ *#ifndef MTK_NO_DISP_IN_LK
+ *        if (_is_decouple_mode(pgc->session_mode))
+ *#endif
+ *                [> this should remove? for video mode when LK has start path <]
+ *                dpmgr_path_start(pgc->dpmgr_handle, CMDQ_DISABLE);
+ *                [> dpmgr_path_flush(pgc->dpmgr_handle, 0);	considering revising <]
+ */
 
 #ifdef MTK_FB_PULLCLK_ENABLE
 	primary_display_pullclk_task = kthread_create(primary_display_vdo_pullclk_worker_kthread,
@@ -5546,21 +5626,6 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 
 	primary_path_aal_task = kthread_create(_disp_primary_path_check_trigger, NULL, "display_check_aal");
 	wake_up_process(primary_path_aal_task);
-#if 0 /* Zaikuo: disable it when HWC not enable to reduce error log */
-	fence_release_worker_task =
-	    kthread_create(_fence_release_worker_thread, NULL, "fence_worker");
-	wake_up_process(fence_release_worker_task);
-	if (_is_decouple_mode(pgc->session_mode)) {
-		if_fence_release_worker_task =
-		    kthread_create(_if_fence_release_worker_thread, NULL, "if_fence_worker");
-		wake_up_process(if_fence_release_worker_task);
-
-		ovl2mem_fence_release_worker_task =
-		    kthread_create(_ovl2mem_fence_release_worker_thread, NULL,
-				   "ovl2mem_fence_worker");
-		wake_up_process(ovl2mem_fence_release_worker_task);
-	}
-#endif
 
 	present_fence_release_worker_task = kthread_create(_present_fence_release_worker_thread, NULL,
 							   "present_fence_worker");
@@ -5592,6 +5657,13 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 
 	}
 
+#ifdef MTK_ONLY_KERNEL_DISP
+	if (lcm_fps == 0)
+		lcm_fps = _primary_display_get_vsync_interval();
+	data_config->fps = lcm_fps;
+
+	DISPCHECK("fps %d \n", lcm_fps);
+#endif
 #ifndef MTKFB_NO_M4U
 #ifdef CONFIG_MTK_M4U
 	{

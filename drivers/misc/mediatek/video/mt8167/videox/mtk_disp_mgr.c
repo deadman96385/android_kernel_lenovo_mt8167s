@@ -1968,6 +1968,7 @@ int _ioctl_insert_session_buffers(unsigned long arg)
 static enum DISP_MODE select_session_mode(struct disp_session_config *session_info)
 {
 	static enum DISP_MODE final_mode = DISP_SESSION_DIRECT_LINK_MODE;
+	static enum DISP_CAP_OUTPUT_MODE output_mode = DISP_HW_MODE_CAP;
 	static int stayInVp;
 
 	if (session_info->user == SESSION_USER_GUIEXT) {
@@ -2007,6 +2008,11 @@ static enum DISP_MODE select_session_mode(struct disp_session_config *session_in
 				DISPMSG("Change session mode to decouple\n");
 			}
 #endif
+			if (output_mode == DISP_OUTPUT_CAP_DECOUPLE &&
+				final_mode == DISP_SESSION_DIRECT_LINK_MODE) {
+				final_mode = DISP_SESSION_DECOUPLE_MODE;
+				DISPDBG("set_session_mode: use decouple for disp mode capacility");
+			}
 		} else if (session_info->mode == DISP_SESSION_DECOUPLE_MIRROR_MODE) {
 			/* DC-->DCm (SingleDisplay: enter ExternalDisplay while VP) */
 			/* ExternalDisplay: exit VP */

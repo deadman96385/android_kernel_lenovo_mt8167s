@@ -101,6 +101,8 @@
  */
 /* #define MTK_NO_DISP_IN_LK  // do not enable display in LK */
 
+#define MTK_ONLY_KERNEL_DISP
+
 /**
  * Disable using CMDQ in display driver.
  * The registers and system event would be processed by CPU.
@@ -219,7 +221,7 @@ enum DISP_SESSION_ENUM {
 	#define DISP_INTERNAL_BUFFER_COUNT 1
 #else
 */
-	#define DISP_HW_MODE_CAP DISP_OUTPUT_CAP_SWITCHABLE
+	#define DISP_HW_MODE_CAP DISP_OUTPUT_CAP_DECOUPLE
 	#ifdef OVL_MULTIPASS_SUPPORT
 		#define DISP_HW_PASS_MODE DISP_OUTPUT_CAP_MULTI_PASS
 	#else

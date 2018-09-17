@@ -939,6 +939,14 @@ int disp_lcm_init(struct disp_lcm_handle *plcm, int force)
 	return -1;
 }
 
+const char *disp_lcm_get_name(struct disp_lcm_handle *plcm)
+{
+	if (_is_lcm_inited(plcm))
+		return plcm->drv->name;
+	else
+		return NULL;
+}
+
 LCM_PARAMS *disp_lcm_get_params(struct disp_lcm_handle *plcm)
 {
 	/* DISPFUNC(); */

@@ -390,3 +390,8 @@ int _config_rdma_input_data(struct RDMA_CONFIG_STRUCT *rdma_config, disp_path_ha
 int init_cmdq_slots(cmdqBackupSlotHandle *pSlot, int count, int init_val);
 int alloc_sec_buffer(int size);
 int free_sec_buffer(unsigned int handle);
+#ifdef MTK_ONLY_KERNEL_DISP
+int primary_display_init_lcm(void);
+const char* primary_display_get_lcm_name(void);
+void *primary_display_alloc_hw_buffer(size_t size, phys_addr_t *fb_handle);
+#endif
