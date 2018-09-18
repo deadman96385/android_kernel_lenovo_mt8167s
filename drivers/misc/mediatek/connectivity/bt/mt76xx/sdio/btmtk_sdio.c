@@ -3754,9 +3754,7 @@ ssize_t btmtk_fops_read(struct file *filp, char __user *buf,
 			size_t count, loff_t *f_pos)
 {
 	struct sk_buff *skb = NULL;
-	int copyLen = 0;
 	u8 hwerr_event[] = { 0x04, 0x10, 0x01, 0xff };
-	static int send_hw_err_event_count;
 
 	if (!probe_ready) {
 		pr_err("%s probe_ready is %d return\n",
@@ -3774,54 +3772,24 @@ ssize_t btmtk_fops_read(struct file *filp, char __user *buf,
 		return -EFAULT;
 	}
 
+	lock_unsleepable_lock(&(metabuffer.spin_lock));
 	if (need_reset_stack == 1) {
 		pr_warn("%s: Reset BT stack", __func__);
-		pr_warn("%s: go if send_hw_err_event_count %d", __func__, send_hw_err_event_count);
-		if (send_hw_err_event_count < sizeof(hwerr_event)) {
-			if (count < (sizeof(hwerr_event) - send_hw_err_event_count)) {
-				copyLen = count;
-				pr_info("call wake_up_interruptible");
-				wake_up_interruptible(&inq);
-			} else
-				copyLen = (sizeof(hwerr_event) - send_hw_err_event_count);
-			pr_warn("%s: in if copyLen = %d", __func__, copyLen);
-			if (copy_to_user(buf, hwerr_event + send_hw_err_event_count, copyLen)) {
-				pr_err("send_hw_err_event_count %d copy to user fail, count = %d, go out",
-					send_hw_err_event_count, copyLen);
-				copyLen = -EFAULT;
-				goto OUT;
-			}
-			send_hw_err_event_count += copyLen;
-			pr_warn("%s: in if send_hw_err_event_count = %d", __func__, send_hw_err_event_count);
-			if (send_hw_err_event_count >= sizeof(hwerr_event)) {
-				send_hw_err_event_count  = 0;
-				pr_warn("%s: set need_reset_stack=0", __func__);
-				need_reset_stack = 0;
-			}
-			pr_warn("%s: set call up", __func__);
-			goto OUT;
-		} else {
-			pr_warn("%s: xx set copyLen = -EFAULT", __func__);
-			copyLen = -EFAULT;
-			goto OUT;
+		if (btmtk_sdio_push_data_to_metabuffer(&metabuffer, hwerr_event,
+				sizeof(hwerr_event), 0, false) < 0) {
+			unlock_unsleepable_lock(&(metabuffer.spin_lock));
+			pr_warn("%s: Save hw error event failed\n", __func__);
+			return -EFAULT;
 		}
+		need_reset_stack = 0;
 	}
 
-	lock_unsleepable_lock(&(metabuffer.spin_lock));
 	if (skb_queue_empty(&g_priv->adapter->fops_queue)) {
 		/* if (filp->f_flags & O_NONBLOCK) { */
 		if (metabuffer.write_p == metabuffer.read_p) {
 			unlock_unsleepable_lock(&(metabuffer.spin_lock));
 			return 0;
 		}
-	}
-
-	if (need_reset_stack == 1) {
-		kill_fasync(&fasync, SIGIO, POLL_IN);
-		need_reset_stack = 0;
-		pr_info("%s Call kill_fasync and set reset_stack 0\n",
-			__func__);
-		return -ENODEV;
 	}
 
 	do {
@@ -3831,11 +3799,6 @@ ssize_t btmtk_fops_read(struct file *filp, char __user *buf,
 			break;
 		}
 
-#if 0
-		pr_debug("%s pkt_type %d metabuffer.buffer %d",
-			__func__, bt_cb(skb)->pkt_type,
-			metabuffer.buffer[copyLen]);
-#endif
 		btmtk_print_buffer_conent(skb->data, skb->len);
 
 		if (btmtk_sdio_push_data_to_metabuffer(&metabuffer, skb->data,
@@ -3848,9 +3811,6 @@ ssize_t btmtk_fops_read(struct file *filp, char __user *buf,
 	unlock_unsleepable_lock(&(metabuffer.spin_lock));
 
 	return btmtk_sdio_pull_data_from_metabuffer(&metabuffer, buf, count);
-
-OUT:
-	return copyLen;
 }
 
 static int btmtk_fops_fasync(int fd, struct file *file, int on)
