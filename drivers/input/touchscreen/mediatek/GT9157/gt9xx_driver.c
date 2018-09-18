@@ -161,7 +161,7 @@ static const struct i2c_device_id tpd_i2c_id[] = { {"gt9xx", 0}, {} };
 static unsigned short force[] = { 0, 0xBA, I2C_CLIENT_END, I2C_CLIENT_END };
 static const unsigned short *const forces[] = { force, NULL };
 static const struct of_device_id gt9xx_dt_match[] = { {.compatible =
-						       "mediatek,cap_touch"},
+						       "mediatek,GT9157"},
 {},
 };
 
@@ -1784,7 +1784,7 @@ static int tpd_irq_registration(void)
 	unsigned long irqf_val = 0;
 	int ret = 0;
 
-	node = of_find_compatible_node(NULL, NULL, "mediatek,cap_touch");
+	node = of_find_compatible_node(NULL, NULL, "mediatek,GT9157");
 	if (node) {
 		/*touch_irq = gpio_to_irq(tpd_int_gpio); */
 		touch_irq = irq_of_parse_and_map(node, 0);

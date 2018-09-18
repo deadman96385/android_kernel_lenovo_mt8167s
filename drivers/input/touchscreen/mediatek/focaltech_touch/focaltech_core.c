@@ -80,7 +80,7 @@ static void fts_release_all_finger(void);
 *****************************************************************************/
 static const struct i2c_device_id fts_tpd_id[] = {{FTS_DRIVER_NAME, 0}, {} };
 static const struct of_device_id fts_dt_match[] = {
-    {.compatible = "mediatek,cap_touch"},
+    {.compatible = "mediatek,FT6336"},
     {},
 };
 MODULE_DEVICE_TABLE(of, fts_dt_match);
