@@ -114,6 +114,35 @@
 			output-high;
 		};
 	};
+
+	mmc2_pins_default: mmc2default {
+		pins_cmd_dat {
+			pinmux = <MT8167_PIN_70_MSDC2_DAT0__FUNC_MSDC2_DAT0>,
+				<MT8167_PIN_71_MSDC2_DAT1__FUNC_MSDC2_DAT1>,
+				<MT8167_PIN_72_MSDC2_DAT2__FUNC_MSDC2_DAT2>,
+				<MT8167_PIN_73_MSDC2_DAT3__FUNC_MSDC2_DAT3>,
+				<MT8167_PIN_68_MSDC2_CMD__FUNC_MSDC2_CMD>;
+			input-enable;
+			drive-strength = <MTK_DRIVE_6mA>;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
+		};
+
+		pins_clk {
+			pinmux = <MT8167_PIN_69_MSDC2_CLK__FUNC_MSDC2_CLK>;
+			drive-strength = <MTK_DRIVE_6mA>;
+			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
+		};
+
+		pins_pmu_en {
+			pinmux = <MT8167_PIN_2_EINT2__FUNC_GPIO2>;
+			output-high;
+		};
+
+		pins_wifi_en {
+			pinmux = <MT8167_PIN_13_EINT13__FUNC_GPIO13>;
+			output-high;
+		};
+	};
 };
 
 &spi {
