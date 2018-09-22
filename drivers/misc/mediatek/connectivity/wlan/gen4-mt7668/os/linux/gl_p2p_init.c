@@ -162,7 +162,7 @@ BOOLEAN p2pLaunch(P_GLUE_INFO_T prGlueInfo)
 	return TRUE;
 }
 
-VOID p2pSetMode(IN UINT_8 ucAPMode)
+VOID p2pSetMode(IN UINT_8 ucAPMode, const char *name)
 {
 	PUCHAR prAPInfName = AP_INF_NAME;
 	PUCHAR prP2PInfName = P2P_INF_NAME;
@@ -188,7 +188,10 @@ VOID p2pSetMode(IN UINT_8 ucAPMode)
 		break;
 	case 1:
 		mode = RUNNING_AP_MODE;
-		ifname = prAPInfName;
+		if (name != NULL)
+			ifname = (PUCHAR)name;
+		else
+			ifname = prAPInfName;
 		break;
 	case 2:
 		mode = RUNNING_DUAL_AP_MODE;
@@ -197,7 +200,10 @@ VOID p2pSetMode(IN UINT_8 ucAPMode)
 	case 3:
 		mode = RUNNING_P2P_AP_MODE;
 		ifname = prP2PInfName;
-		ifname2 = prAPInfName;
+		if (name != NULL)
+			ifname2 = (PUCHAR)name;
+		else
+			ifname2 = prAPInfName;
 		break;
 	}
 }				/* p2pSetMode */

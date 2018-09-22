@@ -89,7 +89,7 @@
 struct semaphore g_halt_sem;
 int g_u4HaltFlag;
 
-static struct wireless_dev *gprWdev;
+struct wireless_dev *gprWdev;
 /*******************************************************************************
 *                             D A T A   T Y P E S
 ********************************************************************************
@@ -335,6 +335,8 @@ const UINT_32 mtk_cipher_suites[5] = {
 };
 
 static struct cfg80211_ops mtk_wlan_ops = {
+	.add_virtual_intf = mtk_cfg80211_add_iface,
+	.del_virtual_intf = mtk_cfg80211_del_iface,
 	.change_virtual_intf = mtk_cfg80211_change_iface,
 	.add_key = mtk_cfg80211_add_key,
 	.get_key = mtk_cfg80211_get_key,
@@ -1910,6 +1912,7 @@ int set_p2p_mode_handler(struct net_device *netdev, PARAM_CUSTOM_P2P_SET_STRUCT_
 
 	rSetP2P.u4Enable = p2pmode.u4Enable;
 	rSetP2P.u4Mode = p2pmode.u4Mode;
+	rSetP2P.name = p2pmode.name;
 
 	if ((!rSetP2P.u4Enable) && (kalIsResetting() == FALSE))
 		p2pNetUnregister(prGlueInfo, FALSE);
@@ -2318,7 +2321,9 @@ static INT_32 wlanProbe(PVOID pvData, PVOID pvDriverData)
 		/* Trigger the action of switching Pwr state to drv_own */
 		prAdapter->fgIsFwOwn = TRUE;
 
+#if 0
 		nicpmWakeUpWiFi(prAdapter);
+#endif
 
 		/* Load NVRAM content to REG_INFO_T */
 		glLoadNvram(prGlueInfo, prRegInfo);
@@ -2492,6 +2497,7 @@ static INT_32 wlanProbe(PVOID pvData, PVOID pvDriverData)
 			PARAM_CUSTOM_P2P_SET_STRUCT_T rSetP2P;
 
 			rSetP2P.u4Enable = 1;
+			rSetP2P.name = NULL;
 
 #ifdef CFG_DRIVER_INITIAL_RUNNING_MODE
 			rSetP2P.u4Mode = CFG_DRIVER_INITIAL_RUNNING_MODE;
