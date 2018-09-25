@@ -322,6 +322,12 @@ int mtk_cfg80211_vendor_set_config(struct wiphy *wiphy, struct wireless_dev *wde
 				break;
 			case GSCAN_ATTRIBUTE_NUM_BUCKETS:
 				prWifiScanCmd->num_buckets = nla_get_u32(attr[k]);
+
+				if (prWifiScanCmd->num_buckets >
+					GSCAN_MAX_BUCKETS)
+					prWifiScanCmd->num_buckets =
+						GSCAN_MAX_BUCKETS;
+
 				len_basic += NLA_ALIGN(attr[k]->nla_len);
 				DBGLOG(REQ, TRACE, "attr=0x%x, num_buckets=%d nla_len=%d,\r\n",
 				       *(UINT_32 *) attr[k], prWifiScanCmd->num_buckets, attr[k]->nla_len);
@@ -1179,7 +1185,14 @@ int mtk_cfg80211_vendor_packet_keep_alive_start(struct wiphy *wiphy, struct wire
 				prPkt->u2IpPktLen = nla_get_u16(attr[i]);
 				break;
 			case MKEEP_ALIVE_ATTRIBUTE_IP_PKT:
-				kalMemCopy(prPkt->pIpPkt, nla_data(attr[i]), prPkt->u2IpPktLen);
+				if (prPkt->u2IpPktLen <= 256)
+					kalMemCopy(prPkt->pIpPkt,
+						nla_data(attr[i]),
+						prPkt->u2IpPktLen);
+				else
+					DBGLOG(REQ, ERROR,
+						"%s invalid packet len: %d\n",
+						__func__, prPkt->u2IpPktLen);
 				break;
 			case MKEEP_ALIVE_ATTRIBUTE_SRC_MAC_ADDR:
 				kalMemCopy(prPkt->ucSrcMacAddr, nla_data(attr[i]), sizeof(mac_addr));
