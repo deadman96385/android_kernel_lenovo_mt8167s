@@ -94,9 +94,13 @@ module_param(delay_time1, int, 0400);
 
 int mt_typec_enable(void)
 {
+#if defined(CONFIG_USB_C_SWITCH)
 	int ret;
 	ret = typec_support();
 	return ret;
+#else
+	return 0;
+#endif
 }
 
 void mt_usb_set_vbus(struct musb *musb, int is_on)
@@ -509,7 +513,7 @@ struct typec_switch_data typec_device_driver = {
 
 void mtk_typec_host_init(void)
 {
-
+#if defined(CONFIG_USB_C_SWITCH)
 	mtk_musb->fifo_cfg_host = fifo_cfg_host;
 	mtk_musb->fifo_cfg_host_size = ARRAY_SIZE(fifo_cfg_host);
 	otg_state.name = "otg_state";
@@ -522,7 +526,9 @@ void mtk_typec_host_init(void)
 		DBG(0, "switch_dev_register success\n");
 	register_typec_switch_callback(&typec_host_driver);
 	register_typec_switch_callback(&typec_device_driver);
-
+#else
+	return;
+#endif
 }
 
 
