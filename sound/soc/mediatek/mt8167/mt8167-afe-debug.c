@@ -168,6 +168,8 @@ static const struct afe_dump_reg_attr spdif_in_dump_regs[] = {
 	DUMP_REG_ENTRY(AFE_IRQ_MCU_CON),
 	DUMP_REG_ENTRY(AFE_IRQ_MCU_CON2),
 	DUMP_REG_ENTRY(AFE_IRQ_MCU_EN),
+	DUMP_REG_ENTRY(AFE_IRQ_CLR),
+	DUMP_REG_ENTRY(AFE_IRQ_STATUS),
 };
 
 static ssize_t mt8167_afe_read_file(struct file *file, char __user *user_buf,

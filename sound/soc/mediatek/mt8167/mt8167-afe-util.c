@@ -580,6 +580,27 @@ static unsigned int get_spdif_in_sample_rate(struct mtk_afe *afe)
 	return fs;
 }
 
+static void spdif_in_reset_and_clear_error(struct mtk_afe *afe,
+					   unsigned int err_bits)
+{
+	regmap_update_bits(afe->regmap,
+			   AFE_SPDIFIN_CFG0,
+			   AFE_SPDIFIN_CFG0_INT_EN |
+			   AFE_SPDIFIN_CFG0_EN,
+			   0x0);
+
+	regmap_write(afe->regmap,
+		     AFE_SPDIFIN_EC,
+		     err_bits);
+
+	regmap_update_bits(afe->regmap,
+			   AFE_SPDIFIN_CFG0,
+			   AFE_SPDIFIN_CFG0_INT_EN |
+			   AFE_SPDIFIN_CFG0_EN,
+			   AFE_SPDIFIN_CFG0_INT_EN |
+			   AFE_SPDIFIN_CFG0_EN);
+}
+
 int mt8167_afe_spdif_in_isr(struct mtk_afe *afe)
 {
 	unsigned int debug1, debug2, debug3, int_ext2;
@@ -604,45 +625,15 @@ int mt8167_afe_spdif_in_isr(struct mtk_afe *afe)
 		if (afe->spdif_in_state.rate > 0)
 			afe->spdif_in_state.rate = 0;
 
-		regmap_update_bits(afe->regmap,
-				   AFE_SPDIFIN_CFG0,
-				   AFE_SPDIFIN_CFG0_INT_EN |
-				   AFE_SPDIFIN_CFG0_EN,
-				   0x0);
-
-		regmap_write(afe->regmap,
-			     AFE_SPDIFIN_EC,
-			     get_spdif_in_clear_bits(err));
-
-		regmap_update_bits(afe->regmap,
-				   AFE_SPDIFIN_CFG0,
-				   AFE_SPDIFIN_CFG0_INT_EN |
-				   AFE_SPDIFIN_CFG0_EN,
-				   AFE_SPDIFIN_CFG0_INT_EN |
-				   AFE_SPDIFIN_CFG0_EN);
+		spdif_in_reset_and_clear_error(afe,
+			get_spdif_in_clear_bits(err));
 
 		return 0;
 	}
 
 	rate = get_spdif_in_sample_rate(afe);
 	if (rate == 0) {
-		regmap_update_bits(afe->regmap,
-				   AFE_SPDIFIN_CFG0,
-				   AFE_SPDIFIN_CFG0_INT_EN |
-				   AFE_SPDIFIN_CFG0_EN,
-				   0x0);
-
-		regmap_write(afe->regmap,
-			     AFE_SPDIFIN_EC,
-			     AFE_SPDIFIN_EC_CLEAR_ALL);
-
-		regmap_update_bits(afe->regmap,
-				   AFE_SPDIFIN_CFG0,
-				   AFE_SPDIFIN_CFG0_INT_EN |
-				   AFE_SPDIFIN_CFG0_EN,
-				   AFE_SPDIFIN_CFG0_INT_EN |
-				   AFE_SPDIFIN_CFG0_EN);
-
+		spdif_in_reset_and_clear_error(afe, AFE_SPDIFIN_EC_CLEAR_ALL);
 		return 0;
 	}
 
@@ -654,5 +645,23 @@ int mt8167_afe_spdif_in_isr(struct mtk_afe *afe)
 		     AFE_SPDIFIN_EC_CLEAR_ALL);
 
 	return 0;
+}
+
+void mt8167_afe_check_and_reset_spdif_in(struct mtk_afe *afe)
+{
+	unsigned int i;
+	unsigned int debug1;
+
+	for (i = 0; i < 6; i++) {
+		if (afe->spdif_in_state.ch_status[i] != 0xffffffff)
+			return;
+	}
+
+	regmap_read(afe->regmap, AFE_SPDIFIN_DEBUG1, &debug1);
+
+	if (((debug1 & AFE_SPDIFIN_DEBUG1_CS_MASK) >> 24) != 0x10)
+		return;
+
+	spdif_in_reset_and_clear_error(afe, AFE_SPDIFIN_EC_CLEAR_ALL);
 }
 

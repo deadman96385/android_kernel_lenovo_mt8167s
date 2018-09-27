@@ -652,6 +652,8 @@ static int mt8167_afe_spdif_in_chs_data_get(struct snd_kcontrol *kcontrol,
 				    AFE_SPDIFIN_CHSTS1 + i * 4,
 				    &afe->spdif_in_state.ch_status[i]);
 
+		mt8167_afe_check_and_reset_spdif_in(afe);
+
 		mt8167_afe_disable_main_clk(afe);
 	} else {
 		memset((void *)afe->spdif_in_state.ch_status,

@@ -56,4 +56,6 @@ int mt8167_afe_disable_spdif_in_detect(struct mtk_afe *afe);
 
 int mt8167_afe_spdif_in_isr(struct mtk_afe *afe);
 
+void mt8167_afe_check_and_reset_spdif_in(struct mtk_afe *afe);
+
 #endif
