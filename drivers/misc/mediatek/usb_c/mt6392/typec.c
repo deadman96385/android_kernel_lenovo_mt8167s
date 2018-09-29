@@ -67,7 +67,7 @@ static struct usbtypc g_typec;
 static bool g_host_connected;
 static bool g_device_connected;
 static uint16_t g_cc_is0;
-static int mt6392_typec_support = 0;
+
 static void typec_platform_handler_work(struct work_struct *work)
 {
 	if (g_cc_is0 & TYPE_C_CC_ENT_UNATTACH_SNK_INTR) {
@@ -853,7 +853,6 @@ int typec_init(struct device *dev, struct typec_hba *hba,
 
 	typec_set_mode(hba, hba->support_role, hba->rp_val, 0);
 	typec_enable(hba, 1);
-	mt6392_typec_support = 1;
 
 	return 0;
 
@@ -865,11 +864,7 @@ out_error:
 EXPORT_SYMBOL_GPL(typec_init);
 
 
-int typec_support(void)
-{
-	return mt6392_typec_support;
-}
-EXPORT_SYMBOL_GPL(typec_support);
+
 
 /**
  * typec_remove - de-allocate data structure memory

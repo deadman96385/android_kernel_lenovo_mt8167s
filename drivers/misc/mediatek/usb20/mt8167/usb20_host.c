@@ -67,6 +67,7 @@ struct pinctrl_state *pinctrl_drvvbus_low;
 struct pinctrl_state *pinctrl_drvvbus_high;
 #endif
 static int usb_iddig_number;
+static int usb_typea_support = 0;
 
 static struct musb_fifo_cfg fifo_cfg_host[] = {
 { .hw_ep_num =  1, .style = MUSB_FIFO_TX,   .maxpacket = 512, .mode = MUSB_BUF_SINGLE},
@@ -300,7 +301,10 @@ void switch_int_to_device(struct musb *musb)
 	mt_eint_set_polarity(IDDIG_EINT_PIN, MT_EINT_POL_POS);
 	mt_eint_unmask(IDDIG_EINT_PIN);
 #else
-	irq_set_irq_type(usb_iddig_number, IRQF_TRIGGER_HIGH);
+	if (usb_typea_support)
+		irq_set_irq_type(usb_iddig_number, IRQF_TRIGGER_LOW);
+	else
+		irq_set_irq_type(usb_iddig_number, IRQF_TRIGGER_HIGH);
 	enable_irq(usb_iddig_number);
 	irq_set_irq_wake(usb_iddig_number, 1);
 	DBG(0, "enable iddig irq HIGH @lin %d\n", __LINE__);
@@ -319,7 +323,10 @@ void switch_int_to_host(struct musb *musb)
 	mt_eint_set_polarity(IDDIG_EINT_PIN, MT_EINT_POL_NEG);
 	mt_eint_unmask(IDDIG_EINT_PIN);
 #else
-	irq_set_irq_type(usb_iddig_number, IRQF_TRIGGER_LOW);
+	if (usb_typea_support)
+		irq_set_irq_type(usb_iddig_number, IRQF_TRIGGER_HIGH);
+	else
+		irq_set_irq_type(usb_iddig_number, IRQF_TRIGGER_LOW);
 	enable_irq(usb_iddig_number);
 	irq_set_irq_wake(usb_iddig_number, 1);
 	DBG(0, "enable iddig irq LOW @lin %d\n", __LINE__);
@@ -339,7 +346,10 @@ void switch_int_to_host_and_mask(struct musb *musb)
 	mt_eint_mask(IDDIG_EINT_PIN);
 #else
 	irq_set_irq_wake(usb_iddig_number, 0);
-	irq_set_irq_type(usb_iddig_number, IRQF_TRIGGER_LOW);
+	if (usb_typea_support)
+		irq_set_irq_type(usb_iddig_number, IRQF_TRIGGER_HIGH);
+	else
+		irq_set_irq_type(usb_iddig_number, IRQF_TRIGGER_LOW);
 	disable_irq(usb_iddig_number);
 	DBG(0, "disable iddig irq @lin %d\n", __LINE__);
 #endif
@@ -552,7 +562,10 @@ static void musb_id_pin_work(struct work_struct *data)
 	}
 
 	wake_lock(&mtk_musb->usb_lock);
-	mtk_musb->is_host = musb_is_host();
+	if (usb_typea_support)
+		mtk_musb->is_host = !musb_is_host();
+	else
+		mtk_musb->is_host = musb_is_host();
 	DBG(0, "musb is as %s, already lock\n", mtk_musb->is_host?"host":"device");
 	switch_set_state((struct switch_dev *)&otg_state, mtk_musb->is_host);
 
@@ -627,7 +640,8 @@ static void musb_id_pin_work(struct work_struct *data)
 
 		if (wake_lock_active(&mtk_musb->usb_lock))
 			wake_unlock(&mtk_musb->usb_lock);
-
+		if (usb_typea_support)
+			mt_usb_connect();
 		mtk_musb->xceiv->otg->state = OTG_STATE_B_IDLE;
 		MUSB_DEV_MODE(mtk_musb);
 		switch_int_to_host(mtk_musb);
@@ -843,6 +857,8 @@ void mt_usb_otg_init(struct musb *musb)
 {
 #ifdef CONFIG_OF
 	struct device_node *node;
+	struct property *prop;
+
 #endif
 
 #if defined(CONFIG_MTK_DUAL_INPUT_CHARGER_SUPPORT)
@@ -853,6 +869,7 @@ void mt_usb_otg_init(struct musb *musb)
 #endif
 
 #ifdef CONFIG_OF
+
 	node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-usb20");
 	if (node == NULL) {
 		DBG(0, "USB OTG - get node failed\n");
@@ -872,6 +889,17 @@ void mt_usb_otg_init(struct musb *musb)
 		}
 		drvvbus_pin_mode = of_get_named_gpio(node, "drvvbus_gpio", 1);
 #endif
+	prop = of_find_property(node, "type", NULL);
+	if (prop && !strcmp(prop->name, "type")) {
+		pr_err("find usb type node,%s\n",(char *)prop->value);
+		if (!strcmp(prop->value, "a")) {
+			usb_typea_support = 1;
+			pr_err("usb_typea_support 1\n");
+		} else {
+			usb_typea_support = 0;
+			pr_err("usb_typea_support 0\n");
+		}
+	}
 	}
 #if !defined(CONFIG_MTK_LEGACY)
 	pinctrl = devm_pinctrl_get(mtk_musb->controller);

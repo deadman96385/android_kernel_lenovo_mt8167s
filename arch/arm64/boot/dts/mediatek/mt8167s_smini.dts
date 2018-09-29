@@ -52,6 +52,14 @@
 	state_default:pinconf_default {
 	};
 
+	usb0_iddig: iddig_irq_init {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_17_EINT17__FUNC_GPIO17>;
+			slew-rate = <0>;
+			bias-pull-up = <00>;
+		};
+	};
+
 	aud_pins_default: audiodefault {
 		pins_cmd_dat {
 			pinmux = <MT8167_PIN_25_EINT25__FUNC_I2S_8CH_MCK>,
@@ -172,9 +180,6 @@
 	status = "okay";
 };
 
-&typec {
-	status = "okay";
-};
 
 &uart0 {
 	status="okay";
@@ -188,6 +193,7 @@
 	pinctrl-3 = <&usb0_drvvbus_high>;
 	usb-power-supply = <&mt6392_vusb_reg>;
 	drvvbus_gpio = <&pio 18 2>;
-	iddig_gpio = <&pio 19 2>;
+	iddig_gpio = <&pio 17 0>;
+	type = "a";
 	status = "okay";
 };

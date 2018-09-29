@@ -15,6 +15,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
 #include "mt_typec.h"
+static int mt6392_typec_support = 0;
 
 #ifdef CONFIG_PM
 /**
@@ -89,6 +90,11 @@ static int typec_pltfrm_runtime_idle(struct device *dev)
 #define typec_pltfrm_runtime_idle	NULL
 #endif				/* CONFIG_PM_RUNTIME */
 
+static const struct of_device_id typec_of_match[] = {
+	{.compatible = "mediatek,mt6392-typec"},
+	{},
+};
+
 /**
  * typec_pltfrm_probe - probe routine of the driver
  * @pdev: pointer to Platform device handle
@@ -103,6 +109,8 @@ static int typec_pltfrm_probe(struct platform_device *pdev)
 	int irq = 0;
 	int err;
 	struct device *dev = &pdev->dev;
+	struct device_node *np = dev->of_node;
+	struct property *prop;
 
 	pm_runtime_set_active(&pdev->dev);
 	pm_runtime_enable(&pdev->dev);
@@ -110,7 +118,17 @@ static int typec_pltfrm_probe(struct platform_device *pdev)
 	hba = kzalloc(sizeof(struct typec_hba), GFP_KERNEL);
 	if (hba == NULL)
 		return -EINVAL;
-
+	prop = of_find_property(np, "status", NULL);
+	if (prop && !strcmp(prop->name, "status")) {
+		pr_err("find typec node,%s\n",(char *)prop->value);
+		if (!strcmp(prop->value, "okay")) {
+			mt6392_typec_support = 1;
+			pr_err("mt6392_typec_support 1\n");
+		} else {
+			mt6392_typec_support = 0;
+			pr_err("mt6392_typec_support 0\n");
+		}
+	}
 	/* Use regmap to read/write MT6392 TypeC register */
 	mt6392 = dev_get_drvdata(pdev->dev.parent);
 	hba->regmap = mt6392->regmap;
@@ -160,10 +178,6 @@ static int typec_pltfrm_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id typec_of_match[] = {
-	{.compatible = "mediatek,mt6392-typec"},
-	{},
-};
 
 static const struct dev_pm_ops typec_dev_pm_ops = {
 	.suspend = typec_pltfrm_suspend,
@@ -183,6 +197,12 @@ static struct platform_driver typec_pltfrm_driver = {
 		   .of_match_table = typec_of_match,
 		   },
 };
+
+int typec_support(void)
+{
+	return mt6392_typec_support;
+}
+EXPORT_SYMBOL_GPL(typec_support);
 
 int typec_pltfrm_init(void)
 {
