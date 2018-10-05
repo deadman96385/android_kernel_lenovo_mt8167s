@@ -47,7 +47,7 @@ static UINT32 gDbgLevel = BT_LOG_INFO;
 #define BT_DBG_FUNC(fmt, arg...)	\
 	do { if (gDbgLevel >= BT_LOG_DBG) pr_debug(PFX "%s: " fmt, __func__, ##arg); } while (0)
 #define BT_INFO_FUNC(fmt, arg...)	\
-	do { if (gDbgLevel >= BT_LOG_INFO) pr_debug(PFX "%s: " fmt, __func__, ##arg); } while (0)
+	do { if (gDbgLevel >= BT_LOG_INFO) pr_info(PFX "%s: " fmt, __func__, ##arg); } while (0)
 #define BT_WARN_FUNC(fmt, arg...)	\
 	do { if (gDbgLevel >= BT_LOG_WARN) pr_warn(PFX "%s: " fmt, __func__, ##arg); } while (0)
 #define BT_ERR_FUNC(fmt, arg...)	\
@@ -71,6 +71,11 @@ static struct device *stpbt_dev;
 #endif
 
 #define BT_BUFFER_SIZE              2048
+#define PKT_MIN_LEN 4
+#define HCI_PKT_TYPE 1
+#define ACL_PKT_TYPE 2
+#define SCO_PKT_TYPE 3
+#define EVT_PKT_TYPE 4
 static UINT8 i_buf[BT_BUFFER_SIZE]; /* Input buffer for read */
 static UINT8 o_buf[BT_BUFFER_SIZE]; /* Output buffer for write */
 
@@ -175,6 +180,8 @@ unsigned int BT_poll(struct file *filp, poll_table *wait)
 ssize_t BT_write(struct file *filp, const char __user *buf, size_t count, loff_t *f_pos)
 {
 	INT32 retval = 0;
+	size_t actual_len = 0;
+	size_t pkt_len = 0;
 
 	down(&wr_mtx);
 
@@ -187,27 +194,61 @@ ssize_t BT_write(struct file *filp, const char __user *buf, size_t count, loff_t
 	}
 
 	if (count > 0) {
-		if (count > BT_BUFFER_SIZE) {
-			count = BT_BUFFER_SIZE;
-			BT_WARN_FUNC("Shorten write count from %zd to %d\n", count, BT_BUFFER_SIZE);
+		if ((count + *f_pos) > BT_BUFFER_SIZE) {
+			count = BT_BUFFER_SIZE - *f_pos;
+			BT_WARN_FUNC("Shorten write count from %zd + %lld to %d\n", count, *f_pos, BT_BUFFER_SIZE);
 		}
 
-		if (copy_from_user(o_buf, buf, count)) {
+		if (copy_from_user(&o_buf[*f_pos], buf, count)) {
 			retval = -EFAULT;
+			goto OUT;
+		} else
+			actual_len = *f_pos + count;
+
+		if (actual_len < PKT_MIN_LEN) {
+			retval = count;
+			*f_pos += retval;
 			goto OUT;
 		}
 
-		retval = mtk_wcn_stp_send_data(o_buf, count, BT_TASK_INDX);
-		if (retval < 0)
-			BT_ERR_FUNC("mtk_wcn_stp_send_data fail, retval %d\n", retval);
-		else if (retval == 0) {
-			/* Device cannot process data in time, STP queue is full and no space is available for write,
-			 * native program should not call BT_write with no delay.
-			 */
-			BT_ERR_FUNC("Packet length %zd, sent bytes %d, no space is available!\n", count, retval);
-			retval = -EAGAIN;
-		} else
-			BT_DBG_FUNC("Packet length %zd, sent bytes %d\n", count, retval);
+		switch (o_buf[0]) {
+		case HCI_PKT_TYPE:
+			pkt_len = o_buf[3] + 4;
+			break;
+		case ACL_PKT_TYPE:
+			pkt_len = (o_buf[3] | (o_buf[4] << 8)) + 5;
+			break;
+		case SCO_PKT_TYPE:
+			pkt_len = o_buf[3] + 4;
+			break;
+		default:
+			retval = -EFAULT;
+			BT_ERR_FUNC("pkt type error: %d\n", o_buf[0]);
+			goto OUT;
+		}
+
+		BT_DBG_FUNC("actual_len=%zd, pkt_len=%zd, %02x %02x %02x %02x\n",
+			actual_len, pkt_len,
+			o_buf[0], o_buf[1], o_buf[2], o_buf[3]);
+		if (actual_len >= pkt_len) {
+			retval = mtk_wcn_stp_send_data(o_buf, pkt_len, BT_TASK_INDX);
+			if (retval < 0)
+				BT_ERR_FUNC("mtk_wcn_stp_send_data fail, retval %d\n", retval);
+			else if (retval == 0) {
+				/* Device cannot process data in time, STP queue is full and no space is available for write,
+				 * native program should not call BT_write with no delay.
+				 */
+				BT_ERR_FUNC("Packet length %zd, sent bytes %d, no space is available!\n", pkt_len, retval);
+				retval = -EAGAIN;
+			} else {
+				BT_DBG_FUNC("Packet length %zd, sent bytes %d\n", pkt_len, retval);
+				retval = retval - *f_pos;
+				*f_pos = 0;
+			}
+		} else {
+			retval = count;
+			*f_pos += retval;
+		}
 
 	} else {
 		BT_ERR_FUNC("Packet length %zd is not allowed\n", count);
@@ -242,19 +283,27 @@ ssize_t BT_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos
 			wait_event(BT_wq, flag != 0);
 			flag = 0;
 		}
+
 		/*
 		 * Reset end, send Hardware Error event to stack only once.
 		 * To avoid high frequency read from stack before process is killed, set rstflag to 3
 		 * to block poll and read after Hardware Error event is sent.
 		 */
-		BT_INFO_FUNC("Send Hardware Error event to stack to restart Bluetooth\n");
-		memcpy(i_buf, HCI_EVT_HW_ERROR, sizeof(HCI_EVT_HW_ERROR));
-		retval = sizeof(HCI_EVT_HW_ERROR);
-		rstflag = 3;
+		if (*f_pos == 0)
+			BT_INFO_FUNC("Send Hardware Error event to stack to restart Bluetooth\n");
 
-		if (copy_to_user(buf, i_buf, retval)) {
+		retval = count < (sizeof(HCI_EVT_HW_ERROR) - *f_pos) ?
+			count : (sizeof(HCI_EVT_HW_ERROR) - *f_pos);
+
+		if (copy_to_user(buf, &HCI_EVT_HW_ERROR[*f_pos], retval)) {
 			retval = -EFAULT;
 			rstflag = 2;
+		} else
+			*f_pos = *f_pos + retval;
+
+		if (*f_pos == sizeof(HCI_EVT_HW_ERROR)) {
+			*f_pos = 0;
+			rstflag = 3;
 		}
 
 		goto OUT;
@@ -413,6 +462,7 @@ static int BT_close(struct inode *inode, struct file *file)
 {
 	BT_INFO_FUNC("major %d minor %d (pid %d)\n", imajor(inode), iminor(inode), current->pid);
 	rstflag = 0;
+
 	mtk_wcn_wmt_msgcb_unreg(WMTDRV_TYPE_BT);
 	mtk_wcn_stp_register_event_cb(BT_TASK_INDX, NULL);
 
