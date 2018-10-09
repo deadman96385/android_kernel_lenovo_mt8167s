@@ -725,7 +725,7 @@ static int tpd_irq_registration(struct fts_ts_data *ts_data)
     struct device_node *node = NULL;
     int ret = 0;
 
-    node = of_find_matching_node(node, touch_of_match);
+    node = of_find_matching_node(node, fts_dt_match);
     if (NULL == node) {
         FTS_ERROR("Can not find touch eint device node!");
         return -ENODATA;
