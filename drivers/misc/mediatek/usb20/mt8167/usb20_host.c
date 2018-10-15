@@ -841,6 +841,8 @@ static void otg_int_init(void)
 		DBG(0, "USB IDDIG IRQ LINE available!!\n");
 
 	irq_set_irq_wake(usb_iddig_number, 1);
+	if (usb_typea_support)
+		schedule_delayed_work(&mtk_musb->id_pin_work, 0);
 #endif
 #else
 	u32 phy_id_pull = 0;
