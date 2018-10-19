@@ -1430,7 +1430,7 @@ void DSI_PHY_TIMCONFIG(LCM_DSI_PARAMS *lcm_params)
 	    (lcm_params->HS_TRAIL == 0) ? NS_TO_CYCLE(((hs_trail_m * 0x4) + 0x60),
 							  cycle_time) : lcm_params->HS_TRAIL;
 	/* +3 is recommended from designer becauase of HW latency */
-	timcon0.HS_TRAIL = ((hs_trail_m > hs_trail_n) ? hs_trail_m : hs_trail_n) + 0x0a;
+	timcon0.HS_TRAIL = ((hs_trail_m > hs_trail_n) ? hs_trail_m : hs_trail_n) + 0x01;
 
 	timcon0.HS_PRPR =
 	    (lcm_params->HS_PRPR == 0) ? NS_TO_CYCLE((0x40 + 0x5 * ui),

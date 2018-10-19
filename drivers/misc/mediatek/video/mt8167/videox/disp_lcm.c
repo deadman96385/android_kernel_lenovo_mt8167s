@@ -850,8 +850,8 @@ struct disp_lcm_handle *disp_lcm_probe(char *plcm_name, LCM_INTERFACE_ID lcm_id)
 				}
 			}
 
-			DISPERR("FATAL ERROR: can't found lcm driver:%s in linux kernel driver\n",
-				plcm_name);
+			DISPERR("found %d lcm driver:%s in linux kernel driver, index is :%d\n",
+				isLCMFound, plcm_name, lcmindex);
 		}
 		/* TODO: */
 	}
