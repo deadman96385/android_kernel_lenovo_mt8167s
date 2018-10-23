@@ -194,6 +194,30 @@ PhysmemNewRamBackedLockedPMR(CONNECTION_DATA * psConnection,
                              const IMG_CHAR *pszAnnotation,
                              PMR **ppsPMRPtr);
 
+/*
+ * PhysmemNewRamBackedPMRPID
+ *
+ * Same as function as PhysmemNewRamBackedPMR but allows the caller to specify
+ * the process that has allocated this memory.
+ *
+ * This allows the created PMR to be assigned to the given process for process
+ * stats even if it was not created in the context of that application.
+ */
+PVRSRV_ERROR
+PhysmemNewRamBackedPMRPID(CONNECTION_DATA * psConnection,
+                          PVRSRV_DEVICE_NODE *psDevNode,
+                          IMG_DEVMEM_SIZE_T uiSize,
+                          PMR_SIZE_T uiChunkSize,
+                          IMG_UINT32 ui32NumPhysChunks,
+                          IMG_UINT32 ui32NumVirtChunks,
+                          IMG_UINT32 *pui32MappingTable,
+                          IMG_UINT32 uiLog2AllocPageSize,
+                          PVRSRV_MEMALLOCFLAGS_T uiFlags,
+                          IMG_UINT32 uiAnnotationLength,
+                          const IMG_CHAR *pszAnnotation,
+                          IMG_PID uiPid,
+                          PMR **ppsPMRPtr);
+
 /**************************************************************************/ /*!
 @Function       PhysmemImportPMR
 @Description    Import PMR a previously exported PMR

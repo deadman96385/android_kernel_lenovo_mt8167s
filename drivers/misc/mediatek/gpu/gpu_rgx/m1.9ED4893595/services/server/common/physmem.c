@@ -389,7 +389,7 @@ static inline PVRSRV_ERROR _ValidateParams(IMG_UINT32 ui32NumPhysChunks,
 }
 
 PVRSRV_ERROR
-PhysmemNewRamBackedPMR(CONNECTION_DATA * psConnection,
+PhysmemNewRamBackedPMRPID(CONNECTION_DATA * psConnection,
                        PVRSRV_DEVICE_NODE *psDevNode,
                        IMG_DEVMEM_SIZE_T uiSize,
                        PMR_SIZE_T uiChunkSize,
@@ -400,6 +400,7 @@ PhysmemNewRamBackedPMR(CONNECTION_DATA * psConnection,
                        PVRSRV_MEMALLOCFLAGS_T uiFlags,
                        IMG_UINT32 uiAnnotationLength,
                        const IMG_CHAR *pszAnnotation,
+                       IMG_PID uiPid,
                        PMR **ppsPMRPtr)
 {
 	PVRSRV_ERROR eError;
@@ -484,7 +485,38 @@ PhysmemNewRamBackedPMR(CONNECTION_DATA * psConnection,
 											uiLog2AllocPageSize,
 											uiFlags,
 											pszAnnotation,
+											uiPid,
 											ppsPMRPtr);
+}
+
+PVRSRV_ERROR
+PhysmemNewRamBackedPMR(CONNECTION_DATA * psConnection,
+                       PVRSRV_DEVICE_NODE *psDevNode,
+                       IMG_DEVMEM_SIZE_T uiSize,
+                       PMR_SIZE_T uiChunkSize,
+                       IMG_UINT32 ui32NumPhysChunks,
+                       IMG_UINT32 ui32NumVirtChunks,
+                       IMG_UINT32 *pui32MappingTable,
+                       IMG_UINT32 uiLog2AllocPageSize,
+                       PVRSRV_MEMALLOCFLAGS_T uiFlags,
+                       IMG_UINT32 uiAnnotationLength,
+                       const IMG_CHAR *pszAnnotation,
+                       PMR **ppsPMRPtr)
+{
+	return PhysmemNewRamBackedPMRPID(psConnection,
+	                                 psDevNode,
+	                                 uiSize,
+	                                 uiChunkSize,
+	                                 ui32NumPhysChunks,
+	                                 ui32NumVirtChunks,
+	                                 pui32MappingTable,
+	                                 uiLog2AllocPageSize,
+	                                 uiFlags,
+	                                 uiAnnotationLength,
+	                                 pszAnnotation,
+	                                 OSGetCurrentClientProcessIDKM(),
+	                                 ppsPMRPtr);
+
 }
 
 PVRSRV_ERROR

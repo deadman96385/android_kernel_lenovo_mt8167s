@@ -106,6 +106,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 @Input          pszAnnotation    string describing the PMR (for debug).
                                  This should be passed into the function
                                  PMRCreatePMR().
+@Input          uiPid            The process ID that this allocation should
+                                 be associated with.
 @Output         ppsPMROut        pointer to the PMR created for the
                                  new allocation
 @Return         PVRSRV_OK on success, a failure code otherwise.
@@ -120,6 +122,7 @@ PhysmemNewOSRamBackedPMR(PVRSRV_DEVICE_NODE *psDevNode,
                          IMG_UINT32 uiLog2PageSize,
                          PVRSRV_MEMALLOCFLAGS_T uiFlags,
                          const IMG_CHAR *pszAnnotation,
+                         IMG_PID uiPid,
                          PMR **ppsPMROut);
 
 #endif /* #ifndef _SRVSRV_PHYSMEM_OSMEM_H_ */

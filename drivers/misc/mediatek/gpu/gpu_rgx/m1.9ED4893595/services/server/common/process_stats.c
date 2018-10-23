@@ -1543,10 +1543,11 @@ PVRSRVStatsAddMemAllocRecord(PVRSRV_MEM_ALLOC_TYPE eAllocType,
 							 void *pvCpuVAddr,
 							 IMG_CPU_PHYADDR sCpuPAddr,
 							 size_t uiBytes,
-							 void *pvPrivateData)
+							 void *pvPrivateData,
+							 IMG_PID currentPid)
 #if defined(PVRSRV_DEBUG_LINUX_MEMORY_STATS) && defined(DEBUG)
 {
-	_PVRSRVStatsAddMemAllocRecord(eAllocType, pvCpuVAddr, sCpuPAddr, uiBytes, pvPrivateData, NULL, 0);
+	_PVRSRVStatsAddMemAllocRecord(eAllocType, pvCpuVAddr, sCpuPAddr, uiBytes, pvPrivateData, currentPid, NULL, 0);
 }
 void
 _PVRSRVStatsAddMemAllocRecord(PVRSRV_MEM_ALLOC_TYPE eAllocType,
@@ -1554,11 +1555,11 @@ _PVRSRVStatsAddMemAllocRecord(PVRSRV_MEM_ALLOC_TYPE eAllocType,
 							  IMG_CPU_PHYADDR sCpuPAddr,
 							  size_t uiBytes,
 							  void *pvPrivateData,
+							  IMG_PID currentPid,
 							  void *pvAllocFromFile, IMG_UINT32 ui32AllocFromLine)
 #endif
 {
 #if defined(PVRSRV_ENABLE_MEMORY_STATS)
-	IMG_PID				   currentPid = OSGetCurrentClientProcessIDKM();
 	IMG_PID				   currentCleanupPid = PVRSRVGetPurgeConnectionPid();
 	PVRSRV_DATA*		   psPVRSRVData = PVRSRVGetPVRSRVData();
 	PVRSRV_MEM_ALLOC_REC*  psRecord   = NULL;
@@ -1909,10 +1910,10 @@ e0:
 
 void
 PVRSRVStatsRemoveMemAllocRecord(PVRSRV_MEM_ALLOC_TYPE eAllocType,
-								IMG_UINT64 ui64Key)
+								IMG_UINT64 ui64Key,
+								IMG_PID currentPid)
 {
 #if defined(PVRSRV_ENABLE_MEMORY_STATS)
-	IMG_PID				   currentPid	  = OSGetCurrentClientProcessIDKM();
 	IMG_PID				   currentCleanupPid = PVRSRVGetPurgeConnectionPid();
 	PVRSRV_DATA*		   psPVRSRVData = PVRSRVGetPVRSRVData();
 	PVRSRV_PROCESS_STATS*  psProcessStats = NULL;
@@ -2082,7 +2083,8 @@ PVR_UNREFERENCED_PARAMETER(ui64Key);
 void
 PVRSRVStatsIncrMemAllocStatAndTrack(PVRSRV_MEM_ALLOC_TYPE eAllocType,
 									size_t uiBytes,
-									IMG_UINT64 uiCpuVAddr)
+									IMG_UINT64 uiCpuVAddr,
+									IMG_PID uiPid)
 {
 	IMG_BOOL bRes = IMG_FALSE;
 	_PVR_STATS_TRACKING_HASH_ENTRY *psNewTrackingHashEntry = NULL;
@@ -2098,7 +2100,7 @@ PVRSRVStatsIncrMemAllocStatAndTrack(PVRSRV_MEM_ALLOC_TYPE eAllocType,
 	{
 		/* Fill-in the size of the allocation and PID of the allocating process */
 		psNewTrackingHashEntry->uiSizeInBytes = uiBytes;
-		psNewTrackingHashEntry->uiPid = OSGetCurrentClientProcessIDKM();
+		psNewTrackingHashEntry->uiPid = uiPid;
 		OSLockAcquire(gpsSizeTrackingHashTableLock);
 		/* Insert address of the new struct into the hash table */
 		bRes = HASH_Insert(gpsSizeTrackingHashTable, uiCpuVAddr, (uintptr_t)psNewTrackingHashEntry);
@@ -2109,7 +2111,7 @@ PVRSRVStatsIncrMemAllocStatAndTrack(PVRSRV_MEM_ALLOC_TYPE eAllocType,
 	{
 		if (bRes)
 		{
-			PVRSRVStatsIncrMemAllocStat(eAllocType, uiBytes);
+			PVRSRVStatsIncrMemAllocStat(eAllocType, uiBytes, uiPid);
 		}
 		else
 		{
@@ -2124,9 +2126,9 @@ PVRSRVStatsIncrMemAllocStatAndTrack(PVRSRV_MEM_ALLOC_TYPE eAllocType,
 
 void
 PVRSRVStatsIncrMemAllocStat(PVRSRV_MEM_ALLOC_TYPE eAllocType,
-									size_t uiBytes)
+									size_t uiBytes,
+									IMG_PID currentPid)
 {
-	IMG_PID				   currentPid = OSGetCurrentClientProcessIDKM();
 	IMG_PID				   currentCleanupPid = PVRSRVGetPurgeConnectionPid();
 	PVRSRV_DATA* 		   psPVRSRVData = PVRSRVGetPVRSRVData();
 	PVRSRV_PROCESS_STATS*  psProcessStats = NULL;
@@ -2591,9 +2593,9 @@ PVRSRVStatsDecrMemAllocStatAndUntrack(PVRSRV_MEM_ALLOC_TYPE eAllocType,
 
 void
 PVRSRVStatsDecrMemAllocStat(PVRSRV_MEM_ALLOC_TYPE eAllocType,
-							size_t uiBytes)
+							size_t uiBytes,
+							IMG_PID currentPid)
 {
-	IMG_PID				   currentPid = OSGetCurrentClientProcessIDKM();
 	IMG_PID				   currentCleanupPid = PVRSRVGetPurgeConnectionPid();
 	PVRSRV_DATA* 		   psPVRSRVData = PVRSRVGetPVRSRVData();
 	PVRSRV_PROCESS_STATS*  psProcessStats = NULL;

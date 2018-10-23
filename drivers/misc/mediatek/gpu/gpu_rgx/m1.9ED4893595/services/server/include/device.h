@@ -191,6 +191,7 @@ typedef PVRSRV_ERROR (*FN_CREATERAMBACKEDPMR)(struct _PVRSRV_DEVICE_NODE_ *psDev
 										IMG_UINT32 uiLog2PageSize,
 										PVRSRV_MEMALLOCFLAGS_T uiFlags,
 										const IMG_CHAR *pszAnnotation,
+										IMG_PID uiPid,
 										PMR **ppsPMRPtr);
 
 typedef struct _PVRSRV_DEVICE_NODE_

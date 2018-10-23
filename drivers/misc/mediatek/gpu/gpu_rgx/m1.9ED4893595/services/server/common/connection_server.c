@@ -82,15 +82,6 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 		return PVRSRV_ERROR_INVALID_PARAMS;
 	}
 
-	/* Close the process statistics */
-#if defined(PVRSRV_ENABLE_PROCESS_STATS) && !defined(PVRSRV_DEBUG_LINUX_MEMORY_STATS)
-	if (psConnection->hProcessStats != NULL)
-	{
-		PVRSRVStatsDeregisterProcess(psConnection->hProcessStats);
-		psConnection->hProcessStats = NULL;
-	}
-#endif
-
 	/* Close HWPerfClient stream here even though we created it in
 	 * PVRSRVConnectKM(). */
 	if (psConnection->hClientTLStream)
@@ -198,7 +189,16 @@ static PVRSRV_ERROR ConnectionDataDestroy(CONNECTION_DATA *psConnection)
 		psConnection->hOsPrivateData = NULL;
 	}
 
-	OSFreeMem(psConnection);
+	/* Close the PID stats entry as late as possible to catch all frees */
+#if defined(PVRSRV_ENABLE_PROCESS_STATS) && !defined(PVRSRV_DEBUG_LINUX_MEMORY_STATS)
+	if (psConnection->hProcessStats != NULL)
+	{
+		PVRSRVStatsDeregisterProcess(psConnection->hProcessStats);
+		psConnection->hProcessStats = NULL;
+	}
+#endif
+
+	OSFreeMemNoStats(psConnection);
 
 	return PVRSRV_OK;
 }
@@ -210,14 +210,26 @@ PVRSRV_ERROR PVRSRVConnectionConnect(void **ppvPrivData, void *pvOSData)
 	PROCESS_HANDLE_BASE *psProcessHandleBase;
 	PVRSRV_DATA *psPVRSRVData = PVRSRVGetPVRSRVData();
 
-	/* Allocate connection data area */
-	psConnection = OSAllocZMem(sizeof(*psConnection));
+	/* Allocate connection data area, no stats since process not regsitered yet */
+	psConnection = OSAllocZMemNoStats(sizeof(*psConnection));
 	if (psConnection == NULL)
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "PVRSRVConnectionConnect: Couldn't allocate connection data"));
 		return PVRSRV_ERROR_OUT_OF_MEMORY;
 	}
+
+	/* Allocate process statistics as early as possible to catch all allocs */
+#if defined(PVRSRV_ENABLE_PROCESS_STATS) && !defined(PVRSRV_DEBUG_LINUX_MEMORY_STATS)
+	eError = PVRSRVStatsRegisterProcess(&psConnection->hProcessStats);
+	if (eError != PVRSRV_OK)
+	{
+		PVR_DPF((PVR_DBG_ERROR,
+			 "PVRSRVConnectionConnect: Couldn't register process statistics (%d)",
+			 eError));
+		goto failure;
+	}
+#endif
 
 	/* Call environment specific connection data init function */
 	eError = OSConnectionPrivateDataInit(&psConnection->hOsPrivateData, pvOSData);
@@ -314,19 +326,6 @@ PVRSRV_ERROR PVRSRVConnectionConnect(void **ppvPrivData, void *pvOSData)
 	OSLockRelease(psPVRSRVData->hProcessHandleBase_Lock);
 
 	psConnection->psProcessHandleBase = psProcessHandleBase;
-
-
-	/* Allocate process statistics */
-#if defined(PVRSRV_ENABLE_PROCESS_STATS) && !defined(PVRSRV_DEBUG_LINUX_MEMORY_STATS)
-	eError = PVRSRVStatsRegisterProcess(&psConnection->hProcessStats);
-	if (eError != PVRSRV_OK)
-	{
-		PVR_DPF((PVR_DBG_ERROR,
-			 "PVRSRVConnectionConnect: Couldn't register process statistics (%d)",
-			 eError));
-		goto failure;
-	}
-#endif
 
 	*ppvPrivData = psConnection;
 

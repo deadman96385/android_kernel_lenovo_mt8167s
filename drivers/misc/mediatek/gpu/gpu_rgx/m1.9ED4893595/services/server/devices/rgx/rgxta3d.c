@@ -501,7 +501,7 @@ PVRSRV_ERROR RGXGrowFreeList(RGX_FREELIST *psFreeList,
 	/* Allocate Memory Block */
 	PDUMPCOMMENT("Allocate PB Block (Pages %08X)", ui32NumPages);
 	uiSize = (IMG_DEVMEM_SIZE_T)ui32NumPages * RGX_BIF_PM_PHYSICAL_PAGE_SIZE;
-	eError = PhysmemNewRamBackedPMR(NULL,
+	eError = PhysmemNewRamBackedPMRPID(NULL,
 	                                psFreeList->psDevInfo->psDeviceNode,
 									uiSize,
 									uiSize,
@@ -512,6 +512,7 @@ PVRSRV_ERROR RGXGrowFreeList(RGX_FREELIST *psFreeList,
 									PVRSRV_MEMALLOCFLAG_GPU_READABLE,
 									OSStringLength(pszAllocName) + 1,
 									pszAllocName,
+									psFreeList->ownerPid,
 									&psPMRNode->psPMR);
 	if(eError != PVRSRV_OK)
 	{
@@ -1581,6 +1582,7 @@ PVRSRV_ERROR RGXCreateFreeList(CONNECTION_DATA      *psConnection,
 	psFreeList->bCheckFreelist = bCheckFreelist;
 	dllist_init(&psFreeList->sMemoryBlockHead);
 	dllist_init(&psFreeList->sMemoryBlockInitHead);
+	psFreeList->ownerPid = OSGetCurrentClientProcessIDKM();
 
 
 	/* Add to list of freelists */
@@ -1664,7 +1666,6 @@ PVRSRV_ERROR RGXCreateFreeList(CONNECTION_DATA      *psConnection,
 
 #endif
 
-	psFreeList->ownerPid = OSGetCurrentClientProcessIDKM();
 	/* return values */
 	*ppsFreeList = psFreeList;
 
