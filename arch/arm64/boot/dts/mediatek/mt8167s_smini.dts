@@ -50,6 +50,11 @@
 	pinctrl-0 = <&state_default>;
 
 	state_default:pinconf_default {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_23_EINT23__FUNC_GPIO23>;
+			input-enable;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_00>;
+		};
 	};
 
 	usb0_iddig: iddig_irq_init {
