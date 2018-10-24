@@ -32,6 +32,11 @@
 #include <linux/slab.h>
 #include <linux/irqdomain.h>
 
+#ifdef CONFIG_KEYBOARD_MTK_PMIC_GPIO
+#include <linux/gpio.h>
+#include <linux/irq_sim.h>
+#endif // CONFIG_KEYBOARD_MTK_PMIC_GPIO
+
 #define PMIC_RG_PWRKEY_RST_EN_MASK  0x1
 #define PMIC_RG_PWRKEY_RST_EN_SHIFT  6
 #define PMIC_RG_HOMEKEY_RST_EN_MASK  0x1
@@ -56,6 +61,20 @@ struct pmic_keys_regs {
 	.intsel_reg		= _intsel_reg,				\
 	.intsel_mask		= _intsel_mask,				\
 }
+
+#ifdef CONFIG_KEYBOARD_MTK_PMIC_GPIO
+struct pmic_gpiochip {
+	struct gpio_chip gc;
+	struct irq_sim irqsim;
+	struct pmic_keys_info *info;
+	unsigned int irq_offset;
+};
+
+static DEFINE_SPINLOCK(pmic_gpiochip_slock);
+static struct pmic_gpiochip *pmic_gpiochip_dev = NULL;
+static unsigned int pmic_gpiochip_base = 0;
+static unsigned int pmic_homekey_code = 0;
+#endif
 
 struct pmic_regs {
 	const struct pmic_keys_regs pwrkey_regs;
@@ -92,6 +111,7 @@ struct pmic_keys_info {
 	int keycode;
 	int irq;
 	u32 hw_irq;
+	bool is_gpio;
 };
 
 struct mtk_pmic_keys {
@@ -149,21 +169,30 @@ static irqreturn_t mtk_pmic_keys_irq_handler_thread(int irq, void *data)
 	struct pmic_keys_info *info = data;
 	u32 key_deb, pressed;
 
-	regmap_read(info->keys->regmap, info->regs->deb_reg, &key_deb);
+#ifdef CONFIG_KEYBOARD_MTK_PMIC_GPIO
+	if (info->is_gpio && pmic_gpiochip_dev) {
+		irq_sim_fire(&pmic_gpiochip_dev->irqsim, pmic_gpiochip_dev->irq_offset);
+		dev_info(info->keys->dev, "[PMICKEYS] Firing IRQ handler for GPIO.\n");
+	} else {
+#endif // CONFIG_KEYBOARD_MTK_PMIC_GPIO
+		regmap_read(info->keys->regmap, info->regs->deb_reg, &key_deb);
 
-	key_deb &= info->regs->deb_mask;
+		key_deb &= info->regs->deb_mask;
 
-	pressed = !key_deb;
+		pressed = !key_deb;
 
-	input_report_key(info->keys->input_dev, info->keycode, pressed);
-	input_sync(info->keys->input_dev);
-	if (pressed)
-		wake_lock(&pwrkey_lock);
-	else
-		wake_lock_timeout(&pwrkey_lock, HZ/2);
+		input_report_key(info->keys->input_dev, info->keycode, pressed);
+		input_sync(info->keys->input_dev);
+		if (pressed)
+			wake_lock(&pwrkey_lock);
+		else
+			wake_lock_timeout(&pwrkey_lock, HZ/2);
 
-	dev_info(info->keys->dev, "[PMICKEYS] (%s) key =%d using PMIC\n",
-		pressed ? "pressed" : "released", info->keycode);
+		dev_info(info->keys->dev, "[PMICKEYS] (%s) key =%d using PMIC\n",
+			 pressed ? "pressed" : "released", info->keycode);
+#ifdef CONFIG_KEYBOARD_MTK_PMIC_GPIO
+	}
+#endif // CONFIG_KEYBOARD_MTK_PMIC_GPIO
 
 	return IRQ_HANDLED;
 }
@@ -181,6 +210,7 @@ static int mtk_pmic_key_setup(struct mtk_pmic_keys *keys,
 		return 0;
 
 	info->keys = keys;
+	info->is_gpio = false;
 
 	if (keys->indie_release_irq_mask == 1) {
 		ret = regmap_update_bits(keys->regmap, info->regs->intsel_reg,
@@ -240,6 +270,61 @@ static const struct of_device_id of_pmic_keys_match_tbl[] = {
 	}
 };
 MODULE_DEVICE_TABLE(of, of_pmic_keys_match_tbl);
+
+#ifdef CONFIG_KEYBOARD_MTK_PMIC_GPIO
+static int pmic_gpiochip_direction_input(struct gpio_chip *gc, unsigned offset)
+{
+	return 0;
+}
+
+static int pmic_gpiochip_direction_output(struct gpio_chip *gc, unsigned offset, int value)
+{
+	return -EINVAL;
+}
+
+static void pmic_gpiochip_get_int_status(struct pmic_keys_info *info, bool *status)
+{
+	int ret;
+	u32 key_deb;
+	unsigned long flags;
+
+	spin_lock_irqsave(&pmic_gpiochip_slock, flags);
+	ret = regmap_read(info->keys->regmap, info->regs->deb_reg, &key_deb);
+	key_deb &= info->regs->deb_mask;
+	spin_unlock_irqrestore(&pmic_gpiochip_slock, flags);
+
+	*status = !key_deb;
+}
+
+static int pmic_gpiochip_get_value(struct gpio_chip *gc, unsigned offset)
+{
+	bool gpio_value = false;
+	/* report the state of the interrupt register */
+	if (pmic_gpiochip_dev && pmic_gpiochip_dev->info) {
+		pmic_gpiochip_get_int_status(pmic_gpiochip_dev->info, &gpio_value);
+	}
+	return gpio_value;
+}
+
+static void pmic_gpiochip_set_value(struct gpio_chip *gc, unsigned offset, int value)
+{
+	return;
+}
+
+static int pmic_gpiochip_to_irq(struct gpio_chip *gc, unsigned offset)
+{
+	unsigned long flags;
+	if (!pmic_gpiochip_dev) {
+		return -EINVAL;
+	}
+	/* save the offset */
+	spin_lock_irqsave(&pmic_gpiochip_slock, flags);
+	pmic_gpiochip_dev->irq_offset = offset;
+	spin_unlock_irqrestore(&pmic_gpiochip_slock, flags);
+	return irq_sim_irqnum(&pmic_gpiochip_dev->irqsim, offset);
+}
+
+#endif // CONFIG_KEYBOARD_MTK_PMIC_GPIO
 
 static int mtk_pmic_keys_probe(struct platform_device *pdev)
 {
@@ -316,6 +401,56 @@ static int mtk_pmic_keys_probe(struct platform_device *pdev)
 			goto out_dispose_irq;
 	}
 
+#ifdef CONFIG_KEYBOARD_MTK_PMIC_GPIO
+	ret = of_property_read_u32(pdev->dev.of_node, "mediatek,homekey-gpio", &pmic_gpiochip_base);
+	if (!ret && !pmic_gpiochip_dev) {
+		/* homekey-code must be provided to setup irqs above */
+		ret = of_property_read_u32(pdev->dev.of_node, "mediatek,homekey-code", &pmic_homekey_code);
+		if (ret) {
+			dev_err(&pdev->dev, "%s: cannot setup gpio without homekey-code specified", __func__);
+			ret = -EINVAL;
+			goto out_dispose_irq;
+		}
+		pmic_gpiochip_dev = devm_kzalloc(&pdev->dev, sizeof(struct pmic_gpiochip), GFP_KERNEL);
+		if (!pmic_gpiochip_dev) {
+			dev_err(&pdev->dev, "%s: failed to allocate pmic_gpiochip_dev", __func__);
+			ret = -ENOMEM;
+			goto out_dispose_irq;
+		}
+
+		/* set reasonable defaults for gpio state and IRQ offset */
+		keys->homekey.is_gpio = true;
+		keys->home_release.is_gpio = true;
+		pmic_gpiochip_dev->irq_offset = 0;
+		pmic_gpiochip_dev->info = &keys->homekey;
+
+		/* populate gpiochip parameters */
+		pmic_gpiochip_dev->gc.base = pmic_gpiochip_base;
+		pmic_gpiochip_dev->gc.ngpio = 1;
+		pmic_gpiochip_dev->gc.label = "mtk-pmic-gpiobase";
+		pmic_gpiochip_dev->gc.direction_input = pmic_gpiochip_direction_input;
+		pmic_gpiochip_dev->gc.direction_output = pmic_gpiochip_direction_output;
+		pmic_gpiochip_dev->gc.get = pmic_gpiochip_get_value;
+		pmic_gpiochip_dev->gc.set = pmic_gpiochip_set_value;
+		pmic_gpiochip_dev->gc.to_irq = pmic_gpiochip_to_irq;
+		pmic_gpiochip_dev->gc.can_sleep = 0;
+		pmic_gpiochip_dev->gc.dev = &pdev->dev;
+
+		/* register gpiochip and simulated interrupt handler */
+		ret = gpiochip_add(&pmic_gpiochip_dev->gc);
+		if (ret) {
+			dev_err(&pdev->dev, "%s: failed to add mtk-pmic-gpiochip, ret=%d\n", __func__, ret);
+			goto out_dispose_irq;
+		}
+		ret = devm_irq_sim_init(&pdev->dev, &pmic_gpiochip_dev->irqsim, pmic_gpiochip_dev->gc.ngpio);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "%s: failed to int mtk-pmic-gpiochip interrupt, ret=%d\n", __func__, ret);
+			gpiochip_remove(&pmic_gpiochip_dev->gc);
+			goto out_dispose_irq;
+		}
+	}
+#endif // CONFIG_KEYBOARD_MTK_PMIC_GPIO
+
 	ret = input_register_device(input_dev);
 	if (ret) {
 		dev_err(&pdev->dev, "[PMICKEYS] register input device failed (%d)\n", ret);
@@ -339,6 +474,15 @@ static int mtk_pmic_keys_remove(struct platform_device *pdev)
 	struct mtk_pmic_keys *keys = platform_get_drvdata(pdev);
 
 	mtk_pmic_keys_dispose_irq(keys);
+
+#ifdef CONFIG_KEYBOARD_MTK_PMIC_GPIO
+	if (pmic_gpiochip_dev) {
+		irq_sim_fini(&pmic_gpiochip_dev->irqsim);
+		gpiochip_remove(&pmic_gpiochip_dev->gc);
+		kfree(pmic_gpiochip_dev);
+		pmic_gpiochip_dev = NULL;
+	}
+#endif // CONFIG_KEYBOARD_MTK_PMIC_GPIO
 
 	input_unregister_device(keys->input_dev);
 

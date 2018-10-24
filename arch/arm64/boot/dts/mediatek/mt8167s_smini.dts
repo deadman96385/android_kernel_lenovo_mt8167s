@@ -45,6 +45,11 @@
 	status = "okay";
 };
 
+&mt6392keys {
+	mediatek,homekey-code = <114>;
+	mediatek,homekey-gpio = <576>;
+};
+
 &pio {
 	pinctrl-names = "default";
 	pinctrl-0 = <&state_default>;
