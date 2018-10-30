@@ -85,7 +85,6 @@
 #define EMMC50_CFG4		0x224
 #define MSDC_SDC_FIFO_CFG	0x228
 
-#define MAX_REGISTER_ADDR	0x228
 /*--------------------------------------------------------------------------*/
 /* Register Mask                                                            */
 /*--------------------------------------------------------------------------*/
@@ -341,6 +340,10 @@
 #define MSDC_PATCH_BIT_SPCPUSH    (0x1 << 29)	/* RW */
 #define MSDC_PATCH_BIT_DECRCTMO   (0x1 << 30)	/* RW */
 
+/* MSDC_PATCH_BIT1 mask */
+#define MSDC_PATCH_BIT1_WRDAT_CRCS  (0x7 << 0)
+#define MSDC_PATCH_BIT1_CMD_RSP     (0x7 << 3)
+
 /* MSDC_PAD_TUNE mask */
 #define MSDC_PAD_TUNE_DATWRDLY  (0x1f << 0)	/* RW */
 #define MSDC_PAD_TUNE_DATRRDLY  (0x1f << 8)	/* RW */
@@ -484,6 +487,10 @@
 /* EMMC50_BLOCK_LENGTH mask */
 #define MSDC_EMMC50_BLOCK_LENGTH_MASK           (0x1FF << 0)
 
+/* MSDC SDC FIFO CFG masd */
+#define MSDC_WR_VALID_SEL                       (0x1 << 24)
+#define MSDC_RD_VALID_SEL                       (0x1 << 25)
+
 #define EMMC50_CFG_PADCMD_LATCHCK (0x1 << 0)   /* RW */
 #define EMMC50_CFG_CRCSTS_EDGE    (0x1 << 3)   /* RW */
 #define EMMC50_CFG_CFCSTS_SEL     (0x1 << 4)   /* RW */
@@ -522,15 +529,11 @@ extern struct sdio_ops mt_sdio_ops[4];
 #define MSDC_ASYNC_FLAG (0x1 << 1)
 #define MSDC_MMAP_FLAG (0x1 << 2)
 
-#define MTK_MMC_AUTOSUSPEND_DELAY	10
+#define MTK_MMC_AUTOSUSPEND_DELAY	50
 #define CMD_TIMEOUT         (HZ/10 * 5)	/* 100ms x5 */
 #define DAT_TIMEOUT         (HZ    * 5)	/* 1000ms x5 */
 
 #define PAD_DELAY_MAX	32 /* PAD delay cells */
-
-#define AUTOK_RECOVERABLE_ERROR		-1
-#define AUTOK_NONE_RECOVERABLE_ERROR	-2
-
 /*--------------------------------------------------------------------------*/
 /* Descriptor Structure                                                     */
 /*--------------------------------------------------------------------------*/
@@ -608,7 +611,6 @@ struct msdc_host {
 	int error;
 
 	void __iomem *base;		/* host base address */
-	void __iomem *infra_reset;      /* infra reset 0x10001030 */
 
 	struct msdc_dma dma;	/* dma channel */
 	u64 dma_mask;
@@ -620,13 +622,8 @@ struct msdc_host {
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *pins_default;
 	struct pinctrl_state *pins_uhs;
-	struct pinctrl_state *pins_dat1;
-	struct pinctrl_state *pins_dat1_eint;
 	struct delayed_work req_timeout;
 	int irq;		/* host interrupt */
-	int eint_irq;
-	int sdio_clk_cnt;
-	int sdio_irq_cnt; /* irq enable cnt */
 	bool irq_thread_alive;
 
 	struct clk *src_clk;	/* msdc source clock */
@@ -639,7 +636,6 @@ struct msdc_host {
 	unsigned char timing;
 	bool vqmmc_enabled;
 	u32 hs400_ds_delay;
-	u32 module_reset_bit;
 	bool hs400_mode;	/* current eMMC will run at hs400 mode */
 	struct msdc_save_para save_para; /* used when gate HCLK */
 	struct msdc_tune_para def_tune_para; /* default tune setting */
@@ -660,3 +656,6 @@ struct msdc_host {
 	void (*register_pm)(pm_callback_t pm_cb, void *data);
 #endif
 };
+
+static bool sdio_online_tune_fail;
+static int sdio_clk_cnt;
