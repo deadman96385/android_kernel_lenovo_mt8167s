@@ -78,6 +78,10 @@
 	};
 };
 
+&sdio_fixed_3v3 {
+	status = "disabled";
+};
+
 &uart0 {
 	status="okay";
 };

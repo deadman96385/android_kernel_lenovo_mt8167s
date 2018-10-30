@@ -17,11 +17,14 @@
 / {
 	msdc1: sdio@11130000 {
 		compatible = "mediatek,mt8167-sdio";
-		reg = <0 0x11130000 0 0x1000>;
+		reg = <0 0x11130000 0 0x1000>,
+		      <0 0x10001030 0 0x10>;
+		module_reset_bit = <22>;
 		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_LOW>;
 		clocks = <&topckgen CLK_TOP_MSDC1>,
+			 <&topckgen CLK_TOP_AHB_INFRA_SEL>,
 			 <&topckgen CLK_TOP_MSDC1_INFRA>;
-		clock-names = "source", "hclk";
+		clock-names = "source", "hclk", "source_cg";
 		status = "disabled";
 	};
 };
@@ -110,9 +113,12 @@
 };
 
 &msdc1 {
-	pinctrl-names = "default", "state_uhs";
-	pinctrl-0 = <&mmc1_pins_default>;
-	pinctrl-1 = <&mmc1_pins_uhs>;
+	pinctrl-names = "state_eint", "default", "state_uhs", "state_dat1";
+	pinctrl-0 = <&mmc1_pins_eint>;
+	pinctrl-1 = <&mmc1_pins_default>;
+	pinctrl-2 = <&mmc1_pins_uhs>;
+	pinctrl-3 = <&mmc1_pins_dat1>;
+	eint-gpios = <&pio 107 0>;
 	status = "okay";
 	bus-width = <4>;
 	max-frequency = <200000000>;
@@ -121,6 +127,7 @@
 	sd-uhs-sdr104;
 	keep-power-in-suspend;
 	enable-sdio-wakeup;
+	vmmc-supply = <&sdio_fixed_3v3>;
 	cap-sdio-irq;
 	non-removable;
 };
@@ -189,6 +196,14 @@
 		};
 	};
 
+	mmc1_pins_eint: dat1_eint {
+		pins_dat1 {
+			pinmux = <MT8167_PIN_107_MSDC1_DAT1__FUNC_GPIO107>;
+			input-enable;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+		};
+	};
+
 	mmc1_pins_default: mmc1default {
 		pins_cmd_dat {
 			pinmux = <MT8167_PIN_106_MSDC1_DAT0__FUNC_MSDC1_DAT0>,
@@ -205,11 +220,6 @@
 			pinmux = <MT8167_PIN_105_MSDC1_CLK__FUNC_MSDC1_CLK>;
 			drive-strength = <MTK_DRIVE_6mA>;
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
-		};
-
-		pins_pmu_en {
-			pinmux = <MT8167_PIN_2_EINT2__FUNC_GPIO2>;
-			output-high;
 		};
 	};
 
@@ -229,6 +239,15 @@
 			pinmux = <MT8167_PIN_105_MSDC1_CLK__FUNC_MSDC1_CLK>;
 			drive-strength = <MTK_DRIVE_8mA>;
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
+		};
+	};
+
+	mmc1_pins_dat1: mmc1_dat1 {
+		pins_dat1 {
+			pinmux = <MT8167_PIN_107_MSDC1_DAT1__FUNC_MSDC1_DAT1>;
+			input-enable;
+			drive-strength = <MTK_DRIVE_6mA>;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
 		};
 	};
 
