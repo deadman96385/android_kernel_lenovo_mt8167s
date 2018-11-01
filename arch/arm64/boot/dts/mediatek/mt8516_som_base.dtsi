@@ -13,6 +13,7 @@
 #include "mt8516.dtsi"
 #include "mt6392.dtsi"
 #include "mt8516_som_bat_setting.dtsi"
+#include <dt-bindings/gpio/gpio.h>
 
 / {
 	memory@00000000 {
@@ -43,14 +44,14 @@
 		status = "disabled";
 	};
 
-	msdc2: sdio@11170000 {
-		compatible = "mediatek,mt8167-sdio";
-		reg = <0 0x11170000 0 0x1000>;
-		interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_LOW>;
-		clocks = <&topckgen CLK_TOP_MSDC2>,
-			 <&topckgen CLK_TOP_MSDC2_INFRA>;
-		clock-names = "source", "hclk";
-		status = "disabled";
+	sdio_fixed_3v3: fixedregulator@2 {
+		compatible = "regulator-fixed";
+		regulator-name = "sdio_fixed_3v3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&pio 2 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		startup-delay-us = <500000>;
 	};
 
 	mtcpufreq {
@@ -83,6 +84,20 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&aud_pins_default>;
 		status = "okay";
+	};
+
+	msdc2: sdio@11170000 {
+		compatible = "mediatek,mt8167-sdio";
+		reg = <0 0x11170000 0 0x1000>,
+		      <0 0x10001030 0 0x10>;
+		module_reset_bit = <23>;
+		interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_LOW>;
+		/* power domain always on */
+		clocks = <&topckgen CLK_TOP_RG_MSDC2>,
+			 <&topckgen CLK_TOP_MSDC2>,
+			 <&topckgen CLK_TOP_MSDC2_INFRA>;
+		clock-names = "source", "hclk", "source_cg";
+		status = "disabled";
 	};
 };
 
@@ -207,9 +222,12 @@
 };
 
 &msdc2 {
-	pinctrl-names = "default", "state_uhs";
-	pinctrl-0 = <&mmc2_pins_default>;
-	pinctrl-1 = <&mmc2_pins_uhs>;
+	pinctrl-names = "state_eint", "default", "state_uhs", "state_dat1";
+	pinctrl-0 = <&mmc2_pins_eint>;
+	pinctrl-1 = <&mmc2_pins_default>;
+	pinctrl-2 = <&mmc2_pins_uhs>;
+	pinctrl-3 = <&mmc2_pins_dat1>;
+	eint-gpios = <&pio 71 0>;
 	status = "okay";
 	bus-width = <4>;
 	max-frequency = <200000000>;
@@ -218,6 +236,7 @@
 	sd-uhs-sdr104;
 	keep-power-in-suspend;
 	enable-sdio-wakeup;
+	vmmc-supply = <&sdio_fixed_3v3>;
 	cap-sdio-irq;
 	non-removable;
 };
@@ -383,6 +402,14 @@
 		};
 	};
 
+	mmc2_pins_eint: dat1_eint {
+		pins_dat1 {
+			pinmux = <MT8167_PIN_71_MSDC2_DAT1__FUNC_GPIO71>;
+			input-enable;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+		};
+	};
+
 	mmc2_pins_default: mmc2default {
 		pins_cmd_dat {
 			pinmux = <MT8167_PIN_70_MSDC2_DAT0__FUNC_MSDC2_DAT0>,
@@ -399,11 +426,6 @@
 			pinmux = <MT8167_PIN_69_MSDC2_CLK__FUNC_MSDC2_CLK>;
 			drive-strength = <MTK_DRIVE_6mA>;
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
-		};
-
-		pins_pmu_en {
-			pinmux = <MT8167_PIN_2_EINT2__FUNC_GPIO2>;
-			output-high;
 		};
 	};
 
@@ -423,6 +445,15 @@
 			pinmux = <MT8167_PIN_69_MSDC2_CLK__FUNC_MSDC2_CLK>;
 			drive-strength = <MTK_DRIVE_8mA>;
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
+		};
+	};
+
+	mmc2_pins_dat1: mmc2_dat1 {
+		pins_dat1 {
+			pinmux = <MT8167_PIN_71_MSDC2_DAT1__FUNC_MSDC2_DAT1>;
+			input-enable;
+			drive-strength = <MTK_DRIVE_8mA>;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
 		};
 	};
 
