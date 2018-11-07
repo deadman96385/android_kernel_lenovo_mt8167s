@@ -1011,6 +1011,9 @@ kalIndicateStatusAndComplete(IN P_GLUE_INFO_T prGlueInfo, IN WLAN_STATUS eStatus
 			}
 
 			/* ensure BSS exists */
+			prGlueInfo->prDevHandler->ieee80211_ptr->ssid_len = ssid.u4SsidLen;
+			memcpy(prGlueInfo->prDevHandler->ieee80211_ptr->ssid, ssid.aucSsid, ssid.u4SsidLen);
+			
 			bss = cfg80211_get_bss(priv_to_wiphy(prGlueInfo), prChannel, arBssid,
 					       ssid.aucSsid, ssid.u4SsidLen, WLAN_CAPABILITY_ESS, WLAN_CAPABILITY_ESS);
 
