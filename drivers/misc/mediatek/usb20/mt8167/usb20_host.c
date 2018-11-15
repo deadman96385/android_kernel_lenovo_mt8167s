@@ -61,6 +61,7 @@ static unsigned int drvvbus_if_config = 1;
 
 #if !defined(CONFIG_MTK_LEGACY)
 struct pinctrl *pinctrl;
+int ocpgpio;
 struct pinctrl_state *pinctrl_iddig;
 struct pinctrl_state *pinctrl_drvvbus;
 struct pinctrl_state *pinctrl_drvvbus_low;
@@ -128,6 +129,8 @@ void mt_usb_set_vbus(struct musb *musb, int is_on)
 #else
 		DBG(0, "****%s:%d Drive VBUS ON!!!!!\n", __func__, __LINE__);
 		pinctrl_select_state(pinctrl, pinctrl_drvvbus_high);
+		if (gpio_is_valid(ocpgpio))
+			gpio_direction_output(ocpgpio, 1);
 #endif
 #else
 		mt_set_gpio_mode(GPIO_OTG_DRVVBUS_PIN, GPIO_OTG_DRVVBUS_PIN_M_GPIO);
@@ -146,6 +149,8 @@ void mt_usb_set_vbus(struct musb *musb, int is_on)
 #else
 		DBG(0, "****%s:%d Drive VBUS OFF!!!!!\n", __func__, __LINE__);
 		pinctrl_select_state(pinctrl, pinctrl_drvvbus_low);
+		if (gpio_is_valid(ocpgpio))
+			gpio_direction_output(ocpgpio, 0);
 #endif
 #else
 		mt_set_gpio_mode(GPIO_OTG_DRVVBUS_PIN, GPIO_OTG_DRVVBUS_PIN_M_GPIO);
@@ -860,6 +865,7 @@ void mt_usb_otg_init(struct musb *musb)
 #ifdef CONFIG_OF
 	struct device_node *node;
 	struct property *prop;
+	int ret;
 
 #endif
 
@@ -915,6 +921,16 @@ void mt_usb_otg_init(struct musb *musb)
 	DBG(0, "drvvbus_pin %x\n", drvvbus_pin);
 	DBG(0, "drvvbus_pin_mode %d\n", drvvbus_pin_mode);
 #endif
+	ocpgpio = of_get_named_gpio(node, "ocp-gpio", 0);
+	if (ocpgpio < 0)
+		DBG(0, "Cannot find usb ocpgpio!\n");
+	else {
+		ret = gpio_request(ocpgpio, "ocp-gpio");
+		if (ret)
+			DBG(0, "gpio_request fail, ret(%d)\n", ret);
+		else
+			gpio_direction_output(ocpgpio, 1);
+	}
 
 	/*init drrvbus*/
 	mt_usb_init_drvvbus();

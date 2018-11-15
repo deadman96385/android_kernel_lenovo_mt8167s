@@ -70,6 +70,29 @@
 		};
 	};
 
+	usb0_drvvbus: drvvbus_init {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_18_EINT18__FUNC_GPIO18>;
+			output-high;
+		};
+	};
+
+	usb0_drvvbus_high: drvvbus_high {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_18_EINT18__FUNC_GPIO18>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+
+	usb0_drvvbus_low: drvvbus_low {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_18_EINT18__FUNC_GPIO18>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+
 	aud_pins_default: audiodefault {
 		pins_cmd_dat {
 			pinmux = <MT8167_PIN_25_EINT25__FUNC_I2S_8CH_MCK>,
@@ -204,6 +227,7 @@
 	usb-power-supply = <&mt6392_vusb_reg>;
 	drvvbus_gpio = <&pio 18 2>;
 	iddig_gpio = <&pio 17 0>;
+	ocp-gpio = <&pio 11 0>;
 	type = "a";
 	status = "okay";
 };
