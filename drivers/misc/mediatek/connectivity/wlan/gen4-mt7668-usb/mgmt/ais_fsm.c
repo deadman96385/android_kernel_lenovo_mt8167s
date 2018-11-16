@@ -3525,7 +3525,8 @@ VOID aisBssBeaconTimeout(IN P_ADAPTER_T prAdapter)
 	if (fgDoAbortIndication) {
 		prConnSettings->fgIsDisconnectedByNonRequest = FALSE;
 		DBGLOG(AIS, EVENT, "aisBssBeaconTimeout\n");
-		aisFsmStateAbort(prAdapter, DISCONNECT_REASON_CODE_RADIO_LOST, TRUE);
+		//Direct to report beacon timeout, not using delay indication
+		aisFsmStateAbort(prAdapter, DISCONNECT_REASON_CODE_RADIO_LOST, FALSE);  //TRUE
 	}
 }				/* end of aisBssBeaconTimeout() */
 
