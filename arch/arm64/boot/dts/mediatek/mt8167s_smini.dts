@@ -43,6 +43,16 @@
 
 &i2c2 {
 	status = "okay";
+
+	sgm37603a_led@36 {
+		compatible = "sgmicro,sgm37603a-led";
+		reg = <0x36>;
+		gpio_en = <&pio 22 0>;
+	};
+};
+
+&led6 {
+	status = "disabled";
 };
 
 &mt6392keys {
