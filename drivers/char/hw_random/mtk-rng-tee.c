@@ -72,8 +72,10 @@ static int mtk_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
 		for (j = 0; j < cpy_len; j++)
 			*(u32 *)(buf + j * sizeof(u32)) = param[j].value.a;
 
+		/*
 		dev_info((struct device *)priv->rng.priv, "DEBUG: rng_mtee_read:[0]0x%x, [1]0x%x, [2]0x%x, [3]0x%x\n",
 			param[0].value.a, param[1].value.a, param[2].value.a, param[3].value.a);
+		*/
 
 		retval += cpy_len * sizeof(u32);
 		buf += cpy_len * sizeof(u32);
