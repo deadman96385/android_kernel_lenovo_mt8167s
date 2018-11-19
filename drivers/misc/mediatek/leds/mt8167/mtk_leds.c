@@ -115,6 +115,12 @@ static int debug_enable_led_hal = 1;
 	} \
 } while (0)
 
+#define LEDS_INFO(format, args...) do { \
+	if (debug_enable_led_hal) {	\
+		pr_info("[LED]"format, ##args);\
+	} \
+} while (0)
+
 /*****************PWM *************************************************/
 #define PWM_DIV_NUM 8
 static int time_array_hal[PWM_DIV_NUM] = {
@@ -188,7 +194,7 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
 							     cust_mt65xx_led),
 						      GFP_KERNEL);
 		if (pled_dtsi == NULL) {
-			LEDS_DEBUG("get_cust_led_dtsi kmalloc fail\n");
+			LEDS_INFO("get_cust_led_dtsi kmalloc fail\n");
 			goto out;
 		}
 
@@ -203,10 +209,26 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
 						    strcat(node_name,
 							   leds_name[i]));
 			if (!led_node) {
-				LEDS_DEBUG("Cannot find LED node from dts\n");
+				LEDS_INFO("Cannot find LED node:%s from dts\n", pled_dtsi[i].name);
 				pled_dtsi[i].mode = 0;
 				pled_dtsi[i].data = -1;
 			} else {
+				const char *status;
+
+				LEDS_DEBUG("find LED node:%s from dts\n", pled_dtsi[i].name);
+
+				ret =
+				    of_property_read_string(led_node, "status",
+							 &status);
+				if (!ret) {
+					LEDS_INFO
+					    ("led dts get led status:%s\n", status);
+					strncpy(pled_dtsi[i].status, status, 16);
+				} else {
+					LEDS_DEBUG
+					    ("can not get led status, can ignore...\n");
+				}
+
 				ate_gpio = of_get_named_gpio(led_node, "ate_gpio", 0);
 				ret = gpio_request(ate_gpio, "ate_gpio");
 				if (ret)
