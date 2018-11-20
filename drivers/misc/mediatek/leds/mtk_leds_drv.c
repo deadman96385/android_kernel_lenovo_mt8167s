@@ -652,7 +652,12 @@ static int mt65xx_leds_probe(struct platform_device *pdev)
 	LEDS_DRV_DEBUG("%s\n", __func__);
 	get_div_array();
 	for (i = 0; i < MT65XX_LED_TYPE_TOTAL; i++) {
-		if (cust_led_list[i].mode == MT65XX_LED_MODE_NONE) {
+		if (cust_led_list[i].mode == MT65XX_LED_MODE_NONE ||
+		    strcmp(cust_led_list[i].status, "disabled") == 0) {
+			LEDS_DRV_INFO("LED %s is ignored! mode:%d, status:%s.\n",
+				cust_led_list[i].name,
+				cust_led_list[i].mode,
+				cust_led_list[i].status);
 			g_leds_data[i] = NULL;
 			continue;
 		}

@@ -26,6 +26,7 @@
 
 &i2c0 {
 	status = "okay";
+	clock-frequency = <400000>;
 
 	cap_touch@38 {
 		compatible = "mediatek,FT6336";
@@ -39,10 +40,22 @@
 
 &i2c1 {
 	status = "okay";
+	clock-frequency = <400000>;
 };
 
 &i2c2 {
 	status = "okay";
+	clock-frequency = <400000>;
+
+	sgm37603a_led@36 {
+		compatible = "sgmicro,sgm37603a-led";
+		reg = <0x36>;
+		gpio_en = <&pio 22 0>;
+	};
+};
+
+&led6 {
+	status = "disabled";
 };
 
 &mt6392keys {
