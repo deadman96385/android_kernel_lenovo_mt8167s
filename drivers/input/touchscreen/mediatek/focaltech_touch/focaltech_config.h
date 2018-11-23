@@ -224,5 +224,6 @@
 #define FTS_UPGRADE_FW3_FILE                     "include/firmware/fw_sample.i"
 
 /*********************************************************/
+#define FTS_UPGRADE_FILE                         "FT6336U.bin"
 
 #endif /* _LINUX_FOCLATECH_CONFIG_H_ */

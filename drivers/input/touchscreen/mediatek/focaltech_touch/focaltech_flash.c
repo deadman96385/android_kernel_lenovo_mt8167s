@@ -34,7 +34,7 @@
 *****************************************************************************/
 #include "focaltech_core.h"
 #include "focaltech_flash.h"
-
+#include <linux/firmware.h>
 /*****************************************************************************
 * Static variables
 *****************************************************************************/
@@ -1685,8 +1685,10 @@ int fts_fwupg_get_vendorid(struct fts_ts_data *ts_data, u16 *vid)
  */
 static int fts_fwupg_get_fw_file(struct fts_ts_data *ts_data)
 {
-    struct upgrade_fw *fw = &fw_list[0];
+
     struct fts_upgrade *upg = fwupgrade;
+    const struct firmware *fw_entry;
+    int ret = 0;
 
 #if (FTS_GET_VENDOR_ID_NUM > 1)
     int ret = 0;
@@ -1714,11 +1716,17 @@ static int fts_fwupg_get_fw_file(struct fts_ts_data *ts_data)
 #endif
 
     if (upg) {
-        upg->fw = fw->fw_file;
-        upg->fw_length = fw->fw_len;
-        upg->lic = fw->fw_file;
-        upg->lic_length = fw->fw_len;
-
+        ret = request_firmware(&fw_entry, FTS_UPGRADE_FILE, &ts_data->client->dev);
+        if (ret) {
+            pr_info("load firmware fail\n");
+            return ret;
+        }
+        upg->fw = (char *)kmalloc(fw_entry->size, GFP_KERNEL);
+        memcpy(upg->fw, fw_entry->data, fw_entry->size);
+        upg->fw_length = fw_entry->size;
+        upg->lic = upg->fw;
+        upg->lic_length = fw_entry->size;
+        release_firmware(fw_entry);
         FTS_INFO("upgrade fw file len:%d", upg->fw_length);
         if ((upg->fw_length < FTS_MIN_LEN)
             || (upg->fw_length > FTS_MAX_LEN_FILE)) {
@@ -1750,7 +1758,7 @@ static void fts_fwupg_work(struct work_struct *work)
 {
     int ret = 0;
     struct fts_ts_data *ts_data = container_of(work,
-                                  struct fts_ts_data, fwupg_work);
+                                  struct fts_ts_data, fwupg_work.work);
 
     FTS_INFO("fw upgrade work function");
     ts_data->fw_loading = 1;
@@ -1830,8 +1838,8 @@ int fts_fwupg_init(struct fts_ts_data *ts_data)
         return -ENODATA;
     }
 
-    INIT_WORK(&ts_data->fwupg_work, fts_fwupg_work);
-    queue_work(ts_data->ts_workqueue, &ts_data->fwupg_work);
+    INIT_DELAYED_WORK(&ts_data->fwupg_work, fts_fwupg_work);
+    queue_delayed_work(ts_data->ts_workqueue, &ts_data->fwupg_work, 1000);
 
     return 0;
 }
@@ -1847,6 +1855,9 @@ int fts_fwupg_exit(struct fts_ts_data *ts_data)
 {
     FTS_FUNC_ENTER();
     if (fwupgrade) {
+        if (fwupgrade->fw) {
+            kfree(fwupgrade->fw);
+        }
         kfree(fwupgrade);
     }
     FTS_FUNC_EXIT();
