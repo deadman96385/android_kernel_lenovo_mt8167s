@@ -847,7 +847,7 @@ static void otg_int_init(void)
 
 	irq_set_irq_wake(usb_iddig_number, 1);
 	if (usb_typea_support)
-		schedule_delayed_work(&mtk_musb->id_pin_work, 0);
+		schedule_delayed_work(&mtk_musb->id_pin_work, 400*HZ/1000);
 #endif
 #else
 	u32 phy_id_pull = 0;
