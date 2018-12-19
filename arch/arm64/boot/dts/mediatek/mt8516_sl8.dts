@@ -37,7 +37,6 @@
 	mediatek,i2s-clock-modes = <0 0>;
 	mediatek,i2s0-bck-fixed-64fs;
 	mediatek,i2s1-bck-fixed-64fs;
-	mediatek,apply-6db-gain-in-ul-src;
 };
 
 &hdmi0 {
