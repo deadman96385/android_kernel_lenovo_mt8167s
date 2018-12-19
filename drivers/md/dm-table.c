@@ -371,41 +371,37 @@ static int upgrade_mode(struct dm_dev_internal *dd, fmode_t new_mode,
 dev_t dm_get_dev_t(const char *path)
 {
 	dev_t uninitialized_var(dev);
+	unsigned int wait_time_ms = 0;
 	struct block_device *bdev;
-	char *dev_path = kstrdup(path, GFP_KERNEL);
 
-	if (!dev_path)
-		return -ENOMEM;
-
-	if (strncmp(dev_path, "PARTUUID=", 9) == 0) {
-		dev = name_to_dev_t(dev_path);
-		if (!dev) {
-			DMWARN("no dev found for %s", dev_path);
-			kfree(dev_path);
-			return -EINVAL;
-		}
-		kfree(dev_path);
+	bdev = lookup_bdev(path);
+	if (IS_ERR(bdev)) {
+		dev = name_to_dev_t(path);
 	} else {
-		bdev = lookup_bdev(dev_path);
-		if (IS_ERR(bdev)) {
-			const unsigned int timeout_ms = DM_VERITY_WAIT_DEV_TIMEOUT_MS;
-			unsigned int wait_time_ms = 0;
+		dev = bdev->bd_dev;
+		bdput(bdev);
+	}
 
-			while (driver_probe_done() || !(dev = name_to_dev_t(path))) {
-				DMERR("dm_get_dev_t: wait %d ms and retry...\n", DM_VERITY_RETRY_TIME_MS);
-				msleep(DM_VERITY_RETRY_TIME_MS);
-				wait_time_ms += DM_VERITY_RETRY_TIME_MS;
-				if (wait_time_ms > timeout_ms) {
-					DMERR("dm_get_dev_t: retry timeout\n");
-					DMERR("no dev found for %s\n", path);
-					break;
-				}
-			}
+	DMERR("%s: retry %s\n", __func__, path);
+	while (dev == 0) {
+		if (wait_time_ms > DM_VERITY_WAIT_DEV_TIMEOUT_MS) {
+			DMERR("%s: retry timeout(%dms)\n", __func__,
+					DM_VERITY_WAIT_DEV_TIMEOUT_MS);
+			DMERR("no dev found for %s", path);
+			return dev;
+		}
+		msleep(DM_VERITY_RETRY_TIME_MS);
+		wait_time_ms += DM_VERITY_RETRY_TIME_MS;
+		DMERR("%s: retry (%dms)\n", __func__,
+				DM_VERITY_RETRY_TIME_MS);
+
+		bdev = lookup_bdev(path);
+		if (IS_ERR(bdev)) {
+			dev = name_to_dev_t(path);
 		} else {
 			dev = bdev->bd_dev;
 			bdput(bdev);
 		}
-		kfree(dev_path);
 	}
 
 	return dev;
