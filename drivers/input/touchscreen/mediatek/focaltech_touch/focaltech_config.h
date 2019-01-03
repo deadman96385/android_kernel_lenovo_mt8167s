@@ -110,7 +110,7 @@
  * show debug log info
  * enable it for debug, disable it for release
  */
-#define FTS_DEBUG_EN                            1
+#define FTS_DEBUG_EN                            0
 
 /*
  * Linux MultiTouch Protocol
@@ -189,7 +189,7 @@
  * 0:No check vendor_id (default)
  * 1/2/3: Check vendor_id for vendor compatibility
  */
-#define FTS_GET_VENDOR_ID_NUM                   0
+#define FTS_GET_VENDOR_ID_NUM                   2
 
 /*
  * vendor_id(s) for vendor(s) to be compatible with.
@@ -200,8 +200,8 @@
  * FTS_GET_VENDOR_ID_NUM >= 2, compatible with FTS_VENDOR_ID2
  * FTS_GET_VENDOR_ID_NUM >= 3, compatible with FTS_VENDOR_ID3
  */
-#define FTS_VENDOR_ID                          0x0000
-#define FTS_VENDOR_ID2                         0x0000
+#define FTS_VENDOR_ID                          0x0082
+#define FTS_VENDOR_ID2                         0x00e4
 #define FTS_VENDOR_ID3                         0x0000
 
 /*
@@ -224,6 +224,8 @@
 #define FTS_UPGRADE_FW3_FILE                     "include/firmware/fw_sample.i"
 
 /*********************************************************/
-#define FTS_UPGRADE_FILE                         "FT6336U.bin"
+#define FTS_UPGRADE_FILE                         "FT6336U_Holitech.bin"
+
+#define FTS_UPGRADE_FILE2                        "FT6336U_KD.bin"
 
 #endif /* _LINUX_FOCLATECH_CONFIG_H_ */

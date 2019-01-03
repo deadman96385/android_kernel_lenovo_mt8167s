@@ -44,11 +44,11 @@
 *****************************************************************************/
 /* Upgrade FW/PRAMBOOT/LCD CFG */
 u8 fw_file[] = {
-#include FTS_UPGRADE_FW_FILE
+    FTS_UPGRADE_FILE
 };
 
 u8 fw_file2[] = {
-#include FTS_UPGRADE_FW2_FILE
+    FTS_UPGRADE_FILE2
 };
 
 u8 fw_file3[] = {
@@ -1685,13 +1685,13 @@ int fts_fwupg_get_vendorid(struct fts_ts_data *ts_data, u16 *vid)
  */
 static int fts_fwupg_get_fw_file(struct fts_ts_data *ts_data)
 {
-
+    struct upgrade_fw *fw = &fw_list[0];
     struct fts_upgrade *upg = fwupgrade;
     const struct firmware *fw_entry;
     int ret = 0;
 
 #if (FTS_GET_VENDOR_ID_NUM > 1)
-    int ret = 0;
+
     int i = 0;
     u16 vendor_id = 0;
 
@@ -1716,7 +1716,7 @@ static int fts_fwupg_get_fw_file(struct fts_ts_data *ts_data)
 #endif
 
     if (upg) {
-        ret = request_firmware(&fw_entry, FTS_UPGRADE_FILE, &ts_data->client->dev);
+        ret = request_firmware(&fw_entry, fw->fw_file, &ts_data->client->dev);
         if (ret) {
             pr_info("load firmware fail\n");
             return ret;
