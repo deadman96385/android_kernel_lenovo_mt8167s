@@ -27,7 +27,9 @@
 };
 
 &keypad {
-	mediatek,kpd-hw-init-map = <115 113 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+	pinctrl-names = "default";
+	pinctrl-0 = <&kpd_pins_default>;
+	mediatek,kpd-hw-init-map = <115 113 0 0 0 0 0 0 0 59 164 0 0 0 0 0 0 0 0 0 0 0 0 0
 			0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 			0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 >;
 	status = "okay";
@@ -67,6 +69,22 @@
 		pins_tlv320adc3101_reset {
 			pinmux = <MT8167_PIN_24_EINT24__FUNC_GPIO24>;
 			output-high;
+		};
+	};
+
+	kpd_pins_default: kpddefault {
+		pins_cols {
+			pinmux = <MT8167_PIN_42_KPCOL0__FUNC_KPCOL0>,
+				 <MT8167_PIN_43_KPCOL1__FUNC_KPCOL1>;
+			input-enable;
+			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
+		};
+
+		pins_rows {
+			pinmux = <MT8167_PIN_40_KPROW0__FUNC_KPROW0>,
+				 <MT8167_PIN_41_KPROW1__FUNC_KPROW1>;
+			output-low;
+			bias-disable;
 		};
 	};
 };
