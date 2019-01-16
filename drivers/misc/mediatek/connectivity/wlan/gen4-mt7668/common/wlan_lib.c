@@ -1681,6 +1681,11 @@ VOID wlanReleasePendingOid(IN P_ADAPTER_T prAdapter, IN ULONG ulParamPtr)
 			}
 
 			prAdapter->fgIsChipNoAck = TRUE;
+#if CFG_CHIP_RESET_SUPPORT
+			DBGLOG(HAL, ERROR, "fgIsChipNoAck = %d\n",
+						prAdapter->fgIsChipNoAck);
+			glResetTrigger(prAdapter);
+#endif
 		}
 		set_bit(GLUE_FLAG_HIF_PRT_HIF_DBG_INFO_BIT, &(prAdapter->prGlueInfo->ulFlag));
 	}
@@ -2212,6 +2217,11 @@ WLAN_STATUS wlanSendNicPowerCtrlCmd(IN P_ADAPTER_T prAdapter, IN UINT_8 ucPowerM
 				DBGLOG(INIT, ERROR, "Fail to get TX resource return within timeout\n");
 				status = WLAN_STATUS_FAILURE;
 				prAdapter->fgIsChipNoAck = TRUE;
+#if CFG_CHIP_RESET_SUPPORT
+				DBGLOG(HAL, ERROR, "fgIsChipNoAck = %d\n",
+						prAdapter->fgIsChipNoAck);
+				glResetTrigger(prAdapter);
+#endif
 				break;
 			}
 			continue;
@@ -8450,6 +8460,8 @@ BOOLEAN wlanIsChipRstRecEnabled(IN P_ADAPTER_T prAdapter)
 
 BOOLEAN wlanIsChipAssert(IN P_ADAPTER_T prAdapter)
 {
+	if (prAdapter == NULL)
+		return TRUE;
 	return prAdapter->rWifiVar.fgChipResetRecover && prAdapter->fgIsChipAssert;
 }
 

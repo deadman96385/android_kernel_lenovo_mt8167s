@@ -289,5 +289,15 @@
 *                              F U N C T I O N S
 ********************************************************************************
 */
+#if MTK_WCN_HIF_SDIO
+extern INT_32 mtk_sdio_probe(MTK_WCN_HIF_SDIO_CLTCTX cltCtx,
+		const MTK_WCN_HIF_SDIO_FUNCINFO * prFuncInfo);
+extern INT_32 mtk_sdio_remove(MTK_WCN_HIF_SDIO_CLTCTX cltCtx);
+#else
+extern int mtk_sdio_probe(struct sdio_func *func,
+				const struct sdio_device_id *id);
+extern void mtk_sdio_remove(struct sdio_func *func);
+#endif
+
 
 #endif /* _PRECOMP_H */

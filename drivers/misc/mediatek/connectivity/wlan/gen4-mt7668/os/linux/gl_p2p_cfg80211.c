@@ -630,7 +630,6 @@ int mtk_p2p_cfg80211_add_key(struct wiphy *wiphy,
 #endif
 
 	ASSERT(wiphy);
-
 	prGlueInfo = *((P_GLUE_INFO_T *) wiphy_priv(wiphy));
 
 	if (mtk_Netdev_To_RoleIdx(prGlueInfo, ndev, &ucRoleIdx) != 0)
@@ -1000,6 +999,9 @@ int mtk_p2p_cfg80211_scan(struct wiphy *wiphy, struct cfg80211_scan_request *req
 		prGlueInfo = *((P_GLUE_INFO_T *) wiphy_priv(wiphy));
 
 		if (wlanIsChipAssert(prGlueInfo->prAdapter))
+			break;
+
+		if (!wlanGetHifState(prGlueInfo))
 			break;
 
 		prP2pGlueInfo = prGlueInfo->prP2PInfo[0];
@@ -1970,6 +1972,10 @@ int mtk_p2p_cfg80211_remain_on_channel(struct wiphy *wiphy,
 		}
 
 		prGlueInfo = *((P_GLUE_INFO_T *) wiphy_priv(wiphy));
+
+		if (!wlanGetHifState(prGlueInfo))
+			break;
+
 		prGlueP2pDevInfo = prGlueInfo->prP2PDevInfo;
 
 		*cookie = prGlueP2pDevInfo->u8Cookie++;
@@ -2758,6 +2764,20 @@ void mtk_p2p_cfg80211_mgmt_frame_register(IN struct wiphy *wiphy,
 	PUINT_32 pu4P2pPacketFilter = NULL;
 	P_P2P_ROLE_FSM_INFO_T prP2pRoleFsmInfo = (P_P2P_ROLE_FSM_INFO_T) NULL;
 
+#if CFG_CHIP_RESET_SUPPORT
+	if (checkResetState() || g_u4HaltFlag) {
+		DBGLOG(INIT, WARN, "wlan is halt, skip reg callback");
+		return;
+	}
+	rst_data.entry_conut++;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#else
+	if (g_u4HaltFlag) {
+		DBGLOG(RLM, WARN, "wlan is halt, skip reg callback\n");
+		return;
+	}
+#endif
+
 	do {
 		if ((wiphy == NULL) || (wdev == NULL))
 			break;
@@ -2835,6 +2855,11 @@ void mtk_p2p_cfg80211_mgmt_frame_register(IN struct wiphy *wiphy,
 #endif
 
 	} while (FALSE);
+
+#if CFG_CHIP_RESET_SUPPORT
+	rst_data.entry_conut--;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 
 }				/* mtk_p2p_cfg80211_mgmt_frame_register */
 
@@ -3364,7 +3389,6 @@ int mtk_p2p_cfg80211_testmode_hotspot_block_list_cmd(IN struct wiphy *wiphy, IN 
 	UINT_32 i;
 
 	ASSERT(wiphy);
-
 	prGlueInfo = *((P_GLUE_INFO_T *) wiphy_priv(wiphy));
 
 	if (data && len)
@@ -3390,7 +3414,6 @@ int mtk_p2p_cfg80211_testmode_sw_cmd(IN struct wiphy *wiphy, IN void *data, IN i
 	UINT_32 u4SetInfoLen = 0;
 
 	ASSERT(wiphy);
-
 	prGlueInfo = *((P_GLUE_INFO_T *) wiphy_priv(wiphy));
 
 #if 1
@@ -3436,7 +3459,6 @@ int mtk_p2p_cfg80211_testmode_get_best_channel(IN struct wiphy *wiphy, IN void *
 	WLAN_STATUS rStatus = WLAN_STATUS_SUCCESS;
 
 	ASSERT(wiphy);
-
 	prGlueInfo = *((P_GLUE_INFO_T *) wiphy_priv(wiphy));
 	if (!prGlueInfo) {
 		DBGLOG(P2P, ERROR, "No glue info\n");

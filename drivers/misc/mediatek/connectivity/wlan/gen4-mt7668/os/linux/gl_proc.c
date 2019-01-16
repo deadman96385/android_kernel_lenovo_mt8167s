@@ -98,8 +98,6 @@
 #define PROC_CSI_DATA_NAME                     "csi_data"
 #define PROC_GET_TXPWR_TBL                      "get_txpwr_tbl"
 
-
-
 #define PROC_MCR_ACCESS_MAX_USER_INPUT_LEN      20
 #define PROC_RX_STATISTICS_MAX_USER_INPUT_LEN   10
 #define PROC_TX_STATISTICS_MAX_USER_INPUT_LEN   10
@@ -596,6 +594,17 @@ static ssize_t procDbgLevelWrite(struct file *file, const char __user *buffer,
 		return -EFAULT;
 	}
 	g_aucProcBuf[u4CopySize] = '\0';
+
+#if CFG_CHIP_RESET_SUPPORT
+	if (temp[0] == 'R') {
+		P_GLUE_INFO_T prGlueInfo = NULL;
+
+		prGlueInfo = g_prGlueInfo_proc;
+		DBGLOG(RSN, ERROR, "WIFI trigger reset!!\n");
+		glResetTrigger(prGlueInfo->prAdapter);
+		temp[0] = 'X';
+	}
+#endif
 
 	while (temp) {
 		if (sscanf(temp, "0x%x:0x%x", &u4NewDbgModule, &u4NewDbgLevel) != 2)  {
@@ -1294,7 +1303,6 @@ INT_32 procRemoveProcfs(VOID)
 #if CFG_SUPPORT_DEBUG_FS
 	remove_proc_entry(PROC_ROAM_PARAM, gprProcRoot);
 	remove_proc_entry(PROC_COUNTRY, gprProcRoot);
-
 #endif
 	return 0;
 } /* end of procRemoveProcfs() */
@@ -1361,6 +1369,7 @@ INT_32 procCreateFsEntry(P_GLUE_INFO_T prGlueInfo)
 		DBGLOG(INIT, ERROR, "Unable to create /proc entry csidata\n\r");
 		return -1;
 	}
+
 	return 0;
 }
 
