@@ -139,7 +139,7 @@ saaFsmSteps(IN P_ADAPTER_T prAdapter,
 	BOOLEAN fgIsTransition;
 
 	ASSERT(prStaRec);
-	if (!prStaRec)
+	if (!prStaRec || g_u4HaltFlag)
 		return;
 
 	do {
