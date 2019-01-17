@@ -17,6 +17,10 @@
 #include <linux/usb.h>
 #include <linux/version.h>
 
+/* It's for reset procedure */
+#include <linux/of_gpio.h>
+#include <linux/mmc/host.h>
+
 /**
  * Kernel configuration check
  */
@@ -69,5 +73,11 @@
 #define WAIT_POWERKEY_TIMEOUT 5000
 #endif
 
+/**
+ * Support toggle GPIO
+ */
+#define MT76x8_PMU_EN_PIN_NAME		"mt76x8_pmu_en_gpio"
+#define MT76x8_PMU_EN_DELAY_NAME	"mt76x8_pmu_en_delay"
+#define MT76x8_PMU_EN_DEFAULT_DELAY	(5) /* Default delay 5ms */
 
 #endif /* __BTMTK_CONFIG_H__ */

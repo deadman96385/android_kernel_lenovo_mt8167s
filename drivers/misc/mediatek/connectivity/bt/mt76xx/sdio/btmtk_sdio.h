@@ -17,9 +17,9 @@
 #if ((SUPPORT_UNIFY_WOBLE & SUPPORT_ANDROID) || SUPPORT_EINT)
 #include <linux/wakelock.h>
 #endif
+#include <linux/mmc/card.h>
 
-
-#define VERSION "v0.0.0.52_2018032301"
+#define VERSION "v0.0.1.00_2019010301"
 
 #define SDIO_HEADER_LEN                 4
 
@@ -210,6 +210,7 @@ struct _PATCH_HEADER {
 #define FW_VERSION 0x80000004
 
 /*common register address*/
+#define CCIR 0X0000
 #define CHLPCR 0x0004
 #define CSDIOCSR 0x0008
 #define CHCR   0x000C
@@ -217,6 +218,8 @@ struct _PATCH_HEADER {
 #define CHIER  0x0014
 #define CTDR   0x0018
 #define CRDR   0x001C
+#define CTFSR 0X0020
+#define CRPLR 0X0024
 #define SWPCDBGR   0x0154
 /*CHLPCR*/
 #define C_FW_INT_EN_SET            0x00000001
@@ -224,6 +227,7 @@ struct _PATCH_HEADER {
 /*CHISR*/
 #define RX_PKT_LEN             0xFFFF0000
 #define FIRMWARE_INT             0x0000FE00
+#define FIRMWARE_INT_BIT15       0x00008000/*FW inform driver don't change to fw own for dore dump*/
 #define TX_FIFO_OVERFLOW         0x00000100
 #define FW_INT_IND_INDICATOR        0x00000080
 #define TX_COMPLETE_COUNT         0x00000070
@@ -288,8 +292,8 @@ struct _PATCH_HEADER {
 		~(((unsigned long)(a)) - 1))
 struct sk_buff *btmtk_create_send_data(struct sk_buff *skb);
 int btmtk_print_buffer_conent(u8 *buf, u32 Datalen);
-u32 lock_unsleepable_lock(struct _OSAL_UNSLEEPABLE_LOCK_ *pUSL);
-u32 unlock_unsleepable_lock(struct _OSAL_UNSLEEPABLE_LOCK_ *pUSL);
+u32 LOCK_UNSLEEPABLE_LOCK(struct _OSAL_UNSLEEPABLE_LOCK_ *pUSL);
+u32 UNLOCK_UNSLEEPABLE_LOCK(struct _OSAL_UNSLEEPABLE_LOCK_ *pUSL);
 
 extern unsigned char probe_counter;
 extern unsigned char *txbuf;
@@ -317,11 +321,12 @@ enum {
  */
 #define MAX_BIN_FILE_NAME_LEN	32
 
-
-#define COMPARE_FAIL				-1
-#define COMPARE_SUCCESS				1
+#define COMPARE_FAIL			-1
+#define COMPARE_SUCCESS			1
 #define WOBLE_COMP_EVENT_TIMO		5000
-
+#define WLAN_STATUS_IS_NOT_LOAD		-1
+#define WLAN_STATUS_DEFAULT		0
+#define WLAN_STATUS_CALL_REMOVE_START	1 /* WIFI driver is inserted */
 
 /**
  * Inline functions
@@ -335,6 +340,10 @@ static inline int is_support_unify_woble(struct btmtk_sdio_card *data)
 #endif
 }
 
+#define FW_OWN_OFF "fw own off"
+#define FW_OWN_ON  "fw own on"
 
+extern int sdio_reset_comm(struct mmc_card *card);
+int btmtk_sdio_reset_dongle(void);
 #endif
 
