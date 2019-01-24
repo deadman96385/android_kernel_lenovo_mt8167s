@@ -90,7 +90,9 @@ static bool sdio_online_tune_fail;
 static void msdc_dump_all_register(struct msdc_host *host);
 static void msdc_cmd_next(struct msdc_host *host,
 		struct mmc_request *mrq, struct mmc_command *cmd);
+#ifndef SUPPORT_LEGACY_SDIO
 static void msdc_recheck_sdio_irq(struct msdc_host *host);
+#endif
 
 static const u32 cmd_ints_mask = MSDC_INTEN_CMDRDY | MSDC_INTEN_RSPCRCERR |
 			MSDC_INTEN_CMDTMO | MSDC_INTEN_ACMDRDY |
@@ -505,7 +507,10 @@ static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
 	if (mrq->data)
 		msdc_unprepare_data(host, mrq);
 	mmc_request_done(host->mmc, mrq);
+
+#ifndef SUPPORT_LEGACY_SDIO
 	msdc_recheck_sdio_irq(host);
+#endif
 }
 
 /* returns true if command is fully handled; returns false otherwise */
@@ -2910,7 +2915,7 @@ static int autok_param_apply(struct msdc_host *host, u8 *autok_tune_res)
 	return 0;
 }
 
-void autok_tuning_parameter_init(struct msdc_host *host, u8 *res)
+static void autok_tuning_parameter_init(struct msdc_host *host, u8 *res)
 {
 	unsigned int ret = 0;
 	/* void __iomem *base = host->base; */
@@ -2936,7 +2941,7 @@ static int autok_result_dump(struct msdc_host *host, u8 *autok_tune_res)
 }
 
 /* online tuning for latch ck */
-int autok_execute_tuning_latch_ck(struct msdc_host *host, unsigned int opcode,
+static int autok_execute_tuning_latch_ck(struct msdc_host *host, unsigned int opcode,
 	unsigned int latch_ck_initail_value)
 {
 	unsigned int ret = 0;
@@ -2996,7 +3001,7 @@ int autok_execute_tuning_latch_ck(struct msdc_host *host, unsigned int opcode,
 		}
 	}
 	host->tune_latch_ck_cnt = 0;
-	return j;
+	return (j >= 8) ? 0 : j;
 }
 
 /*
@@ -3169,7 +3174,7 @@ static int autok_init_sdr104(struct msdc_host *host)
 }
 
 /* online tuning for SDIO/SD */
-int execute_online_tuning(struct msdc_host *host, u8 *res)
+static int execute_online_tuning(struct msdc_host *host, u8 *res)
 {
 	unsigned int ret = 0;
 	unsigned int uCmdEdge = 0;
@@ -3439,6 +3444,7 @@ static void msdc_hw_reset(struct mmc_host *mmc)
  * can be processed immediately
  *
  */
+#ifndef SUPPORT_LEGACY_SDIO
 static void msdc_recheck_sdio_irq(struct msdc_host *host)
 {
 	u32 reg_int, reg_ps, reg_inten;
@@ -3452,6 +3458,7 @@ static void msdc_recheck_sdio_irq(struct msdc_host *host)
 			mmc_signal_sdio_irq(host->mmc);
 	}
 }
+#endif
 
 static void msdc_enable_sdio_irq(struct mmc_host *mmc, int enable)
 {
@@ -3467,6 +3474,7 @@ static void msdc_enable_sdio_irq(struct mmc_host *mmc, int enable)
 		else
 			host->disable_sdio_eirq(); /* combo_sdio_disable_eirq */
 	}
+	return;
 #endif
 
 	if (enable) {
@@ -3597,6 +3605,24 @@ static void msdc_pm(pm_message_t state, void *data)
 }
 #endif
 
+void sdio_set_card_clkpd(int on)
+{
+		u32 value;
+
+		if (!on) {
+			sdr_clr_bits(sdio_host->base + MSDC_CFG,
+				 MSDC_CFG_CKPDN);
+			sdr_get_field(sdio_host->base + MSDC_CFG,
+				 MSDC_CFG_CKPDN, &value);
+		} else {
+			sdr_set_bits(sdio_host->base + MSDC_CFG,
+				 MSDC_CFG_CKPDN);
+			sdr_get_field(sdio_host->base + MSDC_CFG,
+				 MSDC_CFG_CKPDN, &value);
+		}
+}
+EXPORT_SYMBOL(sdio_set_card_clkpd);
+
 static int msdc_drv_probe(struct platform_device *pdev)
 {
 	struct mmc_host *mmc;
@@ -3604,6 +3630,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
 	struct resource *res;
 	int ret;
 	u32 val;
+
 	if (!pdev->dev.of_node) {
 		dev_info(&pdev->dev, "No DT found\n");
 		return -EINVAL;
@@ -3636,6 +3663,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
 				 "module_reset_bit", &host->module_reset_bit))
 		dev_dbg(&pdev->dev, "module_reset_bit: %x\n",
 				 host->module_reset_bit);
+
 	ret = mmc_regulator_get_supply(mmc);
 	if (ret == -EPROBE_DEFER)
 		goto host_free;
@@ -3784,6 +3812,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
 		goto release;
 	}
 
+	pinctrl_select_state(host->pinctrl, host->pins_dat1);
 #ifdef SUPPORT_LEGACY_SDIO
 	host->suspend = 0;
 
@@ -3902,6 +3931,11 @@ static int msdc_runtime_suspend(struct device *dev)
 {
 	struct mmc_host *mmc = dev_get_drvdata(dev);
 	struct msdc_host *host = mmc_priv(mmc);
+#ifdef SUPPORT_LEGACY_SDIO
+	msdc_save_reg(host);
+	msdc_gate_clock(host);
+	return 0;
+#else
 	unsigned long flags;
 
 	msdc_save_reg(host);
@@ -3921,12 +3955,18 @@ static int msdc_runtime_suspend(struct device *dev)
 	}
 	spin_unlock_irqrestore(&host->irqlock, flags);
 	return 0;
+#endif
 }
 
 static int msdc_runtime_resume(struct device *dev)
 {
 	struct mmc_host *mmc = dev_get_drvdata(dev);
 	struct msdc_host *host = mmc_priv(mmc);
+#ifdef SUPPORT_LEGACY_SDIO
+		msdc_ungate_clock(host);
+			msdc_restore_reg(host);
+				return 0;
+#else
 	unsigned long flags;
 
 	spin_lock_irqsave(&host->irqlock, flags);
@@ -3942,6 +3982,7 @@ static int msdc_runtime_resume(struct device *dev)
 	msdc_restore_reg(host);
 	enable_irq(host->irq);
 	return 0;
+#endif
 }
 #endif
 
