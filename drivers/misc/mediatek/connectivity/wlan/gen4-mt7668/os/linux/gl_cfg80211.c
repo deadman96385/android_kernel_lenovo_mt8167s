@@ -925,6 +925,32 @@ int mtk_cfg80211_scan(struct wiphy *wiphy, struct cfg80211_scan_request *request
 	return 0;
 }
 
+/*----------------------------------------------------------------------------*/
+/*!
+ * @brief This routine is responsible for abort an ongoing scan. The driver shall
+ *        indicate the status of the scan through cfg80211_scan_done()
+ *
+ * @param wiphy - pointer of wireless hardware description
+ *        wdev - pointer of  wireless device state
+ *
+ */
+/*----------------------------------------------------------------------------*/
+void mtk_cfg80211_abort_scan(struct wiphy *wiphy, struct wireless_dev *wdev)
+{
+	UINT_32 u4SetInfoLen = 0;
+	WLAN_STATUS rStatus;
+	P_GLUE_INFO_T prGlueInfo = NULL;
+
+	prGlueInfo = (P_GLUE_INFO_T) wiphy_priv(wiphy);
+	ASSERT(prGlueInfo);
+
+	rStatus = kalIoctl(prGlueInfo,
+					   wlanoidAbortScan,
+					   NULL, 1, FALSE, FALSE, TRUE, &u4SetInfoLen);
+	if (rStatus != WLAN_STATUS_SUCCESS)
+		DBGLOG(REQ, ERROR, "wlanoidAbortScan fail 0x%x\n", rStatus);
+}
+
 static UINT_8 wepBuf[48];
 
 /*----------------------------------------------------------------------------*/
@@ -3364,6 +3390,22 @@ mtk_apply_custom_regulatory(IN struct wiphy *pWiphy,
 
 	/* update to kernel */
 	wiphy_apply_custom_regulatory(pWiphy, pRegdom);
+
+#if KERNEL_VERSION(4, 3, 0) <= CFG80211_VERSION_CODE
+		/*Fix Kernel 4.3 and later bug for parser domain info*/
+		for (band_idx = 0; band_idx < KAL_NUM_BANDS; band_idx++) {
+			sband = pWiphy->bands[band_idx];
+			if (!sband)
+				continue;
+
+			for (ch_idx = 0; ch_idx < sband->n_channels; ch_idx++) {
+				chan = &sband->channels[ch_idx];
+
+				if (chan->flags & IEEE80211_CHAN_NO_20MHZ)
+					chan->flags |= IEEE80211_CHAN_DISABLED;
+			}
+		}
+#endif
 }
 
 void
@@ -3561,6 +3603,14 @@ DOMAIN_SEND_CMD:
 void
 cfg80211_regd_set_wiphy(IN struct wiphy *prWiphy)
 {
+#if (CFG_SUPPORT_SINGLE_SKU_LOCAL_DB == 1)
+#if KERNEL_VERSION(4, 3, 0) <= CFG80211_VERSION_CODE
+	u32 band_idx, ch_idx;
+	struct ieee80211_supported_band *sband;
+	struct ieee80211_channel *chan;
+#endif
+#endif
+
 	/*
 	 * register callback
 	 */
@@ -3592,8 +3642,25 @@ cfg80211_regd_set_wiphy(IN struct wiphy *prWiphy)
 	prWiphy->regulatory_flags |= (REGULATORY_CUSTOM_REG);
 #endif
 	/* assigned a defautl one */
-	if (rlmDomainGetLocalDefaultRegd())
+	if (rlmDomainGetLocalDefaultRegd()) {
 		wiphy_apply_custom_regulatory(prWiphy, rlmDomainGetLocalDefaultRegd());
+
+#if KERNEL_VERSION(4, 3, 0) <= CFG80211_VERSION_CODE
+		/*Fix Kernel 4.3 and later bug for parser domain info*/
+		for (band_idx = 0; band_idx < KAL_NUM_BANDS; band_idx++) {
+			sband = prWiphy->bands[band_idx];
+			if (!sband)
+				continue;
+
+			for (ch_idx = 0; ch_idx < sband->n_channels; ch_idx++) {
+				chan = &sband->channels[ch_idx];
+
+				if (chan->flags & IEEE80211_CHAN_NO_20MHZ)
+					chan->flags |= IEEE80211_CHAN_DISABLED;
+			}
+		}
+#endif
+	}
 #endif
 
 

@@ -286,6 +286,13 @@ typedef struct _NDIS_TRANSPORT_STRUCT {
 ********************************************************************************
 */
 
+#ifdef CONFIG_COMPAT
+#define COMPAT_FROMUSER(prIwri, prIwrd) convert_compat_fromuser(prIwri, prIwrd)
+#else
+#define COMPAT_FROMUSER(iwri, iwrd)
+#endif
+
+
 int
 priv_set_int(IN struct net_device *prNetDev,
 	     IN struct iw_request_info *prIwReqInfo, IN union iwreq_data *prIwReqData, IN char *pcExtra);
@@ -331,6 +338,12 @@ int
 priv_ate_set(IN struct net_device *prNetDev,
 	     IN struct iw_request_info *prIwReqInfo, IN union iwreq_data *prIwReqData, IN char *pcExtra);
 #endif
+
+
+#ifdef CONFIG_COMPAT
+void convert_compat_fromuser(IN struct iw_request_info *prIwReqInfo, IN OUT union iwreq_data *prIwReqData);
+#endif
+
 
 /*******************************************************************************
 *                              F U N C T I O N S
