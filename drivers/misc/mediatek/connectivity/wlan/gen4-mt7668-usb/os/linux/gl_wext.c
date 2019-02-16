@@ -97,6 +97,7 @@ const long channel_freq[] = {
 #define NUM_CHANNELS (ARRAY_SIZE(channel_freq))
 
 #define MAX_SSID_LEN    32
+#define COUNTRY_CODE_LEN	10	/* country code length */
 
 /*******************************************************************************
 *                             D A T A   T Y P E S
@@ -211,6 +212,7 @@ static const iw_handler rIwPrivHandler[] = {
 	[IOCTL_GET_DRIVER - SIOCIWFIRSTPRIV] = priv_set_driver,
 
 #if CFG_SUPPORT_QA_TOOL
+	[IOCTL_QA_TOOL_DAEMON - SIOCIWFIRSTPRIV] = priv_qa_agent,
 	[IOCTL_IWPRIV_ATE - SIOCIWFIRSTPRIV] = priv_ate_set
 #endif
 };
@@ -3161,22 +3163,24 @@ static int wext_set_country(IN struct net_device *prNetDev, IN struct iw_point *
 	P_GLUE_INFO_T prGlueInfo;
 	WLAN_STATUS rStatus;
 	UINT_32 u4BufLen;
-	UINT_8 aucCountry[2];
+	UINT_8 aucCountry[COUNTRY_CODE_LEN];
 
 	ASSERT(prNetDev);
 
 	/* prData->pointer should be like "COUNTRY US", "COUNTRY EU"
 	 * and "COUNTRY JP"
 	 */
-	if (GLUE_CHK_PR2(prNetDev, prData) == FALSE || !prData->pointer || prData->length < 10)
+	if (GLUE_CHK_PR2(prNetDev, prData) == FALSE || !prData->pointer || prData->length < COUNTRY_CODE_LEN)
 		return -EINVAL;
 
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
-	aucCountry[0] = *((PUINT_8)prData->pointer + 8);
-	aucCountry[1] = *((PUINT_8)prData->pointer + 9);
+	if (copy_from_user(aucCountry, prData->pointer, COUNTRY_CODE_LEN))
+		return -EFAULT;
 
-	rStatus = kalIoctl(prGlueInfo, wlanoidSetCountryCode, &aucCountry[0], 2, FALSE, FALSE, TRUE, &u4BufLen);
+	rStatus = kalIoctl(prGlueInfo,
+			   wlanoidSetCountryCode,
+			   &aucCountry[COUNTRY_CODE_LEN-2], 2, FALSE, FALSE, TRUE, &u4BufLen);
 	if (rStatus != WLAN_STATUS_SUCCESS) {
 		DBGLOG(REQ, ERROR, "Set country code error: %x\n", rStatus);
 		return -EFAULT;
@@ -3184,6 +3188,7 @@ static int wext_set_country(IN struct net_device *prNetDev, IN struct iw_point *
 
 	return 0;
 }
+
 
 
 /*----------------------------------------------------------------------------*/
@@ -3248,7 +3253,10 @@ int wext_support_ioctl(IN struct net_device *prDev, IN struct ifreq *prIfReq, IN
 
 	/* Prepare the call */
 	rIwReqInfo.cmd = (__u16) i4Cmd;
-	rIwReqInfo.flags = 0;
+	rIwReqInfo.flags = IW_REQUEST_FLAG_COMPAT;
+
+	/*check if needs handle 32 bit userspace to 64 bit kernel*/
+	COMPAT_FROMUSER(&rIwReqInfo, &(iwr->u));
 
 	switch (i4Cmd) {
 	case SIOCGIWNAME:	/* 0x8B01, get wireless protocol name */

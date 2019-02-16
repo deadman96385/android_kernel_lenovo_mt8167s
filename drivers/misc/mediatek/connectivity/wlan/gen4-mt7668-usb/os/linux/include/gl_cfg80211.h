@@ -201,6 +201,8 @@ mtk_cfg80211_get_link_statistics(struct wiphy *wiphy, struct net_device *ndev, u
 
 int mtk_cfg80211_scan(struct wiphy *wiphy, struct cfg80211_scan_request *request);
 
+void mtk_cfg80211_abort_scan(struct wiphy *wiphy, struct wireless_dev *wdev);
+
 int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cfg80211_connect_params *sme);
 
 int mtk_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *ndev, u16 reason_code);
