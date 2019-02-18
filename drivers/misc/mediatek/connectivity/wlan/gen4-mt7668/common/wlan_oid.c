@@ -778,6 +778,39 @@ wlanoidSetBssidListScanAdv(IN P_ADAPTER_T prAdapter,
 
 /*----------------------------------------------------------------------------*/
 /*!
+* \brief This routine will call driver to abort scan.
+*
+* \param[in] prAdapter Pointer to the Adapter structure.
+* \param[in] pvQueryBuffer Pointer to the buffer that holds the data to be set.
+* \param[in] u4QueryBufferLen The length of the set buffer.
+* \param[out] pu4QueryInfoLen If the call is successful, returns the number of
+*                          bytes read from the set buffer. If the call failed
+*                          due to invalid length of the set buffer, returns
+*                          the amount of storage needed.
+*
+* \retval WLAN_STATUS_SUCCESS
+* \retval WLAN_STATUS_ADAPTER_NOT_READY
+* \retval WLAN_STATUS_FAILURE
+*/
+/*----------------------------------------------------------------------------*/
+WLAN_STATUS
+wlanoidAbortScan(IN P_ADAPTER_T prAdapter,
+			OUT PVOID pvQueryBuffer, IN UINT_32 u4QueryBufferLen,
+			OUT PUINT_32 pu4QueryInfoLen) {
+
+	P_AIS_FSM_INFO_T prAisFsmInfo = NULL;
+
+	prAisFsmInfo = &(prAdapter->rWifiVar.rAisFsmInfo);
+	if (prAisFsmInfo->eCurrentState == AIS_STATE_SCAN ||
+			prAisFsmInfo->eCurrentState == AIS_STATE_ONLINE_SCAN) {
+		DBGLOG(OID, INFO,  "wlanoidAbortScan\n");
+		aisFsmStateAbort_SCAN(prAdapter);
+	}
+	return WLAN_STATUS_SUCCESS;
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
 * \brief This routine will initiate the join procedure to attempt to associate
 *        with the specified BSSID.
 *
