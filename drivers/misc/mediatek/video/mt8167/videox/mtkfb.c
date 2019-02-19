@@ -2145,6 +2145,7 @@ int _parse_tag_videolfb(void)
 			vramsize = videolfb_tag->vram;
 			fb_base = videolfb_tag->fb_base;
 			is_videofb_parse_done = 1;
+			is_lk_show_logo = 1;
 			DISPPRINT("[DT][videolfb] lcmfound=%d, fps=%d, fb_base=%p, vram=%d, lcmname=%s\n",
 			     islcmconnected, lcd_fps, (void *)fb_base, vramsize, mtkfb_lcm_name);
 			return 0;
@@ -2166,6 +2167,7 @@ int _parse_tag_videolfb(void)
 			vramsize = ALIGN_TO(vramsize, 0x100000);
 #endif
 			is_videofb_parse_done = 1;
+			is_lk_show_logo = 0;
 			DISPPRINT("[DT][videolfb] lcmfound=%d, fps=%d, fb_base=tobe, vram=%d, lcmname=%s\n",
 			     islcmconnected, lcd_fps, vramsize, mtkfb_lcm_name);
 			return 0;
@@ -2266,10 +2268,6 @@ static int mtkfb_probe(struct platform_device *pdev)
 	}
 
 #endif
-#ifdef MTK_ONLY_KERNEL_DISP
-	if (IS_ERR_OR_NULL(g_ion_device))
-		return -EPROBE_DEFER;
-#endif
 #ifdef CONFIG_OF
 	_parse_tag_videolfb();
 #else
@@ -2292,13 +2290,18 @@ static int mtkfb_probe(struct platform_device *pdev)
 	}
 #endif
 #ifdef MTK_ONLY_KERNEL_DISP
-	fb_virtual_address = primary_display_alloc_hw_buffer(vramsize, &fb_base);
-	if (fb_virtual_address == NULL) {
-		DISPERR("dma allocate framebuffer of size %u failed\n", (uint32_t)vramsize);
-		r = ENOMEM;
-		goto cleanup;
+	if (!is_lk_show_logo && IS_ERR_OR_NULL(g_ion_device))
+		return -EPROBE_DEFER;
+
+	if (!is_lk_show_logo) {
+		fb_virtual_address = primary_display_alloc_hw_buffer(vramsize, &fb_base);
+		if (fb_virtual_address == NULL) {
+			DISPERR("dma allocate framebuffer of size %u failed\n", (uint32_t)vramsize);
+			r = ENOMEM;
+			goto cleanup;
+		}
+		DISPPRINT("fb_base %p fb_virtual_address %p\n", (void *)fb_base, fb_virtual_address);
 	}
-	DISPPRINT("fb_base %p fb_virtual_address %p\n", (void *)fb_base, fb_virtual_address);
 #endif
 	init_state = 0;
 
@@ -2446,13 +2449,13 @@ static int mtkfb_probe(struct platform_device *pdev)
 	if (disp_helper_get_stage() != DISP_HELPER_STAGE_NORMAL)
 		primary_display_diagnose();
 
-#ifndef MTK_ONLY_KERNEL_DISP
-	/* this function will get fb_heap base address to ion for management frame buffer*/
-	DISPPRINT("ion map framebuffer base=0x%p, fb total size=%d DAL size=%d\n",
-		(void *)mtkfb_get_fb_base(),
-		(unsigned int)mtkfb_get_fb_size(), (unsigned int)DAL_GetLayerSize());
-	ion_drv_create_FB_heap(mtkfb_get_fb_base(), mtkfb_get_fb_size() - DAL_GetLayerSize());
-#endif
+	if (is_lk_show_logo) {
+		/* this function will get fb_heap base address to ion for management frame buffer */
+		DISPPRINT("ion map framebuffer base=0x%p, fb total size=%d DAL size=%d\n",
+				(void *)mtkfb_get_fb_base(),
+				(unsigned int)mtkfb_get_fb_size(), (unsigned int)DAL_GetLayerSize());
+		ion_drv_create_FB_heap(mtkfb_get_fb_base(), mtkfb_get_fb_size() - DAL_GetLayerSize());
+	}
 
 	fbdev->state = MTKFB_ACTIVE;
 
