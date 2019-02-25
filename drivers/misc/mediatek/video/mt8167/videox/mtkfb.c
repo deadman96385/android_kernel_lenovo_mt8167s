@@ -2446,11 +2446,13 @@ static int mtkfb_probe(struct platform_device *pdev)
 	if (disp_helper_get_stage() != DISP_HELPER_STAGE_NORMAL)
 		primary_display_diagnose();
 
-	/* this function will get fb_heap base address to ion for management frame buffer */
+#ifndef MTK_ONLY_KERNEL_DISP
+	/* this function will get fb_heap base address to ion for management frame buffer*/
 	DISPPRINT("ion map framebuffer base=0x%p, fb total size=%d DAL size=%d\n",
 		(void *)mtkfb_get_fb_base(),
 		(unsigned int)mtkfb_get_fb_size(), (unsigned int)DAL_GetLayerSize());
 	ion_drv_create_FB_heap(mtkfb_get_fb_base(), mtkfb_get_fb_size() - DAL_GetLayerSize());
+#endif
 
 	fbdev->state = MTKFB_ACTIVE;
 
