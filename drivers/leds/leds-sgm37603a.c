@@ -224,7 +224,7 @@ static void _sgm37603a_led_set_brightness(
 		if (val == 1) {		/* min brightness: 1 */
 			val = 0x4;
 		} else if (val > 1) {
-			val *= 12;	/* 2980 / 255 + 1 */
+			val = (val - 1) * 12;	/* 2980 / 255 == 11.6 */
 			if (val > 2980)		/* 0xba4 */
 				val = 2980;
 		}
