@@ -1904,7 +1904,10 @@ BOOL rlmDomainTxPwrLimitLoadFromFile(P_ADAPTER_T prAdapter,
 	} else if (wlanGetFileContent(prAdapter, "/data/misc/wifi/" WLAN_TX_PWR_LIMIT_FILE_NAME, pucConfigBuf,
 				 WLAN_TX_PWR_LIMIT_FILE_BUF_SIZE, &u4ConfigReadLen, FALSE) == 0) {
 		/* ToDo:: Nothing */
-	} else {
+	} else if (wlanGetFileContent(prAdapter, "/oem/firmware/" WLAN_TX_PWR_LIMIT_FILE_NAME, pucConfigBuf,
+				 WLAN_TX_PWR_LIMIT_FILE_BUF_SIZE, &u4ConfigReadLen, FALSE) == 0) {
+		/* ToDo:: Nothing */
+	}  else {
 		bRet = FALSE;
 		goto error;
 	}
