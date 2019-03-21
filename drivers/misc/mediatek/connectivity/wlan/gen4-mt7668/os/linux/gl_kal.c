@@ -157,7 +157,7 @@ static PPUINT_8 appucFwNameTable[] = {
 };
 #if CFG_ASSERT_DUMP
 /* Core dump debug usage */
-#if MTK_WCN_HIF_SDIO
+#if 1
 PUINT_8 apucCorDumpN9FileName = "/data/misc/wifi/FW_DUMP_N9";
 PUINT_8 apucCorDumpCr4FileName = "/data/misc/wifi/FW_DUMP_Cr4";
 #else
@@ -963,6 +963,7 @@ kalIndicateStatusAndComplete(IN P_GLUE_INFO_T prGlueInfo, IN WLAN_STATUS eStatus
 	struct cfg80211_bss *bss;
 	UINT_8 ucChannelNum;
 	P_BSS_DESC_T prBssDesc = NULL;
+	gfp_t flags = GFP_KERNEL;
 
 	GLUE_SPIN_LOCK_DECLARATION();
 
@@ -1096,6 +1097,9 @@ kalIndicateStatusAndComplete(IN P_GLUE_INFO_T prGlueInfo, IN WLAN_STATUS eStatus
 		DBGLOG(INIT, INFO, "[wifi] %s netif_carrier_off\n", prGlueInfo->prDevHandler->name);
 #endif
 
+		if (prGlueInfo->prAdapter->fgIsChipAssert)
+			flags = GFP_ATOMIC;
+
 		netif_carrier_off(prGlueInfo->prDevHandler);
 		if (prGlueInfo->fgIsRegistered == TRUE) {
 			P_BSS_INFO_T prBssInfo = prGlueInfo->prAdapter->prAisBssInfo;
@@ -1109,7 +1113,7 @@ kalIndicateStatusAndComplete(IN P_GLUE_INFO_T prGlueInfo, IN WLAN_STATUS eStatus
 						(eStatus == WLAN_STATUS_MEDIA_DISCONNECT_LOCALLY));
 			cfg80211_disconnected(prGlueInfo->prDevHandler, u2DeauthReason, NULL, 0,
 						eStatus == WLAN_STATUS_MEDIA_DISCONNECT_LOCALLY,
-						GFP_KERNEL);
+						flags);
 
 #else
 
@@ -1127,7 +1131,7 @@ kalIndicateStatusAndComplete(IN P_GLUE_INFO_T prGlueInfo, IN WLAN_STATUS eStatus
 					u2DeauthReason = prBssInfo->u2DeauthReason;
 				/* CFG80211 Indication */
 				cfg80211_disconnected(prGlueInfo->prDevHandler, u2DeauthReason, NULL, 0,
-							GFP_KERNEL);
+							flags);
 			}
 
 
@@ -5075,6 +5079,9 @@ WLAN_STATUS kalWriteCorDumpFile(PUINT_8 pucBuffer, UINT_16 u2Size, BOOLEAN fgIsN
 {
 	UINT_32 ret;
 	PUINT_8 apucFileName;
+
+	DBGLOG(INIT, WARN, "kalWriteCorDumpFile undo...\n");
+	return WLAN_STATUS_SUCCESS;
 
 	if (fgIsN9)
 		apucFileName = apucCorDumpN9FileName;

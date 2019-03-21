@@ -113,7 +113,6 @@
 ********************************************************************************
 */
 
-
 /*******************************************************************************
 *                           P R I V A T E   D A T A
 ********************************************************************************
@@ -1493,6 +1492,11 @@ static void p2pSetMulticastList(IN struct net_device *prDev)
 		return;
 	}
 
+#if CFG_CHIP_RESET_SUPPORT
+	if (g_u4HaltFlag || checkResetState())
+		return;
+#endif
+
 	g_P2pPrDev = prDev;
 
 	/* 4  Mark HALT, notify main thread to finish current job */
@@ -1592,6 +1596,11 @@ int p2pHardStartXmit(IN struct sk_buff *prSkb, IN struct net_device *prDev)
 	ASSERT(prSkb);
 	ASSERT(prDev);
 
+#if CFG_CHIP_RESET_SUPPORT
+	if (g_u4HaltFlag || checkResetState())
+		return NETDEV_TX_BUSY;
+#endif
+
 	prNetDevPrivate = (P_NETDEV_PRIVATE_GLUE_INFO) netdev_priv(prDev);
 	prGlueInfo = prNetDevPrivate->prGlueInfo;
 	ucBssIndex = prNetDevPrivate->ucBssIdx;
@@ -1635,6 +1644,11 @@ int p2pDoIOCTL(struct net_device *prDev, struct ifreq *prIfReq, int i4Cmd)
 	rIwReqInfo.flags = 0;
 
 	ASSERT(prDev && prIfReq);
+
+#if CFG_CHIP_RESET_SUPPORT
+	if (g_u4HaltFlag || checkResetState())
+		return -EFAULT;
+#endif
 
 	DBGLOG(P2P, ERROR, "p2pDoIOCTL In %x %x\n", i4Cmd, SIOCDEVPRIVATE);
 

@@ -1880,7 +1880,7 @@ VOID halProcessSoftwareInterrupt(IN P_ADAPTER_T prAdapter)
 	if ((u4IntrBits & WHISR_D2H_SW_ASSERT_INFO_INT) != 0) {
 		halPrintFirmwareAssertInfo(prAdapter);
 #if CFG_CHIP_RESET_SUPPORT
-		glResetTrigger();
+		glResetTrigger(prAdapter);
 #endif
 	}
 

@@ -239,6 +239,8 @@
 	vmmc-supply = <&sdio_fixed_3v3>;
 	cap-sdio-irq;
 	non-removable;
+	mt76x8_pmu_en_gpio = <&pio 2 0>;
+	mt76x8_pmu_en_delay = <5>; /* ms */
 };
 
 &mt6392keys {
