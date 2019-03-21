@@ -262,14 +262,14 @@
 
 	usb0_drvvbus: drvvbus_init {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_18_EINT18__FUNC_USB_DRVVBUS>;
+			pins = <MT8167_PIN_67_DSI_TE__FUNC_GPIO67>;
 			output-low;
 		};
 	};
 
 	usb0_drvvbus_high: drvvbus_high {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_18_EINT18__FUNC_USB_DRVVBUS>;
+			pins = <MT8167_PIN_67_DSI_TE__FUNC_GPIO67>;
 			slew-rate = <1>;
 			output-high;
 		};
@@ -277,7 +277,7 @@
 
 	usb0_drvvbus_low: drvvbus_low {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_18_EINT18__FUNC_USB_DRVVBUS>;
+			pins = <MT8167_PIN_67_DSI_TE__FUNC_GPIO67>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -312,7 +312,7 @@
 	pinctrl-3 = <&usb0_drvvbus_low>;
 	pinctrl-4 = <&usb0_drvvbus_high>;
 
-	drvvbus_gpio = <&pio 18 2>;
+	drvvbus_gpio = <&pio 67 2>;
 	iddig_gpio = <&pio 19 2>;
 
 	status = "okay";
