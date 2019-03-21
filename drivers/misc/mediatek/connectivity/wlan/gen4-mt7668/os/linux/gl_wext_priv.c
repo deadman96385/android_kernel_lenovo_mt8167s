@@ -674,6 +674,11 @@ priv_set_int(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+	if (!test_bit(GLUE_FLAG_ADAPT_RDY_BIT, &prGlueInfo->ulFlag)) {
+		DBGLOG(REQ, INFO, "adapter is not ready\n");
+		return -EIO;
+	}
+
 	/*check if needs handle 32 bit userspace to 64 bit kernel*/
 	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
 
@@ -956,6 +961,11 @@ priv_get_int(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+	if (!test_bit(GLUE_FLAG_ADAPT_RDY_BIT, &prGlueInfo->ulFlag)) {
+		DBGLOG(REQ, INFO, "adapter is not ready\n");
+		return -EIO;
+	}
+
 	/*check if needs handle 32 bit userspace to 64 bit kernel*/
 	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
 
@@ -1155,6 +1165,11 @@ priv_set_ints(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+	if (!test_bit(GLUE_FLAG_ADAPT_RDY_BIT, &prGlueInfo->ulFlag)) {
+		DBGLOG(REQ, INFO, "adapter is not ready\n");
+		return -EIO;
+	}
+
 		/*check if needs handle 32 bit userspace to 64 bit kernel*/
 	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
 
@@ -1262,6 +1277,11 @@ priv_get_ints(IN struct net_device *prNetDev,
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+	if (!test_bit(GLUE_FLAG_ADAPT_RDY_BIT, &prGlueInfo->ulFlag)) {
+		DBGLOG(REQ, INFO, "adapter is not ready\n");
+		return -EIO;
+	}
+
 		/*check if needs handle 32 bit userspace to 64 bit kernel*/
 	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
 
@@ -1332,6 +1352,11 @@ priv_set_struct(IN struct net_device *prNetDev,
 	if (GLUE_CHK_PR2(prNetDev, prIwReqData) == FALSE)
 		return -EINVAL;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
+
+	if (!test_bit(GLUE_FLAG_ADAPT_RDY_BIT, &prGlueInfo->ulFlag)) {
+		DBGLOG(REQ, INFO, "adapter is not ready\n");
+		return -EIO;
+	}
 
 	/*check if needs handle 32 bit userspace to 64 bit kernel*/
 	COMPAT_FROMUSER(prIwReqInfo, prIwReqData);
@@ -1513,6 +1538,12 @@ priv_get_struct(IN struct net_device *prNetDev,
 		       prNetDev, *((P_GLUE_INFO_T *) netdev_priv(prNetDev)));
 		return -EINVAL;
 	}
+
+	if (!test_bit(GLUE_FLAG_ADAPT_RDY_BIT, &prGlueInfo->ulFlag)) {
+		DBGLOG(REQ, INFO, "adapter is not ready\n");
+		return -EIO;
+	}
+
 #if 0
 	DBGLOG(INIT, INFO, "priv_get_struct(): prIwReqInfo->cmd(0x%X), u4SubCmd(%ld)\n", prIwReqInfo->cmd, u4SubCmd);
 #endif
@@ -1857,6 +1888,12 @@ priv_ate_set(IN struct net_device *prNetDev,
 
 	GlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
+	if (!test_bit(GLUE_FLAG_ADAPT_RDY_BIT, &GlueInfo->ulFlag)) {
+		DBGLOG(REQ, INFO, "adapter is not ready\n");
+		return -EIO;
+	}
+
+
 	u4SubCmd = (UINT_32) prIwReqData->data.flags;
 
 	DBGLOG(REQ, INFO, "MT6632 : priv_ate_set u4SubCmd = %d\n", u4SubCmd);
@@ -1956,6 +1993,12 @@ priv_set_driver(IN struct net_device *prNetDev,
 		       prNetDev, *((P_GLUE_INFO_T *) netdev_priv(prNetDev)));
 		return -EINVAL;
 	}
+
+	if (!test_bit(GLUE_FLAG_ADAPT_RDY_BIT, &prGlueInfo->ulFlag)) {
+		DBGLOG(REQ, INFO, "adapter is not ready\n");
+		return -EIO;
+	}
+
 
 	/* trick,hack in ./net/wireless/wext-priv.c ioctl_private_iw_point */
 	/* because the cmd number is odd (get), the input string will not be copy_to_user */
@@ -10801,13 +10844,23 @@ INT_32 priv_driver_cmds(IN struct net_device *prNetDev, IN PCHAR pcCommand, IN I
 	P_GLUE_INFO_T prGlueInfo = NULL;
 	INT_32 i4BytesWritten = 0;
 
-	if (g_u4HaltFlag) {
-		DBGLOG(REQ, WARN, "wlan is halt, skip priv_driver_cmds\n");
+#if CFG_CHIP_RESET_SUPPORT
+	if (g_u4HaltFlag || checkResetState()) {
+		DBGLOG(INIT, WARN, "wlan is halt, skip priv_driver_cmds\n");
+		return -1;
+	}
+	rst_data.entry_conut++;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
+
+	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE) {
+#if CFG_CHIP_RESET_SUPPORT
+		rst_data.entry_conut--;
+		DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 		return -1;
 	}
 
-	if (GLUE_CHK_PR2(prNetDev, pcCommand) == FALSE)
-		return -1;
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDev));
 
 		if (strnicmp(pcCommand, CMD_RSSI, strlen(CMD_RSSI)) == 0) {
@@ -11098,7 +11151,10 @@ INT_32 priv_driver_cmds(IN struct net_device *prNetDev, IN PCHAR pcCommand, IN I
 			i4BytesWritten++;
 		}
 	}
-
+#if CFG_CHIP_RESET_SUPPORT
+	rst_data.entry_conut--;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 	return i4BytesWritten;
 
 }				/* priv_driver_cmds */

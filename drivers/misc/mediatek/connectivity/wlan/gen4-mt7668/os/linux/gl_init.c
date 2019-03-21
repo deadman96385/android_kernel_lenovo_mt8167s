@@ -161,6 +161,11 @@ static PUINT_8 apucEepromName[] = {
 };
 #endif
 
+#if CFG_CHIP_RESET_SUPPORT
+static int g_u4ProbeChipResetTimes;
+#define PROBE_CHIP_RESET_LIMIT     3
+#endif
+
 int CFG80211_Suspend(struct wiphy *wiphy, struct cfg80211_wowlan *wow)
 {
 	DBGLOG(INIT, INFO, "CFG80211 suspend CB\n");
@@ -826,6 +831,43 @@ P_GLUE_INFO_T wlanGetGlueInfo(VOID)
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prDev));
 
 	return prGlueInfo;
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief This function check the HIF state allow to handle callback or not.
+*
+* \param[in]  prGlueInfo Pointer to struct GLUE_INFO_T
+*
+* \return TRUE: HIF state allow to handle it.
+*         FALSE: HIF state NOT allow to handle it.
+*/
+/*---------------------------------------------------------------------------*/
+BOOLEAN wlanGetHifState(IN P_GLUE_INFO_T prGlueInfo)
+{
+	P_GL_HIF_INFO_T prHifInfo;
+	BOOLEAN fgIsHifReady = TRUE;
+#if defined(_HIF_USB)
+	unsigned long flags;
+#endif
+
+	if (!prGlueInfo) {
+		DBGLOG(INIT, ERROR, "prGlueInfo is NULL\n");
+		return FALSE;
+	}
+
+	prHifInfo = &prGlueInfo->rHifInfo;
+
+#if defined(_HIF_USB)
+	spin_lock_irqsave(&prHifInfo->rStateLock, flags);
+	if (prHifInfo->state != USB_STATE_LINK_UP) {
+		DBGLOG(INIT, WARN, "USB in suspend skip cfg callback\n");
+		fgIsHifReady = FALSE;
+	}
+	spin_unlock_irqrestore(&prHifInfo->rStateLock, flags);
+#endif
+
+	return fgIsHifReady;
 }
 
 /*----------------------------------------------------------------------------*/
@@ -2217,7 +2259,7 @@ label_exit:
 * \retval negative value Failed
 */
 /*----------------------------------------------------------------------------*/
-static INT_32 wlanProbe(PVOID pvData, PVOID pvDriverData)
+INT_32 wlanProbe(PVOID pvData, PVOID pvDriverData)
 {
 	struct wireless_dev *prWdev = NULL;
 	P_WLANDEV_INFO_T prWlandevInfo = NULL;
@@ -2513,6 +2555,24 @@ static INT_32 wlanProbe(PVOID pvData, PVOID pvDriverData)
 #endif
 	} while (FALSE);
 
+
+	if (i4Status != 0) {
+		if (prGlueInfo == NULL)
+			return -1;
+
+		glBusFreeIrq(prGlueInfo->prDevHandler, prGlueInfo);
+		DBGLOG(INIT, ERROR, "probe failed %d\n", i4Status);
+
+#if CFG_CHIP_RESET_SUPPORT
+		if (g_u4ProbeChipResetTimes < PROBE_CHIP_RESET_LIMIT) {
+			DBGLOG(INIT, ERROR, "wlanProbe: trigger whole reset\n");
+			g_u4ProbeChipResetTimes++;
+			glResetTrigger(prGlueInfo->prAdapter);
+		}
+#endif
+		return i4Status;
+	}
+
 	/* Configure 5G band for registered wiphy */
 	if (prAdapter->fgEnable5GBand)
 		prWdev->wiphy->bands[KAL_BAND_5GHZ] = &mtk_band_5ghz;
@@ -2616,6 +2676,11 @@ static INT_32 wlanProbe(PVOID pvData, PVOID pvDriverData)
 			GTK_REKEY_CMD_MODE_RPY_OFFLOAD_OFF);
 	}
 #endif
+#if CFG_CHIP_RESET_SUPPORT
+		g_u4ProbeChipResetTimes = 0;
+#endif
+	DBGLOG(INIT, EVENT, "wlanProbe: probe success\n");
+	set_bit(GLUE_FLAG_ADAPT_RDY_BIT, &prGlueInfo->ulFlag);
 
 	return i4Status;
 }				/* end of wlanProbe() */
@@ -2628,7 +2693,7 @@ static INT_32 wlanProbe(PVOID pvData, PVOID pvDriverData)
 * \return (none)
 */
 /*----------------------------------------------------------------------------*/
-static VOID wlanRemove(VOID)
+VOID wlanRemove(VOID)
 {
 	struct net_device *prDev = NULL;
 	P_WLANDEV_INFO_T prWlandevInfo = NULL;
@@ -2692,8 +2757,13 @@ static VOID wlanRemove(VOID)
 
 	flush_delayed_work(&sched_workq);
 
+	rtnl_lock();
+	clear_bit(GLUE_FLAG_ADAPT_RDY_BIT, &prGlueInfo->ulFlag);
+	rtnl_unlock();
+
 	down(&g_halt_sem);
 	g_u4HaltFlag = 1;
+	up(&g_halt_sem);
 
 	/* 4 <2> Mark HALT, notify main thread to stop, and clean up queued requests */
 	set_bit(GLUE_FLAG_HALT_BIT, &prGlueInfo->ulFlag);
@@ -2784,8 +2854,6 @@ static VOID wlanRemove(VOID)
 	/* 4 <5> Release the Bus */
 	glBusRelease(prDev);
 
-	up(&g_halt_sem);
-
 	/* 4 <6> Unregister the card */
 	wlanNetUnregister(prDev->ieee80211_ptr);
 
@@ -2823,6 +2891,10 @@ static int initWlan(void)
 	int ret = 0;
 
 	DBGLOG(INIT, INFO, "initWlan\n");
+#if CFG_CHIP_RESET_SUPPORT
+	rst_data.entry_conut = 0;
+#endif
+
 
 #ifdef CFG_DRIVER_INF_NAME_CHANGE
 

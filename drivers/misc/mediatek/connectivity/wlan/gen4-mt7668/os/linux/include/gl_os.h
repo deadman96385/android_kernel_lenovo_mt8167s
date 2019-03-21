@@ -292,6 +292,9 @@ extern const INT_32 mtk_iface_combinations_sta_num;
 #define GLUE_FLAG_HIF_FW_OWN_BIT			(15)
 #define GLUE_FLAG_HIF_PRT_HIF_DBG_INFO_BIT	(16)
 #endif
+#define GLUE_FLAG_ADAPT_RDY BIT(17)
+
+#define GLUE_FLAG_ADAPT_RDY_BIT (17)
 
 #define GLUE_BOW_KFIFO_DEPTH        (1024)
 /* #define GLUE_BOW_DEVICE_NAME        "MT6620 802.11 AMP" */
@@ -979,6 +982,7 @@ void p2pSetMulticastListWorkQueueWrapper(P_GLUE_INFO_T prGlueInfo);
 
 P_GLUE_INFO_T wlanGetGlueInfo(VOID);
 
+BOOLEAN wlanGetHifState(P_GLUE_INFO_T prGlueInfo);
 #if KERNEL_VERSION(3, 14, 0) <= LINUX_VERSION_CODE
 u16 wlanSelectQueue(struct net_device *dev, struct sk_buff *skb,
 		    void *accel_priv, select_queue_fallback_t fallback);

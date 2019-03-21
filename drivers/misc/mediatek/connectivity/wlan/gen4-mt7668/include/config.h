@@ -323,7 +323,7 @@
 #define HW_WMM_NUM                  4	/* HW WMM number by chip */
 
 #ifndef CFG_CHIP_RESET_SUPPORT
-#define CFG_CHIP_RESET_SUPPORT          0
+#define CFG_CHIP_RESET_SUPPORT          1
 #endif
 
 /*------------------------------------------------------------------------------
@@ -992,7 +992,7 @@
  *------------------------------------------------------------------------------
  */
 #ifndef CFG_PRE_ALLOCATION_IO_BUFFER
-#define CFG_PRE_ALLOCATION_IO_BUFFER 0
+#define CFG_PRE_ALLOCATION_IO_BUFFER 1
 #endif
 
 

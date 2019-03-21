@@ -418,10 +418,14 @@ int mtk_cfg80211_del_key(struct wiphy *wiphy, struct net_device *ndev, u8 key_in
 	prGlueInfo = (P_GLUE_INFO_T) wiphy_priv(wiphy);
 	ASSERT(prGlueInfo);
 
+#if CFG_CHIP_RESET_SUPPORT
 	if (g_u4HaltFlag) {
-		DBGLOG(RSN, WARN, "wlan is halt, skip key deletion\n");
+		DBGLOG(INIT, WARN, "wlan is halt, skip key deletion\n");
 		return WLAN_STATUS_FAILURE;
 	}
+	rst_data.entry_conut++;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 
 #if DBG
 	DBGLOG(RSN, TRACE, "mtk_cfg80211_del_key\n");
@@ -451,6 +455,10 @@ int mtk_cfg80211_del_key(struct wiphy *wiphy, struct net_device *ndev, u8 key_in
 	else
 		i4Rslt = 0;
 
+#if CFG_CHIP_RESET_SUPPORT
+	rst_data.entry_conut--;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 	return i4Rslt;
 }
 
@@ -530,7 +538,14 @@ int mtk_cfg80211_get_station(struct wiphy *wiphy, struct net_device *ndev, const
 
 	prGlueInfo = (P_GLUE_INFO_T) wiphy_priv(wiphy);
 	ASSERT(prGlueInfo);
-
+#if CFG_CHIP_RESET_SUPPORT
+	if (checkResetState()) {
+		DBGLOG(INIT, WARN, "wlan is halt, skip get station\n");
+		return WLAN_STATUS_FAILURE;
+	}
+	rst_data.entry_conut++;
+	DBGLOG(INIT, TRACE, " entry_conut = %d\n", rst_data.entry_conut);
+#endif
 	kalMemZero(arBssid, MAC_ADDR_LEN);
 	wlanQueryInformation(prGlueInfo->prAdapter, wlanoidQueryBssid, &arBssid[0], sizeof(arBssid), &u4BufLen);
 
@@ -541,6 +556,11 @@ int mtk_cfg80211_get_station(struct wiphy *wiphy, struct net_device *ndev, const
 		DBGLOG(REQ, WARN,
 			"incorrect BSSID: [" MACSTR "] currently connected BSSID[" MACSTR "]\n",
 			MAC2STR(mac), MAC2STR(arBssid));
+#if CFG_CHIP_RESET_SUPPORT
+		rst_data.entry_conut--;
+		DBGLOG(INIT, TRACE, " entry_conut = %d\n",
+						rst_data.entry_conut);
+#endif
 		return -ENOENT;
 	}
 
@@ -642,7 +662,10 @@ int mtk_cfg80211_get_station(struct wiphy *wiphy, struct net_device *ndev, const
 #endif
 		sinfo->tx_failed = prDevStats->tx_errors;
 	}
-
+#if CFG_CHIP_RESET_SUPPORT
+	rst_data.entry_conut--;
+	DBGLOG(INIT, TRACE, " entry_conut = %d\n", rst_data.entry_conut);
+#endif
 	return 0;
 }
 #else
@@ -659,7 +682,14 @@ int mtk_cfg80211_get_station(struct wiphy *wiphy, struct net_device *ndev, u8 *m
 
 	prGlueInfo = (P_GLUE_INFO_T) wiphy_priv(wiphy);
 	ASSERT(prGlueInfo);
-
+#if CFG_CHIP_RESET_SUPPORT
+	if (checkResetState()) {
+		DBGLOG(INIT, WARN, "wlan is halt, skip get station\n");
+		return WLAN_STATUS_FAILURE;
+	}
+	rst_data.entry_conut++;
+	DBGLOG(INIT, TRACE, " entry_conut = %d\n", rst_data.entry_conut);
+#endif
 	kalMemZero(arBssid, MAC_ADDR_LEN);
 	wlanQueryInformation(prGlueInfo->prAdapter, wlanoidQueryBssid, &arBssid[0], sizeof(arBssid), &u4BufLen);
 
@@ -669,6 +699,11 @@ int mtk_cfg80211_get_station(struct wiphy *wiphy, struct net_device *ndev, u8 *m
 		DBGLOG(REQ, WARN,
 		       "incorrect BSSID: [" MACSTR "] currently connected BSSID[" MACSTR "]\n",
 		       MAC2STR(mac), MAC2STR(arBssid));
+#if CFG_CHIP_RESET_SUPPORT
+		rst_data.entry_conut--;
+		DBGLOG(INIT, TRACE, " entry_conut = %d\n",
+						rst_data.entry_conut);
+#endif
 		return -ENOENT;
 	}
 
@@ -751,7 +786,10 @@ int mtk_cfg80211_get_station(struct wiphy *wiphy, struct net_device *ndev, u8 *m
 		sinfo->filled |= STATION_INFO_TX_FAILED;
 		sinfo->tx_failed = prDevStats->tx_errors;
 	}
-
+#if CFG_CHIP_RESET_SUPPORT
+	rst_data.entry_conut--;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 	return 0;
 }
 #endif
@@ -864,9 +902,35 @@ int mtk_cfg80211_scan(struct wiphy *wiphy, struct cfg80211_scan_request *request
 	ASSERT(prGlueInfo);
 	kalMemZero(&rScanRequest, sizeof(rScanRequest));
 
+	if (!wlanGetHifState(prGlueInfo))
+		return -EINVAL;
+
+#if CFG_CHIP_RESET_SUPPORT
+	if (checkResetState()) {
+		DBGLOG(INIT, WARN, "wlan is halt, skip scan");
+		return WLAN_STATUS_FAILURE;
+	}
+	rst_data.entry_conut++;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
+
 	/* check if there is any pending scan/sched_scan not yet finished */
-	if (prGlueInfo->prScanRequest != NULL)
+	if (prGlueInfo->prScanRequest != NULL) {
+#if CFG_CHIP_RESET_SUPPORT
+		rst_data.entry_conut--;
+		DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 		return -EBUSY;
+	}
+
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "prGlueInfo->u4ReadyFlag == 0\n");
+#if CFG_CHIP_RESET_SUPPORT
+		rst_data.entry_conut--;
+		DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
+		return -EFAULT;
+	}
 
 	if (request->n_ssids == 0) {
 		rScanRequest.u4SsidNum = 0;
@@ -878,6 +942,10 @@ int mtk_cfg80211_scan(struct wiphy *wiphy, struct cfg80211_scan_request *request
 				  rScanRequest.rSsid[i].u4SsidLen, request->ssids[i].ssid, request->ssids[i].ssid_len);
 		}
 	} else {
+#if CFG_CHIP_RESET_SUPPORT
+		rst_data.entry_conut--;
+		DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 		return -EINVAL;
 	}
 
@@ -914,7 +982,10 @@ int mtk_cfg80211_scan(struct wiphy *wiphy, struct cfg80211_scan_request *request
 	rStatus = kalIoctl(prGlueInfo,
 			   wlanoidSetBssidListScanAdv,
 			   &rScanRequest, sizeof(PARAM_SCAN_REQUEST_ADV_T), FALSE, FALSE, FALSE, &u4BufLen);
-
+#if CFG_CHIP_RESET_SUPPORT
+	rst_data.entry_conut--;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 	if (rStatus != WLAN_STATUS_SUCCESS) {
 		DBGLOG(REQ, WARN, "scan error:%lx\n", rStatus);
 		return -EINVAL;
@@ -977,16 +1048,49 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 	ENUM_PARAM_OP_MODE_T eOpMode;
 	UINT_32 i, u4AkmSuite = 0;
 	P_DOT11_RSNA_CONFIG_AUTHENTICATION_SUITES_ENTRY prEntry;
+	struct wireless_dev *wdev = NULL;
 #if CFG_SUPPORT_REPLAY_DETECTION
 	P_BSS_INFO_T prBssInfo = NULL;
 	struct SEC_DETECT_REPLAY_INFO *prDetRplyInfo = NULL;
 #endif
 
-
+#if CFG_CHIP_RESET_SUPPORT
+	if (checkResetState()) {
+		DBGLOG(INIT, WARN, "wlan is halt, skip conn.");
+		return WLAN_STATUS_FAILURE;
+	}
+	rst_data.entry_conut++;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 	prGlueInfo = (P_GLUE_INFO_T) wiphy_priv(wiphy);
 	ASSERT(prGlueInfo);
 
-	/* printk("[wlan]mtk_cfg80211_connect\n"); */
+	if (ndev == NULL) {
+		DBGLOG(REQ, ERROR, "ndev is NULL\n");
+#if CFG_CHIP_RESET_SUPPORT
+		rst_data.entry_conut--;
+		DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
+		return -EINVAL;
+	}
+	wdev = ndev->ieee80211_ptr;
+
+	/* Supplicant requests connecting during driver do disconnecting,
+	 * it will cause to install key fail, error is -67(link has been
+	 * servered).
+	 * Beacaus driver disconnected is done, but cfg80211 is disconnecting.
+	 * Reject this request.Supplicant will issue the connecting request again.
+	 */
+	if (wdev->current_bss &&
+		kalGetMediaStateIndicated(prGlueInfo) == PARAM_MEDIA_STATE_DISCONNECTED) {
+		DBGLOG(REQ, WARN, "Reject this connecting request\n");
+#if CFG_CHIP_RESET_SUPPORT
+		rst_data.entry_conut--;
+		DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
+		return -EALREADY;
+	}
+
 	if (prGlueInfo->prAdapter->rWifiVar.rConnSettings.eOPMode > NET_TYPE_AUTO_SWITCH)
 		eOpMode = NET_TYPE_AUTO_SWITCH;
 	else
@@ -997,6 +1101,10 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 
 	if (rStatus != WLAN_STATUS_SUCCESS) {
 		DBGLOG(INIT, INFO, "wlanoidSetInfrastructureMode fail 0x%lx\n", rStatus);
+#if CFG_CHIP_RESET_SUPPORT
+		rst_data.entry_conut--;
+		DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 		return -EFAULT;
 	}
 
@@ -1076,6 +1184,11 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 			break;
 		default:
 			DBGLOG(REQ, WARN, "invalid cipher pairwise (%d)\n", sme->crypto.ciphers_pairwise[0]);
+#if CFG_CHIP_RESET_SUPPORT
+			rst_data.entry_conut--;
+			DBGLOG(INIT, TRACE, "entry_conut = %d\n",
+						rst_data.entry_conut);
+#endif
 			return -EINVAL;
 		}
 	}
@@ -1100,6 +1213,11 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 			break;
 		default:
 			DBGLOG(REQ, WARN, "invalid cipher group (%d)\n", sme->crypto.cipher_group);
+#if CFG_CHIP_RESET_SUPPORT
+			rst_data.entry_conut--;
+			DBGLOG(INIT, TRACE, "entry_conut = %d\n",
+						rst_data.entry_conut);
+#endif
 			return -EINVAL;
 		}
 	}
@@ -1120,6 +1238,11 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 				break;
 			default:
 				DBGLOG(REQ, WARN, "invalid Akm Suite (%d)\n", sme->crypto.akm_suites[0]);
+#if CFG_CHIP_RESET_SUPPORT
+				rst_data.entry_conut--;
+				DBGLOG(INIT, TRACE, "entry_conut = %d\n",
+							rst_data.entry_conut);
+#endif
 				return -EINVAL;
 			}
 		} else if (prGlueInfo->rWpaInfo.u4WpaVersion == IW_AUTH_WPA_VERSION_WPA2) {
@@ -1145,6 +1268,11 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 #endif
 			default:
 				DBGLOG(REQ, WARN, "invalid Akm Suite (%d)\n", sme->crypto.akm_suites[0]);
+#if CFG_CHIP_RESET_SUPPORT
+				rst_data.entry_conut--;
+				DBGLOG(INIT, TRACE, "entry_conut = %d\n",
+							rst_data.entry_conut);
+#endif
 				return -EINVAL;
 			}
 		}
@@ -1289,6 +1417,11 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 		prWepKey->u4KeyIndex |= IS_TRANSMIT_KEY;
 		if (prWepKey->u4KeyLength > MAX_KEY_LEN) {
 			DBGLOG(REQ, WARN, "Too long key length (%lu)\n", prWepKey->u4KeyLength);
+#if CFG_CHIP_RESET_SUPPORT
+			rst_data.entry_conut--;
+			DBGLOG(INIT, TRACE, "entry_conut = %d\n",
+						rst_data.entry_conut);
+#endif
 			return -EINVAL;
 		}
 		kalMemCopy(prWepKey->aucKeyMaterial, sme->key, prWepKey->u4KeyLength);
@@ -1298,6 +1431,11 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 
 		if (rStatus != WLAN_STATUS_SUCCESS) {
 			DBGLOG(INIT, INFO, "wlanoidSetAddWep fail 0x%lx\n", rStatus);
+#if CFG_CHIP_RESET_SUPPORT
+			rst_data.entry_conut--;
+			DBGLOG(INIT, TRACE, "entry_conut = %d\n",
+						rst_data.entry_conut);
+#endif
 			return -EFAULT;
 		}
 	}
@@ -1311,6 +1449,10 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 
 	if (rStatus != WLAN_STATUS_SUCCESS) {
 		DBGLOG(REQ, WARN, "set SSID:%x\n", rStatus);
+#if CFG_CHIP_RESET_SUPPORT
+		rst_data.entry_conut--;
+		DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 		return -EINVAL;
 	}
 #if 0
@@ -1344,6 +1486,10 @@ int mtk_cfg80211_connect(struct wiphy *wiphy, struct net_device *ndev, struct cf
 			return -EINVAL;
 		}
 	}
+#endif
+#if CFG_CHIP_RESET_SUPPORT
+	rst_data.entry_conut--;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
 #endif
 	return 0;
 }
@@ -1479,6 +1625,20 @@ int mtk_cfg80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *ndev, bo
 	if (!prGlueInfo->prAdapter->prAisBssInfo)
 		return -EFAULT;
 
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "prGlueInfo->u4ReadyFlag == 0\n");
+		return -EFAULT;
+	}
+
+#if CFG_CHIP_RESET_SUPPORT
+	if (checkResetState()) {
+		DBGLOG(INIT, WARN, "wlan is halt, skip set pwr mgmt\n");
+		return WLAN_STATUS_FAILURE;
+	}
+	rst_data.entry_conut++;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
+
 	if (enabled) {
 		if (timeout == -1)
 			rPowerMode.ePowerMode = Param_PowerModeFast_PSP;
@@ -1493,7 +1653,10 @@ int mtk_cfg80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *ndev, bo
 	rStatus = kalIoctl(prGlueInfo,
 			   wlanoidSet802dot11PowerSaveProfile,
 			   &rPowerMode, sizeof(PARAM_POWER_MODE_T), FALSE, FALSE, TRUE, &u4BufLen);
-
+#if CFG_CHIP_RESET_SUPPORT
+	rst_data.entry_conut--;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 	if (rStatus != WLAN_STATUS_SUCCESS) {
 		DBGLOG(REQ, WARN, "set_power_mgmt error:%lx\n", rStatus);
 		return -EFAULT;
@@ -1587,6 +1750,14 @@ int mtk_cfg80211_flush_pmksa(struct wiphy *wiphy, struct net_device *ndev)
 		return -ENOMEM;
 	}
 
+#if CFG_CHIP_RESET_SUPPORT
+	if (checkResetState()) {
+		DBGLOG(INIT, WARN, "wlan is halt, skip flush pmksa\n");
+		return WLAN_STATUS_FAILURE;
+	}
+	rst_data.entry_conut++;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 	prPmkid->u4Length = 8;
 	prPmkid->u4BSSIDInfoCount = 0;
 
@@ -1596,6 +1767,10 @@ int mtk_cfg80211_flush_pmksa(struct wiphy *wiphy, struct net_device *ndev)
 		DBGLOG(INIT, INFO, "flush pmkid error:%lx\n", rStatus);
 	kalMemFree(prPmkid, VIR_MEM_TYPE, 8);
 
+#if CFG_CHIP_RESET_SUPPORT
+	rst_data.entry_conut--;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 	return 0;
 }
 
@@ -1707,6 +1882,14 @@ void mtk_cfg80211_mgmt_frame_register(IN struct wiphy *wiphy,
 #endif
 	P_GLUE_INFO_T prGlueInfo = (P_GLUE_INFO_T) NULL;
 
+#if CFG_CHIP_RESET_SUPPORT
+	if (checkResetState()) {
+		DBGLOG(INIT, WARN, "wlan is halt, skip mgmt reg.");
+		return;
+	}
+	rst_data.entry_conut++;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
 	do {
 
 		DBGLOG(INIT, TRACE, "mtk_cfg80211_mgmt_frame_register\n");
@@ -1769,6 +1952,11 @@ void mtk_cfg80211_mgmt_frame_register(IN struct wiphy *wiphy,
 
 	} while (FALSE);
 
+#if CFG_CHIP_RESET_SUPPORT
+	rst_data.entry_conut--;
+	DBGLOG(INIT, TRACE, "entry_conut = %d\n", rst_data.entry_conut);
+#endif
+
 }				/* mtk_cfg80211_mgmt_frame_register */
 
 /*----------------------------------------------------------------------------*/
@@ -1800,6 +1988,9 @@ int mtk_cfg80211_remain_on_channel(struct wiphy *wiphy,
 
 		prGlueInfo = (P_GLUE_INFO_T) wiphy_priv(wiphy);
 		ASSERT(prGlueInfo);
+
+		if (!wlanGetHifState(prGlueInfo))
+			break;
 
 #if 1
 		DBGLOG(INIT, INFO, "--> %s()\n", __func__);

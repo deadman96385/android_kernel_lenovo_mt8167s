@@ -146,7 +146,7 @@ static MTK_WCN_HIF_SDIO_CLTINFO cltInfo = {
 static int mtk_sdio_pm_suspend(struct device *pDev);
 static int mtk_sdio_pm_resume(struct device *pDev);
 
-static const struct sdio_device_id mtk_sdio_ids[] = {
+const struct sdio_device_id mtk_sdio_ids[] = {
 	{	SDIO_DEVICE(0x037a, 0x6602),
 		.driver_data = (kernel_ulong_t)&mt66xx_driver_data_mt6632},/* Not an SDIO standard class device */
 	{	SDIO_DEVICE(0x037a, 0x7608),
@@ -325,69 +325,69 @@ static INT_32 mtk_sdio_probe(MTK_WCN_HIF_SDIO_CLTCTX cltCtx, const MTK_WCN_HIF_S
 	return ret;
 }
 #else
-static int mtk_sdio_probe(struct sdio_func *func, const struct sdio_device_id *id)
+int mtk_sdio_probe(struct sdio_func *func, const struct sdio_device_id *id)
 {
 	int ret = 0;
 	/* int i = 0; */
-
-	/* printk(KERN_INFO DRV_NAME "mtk_sdio_probe()\n"); */
+	DBGLOG(HAL, WARN, "start mtk_sdio_probe\n");
 
 	ASSERT(func);
 	ASSERT(id);
-	/*
-	*printk(KERN_INFO DRV_NAME "Basic struct size checking...\n");
-	*printk(KERN_INFO DRV_NAME "sizeof(struct device) = %d\n", sizeof(struct device));
-	*printk(KERN_INFO DRV_NAME "sizeof(struct mmc_host) = %d\n", sizeof(struct mmc_host));
-	*printk(KERN_INFO DRV_NAME "sizeof(struct mmc_card) = %d\n", sizeof(struct mmc_card));
-	*printk(KERN_INFO DRV_NAME "sizeof(struct mmc_driver) = %d\n", sizeof(struct mmc_driver));
-	*printk(KERN_INFO DRV_NAME "sizeof(struct mmc_data) = %d\n", sizeof(struct mmc_data));
-	*printk(KERN_INFO DRV_NAME "sizeof(struct mmc_command) = %d\n", sizeof(struct mmc_command));
-	*printk(KERN_INFO DRV_NAME "sizeof(struct mmc_request) = %d\n", sizeof(struct mmc_request));
-	*printk(KERN_INFO DRV_NAME "sizeof(struct sdio_func) = %d\n", sizeof(struct sdio_func));
-	*
-	*printk(KERN_INFO DRV_NAME "Card information checking...\n");
-	*printk(KERN_INFO DRV_NAME "func = 0x%p\n", func);
-	*printk(KERN_INFO DRV_NAME "Number of info = %d:\n", func->card->num_info);
-	*
-	*
-	*for (i = 0; i < func->card->num_info; i++)
-	*	printk(KERN_INFO DRV_NAME "info[%d]: %s\n", i, func->card->info[i]);
-	*
-	*/
+
+#if 0
+	DBGLOG(HAL, WARN, "Basic struct size checking...\n");
+	DBGLOG(HAL, WARN, "sizeof(struct device) = %d\n", sizeof(struct device));
+	DBGLOG(HAL, WARN, "sizeof(struct mmc_host) = %d\n", sizeof(struct mmc_host));
+	DBGLOG(HAL, WARN, "sizeof(struct mmc_card) = %d\n", sizeof(struct mmc_card));
+	DBGLOG(HAL, WARN, "sizeof(struct mmc_driver) = %d\n", sizeof(struct mmc_driver));
+	DBGLOG(HAL, WARN, "sizeof(struct mmc_data) = %d\n", sizeof(struct mmc_data));
+	DBGLOG(HAL, WARN, "sizeof(struct mmc_command) = %d\n",
+			sizeof(struct mmc_command));
+	DBGLOG(HAL, WARN, "sizeof(struct mmc_request) = %d\n",
+			sizeof(struct mmc_request));
+	DBGLOG(HAL, WARN, "sizeof(struct sdio_func) = %d\n", sizeof(struct sdio_func));
+
+	DBGLOG(HAL, WARN, "Card information checking...\n");
+	DBGLOG(HAL, WARN, "func = 0x%p\n", func);
+	DBGLOG(HAL, WARN, "Number of info = %d:\n", func->card->num_info);
+
+	for (i = 0; i < func->card->num_info; i++)
+		DBGLOG(HAL, WARN, "info[%d]: %s\n", i, func->card->info[i]);
+#endif
 
 	sdio_claim_host(func);
 	ret = sdio_enable_func(func);
 	sdio_release_host(func);
 
 	if (ret) {
-		/* printk(KERN_INFO DRV_NAME"sdio_enable_func failed!\n"); */
+		DBGLOG(HAL, ERROR, "sdio_enable_func failed!\n");
 		goto out;
 	}
-	/* printk(KERN_INFO DRV_NAME"sdio_enable_func done!\n"); */
+	/* DBGLOG(HAL, WARN, "sdio_enable_func done!\n"); */
 
 	if (pfWlanProbe((PVOID) func, (PVOID) id->driver_data) != WLAN_STATUS_SUCCESS) {
-		/* printk(KERN_WARNING DRV_NAME"pfWlanProbe fail!call pfWlanRemove()\n"); */
+		DBGLOG(HAL, ERROR, "pfWlanProbe fail!call pfWlanRemove()\n");
 		pfWlanRemove();
 		ret = -1;
 	}
 
 out:
-	/* printk(KERN_INFO DRV_NAME"mtk_sdio_probe() done(%d)\n", ret); */
+	DBGLOG(HAL, WARN, "mtk_sdio_probe() done(%d)\n", ret);
 	return ret;
 }
 #endif
 
 #if MTK_WCN_HIF_SDIO
-static INT_32 mtk_sdio_remove(MTK_WCN_HIF_SDIO_CLTCTX cltCtx)
+int32_t mtk_sdio_remove(MTK_WCN_HIF_SDIO_CLTCTX cltCtx)
 {
-	INT_32 ret = HIF_SDIO_ERR_SUCCESS;
+	int32_t ret = HIF_SDIO_ERR_SUCCESS;
 	/* printk(KERN_INFO DRV_NAME"pfWlanRemove done\n"); */
 	pfWlanRemove();
 
 	return ret;
 }
 #else
-static void mtk_sdio_remove(struct sdio_func *func)
+void mtk_sdio_remove(struct sdio_func *func)
 {
 	/* printk(KERN_INFO DRV_NAME"mtk_sdio_remove()\n"); */
 
@@ -670,7 +670,11 @@ VOID glSetHifInfo(P_GLUE_INFO_T prGlueInfo, ULONG ulCookie)
 
 	mutex_init(&prHif->rRxFreeBufQueMutex);
 	mutex_init(&prHif->rRxDeAggQueMutex);
-
+#if CFG_CHIP_RESET_SUPPORT
+	rst_data.func = prGlueInfo->rHifInfo.func;
+	mutex_init(&(rst_data.rst_mutex));
+	/* DBGLOG(HAL, WARN, "[RST]set rst_data.func = 0x%p\n", rst_data.func); */
+#endif
 }				/* end of glSetHifInfo() */
 
 /*----------------------------------------------------------------------------*/
@@ -915,9 +919,19 @@ BOOL kalDevRegRead(IN P_GLUE_INFO_T prGlueInfo, IN UINT_32 u4Register, OUT PUINT
 	} while (ret);
 
 	if (ret) {
+#if CFG_CHIP_RESET_SUPPORT
+		P_ADAPTER_T prAdapter = NULL;
+#endif
 		kalSendAeeWarning(HIF_SDIO_ERR_TITLE_STR,
 				  HIF_SDIO_ERR_DESC_STR "sdio_readl() reports error: %x retry: %u", ret, ucRetryCount);
 		DBGLOG(HAL, ERROR, "sdio_readl() reports error: %x retry: %u\n", ret, ucRetryCount);
+#if CFG_CHIP_RESET_SUPPORT
+		prAdapter = container_of(&prGlueInfo, ADAPTER_T, prGlueInfo);
+		prAdapter->fgIsChipNoAck = TRUE;
+		DBGLOG(HAL, ERROR, "fgIsChipNoAck = %d\n",
+						prAdapter->fgIsChipNoAck);
+		glResetTrigger(prAdapter);
+#endif
 	}
 
 	return (ret) ? FALSE : TRUE;
@@ -1032,9 +1046,19 @@ BOOL kalDevRegWrite(IN P_GLUE_INFO_T prGlueInfo, IN UINT_32 u4Register, IN UINT_
 	} while (ret);
 
 	if (ret) {
+#if CFG_CHIP_RESET_SUPPORT
+		P_ADAPTER_T prAdapter = NULL;
+#endif
 		kalSendAeeWarning(HIF_SDIO_ERR_TITLE_STR,
 				  HIF_SDIO_ERR_DESC_STR "sdio_writel() reports error: %x retry: %u", ret, ucRetryCount);
 		DBGLOG(HAL, ERROR, "sdio_writel() reports error: %x retry: %u\n", ret, ucRetryCount);
+#if CFG_CHIP_RESET_SUPPORT
+		prAdapter = container_of(&prGlueInfo, ADAPTER_T, prGlueInfo);
+		prAdapter->fgIsChipNoAck = TRUE;
+		DBGLOG(HAL, ERROR, "fgIsChipNoAck = %d\n",
+					prAdapter->fgIsChipNoAck);
+		glResetTrigger(prAdapter);
+#endif
 	}
 
 	return (ret) ? FALSE : TRUE;
@@ -1198,8 +1222,18 @@ kalDevPortRead(IN P_GLUE_INFO_T prGlueInfo,
 #endif
 
 	if (ret) {
+#if CFG_CHIP_RESET_SUPPORT
+		P_ADAPTER_T prAdapter = NULL;
+#endif
 		kalSendAeeWarning(HIF_SDIO_ERR_TITLE_STR, HIF_SDIO_ERR_DESC_STR "sdio_readsb() reports error: %x", ret);
 		DBGLOG(HAL, ERROR, "sdio_readsb() reports error: %x\n", ret);
+#if CFG_CHIP_RESET_SUPPORT
+		prAdapter = container_of(&prGlueInfo, ADAPTER_T, prGlueInfo);
+		prAdapter->fgIsChipNoAck = TRUE;
+		DBGLOG(HAL, ERROR, "fgIsChipNoAck = %d\n",
+						prAdapter->fgIsChipNoAck);
+		glResetTrigger(prAdapter);
+#endif
 	}
 
 	return (ret) ? FALSE : TRUE;
@@ -1296,9 +1330,19 @@ kalDevPortWrite(IN P_GLUE_INFO_T prGlueInfo,
 #endif
 
 	if (ret) {
+#if CFG_CHIP_RESET_SUPPORT
+		P_ADAPTER_T prAdapter = NULL;
+#endif
 		kalSendAeeWarning(HIF_SDIO_ERR_TITLE_STR,
 				  HIF_SDIO_ERR_DESC_STR "sdio_writesb() reports error: %x", ret);
 		DBGLOG(HAL, ERROR, "sdio_writesb() reports error: %x\n", ret);
+#if CFG_CHIP_RESET_SUPPORT
+		prAdapter = container_of(&prGlueInfo, ADAPTER_T, prGlueInfo);
+		prAdapter->fgIsChipNoAck = TRUE;
+		DBGLOG(HAL, ERROR, "fgIsChipNoAck = %d\n",
+						prAdapter->fgIsChipNoAck);
+		glResetTrigger(prAdapter);
+#endif
 	}
 
 	return (ret) ? FALSE : TRUE;
@@ -1391,8 +1435,18 @@ BOOL kalDevWriteWithSdioCmd52(IN P_GLUE_INFO_T prGlueInfo, IN UINT_32 u4Addr, IN
 #endif
 
 	if (ret) {
+#if CFG_CHIP_RESET_SUPPORT
+		P_ADAPTER_T prAdapter = container_of(&prGlueInfo, ADAPTER_T,
+								prGlueInfo);
+#endif
 		kalSendAeeWarning(HIF_SDIO_ERR_TITLE_STR, HIF_SDIO_ERR_DESC_STR "sdio_writeb() reports error: %x", ret);
 		DBGLOG(HAL, ERROR, "sdio_writeb() reports error: %x\n", ret);
+#if CFG_CHIP_RESET_SUPPORT
+		prAdapter->fgIsChipNoAck = TRUE;
+		DBGLOG(HAL, ERROR, "fgIsChipNoAck = %d\n",
+					prAdapter->fgIsChipNoAck);
+		glResetTrigger(prAdapter);
+#endif
 	}
 
 	return (ret) ? FALSE : TRUE;
