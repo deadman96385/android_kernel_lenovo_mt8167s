@@ -3804,7 +3804,7 @@ VOID rlmProcessSpecMgtAction(P_ADAPTER_T prAdapter, P_SW_RFB_T prSwRfb)
 						DBGLOG(RLM, EVENT, "[Ch] TxAllowed = FALSE\n");
 					}
 
-					if (prChannelSwitchAnnounceIE->ucChannelSwitchCount <= 3) {
+					{
 						DBGLOG(RLM, INFO,
 						       "[Mgt Action] switch channel [%d]->[%d]\n",
 							prBssInfo->ucPrimaryChannel,
