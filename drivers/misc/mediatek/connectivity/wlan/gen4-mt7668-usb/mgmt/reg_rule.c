@@ -198,6 +198,21 @@ const struct ieee80211_regdomain regdom_us01 = {
 	REG_RULE_LIGHT(5745-10, 5825+10, 40, 0) }
 };
 
+const struct ieee80211_regdomain regdom_tw = {
+	.n_reg_rules = 5,
+	.reg_rules = {
+	/* channels 1..11 */
+	REG_RULE_LIGHT(2412-10, 2462+10, 40, 0),
+	/* channels 36..48 */
+	REG_RULE_LIGHT(5180-10, 5240+10, 40, 0),
+	/* channels 52..64 */
+	REG_RULE_LIGHT(5260-10, 5320+10, 40, 0),
+	/* channels 100..140*/
+	REG_RULE_LIGHT(5500-10, 5700+10, 40, 0),
+	/* channels 149..165 */
+	REG_RULE_LIGHT(5745-10, 5825+10, 40, 0) }
+};
+
 const struct ieee80211_regdomain regdom_us = {
 	.n_reg_rules = 5,
 	.dfs_region = NL80211_DFS_FCC,
@@ -325,6 +340,20 @@ const struct ieee80211_regdomain regdom_au = {
 	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
 
+const struct ieee80211_regdomain regdom_ng = {
+	.n_reg_rules = 4,
+	.dfs_region = NL80211_DFS_FCC,
+	.reg_rules = {
+	/* channels 1..13 */
+	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
+	/* channels 52..64 */
+	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
+	/* channels 100..140 */
+	REG_RULE_LIGHT(5500-10, 5700+10, 160, KAL_RRF_DFS),
+	/* channels 149..165 */
+	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
+};
+
 const struct ieee80211_regdomain regdom_ae = {
 	.n_reg_rules = 5,
 	.dfs_region = NL80211_DFS_FCC,
@@ -362,6 +391,22 @@ const struct ieee80211_regdomain regdom_id = {
 	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
 	/* channels 149..161 */
 	REG_RULE_LIGHT(5745-10, 5805+10, 80, 0) }
+};
+
+const struct ieee80211_regdomain regdom_ao = {
+	.n_reg_rules = 1,
+	.reg_rules = {
+	/* channels 1..13 */
+	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0) }
+};
+
+const struct ieee80211_regdomain regdom_qa = {
+	.n_reg_rules = 2,
+	.reg_rules = {
+	/* channels 1..13 */
+	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
+	/* channels 149..165 */
+	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
 
 const struct ieee80211_regdomain regdom_kr = {
@@ -427,6 +472,16 @@ const struct mtk_regdomain my_regdom_us01 = {
 	.prRegdRules = &regdom_us01
 };
 
+const struct mtk_regdomain my_regdom_tw = {
+	.country_code = "TW",
+	.prRegdRules = &regdom_tw
+};
+
+const struct mtk_regdomain my_regdom_ao = {
+	.country_code = "AO",
+	.prRegdRules = &regdom_ao
+};
+
 const struct mtk_regdomain my_regdom_us = {
 	.country_code = "US",
 	.prRegdRules = &regdom_us
@@ -435,6 +490,26 @@ const struct mtk_regdomain my_regdom_us = {
 const struct mtk_regdomain my_regdom_ca = {
 	.country_code = "CA",
 	.prRegdRules = &regdom_ca
+};
+
+const struct mtk_regdomain my_regdom_ng = {
+	.country_code = "NG",
+	.prRegdRules = &regdom_ng
+};
+
+const struct mtk_regdomain my_regdom_qa = {
+	.country_code = "QA",
+	.prRegdRules = &regdom_qa
+};
+
+const struct mtk_regdomain my_regdom_pk = {
+	.country_code = "PK",
+	.prRegdRules = &regdom_qa
+};
+
+const struct mtk_regdomain my_regdom_hn = {
+	.country_code = "HN",
+	.prRegdRules = &regdom_qa
 };
 
 const struct mtk_regdomain my_regdom_at = {
@@ -457,6 +532,21 @@ const struct mtk_regdomain my_regdom_fr = {
 	.prRegdRules = &regdom_cz_nl
 };
 
+const struct mtk_regdomain my_regdom_hr = {
+	.country_code = "HR",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_by = {
+	.country_code = "BY",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_iq = {
+	.country_code = "IQ",
+	.prRegdRules = &regdom_cz_nl
+};
+
 const struct mtk_regdomain my_regdom_it = {
 	.country_code = "IT",
 	.prRegdRules = &regdom_cz_nl
@@ -474,6 +564,21 @@ const struct mtk_regdomain my_regdom_se = {
 
 const struct mtk_regdomain my_regdom_cn = {
 	.country_code = "CN",
+	.prRegdRules = &regdom_cn
+};
+
+const struct mtk_regdomain my_regdom_bh = {
+	.country_code = "BH",
+	.prRegdRules = &regdom_il
+};
+
+const struct mtk_regdomain my_regdom_eg = {
+	.country_code = "EG",
+	.prRegdRules = &regdom_cn
+};
+
+const struct mtk_regdomain my_regdom_zm = {
+	.country_code = "ZM",
 	.prRegdRules = &regdom_cn
 };
 
@@ -502,6 +607,41 @@ const struct mtk_regdomain my_regdom_au = {
 	.prRegdRules = &regdom_au
 };
 
+const struct mtk_regdomain my_regdom_ar = {
+	.country_code = "AR",
+	.prRegdRules = &regdom_au
+};
+
+const struct mtk_regdomain my_regdom_lb = {
+	.country_code = "LB",
+	.prRegdRules = &regdom_au
+};
+
+const struct mtk_regdomain my_regdom_hk = {
+	.country_code = "HK",
+	.prRegdRules = &regdom_au
+};
+
+const struct mtk_regdomain my_regdom_nz = {
+	.country_code = "NZ",
+	.prRegdRules = &regdom_au
+};
+
+const struct mtk_regdomain my_regdom_gt = {
+	.country_code = "GT",
+	.prRegdRules = &regdom_au
+};
+
+const struct mtk_regdomain my_regdom_cr = {
+	.country_code = "CR",
+	.prRegdRules = &regdom_au
+};
+
+const struct mtk_regdomain my_regdom_ec = {
+	.country_code = "EC",
+	.prRegdRules = &regdom_au
+};
+
 const struct mtk_regdomain my_regdom_sg = {
 	.country_code = "SG",
 	.prRegdRules = &regdom_au
@@ -519,6 +659,16 @@ const struct mtk_regdomain my_regdom_vn = {
 
 const struct mtk_regdomain my_regdom_my = {
 	.country_code = "MY",
+	.prRegdRules = &regdom_my
+};
+
+const struct mtk_regdomain my_regdom_sv = {
+	.country_code = "SV",
+	.prRegdRules = &regdom_my
+};
+
+const struct mtk_regdomain my_regdom_ve = {
+	.country_code = "VE",
 	.prRegdRules = &regdom_my
 };
 
@@ -540,11 +690,6 @@ const struct mtk_regdomain my_regdom_kr = {
 const struct mtk_regdomain my_regdom_ru = {
 	.country_code = "RU",
 	.prRegdRules = &regdom_mx
-};
-
-const struct mtk_regdomain my_regdom_pt = {
-	.country_code = "PT",
-	.prRegdRules = &regdom_cz_nl
 };
 
 const struct mtk_regdomain my_regdom_gr = {
@@ -589,11 +734,106 @@ const struct mtk_regdomain my_regdom_th = {
 
 const struct mtk_regdomain my_regdom_ae = {
 	.country_code = "AE",
-	.prRegdRules = &regdom_ae
+	.prRegdRules = &regdom_il
 };
 
 const struct mtk_regdomain my_regdom_tr = {
 	.country_code = "TR",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_be = {
+	.country_code = "BE",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_bg = {
+	.country_code = "BG",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_cy = {
+	.country_code = "CY",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_dk = {
+	.country_code = "DK",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_ee = {
+	.country_code = "EE",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_no = {
+	.country_code = "NO",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_fi = {
+	.country_code = "FI",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_ie = {
+	.country_code = "IE",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_lv = {
+	.country_code = "LV",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_lt = {
+	.country_code = "LT",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_lu = {
+	.country_code = "LU",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_mt = {
+	.country_code = "MT",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_pt = {
+	.country_code = "PT",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_ke = {
+	.country_code = "KE",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_om = {
+	.country_code = "OM",
+	.prRegdRules = &regdom_il
+};
+
+const struct mtk_regdomain my_regdom_ro = {
+	.country_code = "RO",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_dz = {
+	.country_code = "DZ",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_sk = {
+	.country_code = "SK",
+	.prRegdRules = &regdom_cz_nl
+};
+
+const struct mtk_regdomain my_regdom_si = {
+	.country_code = "SI",
 	.prRegdRules = &regdom_cz_nl
 };
 
@@ -622,9 +862,64 @@ const struct mtk_regdomain my_regdom_ir = {
 	.prRegdRules = &regdom_ir
 };
 
+const struct mtk_regdomain my_regdom_ps = {
+	.country_code = "PS",
+	.prRegdRules = &regdom_ir
+};
+
+const struct mtk_regdomain my_regdom_sd = {
+	.country_code = "SD",
+	.prRegdRules = &regdom_ir
+};
+
+const struct mtk_regdomain my_regdom_sy = {
+	.country_code = "SY",
+	.prRegdRules = &regdom_ir
+};
+
 const struct mtk_regdomain my_regdom_il = {
 	.country_code = "IL",
 	.prRegdRules = &regdom_il
+};
+
+const struct mtk_regdomain my_regdom_am = {
+	.country_code = "AM",
+	.prRegdRules = &regdom_il
+};
+
+const struct mtk_regdomain my_regdom_az = {
+	.country_code = "AZ",
+	.prRegdRules = &regdom_il
+};
+
+const struct mtk_regdomain my_regdom_ma = {
+	.country_code = "MA",
+	.prRegdRules = &regdom_il
+};
+
+const struct mtk_regdomain my_regdom_kw = {
+	.country_code = "KW",
+	.prRegdRules = &regdom_il
+};
+
+const struct mtk_regdomain my_regdom_br = {
+	.country_code = "BR",
+	.prRegdRules = &regdom_mx
+};
+
+const struct mtk_regdomain my_regdom_ua = {
+	.country_code = "UA",
+	.prRegdRules = &regdom_mx
+};
+
+const struct mtk_regdomain my_regdom_kz = {
+	.country_code = "KZ",
+	.prRegdRules = &regdom_mx
+};
+
+const struct mtk_regdomain my_regdom_dm = {
+	.country_code = "DM",
+	.prRegdRules = &regdom_mx
 };
 
 /*
@@ -671,6 +966,59 @@ const struct mtk_regdomain *g_prRegRuleTable[] = {
 	&my_regdom_za,
 	&my_regdom_ir,
 	&my_regdom_il,
+	&my_regdom_br,
+	&my_regdom_ar,
+	&my_regdom_dm,
+	&my_regdom_ec,
+	&my_regdom_ve,
+	&my_regdom_gt,
+	&my_regdom_sv,
+	&my_regdom_nz,
+	&my_regdom_ua,
+	&my_regdom_kz,
+	&my_regdom_be,
+	&my_regdom_bg,
+	&my_regdom_cy,
+	&my_regdom_dk,
+	&my_regdom_ee,
+	&my_regdom_no,
+	&my_regdom_ie,
+	&my_regdom_lv,
+	&my_regdom_lt,
+	&my_regdom_lu,
+	&my_regdom_mt,
+	&my_regdom_pt,
+	&my_regdom_ro,
+	&my_regdom_sk,
+	&my_regdom_si,
+	&my_regdom_kw,
+	&my_regdom_om,
+	&my_regdom_sa,
+	&my_regdom_bh,
+	&my_regdom_lb,
+	&my_regdom_ke,
+	&my_regdom_zm,
+	&my_regdom_sd,
+	&my_regdom_dz,
+	&my_regdom_sy,
+	&my_regdom_co,
+	&my_regdom_eg,
+	&my_regdom_ma,
+	&my_regdom_qa,
+	&my_regdom_pk,
+	&my_regdom_hn,
+	&my_regdom_ng,
+	&my_regdom_tw,
+	&my_regdom_ao,
+	&my_regdom_iq,
+	&my_regdom_ps,
+	&my_regdom_am,
+	&my_regdom_az,
+	&my_regdom_hr,
+	&my_regdom_by,
+	&my_regdom_hk,
+	&my_regdom_cr,
+	&my_regdom_fi,
 	NULL /* this NULL SHOULD be at the end of the array */
 };
 
