@@ -221,13 +221,16 @@ static void _sgm37603a_led_set_brightness(
 			val = brightness * lp->brightness_limit /
 				lp->max_brightness;
 
-		if (val == 1) {		/* min brightness: 1 */
-			val = 0x4;
-		} else if (val > 1) {
-			val = (val - 1) * 12;	/* 2980 / 255 == 11.6 */
-			if (val > 2980)		/* 0xba4 */
-				val = 2980;
-		}
+		if (brightness <= 0)
+			val = 0;
+		else if (brightness < 40)
+			val = brightness * 2 + 2; // 4 - 80
+		else if (brightness < 100)
+			val = brightness * 9 - 271; // 89 - 620
+		else if (brightness < 255)
+			val = brightness * 15 - 865; // 635 - 2945
+		else
+			val = 2980; // Last step 35
 
 		sgm37603a_write_byte(lp, lp->cfg->reg_devicectrl, 0x00);
 		sgm37603a_write_byte(lp, lp->cfg->reg_brightness1, val & 0xF);
