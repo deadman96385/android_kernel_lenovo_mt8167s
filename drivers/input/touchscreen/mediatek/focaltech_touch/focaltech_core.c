@@ -891,6 +891,11 @@ static int tpd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     ts_data->client = client;
     ts_data->input_dev = tpd->dev;
 
+#if FTS_POWER_SOURCE_CUST_EN
+    if (fts_power_init() != 0)
+        return -1;
+#endif
+
     if (client->addr != FTS_I2C_SLAVE_ADDR) {
         FTS_INFO("[TPD]Change i2c addr 0x%02x to %x", client->addr, FTS_I2C_SLAVE_ADDR);
         client->addr = FTS_I2C_SLAVE_ADDR;
@@ -1075,10 +1080,6 @@ static int tpd_remove(struct i2c_client *client)
 static int tpd_local_init(void)
 {
     FTS_FUNC_ENTER();
-#if FTS_POWER_SOURCE_CUST_EN
-    if (fts_power_init() != 0)
-        return -1;
-#endif
 
     if (i2c_add_driver(&tpd_i2c_driver) != 0) {
         FTS_ERROR("[TPD]: Unable to add fts i2c driver!!");

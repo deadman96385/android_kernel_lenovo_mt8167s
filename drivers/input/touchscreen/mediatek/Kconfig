@@ -21,6 +21,19 @@ config TOUCHSCREEN_MTK
 	  To compile this dirver as a module, choose M here: the
 	  module will be called.
 
+config TOUCHSCREEN_MTK_GT9XX
+	bool "GOODIX_UPDATE_GT9XX for Mediatek package"
+	default n
+	help
+	  Say Y here if you have GT9XX touch panel.
+
+	  If unsure, say N.
+
+	  To compile this dirver as a module, choose M here: the
+	  module will be called.
+
+source "drivers/input/touchscreen/mediatek/gt9xx_mtk/Kconfig
+
 config TOUCHSCREEN_PHYSICAL_ROTATION_WITH_LCM
 	bool "MediaTek Touch Panel Rotation With LCM"
 	default y
