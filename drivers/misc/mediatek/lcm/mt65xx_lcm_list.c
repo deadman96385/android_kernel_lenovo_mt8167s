@@ -1129,6 +1129,10 @@ LCM_DRIVER *lcm_driver_list[] = {
 #if defined(ST7701S_T400_WVGA_DSI_VDO)
 	&st7701s_t400_wvga_dsi_vdo_lcm_drv,
 #endif
+
+#if defined(NT51021B_WSVGA_DSI_GX)
+	&nt51021b_wsvga_dsi_gx_lcm_drv,
+#endif
 };
 
 unsigned char lcm_name_list[][128] = {
