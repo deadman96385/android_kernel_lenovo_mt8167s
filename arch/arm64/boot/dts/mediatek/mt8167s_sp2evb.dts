@@ -25,11 +25,13 @@
 };
 
 &i2c0 {
+	clock-div = <2>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c0_pins_a>;
 	status = "okay";
-	clock-frequency = <400000>;
 
 	cap_touch@14 {
-		compatible = "mediatek,FT6336";
+		compatible = "mediatek,GT9XX_MTK";
 		reg = <0x14>;
 		interrupt-parent = <&pio>;
 		interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
@@ -152,6 +154,14 @@
 			pins = <MT8167_PIN_9_EINT9__FUNC_GPIO9>;
 			slew-rate = <1>;
 			output-high;
+		};
+	};
+
+	i2c0_pins_a: i2c0@0 {
+		pins1 {
+			pinmux = <MT8167_PIN_58_SDA0__FUNC_SDA0_0>,
+				 <MT8167_PIN_59_SCL0__FUNC_SCL0_0>;
+			bias-disable;
 		};
 	};
 
