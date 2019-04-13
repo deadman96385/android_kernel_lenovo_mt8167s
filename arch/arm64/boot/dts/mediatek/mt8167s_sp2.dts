@@ -38,13 +38,64 @@
 };
 
 &i2c1 {
+	clock-div = <2>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c1_pins_a>;
 	status = "okay";
 	clock-frequency = <400000>;
+	kd_camera_hw1@36 {
+		compatible = "mediatek,camera_main";
+		reg = <0x36>;
+	};
+	kd_camera_hw2@10 {
+		compatible = "mediatek,camera_sub";
+		reg = <0x10>;
+	};
+	 camera_main_af@0c {
+		compatible = "mediatek,CAMERA_MAIN_AF";
+		reg = <0x0c>;
+	};
 };
 
 &i2c2 {
 	status = "okay";
 	clock-frequency = <400000>;
+};
+
+/* Main Cam */
+&kd_camera_hw1 {
+	reg-vcama-supply = <&mt6392_vcama_reg>;		/* AVDD */
+	reg-vcamd-supply = <&mt6392_vcamd_reg>;		/* DVDD */
+	reg-vcamio-supply = <&mt6392_vcamio_reg>;	/* DOVDD */
+	reg-vcamaf-supply = <&mt6392_vcamaf_reg>;	/* AFVDD */
+
+	pinctrl-names = "default",
+		"cam_mclk", "cam_gpio84", "cam_gpio85",
+		"cam_gpio86", "cam_gpio87", "cam_gpio88",  "cam_gpio89";
+
+	pinctrl-0 = <&camera_pins_default>;
+	pinctrl-1 = <&camera_pins_cam_mclk>;
+	pinctrl-2 = <&camera_pins_gpio84>;
+	pinctrl-3 = <&camera_pins_gpio85>;
+	pinctrl-4 = <&camera_pins_gpio86>;
+	pinctrl-5 = <&camera_pins_gpio87>;
+	pinctrl-6 = <&camera_pins_gpio88>;
+	pinctrl-7 = <&camera_pins_gpio89>;
+
+	cam0_rst = <&pio 49 0>;
+	cam0_pdn = <&pio 48 0>;
+/* cam1_rst = <&pio 10 0>; */
+/* cam1_pdn = <&pio 7 0>; */
+	status = "okay";
+};
+
+/* Sub Cam */
+/* Same power pins as Main, actually, it can be commented */
+&kd_camera_hw2 {
+	reg-vcama-supply = <&mt6392_vcama_reg>;		/* AVDD */
+	reg-vcamd-supply = <&mt6392_vcamd_reg>;		/* DVDD */
+	reg-vcamio-supply = <&mt6392_vcamio_reg>;	/* DOVDD */
+	reg-vcamaf-supply = <&mt6392_vcamaf_reg>;	/* AFVDD */
 };
 
 &led6 {
@@ -105,6 +156,63 @@
 			 drive-strength = <MTK_DRIVE_4mA>;
 		};
 	};
+
+	/* CAMERA GPIO standardization */
+	/* default mode */
+	camera_pins_default: camdefault {
+		pins_cmd_dat {
+			pinmux = <MT8167_PIN_84_RDN0__FUNC_RDN0>,
+				<MT8167_PIN_85_RDP0__FUNC_RDP0>,
+				<MT8167_PIN_86_RDN1__FUNC_RDN1>,
+				<MT8167_PIN_87_RDP1__FUNC_RDP1>,
+				<MT8167_PIN_88_RCN__FUNC_RCN>,
+				<MT8167_PIN_89_RCP__FUNC_RCP>;
+		};
+	};
+
+	camera_pins_cam_mclk: cam_pin_mclk {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_102_CMMCLK__FUNC_CMMCLK>;
+		};
+	};
+
+	camera_pins_gpio88: cam_pin_gpio88 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_88_RCN__FUNC_RCN>;
+		};
+	};
+
+	camera_pins_gpio89: cam_pin_gpio89 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_89_RCP__FUNC_RCP>;
+		};
+	};
+
+	camera_pins_gpio86: cam_pin_gpio86 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_86_RDN1__FUNC_RDN1>;
+		};
+	};
+
+	camera_pins_gpio87: cam_pin_gpio87 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_87_RDP1__FUNC_RDP1>;
+		};
+	};
+
+	camera_pins_gpio84: cam_pin_gpio84 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_84_RDN0__FUNC_RDN0>;
+		};
+	};
+
+	camera_pins_gpio85: cam_pin_gpio85 {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_85_RDP0__FUNC_RDP0>;
+		};
+	};
+	/* CAMERA GPIO standardization END */
+
 
 	CTP_pins_default: eint0default {
 		pins_cmd_dat {

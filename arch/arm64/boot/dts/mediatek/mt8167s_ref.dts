@@ -37,12 +37,24 @@
 };
 
 &i2c1 {
+	clock-div = <2>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c1_pins_a>;
 	status = "okay";
 	clock-frequency = <400000>;
 
 	kd_camera_hw1@36 {
 		compatible = "mediatek,camera_main";
 		reg = <0x36>;
+	};
+	kd_camera_hw2@10 {
+		compatible = "mediatek,camera_sub";
+		reg = <0x10>;
+	};
+
+	 camera_main_af@0c {
+		compatible = "mediatek,CAMERA_MAIN_AF";
+		reg = <0x0c>;
 	};
 };
 
@@ -72,9 +84,19 @@
 
 	cam0_rst = <&pio 10 0>;
 	cam0_pdn = <&pio 7 0>;
+/* cam1_rst = <&pio 10 0>; */
+/* cam1_pdn = <&pio 7 0>; */
 	status = "okay";
 };
 
+/* Sub Cam */
+/* Same power pins as Main, actually, it can be commented */
+&kd_camera_hw2 {
+	reg-vcama-supply = <&mt6392_vcama_reg>;		/* AVDD */
+	reg-vcamd-supply = <&mt6392_vcamd_reg>;		/* DVDD */
+	reg-vcamio-supply = <&mt6392_vcamio_reg>;	/* DOVDD */
+	reg-vcamaf-supply = <&mt6392_vcamaf_reg>;	/* AFVDD */
+};
 &keypad {
 	pinctrl-names = "default";
 	pinctrl-0 = <&kpd_pins_default>;

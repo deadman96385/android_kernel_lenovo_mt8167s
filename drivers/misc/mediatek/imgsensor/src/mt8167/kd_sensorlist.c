@@ -4614,24 +4614,40 @@ static int CAMERA_HW_probe(struct platform_device *pdev)
 	GPIO_CAM0_PDN = of_get_named_gpio(dev->of_node, "cam0_pdn", 0);
 	GPIO_CAM1_PDN = of_get_named_gpio(dev->of_node, "cam1_pdn", 0);
 
-	ret = gpio_request(GPIO_CAM0_RST, "cam0_rst");
-	if (ret < 0)
-		PK_ERR("[Camera][ERROR] Unable to request GPIO_CAM0_RST\n");
-
-	ret = gpio_request(GPIO_CAM1_RST, "cam0_rst");
-	if (ret < 0) {
-		PK_ERR("[Camera][ERROR] Unable to request GPIO_CAM1_RST\n");
-		if (CamUseSameRst == 1)
-			GPIO_CAM1_RST = GPIO_CAM0_RST;
+	if (!gpio_is_valid(GPIO_CAM0_RST)) {
+		PK_ERR("[Camera][ERROR] unvalid GPIO_CAM0_RST\n");
+	} else {
+		ret = gpio_request(GPIO_CAM0_RST, "cam0_rst");
+		if (ret < 0)
+			PK_ERR("[Camera][ERROR] Unable to request GPIO_CAM0_RST\n");
 	}
 
-	ret = gpio_request(GPIO_CAM0_PDN, "cam0_pdn");
-	if (ret < 0)
-		PK_ERR("[Camera][ERROR] Unable to request GPIO_CAM0_PDN\n");
+	if (!gpio_is_valid(GPIO_CAM1_RST)) {
+		PK_ERR("[Camera][ERROR] unvalid GPIO_CAM1_RST\n");
+	} else {
+		ret = gpio_request(GPIO_CAM1_RST, "cam1_rst");
+		if (ret < 0) {
+			PK_ERR("[Camera][ERROR] Unable to request GPIO_CAM1_RST\n");
+			if (CamUseSameRst == 1)
+				GPIO_CAM1_RST = GPIO_CAM0_RST;
+		}
+	}
 
-	ret = gpio_request(GPIO_CAM1_PDN, "cam1_pdn");
-	if (ret < 0)
-		PK_ERR("[Camera][ERROR] Unable to request GPIO_CAM1_PDN\n");
+	if (!gpio_is_valid(GPIO_CAM0_PDN)) {
+		PK_ERR("[Camera][ERROR] unvalid GPIO_CAM0_PDN\n");
+	} else {
+		ret = gpio_request(GPIO_CAM0_PDN, "cam0_pdn");
+		if (ret < 0)
+			PK_ERR("[Camera][ERROR] Unable to request GPIO_CAM0_PDN\n");
+	}
+
+	if (!gpio_is_valid(GPIO_CAM1_PDN)) {
+		PK_ERR("[Camera][ERROR] unvalid GPIO_CAM1_PDN\n");
+	} else {
+		ret = gpio_request(GPIO_CAM1_PDN, "cam1_pdn");
+		if (ret < 0)
+			PK_ERR("[Camera][ERROR] Unable to request GPIO_CAM1_PDN\n");
+	}
 #endif
 	mtkcam_gpio_init(pdev);
 
@@ -5163,10 +5179,6 @@ static struct platform_driver g_stCAMERA_HW_Driver = {
 		   }
 };
 
-
-
-
-
 static struct file_operations fcamera_proc_fops = {
 	.read = CAMERA_HW_DumpReg_To_Proc,
 	.write = CAMERA_HW_Reg_Debug
@@ -5313,8 +5325,6 @@ static int __init CAMERA_HW_i2C_init(void)
 	atomic_set(&g_CamDrvOpenCnt2, 0);
 	atomic_set(&g_CamHWOpening, 0);
 
-
-
 	return 0;
 }
 
@@ -5332,7 +5342,7 @@ EXPORT_SYMBOL(kdSetSensorSyncFlag);
 EXPORT_SYMBOL(kdSensorSyncFunctionPtr);
 EXPORT_SYMBOL(kdGetRawGainInfoPtr);
 
-module_init(CAMERA_HW_i2C_init);
+late_initcall(CAMERA_HW_i2C_init);
 module_exit(CAMERA_HW_i2C_exit);
 
 MODULE_DESCRIPTION("CAMERA_HW driver");
