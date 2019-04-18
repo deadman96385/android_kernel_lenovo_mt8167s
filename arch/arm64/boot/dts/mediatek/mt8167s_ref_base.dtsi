@@ -562,13 +562,12 @@
 };
 
 &usb0 {
-	pinctrl-names = "iddig_irq_init", "drvvbus_init", "drvvbus_low", "drvvbus_high";
+	pinctrl-names = "drvvbus_init", "drvvbus_low", "drvvbus_high";
 	pinctrl-0 = <&usb0_iddig>;
 	pinctrl-1 = <&usb0_drvvbus>;
 	pinctrl-2 = <&usb0_drvvbus_low>;
 	pinctrl-3 = <&usb0_drvvbus_high>;
 	status = "okay";
 	drvvbus_gpio = <&pio 18 2>;
-	iddig_gpio = <&pio 19 2>;
 };
 
