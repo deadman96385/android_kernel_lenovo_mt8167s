@@ -54,6 +54,11 @@
 		startup-delay-us = <500000>;
 	};
 
+	mediatek,connectivity-bt {
+		compatible = "mediatek,connectivity-bt";
+		pmu_en_pin = <&pio 2 0>;	/* GPIO_BT_PMU_EN_PIN */
+	};
+
 	mtcpufreq {
 		compatible = "mediatek,mt8167-cpufreq";
 	};
