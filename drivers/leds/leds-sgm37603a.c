@@ -404,7 +404,8 @@ static int sgm37603a_probe(struct i2c_client *cl, const struct i2c_device_id *id
 	 * FIXME : Will read from device tree later
 	 */
 	lp->mode = REGISTER_BASED;
-	lp->initial_brightness = 100;
+        // The initial brightness will be set by boot animations.
+	lp->initial_brightness = 1;
 	lp->device_control = SGM37603A_DEVICE_CTRL;
 	lp->max_brightness = 255;
 	lp->brightness_limit = 0;
@@ -516,5 +517,3 @@ module_i2c_driver(sgm37603a_driver);
 MODULE_DESCRIPTION("SGMICRO SGM37603A Backlight driver");
 MODULE_AUTHOR("Xi Chen<xixi.chen@mediatek.com>");
 MODULE_LICENSE("GPL");
-
-
