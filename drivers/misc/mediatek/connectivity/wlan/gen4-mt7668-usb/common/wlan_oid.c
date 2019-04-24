@@ -577,6 +577,10 @@ wlanoidSetBssidListScan(IN P_ADAPTER_T prAdapter,
 			return WLAN_STATUS_FAILURE;
 	}
 
+	cnmTimerStartTimer(prAdapter,
+		&prAdapter->rWifiVar.rAisFsmInfo.rScanDoneTimer,
+		SEC_TO_MSEC(AIS_SCN_DONE_TIMEOUT_SEC));
+
 	return WLAN_STATUS_SUCCESS;
 }				/* wlanoidSetBssidListScan */
 
