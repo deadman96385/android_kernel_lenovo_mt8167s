@@ -1171,6 +1171,7 @@ VOID p2pFuncDfsSwitchCh(IN P_ADAPTER_T prAdapter, IN P_BSS_INFO_T prBssInfo, IN 
 	P_GLUE_INFO_T prGlueInfo;
 	P_P2P_ROLE_FSM_INFO_T prP2pRoleFsmInfo = (P_P2P_ROLE_FSM_INFO_T) NULL;
 	P_CMD_RDD_ON_OFF_CTRL_T prCmdRddOnOffCtrl;
+	UINT_8 role_idx;
 
 	DEBUGFUNC("p2pFuncDfsSwitchCh()");
 
@@ -1219,6 +1220,13 @@ VOID p2pFuncDfsSwitchCh(IN P_ADAPTER_T prAdapter, IN P_BSS_INFO_T prBssInfo, IN 
 	prP2pRoleFsmInfo = P2P_ROLE_INDEX_2_ROLE_FSM_INFO(prAdapter, prBssInfo->u4PrivateData);
 
 	prGlueInfo = prAdapter->prGlueInfo;
+
+	role_idx = prP2pRoleFsmInfo->ucRoleIndex;
+
+	if (prGlueInfo->prP2PInfo[role_idx]->chandef == NULL) {
+		DBGLOG(P2P, INFO, "Not start ch switch!\n");
+		return;
+	}
 
 	DBGLOG(P2P, INFO, "p2pFuncDfsSwitchCh: Update to OS\n");
 	cfg80211_ch_switch_notify(prGlueInfo->prP2PInfo[prP2pRoleFsmInfo->ucRoleIndex]->prDevHandler,
