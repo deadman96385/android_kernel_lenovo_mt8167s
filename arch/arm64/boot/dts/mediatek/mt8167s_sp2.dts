@@ -16,9 +16,8 @@
 
 / {
 	panel: panel@0 {
-		compatible = "st7701s,st7701s_t400_wvga_dsi_vdo";
-		gpio_lcd_rst = <&pio 66 0>;
-		gpio_lcd_bl_en = <&pio 22 0>;
+		compatible = "jd9364,jd9364_wsvga_dsi_boe";
+		gpio_lcd_rst = <&pio 106 0>;
 		reg-lcm-supply = <&mt6392_vgp2_reg>;
 		status = "okay";
 	};
