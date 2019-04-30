@@ -1,0 +1,1 @@
+obj-$(CONFIG_TOUCHSCREEN_MTK_FT3427) += focaltech_test_ft3427.o

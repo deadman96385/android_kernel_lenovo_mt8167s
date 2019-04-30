@@ -65,7 +65,20 @@ config TOUCHSCREEN_MTK_GT911
 	  If unsure, say N.
 
 source "drivers/input/touchscreen/mediatek/GT911/Kconfig"
-source "drivers/input/touchscreen/mediatek/focaltech_touch/Kconfig"
+
+config TOUCHSCREEN_MTK_FT3427
+	bool "Focaltech FT3427 Ts for Mediatek package"
+	help
+	  Say Y here if you have FT3427 touch panel.
+
+	  If unsure, say N.
+
+config TOUCHSCREEN_MTK_FT6336
+	bool "Focaltech FT6336 Ts for Mediatek package"
+	depends on I2C
+	help
+	  Say Y here if you have FT6336 touch panel.
+	  If unsure, say N.
 
 config TOUCHSCREEN_MTK_GT9157
 	bool "GT9157 for Mediatek package"
