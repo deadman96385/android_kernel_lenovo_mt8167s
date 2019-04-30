@@ -1133,6 +1133,10 @@ LCM_DRIVER *lcm_driver_list[] = {
 #if defined(NT51021B_WSVGA_DSI_GX)
 	&nt51021b_wsvga_dsi_gx_lcm_drv,
 #endif
+
+#if defined(JD9364_WSVGA_DSI_BOE)
+	&jd9364_wsvga_dsi_boe_lcm_drv,
+#endif
 };
 
 unsigned char lcm_name_list[][128] = {
