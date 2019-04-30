@@ -27,9 +27,9 @@
 	status = "okay";
 	clock-frequency = <400000>;
 
-	cap_touch@14 {
-		compatible = "mediatek,FT6336";
-		reg = <0x14>;
+	cap_touch@38 {
+		compatible = "mediatek,FT3427";
+		reg = <0x38>;
 		interrupt-parent = <&pio>;
 		interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
 		int-gpio = <&pio 18 0>;
@@ -124,7 +124,7 @@
 
 	CTP_pins_eint_output0: eintoutput0 {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_8_EINT8__FUNC_GPIO8>;
+			pins = <MT8167_PIN_18_EINT18__FUNC_GPIO18>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -132,7 +132,7 @@
 
 	CTP_pins_eint_output1: eintoutput1 {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_8_EINT8__FUNC_GPIO8>;
+			pins = <MT8167_PIN_18_EINT18__FUNC_GPIO18>;
 			slew-rate = <1>;
 			output-high;
 		};
@@ -140,7 +140,7 @@
 
 	CTP_pins_rst_output0: rstoutput0 {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_9_EINT9__FUNC_GPIO9>;
+			pins = <MT8167_PIN_24_EINT24__FUNC_GPIO24>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -148,7 +148,7 @@
 
 	CTP_pins_rst_output1: rstoutput1 {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_9_EINT9__FUNC_GPIO9>;
+			pins = <MT8167_PIN_24_EINT24__FUNC_GPIO24>;
 			slew-rate = <1>;
 			output-high;
 		};
