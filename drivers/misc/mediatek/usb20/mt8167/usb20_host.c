@@ -832,9 +832,9 @@ static void otg_int_init(void)
 	if (IS_ERR(pinctrl_iddig)) {
 		ret = PTR_ERR(pinctrl_iddig);
 		DBG(0, "Cannot find usb pinctrl iddig_irq_init\n");
+	} else {
+		pinctrl_select_state(pinctrl, pinctrl_iddig);
 	}
-
-	pinctrl_select_state(pinctrl, pinctrl_iddig);
 	DBG(0, "usb iddig_pin %d\n", iddig_pin);
 
 #if 0
@@ -975,6 +975,14 @@ void switch_int_to_device(struct musb *musb) {}
 void switch_int_to_host(struct musb *musb) {}
 void switch_int_to_host_and_mask(struct musb *musb) {}
 void musb_session_restart(struct musb *musb) {}
-int mt_typec_enable(void) {}
+void mtk_typec_host_init(void) {}
+int mt_typec_enable(void)
+{
+#if defined(CONFIG_USB_C_SWITCH)
+	return 1;
+#else
+	return 0;
+#endif
+}
 
 #endif
