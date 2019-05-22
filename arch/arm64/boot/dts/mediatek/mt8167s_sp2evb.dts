@@ -49,7 +49,7 @@
 };
 
 &led6 {
-	status = "disabled";
+	status = "okay";
 };
 
 &mt6392keys {
