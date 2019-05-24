@@ -372,6 +372,8 @@ static int compat_get_disp_session_info(struct compat_disp_session_info __user *
 	err |= get_user(i, &(data32->physicalHeight));
 	err |= put_user(i, &(data->physicalHeight));
 
+	err |= get_user(i, &(data32->density));
+	err |= put_user(i, &(data->density));
 
 	err |= get_user(i, &(data32->isConnected));
 	err |= put_user(i, &(data->isConnected));
@@ -432,6 +434,8 @@ static int compat_put_disp_session_info(struct compat_disp_session_info __user *
 	err |= get_user(i, &(data->physicalHeight));
 	err |= put_user(i, &(data32->physicalHeight));
 
+	err |= get_user(i, &(data->density));
+	err |= put_user(i, &(data32->density));
 
 	err |= get_user(i, &(data->isConnected));
 	err |= put_user(i, &(data32->isConnected));
