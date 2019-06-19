@@ -41,12 +41,7 @@
 #include <linux/of_gpio.h>
 #endif
 
-
 #include "../../usb_c/inc/typec.h"
-
-
-
-#ifdef CONFIG_USB_MTK_OTG
 
 #ifdef CONFIG_OF
 static unsigned int iddig_pin;
@@ -97,17 +92,19 @@ module_param(delay_time1, int, 0400);
 int mt_typec_enable(void)
 {
 #if defined(CONFIG_USB_C_SWITCH)
-	int ret;
-	ret = typec_support();
-	return ret;
-#else
-	return 0;
+	if (usb_c_switch_enable)
+		return typec_support();
+	else
 #endif
+		return 0;
 }
 
 void mt_usb_set_vbus(struct musb *musb, int is_on)
 {
 	DBG(0, "mt65xx_usb20_vbus++,is_on=%d\r\n", is_on);
+
+	if (!mtk_otg_enable)
+		return;
 
 #if defined(CONFIG_MTK_DUAL_INPUT_CHARGER_SUPPORT)
 	if (is_on)
@@ -188,6 +185,9 @@ void mt_usb_init_drvvbus(void)
 	mt_set_gpio_pull_select(drvvbus_pin, GPIO_PULL_UP);
 #else
 	int ret = 0;
+
+	if (!mtk_otg_enable)
+		return;
 
 	DBG(0, "****%s:%d Init Drive VBUS!!!!!\n", __func__, __LINE__);
 
@@ -285,6 +285,9 @@ void musb_session_restart(struct musb *musb)
 {
 	void __iomem	*mbase = musb->mregs;
 
+	if (!mtk_otg_enable)
+		return;
+
 	musb_writeb(mbase, MUSB_DEVCTL, (musb_readb(mbase, MUSB_DEVCTL) & (~MUSB_DEVCTL_SESSION)));
 	DBG(0, "[MUSB] stopped session for VBUSERROR interrupt\n");
 	USBPHY_SET8(0x6d, 0x3c);
@@ -301,6 +304,9 @@ void musb_session_restart(struct musb *musb)
 
 void switch_int_to_device(struct musb *musb)
 {
+	if (!mtk_otg_enable)
+		return;
+
 #ifdef ID_PIN_USE_EX_EINT
 #if defined(CONFIG_MTK_LEGACY)
 	mt_eint_set_polarity(IDDIG_EINT_PIN, MT_EINT_POL_POS);
@@ -323,6 +329,9 @@ void switch_int_to_device(struct musb *musb)
 
 void switch_int_to_host(struct musb *musb)
 {
+	if (!mtk_otg_enable)
+		return;
+
 #ifdef ID_PIN_USE_EX_EINT
 #if defined(CONFIG_MTK_LEGACY)
 	mt_eint_set_polarity(IDDIG_EINT_PIN, MT_EINT_POL_NEG);
@@ -345,6 +354,9 @@ void switch_int_to_host(struct musb *musb)
 
 void switch_int_to_host_and_mask(struct musb *musb)
 {
+	if (!mtk_otg_enable)
+		return;
+
 #ifdef ID_PIN_USE_EX_EINT
 #if defined(CONFIG_MTK_LEGACY)
 	mt_eint_set_polarity(IDDIG_EINT_PIN, MT_EINT_POL_NEG);
@@ -533,22 +545,27 @@ struct typec_switch_data typec_device_driver = {
 
 void mtk_typec_host_init(void)
 {
-#if defined(CONFIG_USB_C_SWITCH)
-	mtk_musb->fifo_cfg_host = fifo_cfg_host;
-	mtk_musb->fifo_cfg_host_size = ARRAY_SIZE(fifo_cfg_host);
-	otg_state.name = "otg_state";
-	otg_state.index = 0;
-	otg_state.state = 0;
+	if (!mtk_otg_enable)
+		return;
 
-	if (switch_dev_register(&otg_state))
-		DBG(0, "switch_dev_register fail\n");
-	else
-		DBG(0, "switch_dev_register success\n");
-	register_typec_switch_callback(&typec_host_driver);
-	register_typec_switch_callback(&typec_device_driver);
-#else
-	return;
+#if defined(CONFIG_USB_C_SWITCH)
+	if (usb_c_switch_enable) {
+		mtk_musb->fifo_cfg_host = fifo_cfg_host;
+		mtk_musb->fifo_cfg_host_size = ARRAY_SIZE(fifo_cfg_host);
+		otg_state.name = "otg_state";
+		otg_state.index = 0;
+		otg_state.state = 0;
+
+		if (switch_dev_register(&otg_state))
+			DBG(0, "switch_dev_register fail\n");
+		else
+			DBG(0, "switch_dev_register success\n");
+		register_typec_switch_callback(&typec_host_driver);
+		register_typec_switch_callback(&typec_device_driver);
+	}
 #endif
+
+	return;
 }
 
 
@@ -790,6 +807,9 @@ void mt_usb_iddig_int(struct musb *musb)
 {
 	u32 usb_l1_ploy = musb_readl(musb->mregs, USB_L1INTP);
 
+	if (!mtk_otg_enable)
+		return;
+
 	DBG(0, "id pin interrupt assert,polarity=0x%x\n", usb_l1_ploy);
 	if (usb_l1_ploy & IDDIG_INT_STATUS)
 		usb_l1_ploy &= (~IDDIG_INT_STATUS);
@@ -871,8 +891,10 @@ void mt_usb_otg_init(struct musb *musb)
 	struct device_node *node;
 	struct property *prop;
 	int ret;
-
 #endif
+
+	if (!mtk_otg_enable)
+		return;
 
 #if defined(CONFIG_MTK_DUAL_INPUT_CHARGER_SUPPORT)
 #ifdef MTK_KERNEL_POWER_OFF_CHARGING
@@ -963,26 +985,3 @@ void mt_usb_otg_init(struct musb *musb)
 
 }
 
-#else
-
-/* for not define CONFIG_USB_MTK_OTG */
-void mt_usb_otg_init(struct musb *musb) {}
-void mt_usb_init_drvvbus(void) {}
-void mt_usb_set_vbus(struct musb *musb, int is_on) {}
-int mt_usb_get_vbus_status(struct musb *musb) {return 1; }
-void mt_usb_iddig_int(struct musb *musb) {}
-void switch_int_to_device(struct musb *musb) {}
-void switch_int_to_host(struct musb *musb) {}
-void switch_int_to_host_and_mask(struct musb *musb) {}
-void musb_session_restart(struct musb *musb) {}
-void mtk_typec_host_init(void) {}
-int mt_typec_enable(void)
-{
-#if defined(CONFIG_USB_C_SWITCH)
-	return 1;
-#else
-	return 0;
-#endif
-}
-
-#endif

@@ -38,7 +38,9 @@ extern void mt_usb_clock_unprepare(struct musb *musb);
 extern struct regmap *mt_regmap;
 #endif
 
-#ifdef CONFIG_USB_MTK_OTG
+extern bool mtk_otg_enable;
+extern bool usb_c_switch_enable;
+
 #ifdef ID_PIN_USE_EX_EINT
 #if defined(CONFIG_MTK_LEGACY)
 #define IDDIG_EINT_PIN (GPIO_OTG_IDDIG_EINT_PIN & ~(0x80000000))
@@ -53,7 +55,6 @@ extern struct musb *mtk_musb;
 #endif
 #define ID_PULL_UP 0x0101
 #define ID_PHY_RESET 0x3d11
-#endif
 #endif
 
 #if (defined(CONFIG_MTK_FAN5405_SUPPORT) \
