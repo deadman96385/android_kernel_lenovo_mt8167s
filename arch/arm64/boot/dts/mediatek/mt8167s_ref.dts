@@ -309,10 +309,9 @@
 	pinctrl-2 = <&usb0_drvvbus_low>;
 	pinctrl-3 = <&usb0_drvvbus_high>;
 	usb-power-supply = <&mt6392_vusb_reg>;
-
 	drvvbus_gpio = <&pio 18 2>;
 	iddig_gpio = <&pio 19 2>;
-
+	mediatek,otg-enable;
 	status = "okay";
 };
 

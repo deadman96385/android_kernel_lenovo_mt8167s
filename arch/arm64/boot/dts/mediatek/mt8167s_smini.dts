@@ -242,5 +242,7 @@
 	iddig_gpio = <&pio 17 0>;
 	ocp-gpio = <&pio 11 0>;
 	type = "a";
+	mediatek,otg-enable;
+	mediatek,c-switch;
 	status = "okay";
 };
