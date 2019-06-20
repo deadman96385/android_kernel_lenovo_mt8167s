@@ -27,7 +27,7 @@
 	status = "okay";
 
 	cap_touch@5d {
-		compatible = "mediatek,GT9157";
+		compatible = "mediatek,GT9157", "mediatek,GT9XX_MTK";
 		reg = <0x5d>;
 		interrupt-parent = <&pio>;
 		interrupts = <8 IRQ_TYPE_EDGE_FALLING>;

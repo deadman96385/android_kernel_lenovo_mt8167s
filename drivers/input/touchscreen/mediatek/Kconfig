@@ -21,6 +21,19 @@ config TOUCHSCREEN_MTK
 	  To compile this dirver as a module, choose M here: the
 	  module will be called.
 
+config TOUCHSCREEN_MTK_GT9XX
+	bool "GOODIX_UPDATE_GT9XX for Mediatek package"
+	default n
+	help
+	  Say Y here if you have GT9XX touch panel.
+
+	  If unsure, say N.
+
+	  To compile this dirver as a module, choose M here: the
+	  module will be called.
+
+source "drivers/input/touchscreen/mediatek/gt9xx_mtk/Kconfig
+
 config TOUCHSCREEN_PHYSICAL_ROTATION_WITH_LCM
 	bool "MediaTek Touch Panel Rotation With LCM"
 	default y
@@ -52,7 +65,20 @@ config TOUCHSCREEN_MTK_GT911
 	  If unsure, say N.
 
 source "drivers/input/touchscreen/mediatek/GT911/Kconfig"
-source "drivers/input/touchscreen/mediatek/focaltech_touch/Kconfig"
+
+config TOUCHSCREEN_MTK_FT3427
+	bool "Focaltech FT3427 Ts for Mediatek package"
+	help
+	  Say Y here if you have FT3427 touch panel.
+
+	  If unsure, say N.
+
+config TOUCHSCREEN_MTK_FT6336
+	bool "Focaltech FT6336 Ts for Mediatek package"
+	depends on I2C
+	help
+	  Say Y here if you have FT6336 touch panel.
+	  If unsure, say N.
 
 config TOUCHSCREEN_MTK_GT9157
 	bool "GT9157 for Mediatek package"
