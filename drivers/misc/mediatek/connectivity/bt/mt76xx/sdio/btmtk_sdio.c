@@ -4522,7 +4522,7 @@ ssize_t btmtk_fops_write(struct file *filp, const char __user *buf,
 		return -EFAULT;
 	}
 
-	if (userbuf[0] == 0x7) {
+	if (userbuf[0] == 0x7 && waiting_for_hci_without_packet_type == 0) {
 		/* write CR */
 		if (count < 15) {
 			pr_info("%s count=%zd less than 15, error\n",
@@ -4545,7 +4545,7 @@ ssize_t btmtk_fops_write(struct file *filp, const char __user *buf,
 			crAddr, crValue);
 		btmtk_sdio_writel(crAddr, crValue);
 		retval = count;
-	} else if (userbuf[0] == 0x8) {
+	} else if (userbuf[0] == 0x8 && waiting_for_hci_without_packet_type == 0) {
 		/* read CR */
 		if (count < 16) {
 			pr_info("%s count=%zd less than 15, error\n",
@@ -4584,15 +4584,24 @@ ssize_t btmtk_fops_write(struct file *filp, const char __user *buf,
 		if (waiting_for_hci_without_packet_type) {
 			copy_size = count + 1;
 			skb = bt_skb_alloc(copy_size-1, GFP_ATOMIC);
+			if (skb == NULL) {
+				pr_warn("skb is null\n");
+				retval = -ENOMEM;
+				goto OUT;
+			}
 			bt_cb(skb)->pkt_type = hci_packet_type;
 			memcpy(&skb->data[0], &userbuf[0], copy_size-1);
 		} else {
 			copy_size = count;
 			skb = bt_skb_alloc(copy_size-1, GFP_ATOMIC);
+			if (skb == NULL) {
+				pr_warn("skb is null\n");
+				retval = -ENOMEM;
+				goto OUT;
+			}
 			bt_cb(skb)->pkt_type = userbuf[0];
 			memcpy(&skb->data[0], &userbuf[1], copy_size-1);
 		}
-
 
 		skb->len = copy_size-1;
 		skb_queue_tail(&g_priv->adapter->tx_queue, skb);

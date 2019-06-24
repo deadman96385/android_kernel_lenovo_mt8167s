@@ -19,7 +19,7 @@
 #endif
 #include <linux/mmc/card.h>
 
-#define VERSION "v0.0.1.00_2019010301"
+#define VERSION "v0.0.1.00_2019061801"
 
 #define SDIO_HEADER_LEN                 4
 
