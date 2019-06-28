@@ -145,6 +145,9 @@ static int lcm_driver_probe(struct device *dev, void const *data)
 {
 	lcm_request_gpio_control(dev);
 	lcm_get_vgp_supply(dev);
+	if (is_lk_show_logo)
+		lcm_vgp_supply_enable();
+
 
 	return 0;
 }
@@ -430,7 +433,8 @@ static void lcm_init_lcm(void)
 {
 #ifndef BUILD_LK
 	pr_notice("[Kernel/LCM] lcm_init() enter\n");
-	lcm_resume();
+	if (!is_lk_show_logo)
+		lcm_resume();
 #endif
 }
 

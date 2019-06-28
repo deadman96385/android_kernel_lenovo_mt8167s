@@ -936,7 +936,7 @@ static int __init typec_module_init(void)
 	return 0;
 }
 
-module_init(typec_module_init);
+late_initcall(typec_module_init);
 
 /**
  * typec_exit - Driver exit clean-up routine

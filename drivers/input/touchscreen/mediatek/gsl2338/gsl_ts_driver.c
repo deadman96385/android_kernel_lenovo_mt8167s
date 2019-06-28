@@ -2118,6 +2118,12 @@ static int  gsl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
    	//client->timing = 400; //add by litianfeng 20160106
 
+	print_info("[wsl] regulator_get start \n");
+    tpd->reg = regulator_get(tpd->tpd_dev, "vtouch");
+    if (IS_ERR(tpd->reg))
+	print_info("tpd->reg error\n");
+	print_info("[wsl] regulator_get end \n");
+
 	if(client->addr != 0x40)
 	{
 		client->addr = 0x40;
@@ -2396,14 +2402,9 @@ static int gsl_local_init(void)
 {
 	int ret;
 	print_info();
+
 	#ifdef CONFIG_OF_TOUCH
 		print_info("[wsl] gsl_local_init start \n");
-
-	print_info("[wsl] regulator_get start \n");
-    tpd->reg = regulator_get(tpd->tpd_dev, "vtouch");
-    if (IS_ERR(tpd->reg))
-	print_info("tpd->reg error\n");
-	print_info("[wsl] regulator_get end \n");
 	
        input_set_abs_params(tpd->dev, ABS_MT_TRACKING_ID, 0, 10, 0, 0);
 	if (tpd_dts_data.use_tpd_button) {

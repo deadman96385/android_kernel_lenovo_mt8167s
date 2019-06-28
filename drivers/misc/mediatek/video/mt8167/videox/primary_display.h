@@ -35,6 +35,7 @@ extern unsigned int FB_LAYER;	/* default LCD layer */
 extern unsigned int gEnableDSIStateCheck;
 extern unsigned int ext_session_id;
 extern unsigned int is_hwc_enabled;
+extern unsigned int is_lk_show_logo;
 #ifdef CONFIG_SINGLE_PANEL_OUTPUT
 extern  unsigned int g_suspend_flag;
 #endif

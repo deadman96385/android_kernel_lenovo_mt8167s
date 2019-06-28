@@ -104,6 +104,7 @@
 unsigned int is_hwc_enabled;
 static int is_hwc_update_frame;
 unsigned int gEnableLowPowerFeature;
+unsigned int is_lk_show_logo;
 /* int _trigger_display_interface(int blocking, void *callback, unsigned int userdata); */
 
 int primary_display_use_cmdq = CMDQ_DISABLE;
@@ -2802,6 +2803,11 @@ static int _build_path_rdma_to_dsi(void)
 
 	dpmgr_path_set_video_mode(pgc->dpmgr_handle, primary_display_is_video_mode());
 
+	if (is_lk_show_logo) {
+		if (primary_display_is_video_mode())
+			_cmdq_insert_wait_frame_done_token();
+		dpmgr_path_init(pgc->dpmgr_handle, CMDQ_ENABLE);
+	}
 #if 0 /*ndef CONFIG_MTK_CLKMGR*/
 	ddp_clk_prepare(DISP_MTCMOS_CLK);
 #endif
@@ -2819,6 +2825,8 @@ static int _build_path_rdma_to_dsi(void)
 	decouple_rdma_config.pitch = primary_display_get_width() * DP_COLOR_BITS_PER_PIXEL(eRGB888) / 8;
 
 	_config_rdma_input_data(&decouple_rdma_config, pgc->dpmgr_handle, pgc->cmdq_handle_config);
+	if (is_lk_show_logo)
+		cmdqRecFlush(pgc->cmdq_handle_config);
 	DISPCHECK("dpmgr set dst module FINISHED(%s)\n", ddp_get_module_name(dst_module));
 
 	return 0;
@@ -5432,7 +5440,8 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 		ret = DISP_STATUS_ERROR;
 		goto done;
 	}
-	primary_display_mode = DECOUPLE_MODE;
+	if (!is_lk_show_logo)
+		primary_display_mode = DECOUPLE_MODE;
 #ifndef MTK_FB_CMDQ_DISABLE
 	ret = cmdqCoreRegisterCB(CMDQ_GROUP_DISP, (CmdqClockOnCB)cmdqDdpClockOn, (CmdqDumpInfoCB)cmdqDdpDumpInfo,
 				 (CmdqResetEngCB)cmdqDdpResetEng, (CmdqClockOffCB)cmdqDdpClockOff);
@@ -5489,11 +5498,18 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 	primary_display_use_cmdq = CMDQ_DISABLE;
 #endif
 
+	if (is_lk_show_logo)
+		dpmgr_path_set_video_mode(pgc->dpmgr_handle, primary_display_is_video_mode());
+
 	/* For DEBUG: Reset OVL here if without CMDQ and DDP hang */
 
 	if (primary_display_use_cmdq == CMDQ_ENABLE) {
 		_cmdq_build_trigger_loop();
 		_cmdq_start_trigger_loop();
+		if (is_lk_show_logo) {
+			_cmdq_reset_config_handle();
+			_cmdq_insert_wait_frame_done_token();
+		}
 	}
 
 	data_config = dpmgr_path_get_last_config(pgc->dpmgr_handle);
@@ -5520,14 +5536,16 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 	data_config->fps = lcm_fps;
 	data_config->dst_dirty = 1;
 
-	dpmgr_path_set_video_mode(pgc->dpmgr_handle, primary_display_is_video_mode());
-	dpmgr_path_init(pgc->dpmgr_handle, CMDQ_DISABLE);
-	dpmgr_path_config(pgc->dpmgr_handle, data_config, NULL);
-	disp_lcm_init(pgc->plcm, 1);
-	dpmgr_path_start(pgc->dpmgr_handle, CMDQ_DISABLE);
-	dpmgr_path_trigger(pgc->dpmgr_handle, NULL, CMDQ_DISABLE);
-	if (primary_display_use_cmdq == CMDQ_ENABLE)
-		 _cmdq_reset_config_handle();
+	if (!is_lk_show_logo) {
+		dpmgr_path_set_video_mode(pgc->dpmgr_handle, primary_display_is_video_mode());
+		dpmgr_path_init(pgc->dpmgr_handle, CMDQ_DISABLE);
+		dpmgr_path_config(pgc->dpmgr_handle, data_config, NULL);
+		disp_lcm_init(pgc->plcm, 1);
+		dpmgr_path_start(pgc->dpmgr_handle, CMDQ_DISABLE);
+		dpmgr_path_trigger(pgc->dpmgr_handle, NULL, CMDQ_DISABLE);
+		if (primary_display_use_cmdq == CMDQ_ENABLE)
+			_cmdq_reset_config_handle();
+	}
 
 	/* use fake timer to generate vsync signal for cmd mode w/o LCM(originally using LCM TE Signal as VSYNC) */
 	/* so we don't need to modify display driver's behavior. */
@@ -5552,14 +5570,30 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps)
 
 	dpmgr_path_enable_irq(pgc->dpmgr_handle, NULL, DDP_IRQ_LEVEL_ALL);
 
-/*
- *#ifndef MTK_NO_DISP_IN_LK
- *        if (_is_decouple_mode(pgc->session_mode))
- *#endif
- *                [> this should remove? for video mode when LK has start path <]
- *                dpmgr_path_start(pgc->dpmgr_handle, CMDQ_DISABLE);
- *                [> dpmgr_path_flush(pgc->dpmgr_handle, 0);	considering revising <]
- */
+	if (is_lk_show_logo) {
+		if (primary_display_use_cmdq == CMDQ_ENABLE) {
+			ret = dpmgr_path_config(pgc->dpmgr_handle, data_config, pgc->cmdq_handle_config);
+
+			/* should we set dirty here???????? */
+			_cmdq_flush_config_handle(0, NULL, 0);
+
+			_cmdq_reset_config_handle();
+			_cmdq_insert_wait_frame_done_token();
+		} else
+			ret = dpmgr_path_config(pgc->dpmgr_handle, data_config, NULL);
+
+#ifdef MTK_NO_DISP_IN_LK
+		ret = disp_lcm_init(pgc->plcm, 1);
+#else
+		ret = disp_lcm_init(pgc->plcm, 0);
+#endif
+#ifndef MTK_NO_DISP_IN_LK
+		if (_is_decouple_mode(pgc->session_mode))
+#endif
+			/* this should remove? for video mode when LK has start path */
+			dpmgr_path_start(pgc->dpmgr_handle, CMDQ_DISABLE);
+		/* dpmgr_path_flush(pgc->dpmgr_handle, 0);	considering revising */
+	}
 
 #ifdef MTK_FB_PULLCLK_ENABLE
 	primary_display_pullclk_task = kthread_create(primary_display_vdo_pullclk_worker_kthread,

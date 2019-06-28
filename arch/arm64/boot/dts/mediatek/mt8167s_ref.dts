@@ -27,7 +27,7 @@
 	status = "okay";
 
 	cap_touch@5d {
-		compatible = "mediatek,GT9157";
+		compatible = "mediatek,GT9157", "mediatek,GT9XX_MTK";
 		reg = <0x5d>;
 		interrupt-parent = <&pio>;
 		interrupts = <8 IRQ_TYPE_EDGE_FALLING>;
@@ -237,6 +237,14 @@
 				 <MT8167_PIN_41_KPROW1__FUNC_KPROW1>;
 			output-low;
 			bias-disable;
+		};
+	};
+
+	usb0_iddig: iddig_irq_init {
+		pins_cmd_dat {
+			pins = <MT8167_PIN_19_EINT19__FUNC_IDDIG>;
+			slew-rate = <0>;
+			bias-pull-up = <00>;
 		};
 	};
 };

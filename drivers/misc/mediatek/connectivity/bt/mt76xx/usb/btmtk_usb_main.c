@@ -34,13 +34,19 @@
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
 
+#include <linux/gpio.h>
+#include <linux/of.h>
+#include <linux/of_address.h>
+#include <linux/of_gpio.h>
+#include <linux/input.h>
+
 #include "btmtk_usb_main.h"
 #include "btmtk_usb_fifo.h"
 
 /*============================================================================*/
 /* Local Configuration */
 /*============================================================================*/
-#define VERSION "6.0.18051601"
+#define VERSION "6.0.19041702"
 
 /*============================================================================*/
 /* Function Prototype */
@@ -214,6 +220,7 @@ static dev_t g_devIDfwlog;
 u8 btmtk_log_lvl = BTMTK_LOG_LEVEL_DEFAULT;
 static char fw_version_str[FW_VERSION_BUF_SIZE];
 static struct proc_dir_entry *g_proc_dir;
+static int pmu_en_gpio;
 
 const struct file_operations BT_proc_fops = {
 	.open = btmtk_proc_open,
@@ -716,6 +723,14 @@ void btmtk_usb_toggle_rst_pin(void)
 		need_reset_stack = HW_ERR_CODE_CHIP_RESET;
 
 	btmtk_usb_hci_snoop_print_to_log();
+
+	if (gpio_is_valid(pmu_en_gpio)) {
+		gpio_direction_output(pmu_en_gpio, 0);
+		mdelay(RESET_PIN_SET_LOW_TIME);
+		gpio_direction_output(pmu_en_gpio, 1);
+	} else {
+		pr_info("%s pmu_en is valid\n", __func__);
+	}
 
 	do {
 		typedef void (*pdwnc_func) (u8 fgReset);
@@ -5883,6 +5898,22 @@ static struct usb_driver btmtk_usb_driver = {
 static int __init btmtk_usb_init(void)
 {
 	int retval = 0;
+	struct device_node *node;
+
+	node = of_find_compatible_node(NULL, NULL, "mediatek,connectivity-bt");
+	if (node) {
+		pmu_en_gpio = of_get_named_gpio(node, "pmu_en_pin", 0);
+		pr_info("%s pmu_en %d\n", __func__, pmu_en_gpio);
+
+		/* workaround for adb reboot*/
+		if (gpio_is_valid(pmu_en_gpio)) {
+			gpio_direction_output(pmu_en_gpio, 0);
+			mdelay(RESET_PIN_SET_LOW_TIME);
+			gpio_direction_output(pmu_en_gpio, 1);
+		} else {
+			pr_info("%s pmu_en is valid\n", __func__);
+		}
+	}
 
 	BTUSB_INFO("%s: btmtk usb driver ver %s", __func__, VERSION);
 

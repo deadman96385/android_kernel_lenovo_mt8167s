@@ -141,7 +141,8 @@ static int lcm_driver_probe(struct device *dev, void const *data)
 {
 	lcm_request_gpio_control(dev);
 	lcm_get_vgp_supply(dev);
-	lcm_vgp_supply_disable();
+	if (is_lk_show_logo)
+		lcm_vgp_supply_enable();
 
 	return 0;
 }
