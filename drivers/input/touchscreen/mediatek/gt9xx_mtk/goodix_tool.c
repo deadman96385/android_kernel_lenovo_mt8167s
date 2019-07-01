@@ -13,7 +13,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the GNU
  * General Public License for more details.
  *
- * Version: V2.6
+ * Version: V2.6.0.3
  */
 
 #include "tpd.h"
@@ -32,7 +32,7 @@
 
 #pragma pack(1)
 struct st_cmd_head {
-	u8 wr;			/* write read flag£¬0:R1:W2:PID 3: */
+	u8 wr;			/* write read flagÂ£Â¬0:R1:W2:PID 3: */
 	u8 flag;		/* 0:no need flag/int 1: need flag2:need int */
 	u8 flag_addr[2];	/* flag address */
 	u8 flag_val;		/* flag val */
@@ -151,10 +151,6 @@ static s32 tool_i2c_write_with_extra(u8 *buf, u16 len)
 
 static void register_i2c_func(void)
 {
-/* if (!strncmp(IC_TYPE, "GT818", 5) || !strncmp(IC_TYPE, "GT816", 5) */
-/* || !strncmp(IC_TYPE, "GT811", 5) || !strncmp(IC_TYPE, "GT818F", 6) */
-/* || !strncmp(IC_TYPE, "GT827", 5) || !strncmp(IC_TYPE,"GT828", 5) */
-/* || !strncmp(IC_TYPE, "GT813", 5)) */
 	if (strncmp(IC_TYPE, "GT8110", 6) && strncmp(IC_TYPE, "GT8105", 6)
 	    && strncmp(IC_TYPE, "GT801", 5) && strncmp(IC_TYPE, "GT800", 5)
 	    && strncmp(IC_TYPE, "GT801PLUS", 9) && strncmp(IC_TYPE, "GT811", 5)
@@ -311,9 +307,6 @@ static u8 comfirm(void)
 {
 	s32 i = 0;
 	u8 buf[32];
-
-	/* memcpy(&buf[GTP_ADDR_LENGTH - cmd_head.addr_len], &cmd_head.flag_addr, cmd_head.addr_len); */
-	/* memcpy(buf, &cmd_head.flag_addr, cmd_head.addr_len);//Modified by Scott, 2012-02-17 */
 	memcpy(buf, cmd_head.flag_addr, cmd_head.addr_len);
 
 	for (i = 0; i < cmd_head.times; i++) {
@@ -413,11 +406,17 @@ static ssize_t goodix_tool_write(struct file *filp, const char __user *buff, siz
 #ifdef CONFIG_GTP_ESD_PROTECT
 		gtp_esd_switch(i2c_client_point, SWITCH_OFF);
 #endif
+#ifdef CONFIG_GTP_CHARGER_DETECT
+		gtp_charger_switch(0);
+#endif
 		return CMD_HEAD_LENGTH;
 	} else if (9 == cmd_head.wr) {	/* enable irq! */
 		gtp_irq_enable();
 #ifdef CONFIG_GTP_ESD_PROTECT
 		gtp_esd_switch(i2c_client_point, SWITCH_ON);
+#endif
+#ifdef CONFIG_GTP_CHARGER_DETECT
+		gtp_charger_switch(1);
 #endif
 		return CMD_HEAD_LENGTH;
 	} else if (17 == cmd_head.wr) {
@@ -666,14 +665,13 @@ static ssize_t hotknot_write(struct file *filp, const char __user *buff, size_t 
 {
 	s32 ret = 0;
 	int cnt = 30;
-	
+
 	GTP_DEBUG_FUNC();
 	GTP_DEBUG_ARRAY((u8 *) buff, len);
-	
-	while (cnt-- && gtp_updating_fw) {
+	while (cnt-- && gtp_loading_fw) {
 	        ssleep(1);
 	}
-	
+
 	if (gtp_resetting == 1) {
 		GTP_DEBUG("[Write]tpd_halt =1 fail!");
 		return FAIL;
@@ -748,11 +746,17 @@ static ssize_t hotknot_write(struct file *filp, const char __user *buff, size_t 
 #ifdef CONFIG_GTP_ESD_PROTECT
 		gtp_esd_switch(i2c_client_point, SWITCH_OFF);
 #endif
+#ifdef CONFIG_GTP_CHARGER_DETECT
+		gtp_charger_switch(0);
+#endif
 		return CMD_HEAD_LENGTH;
 	} else if (9 == cmd_head2.wr) {	/* enable irq! */
 		gtp_irq_enable();
 #ifdef CONFIG_GTP_ESD_PROTECT
 		gtp_esd_switch(i2c_client_point, SWITCH_ON);
+#endif
+#ifdef CONFIG_GTP_CHARGER_DETECT
+		gtp_charger_switch(1);
 #endif
 		return CMD_HEAD_LENGTH;
 	} else if (17 == cmd_head2.wr) {
