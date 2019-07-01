@@ -43,15 +43,18 @@
 #ifndef BUILD_LK
 static struct regulator *lcm_vgp;
 static unsigned int GPIO_LCD_RST;
-static unsigned int GPIO_LCD_BL_EN;
+/* GPIO51: high id normal mode, low is BIST mode*/
+static unsigned int GPIO_LCD_ID1;
 
 static void lcm_request_gpio_control(struct device *dev)
 {
 	pr_notice("[Kernel/LCM] nt51021b: %s", __func__);
+
+	GPIO_LCD_ID1 = of_get_named_gpio(dev->of_node, "gpio_lcd_id1", 0);
+	gpio_request(GPIO_LCD_ID1, "GPIO_LCD_ID1");
+
 	GPIO_LCD_RST = of_get_named_gpio(dev->of_node, "gpio_lcd_rst", 0);
 	gpio_request(GPIO_LCD_RST, "GPIO_LCD_RST");
-	GPIO_LCD_BL_EN = of_get_named_gpio(dev->of_node, "gpio_lcd_bl_en", 0);
-	gpio_request(GPIO_LCD_BL_EN, "GPIO_LCD_BL_EN");
 }
 
 /* get LDO supply */
@@ -368,9 +371,6 @@ static void lcm_suspend(void)
 #ifndef BUILD_LK
 	pr_notice("[Kernel/LCM] nt51021b: %s enter\n", __func__);
 
-	lcm_set_gpio_output(GPIO_LCD_BL_EN, GPIO_OUT_ZERO);
-	MDELAY(20);
-
 	suspend_lcm_registers();
 
 	lcm_set_gpio_output(GPIO_LCD_RST, GPIO_OUT_ZERO);
@@ -378,6 +378,10 @@ static void lcm_suspend(void)
 
 	lcm_vgp_supply_disable();
 	MDELAY(20);
+
+	lcm_set_gpio_output(GPIO_LCD_ID1, GPIO_OUT_ZERO);
+	MDELAY(20);
+
 #endif
 }
 
@@ -385,6 +389,9 @@ static void lcm_resume(void)
 {
 #ifndef BUILD_LK
 	pr_notice("[Kernel/LCM] nt51021b: %s enter\n", __func__);
+
+	lcm_set_gpio_output(GPIO_LCD_ID1, GPIO_OUT_ONE);
+	MDELAY(20);
 
 	lcm_vgp_supply_enable();
 	MDELAY(20);
@@ -397,8 +404,6 @@ static void lcm_resume(void)
 	MDELAY(20);
 
 	init_lcm_registers();
-	lcm_set_gpio_output(GPIO_LCD_BL_EN, GPIO_OUT_ONE);
-	MDELAY(20);
 #endif
 }
 
