@@ -21,6 +21,13 @@
 		reg-lcm-supply = <&mt6392_vgp2_reg>;
 		status = "okay";
 	};
+	panel1: panel1@1 {
+		compatible = "nt51021b,nt51021b_wsvga_dsi_gx";
+		gpio_lcd_id1 = <&pio 51 0>;
+		gpio_lcd_rst = <&pio 106 0>;
+		reg-lcm-supply = <&mt6392_vgp2_reg>;
+		status = "okay";
+	};
 };
 
 &i2c0 {
@@ -290,10 +297,6 @@
 			output-high;
 		};
 	};
-};
-
-&spi {
-	status = "okay";
 };
 
 &touch {
