@@ -48,6 +48,7 @@
 #define UPDATE_FUNCTIONS
 #define  GTP_ANDROID_TOUCH   "android_touch"
 #define  GTP_ITO_TEST_lcmon        "self_test"
+#define	 TP_INFO				"tp"
 #define  GTP_ITO_TEST_lcmoff       "gtp_ito_lcm_off"
 
 #define GTP_CONFIG_MIN_LENGTH       186
@@ -204,7 +205,7 @@ enum chip_type_t {
 #endif
 
 /* Log define */
-#define GTP_INFO(fmt, arg...)           pr_warn("<<-GTP-INFO->> "fmt"\n", ##arg)
+#define GTP_INFO(fmt, arg...)           pr_info("<<-GTP-INFO->> "fmt"\n", ##arg)
 #define GTP_ERROR(fmt, arg...)          pr_err("<<-GTP-ERROR->> "fmt"\n", ##arg)
 #define GTP_DEBUG(fmt, arg...)	do {\
 	if (GTP_DEBUG_ON)\

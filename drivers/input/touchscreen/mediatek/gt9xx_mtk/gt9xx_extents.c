@@ -33,7 +33,7 @@
 
 #ifdef CONFIG_GTP_GESTURE_WAKEUP
 
-#define GESTURE_NODE "goodix_gesture"
+#define GESTURE_NODE "gtp_gesture"
 #define GTP_REG_WAKEUP_GESTURE     		0x814B
 #define GTP_REG_WAKEUP_GESTURE_DETAIL	0x9420
 
@@ -58,16 +58,16 @@ static inline s32 ges_i2c_read_bytes(u16 addr, u8 *buf, s32 len)
 static ssize_t gtp_gesture_data_read(struct file *file, char __user * page, size_t size, loff_t * ppos)
 {
 	s32 ret = -1;
+    char buf[4] = {'\0'};
 
 	GTP_DEBUG("visit gtp_gesture_data_read. ppos:%d", (int)*ppos);
 	if (*ppos) {
 		return 0;
 	}
-	if (size == 4) {
-		ret = copy_to_user(((u8 __user *) page), "GT1X", 4);
-		return 4;
-	}
-	ret = simple_read_from_buffer(page, size, ppos, &gesture_data, sizeof(gesture_data));
+    sprintf(buf, "%d",gesture_data.enabled);
+    GTP_ERROR("buf = %s", buf);
+
+    ret = simple_read_from_buffer(page, size, ppos, buf, strlen(buf));
 
 	GTP_DEBUG("Got the gesture data.");
 	return ret;
@@ -76,13 +76,13 @@ static ssize_t gtp_gesture_data_read(struct file *file, char __user * page, size
 static ssize_t gtp_gesture_data_write(struct file *filp, const char __user * buff, size_t len, loff_t * off)
 {
 	s32 ret = 0;
-
-	ret = copy_from_user(&gesture_data.enabled, buff, 1);
+    char buf_temp[4] = {'\0'};
+    ret = copy_from_user(buf_temp, buff, 1);
 	if (ret) {
 		GTP_ERROR("copy_from_user failed.");
 		return -EPERM;
 	}
-
+    gesture_data.enabled = simple_strtol(buf_temp, NULL, 10);
 	GTP_DEBUG("gesture enabled:%x, ret:%d", gesture_data.enabled, ret);
 
 	return len;
@@ -98,7 +98,7 @@ s8 gtp_enter_doze(void)
     while(retry++ < 5) {
         ret = ges_i2c_write_bytes(0x8046, i2c_control_buf, 1);
         if (ret < 0) {
-            GTP_DEBUG("failed to set doze flag into 0x8046, %d", retry);
+            GTP_ERROR("GTP failed to set doze flag into 0x8046, %d", retry);
             continue;
         }
 
@@ -166,13 +166,14 @@ s32 gesture_event_handler(struct input_dev * dev)
 
             doze_buf[2] &= ~0x30;
             doze_buf[2] |= extra_len > 0 ? 0x20 : 0x10;
+
 			gesture_data.data[0] = doze_buf[0];	/* gesture type*/
 			gesture_data.data[1] = len;	/* gesture points number*/
 			gesture_data.data[2] = doze_buf[2];
 			gesture_data.data[3] = extra_len;
 			mutex_unlock(&gesture_data_mutex);
 
-			key_code = doze_buf[0] < 16 ?  KEY_F3: KEY_F2;
+			key_code = doze_buf[0] < 16 ?  KEY_F3: KEY_POWER;
 			GTP_DEBUG("Gesture: 0x%02X, points: %d", doze_buf[0], doze_buf[1]);
 
 			doze_buf[0] = 0;
@@ -182,6 +183,7 @@ s32 gesture_event_handler(struct input_dev * dev)
 			input_sync(dev);
 			input_report_key(dev, key_code, 0);
 			input_sync(dev);
+            gesture_data.doze_status = DOZE_DISABLED;
 			return 2; /* doze enabled and get valid gesture data*/
 		}
 		return 1; /* doze enabled, but no invalid gesutre data*/

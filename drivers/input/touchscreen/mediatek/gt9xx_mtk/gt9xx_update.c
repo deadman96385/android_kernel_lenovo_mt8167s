@@ -43,8 +43,8 @@
 #define GUP_REG_PID_VID						 0x8140
 
 #define GUP_SEARCH_FILE_TIMES			 50
-#define UPDATE_FILE_PATH_1					"/data/_goodix_update_.bin"
-#define UPDATE_FILE_PATH_2					"/sdcard/_goodix_update_.bin"
+#define UPDATE_FILE_PATH_1					"/vendor/firmware/GT9293_PANEL.bin"
+#define UPDATE_FILE_PATH_2					"/sdcard/GT9293_PANEL.bin"
 
 #define CONFIG_FILE_PATH_1					"/data/_goodix_config_.cfg"
 #define CONFIG_FILE_PATH_2					"/sdcard/_goodix_config_.cfg"
@@ -417,7 +417,7 @@ static u8 gup_enter_update_judge(struct st_fw_head *fw_head)
 				GTP_DEBUG("Get the same pid.");
 
 			/* The third condition */
-			if (fw_head->vid > update_msg.ic_fw_msg.vid) {
+			if (fw_head->vid != update_msg.ic_fw_msg.vid) {
 				GTP_INFO("Need enter update.");
 				return SUCCESS;
 			}
@@ -478,8 +478,7 @@ static s8 gup_update_config(struct i2c_client *client)
 		update_msg.cfg_file->f_op->llseek(update_msg.cfg_file, 0, SEEK_SET);
 
 		GTP_DEBUG("[update_cfg]Read config from file.");
-		ret = update_msg.cfg_file->f_op->read(update_msg.cfg_file,
-		(char *)pre_buf, file_len, &update_msg.cfg_file->f_pos);
+		ret = vfs_read(update_msg.cfg_file, (char *)pre_buf, file_len, &update_msg.cfg_file->f_pos);
 		if (ret < 0) {
 			GTP_ERROR("[update_cfg]Read config file failed.");
 			goto update_cfg_file_failed;
@@ -708,8 +707,7 @@ static u8 gup_check_update_file(struct i2c_client *client, struct st_fw_head *fw
 		update_msg.fw_total_len, update_msg.fw_total_len/1024);
 
 		update_msg.file->f_op->llseek(update_msg.file, 0, SEEK_SET);
-		ret = update_msg.file->f_op->read(update_msg.file,
-		(char *)buf, FW_HEAD_LENGTH, &update_msg.file->f_pos);
+		ret = vfs_read(update_msg.file, (char *)buf, FW_HEAD_LENGTH, &update_msg.file->f_pos);
 
 		if (ret < 0) {
 			GTP_ERROR("Read firmware head in update file error.");
@@ -723,8 +721,7 @@ static u8 gup_check_update_file(struct i2c_client *client, struct st_fw_head *fw
 		for (i = 0; i < update_msg.fw_total_len; i += 2) {
 			u16 temp;
 
-			ret = update_msg.file->f_op->read(update_msg.file,
-			(char *)buf, 2, &update_msg.file->f_pos);
+			ret = vfs_read(update_msg.file, (char *)buf, 2, &update_msg.file->f_pos);
 			if (ret < 0) {
 				GTP_ERROR("Read firmware file error.");
 				goto load_failed;
@@ -837,7 +834,7 @@ static u8 gup_load_section_file(u8 *buf, u32 offset, u16 length, u8 set_or_end)
 		else	/* seek end */
 			update_msg.file->f_pos = update_msg.fw_total_len + FW_HEAD_LENGTH - offset;
 
-		ret = update_msg.file->f_op->read(update_msg.file, (char *)buf, length, &update_msg.file->f_pos);
+		ret = vfs_read(update_msg.file, (char *)buf, length, &update_msg.file->f_pos);
 
 		if (ret < 0) {
 			GTP_ERROR("Read update file fail.");

@@ -38,7 +38,6 @@
 //#include <linux/hqsysfs.h>
 
 static u8 sensor_id;
-
 static int tpd_flag;
 int tpd_halt = 0;
 static int tpd_eint_mode = 1;
@@ -117,8 +116,19 @@ u8 hotknot_paired_flag = 0;
 #ifdef CONFIG_GTP_PROXIMITY
 #define TPD_PROXIMITY_VALID_REG									0x814E
 #define TPD_PROXIMITY_ENABLE_REG								0x8042
-static u8 tpd_proximity_flag;
+static u8 tpd_proximity_flag =0;
 static u8 tpd_proximity_detect = 1;/* 0-->close ; 1--> far away */
+#define PS_FAR_AWAY          1
+#define PS_NEAR              0
+
+#define ENABLE          1
+#define DISABLE         0
+struct proximity_st {
+   u8      mode                : 1;    /* 1- proximity enable 0- disable */
+   u8      detect              : 1;    /* 0-->close ; 1--> far away */
+   u8      unused              : 4;
+};
+static struct proximity_st proximity_data;
 #endif
 
 #ifndef GTP_REG_REFRESH_RATE
@@ -360,88 +370,28 @@ static int tpd_i2c_detect(struct i2c_client *client, struct i2c_board_info *info
 		strcpy(info->type, "mtk-tpd");
 		return 0;
 }
-
 #ifdef CONFIG_GTP_PROXIMITY
-static s32 tpd_get_ps_value(void)
+int gtx_enter_proximity_mode(int mode)
 {
-		return tpd_proximity_detect;
+	u8 buf_value = 0;
+	if (mode)
+		buf_value = 0x01;
+	else
+		buf_value = 0x00;
+	proximity_data.mode = buf_value ? ENABLE : DISABLE;
+	tpd_proximity_flag = proximity_data.mode;
+	GTP_DEBUG("proximity_data.mode ==%d", proximity_data.mode);
+	return 0 ;
 }
 
-static s32 tpd_enable_ps(s32 enable)
+
+int gtx_ps_get_data(int *value, int *status)
 {
-		u8	state;
-		s32 ret = -1;
+	*value = (int)proximity_data.detect;
+	*status = SENSOR_STATUS_ACCURACY_MEDIUM;
 
-	if (enable) {
-		state = 1;
-		tpd_proximity_flag = 1;
-		GTP_INFO("TPD proximity function to be on.");
-	} else {
-		state = 0;
-		tpd_proximity_flag = 0;
-		GTP_INFO("TPD proximity function to be off.");
-	}
-
-	ret = i2c_write_bytes(i2c_client_point, TPD_PROXIMITY_ENABLE_REG, &state, 1);
-
-	if (ret < 0) {
-		GTP_ERROR("TPD %s proximity cmd failed.", state ? "enable" : "disable");
-		return ret;
-	}
-
-		GTP_INFO("TPD proximity function %s success.", state ? "enable" : "disable");
-		return 0;
-}
-
-s32 tpd_ps_operate(void *self, u32 command, void *buff_in, s32 size_in,
-			 void *buff_out, s32 size_out, s32 *actualout)
-{
-		s32 err = 0;
-		s32 value;
-		struct hwm_sensor_data *sensor_data;
-		struct hwm_sensor_data sensor_size;
-
-	switch (command) {
-	case SENSOR_DELAY:
-		if ((buff_in == NULL) || (size_in < sizeof(int))) {
-			GTP_ERROR("Set delay parameter error!");
-			err = -EINVAL;
-		}
-
-		/* Do nothing */
-		break;
-
-	case SENSOR_ENABLE:
-		if ((buff_in == NULL) || (size_in < sizeof(int))) {
-			GTP_ERROR("Enable sensor parameter error!");
-			err = -EINVAL;
-		} else {
-			value = *(int *)buff_in;
-			err = tpd_enable_ps(value);
-		}
-
-		break;
-
-	case SENSOR_GET_DATA:
-		if ((buff_out == NULL) || (size_out < sizeof(sensor_size))) {
-			GTP_ERROR("Get sensor data parameter error!");
-			err = -EINVAL;
-		} else {
-			sensor_data = (struct hwm_sensor_data *)buff_out;
-			sensor_data->values[0] = tpd_get_ps_value();
-			sensor_data->value_divide = 1;
-			sensor_data->status = SENSOR_STATUS_ACCURACY_MEDIUM;
-		}
-
-		break;
-
-	default:
-		GTP_ERROR("proxmy sensor operate function no this parameter %d!", command);
-			err = -1;
-			break;
-		}
-
-		return err;
+	GTP_DEBUG(" gtp  psensor       gtx_ps_get_data\r");
+	return 0;
 }
 #endif
 
@@ -1058,6 +1008,7 @@ s32 gtp_read_version(struct i2c_client *client, u16 *version)
 				sensor_id = 1;
 			else
 				sensor_id = 0;
+
 		} else {
 			if (buf[5] == 'S' || buf[5] == 's')
 				chip_gt9xxs = 1;
@@ -1147,7 +1098,7 @@ s32 gtp_init_panel(struct i2c_client *client)
 				GTP_ERROR("GTP sensor_ID read failed time %d.", retry);
 			}
 
-			if (sensor_id >= 0x06) {
+			if (sensor_id >= 0x09) {
 				GTP_ERROR("Invalid sensor_id(0x%02X), No Config Sent!", sensor_id);
 				pnl_init_error = 1;
 				return -1;
@@ -1535,6 +1486,7 @@ static u8 gtp_bak_ref_proc(struct i2c_client *client, u8 mode)
 			set_fs(old_fs);
 			return FAIL;
 		}
+
 		memset(refp, 0, ref_len);
 		if (gtp_ref_retries >= GTP_CHK_FS_MNT_MAX) {
 			for (j = 0; j < ref_grps; ++j)
@@ -1671,6 +1623,7 @@ static u8 gtp_main_clk_proc(struct i2c_client *client)
 		mm_segment_t old_fs1;
 		old_fs1 = get_fs();
 		set_fs(KERNEL_DS);
+
 		/* check clk legality */
 		ret = gtp_check_clk_legality();
 		if (SUCCESS == ret)
@@ -1797,9 +1750,7 @@ static s32 tpd_i2c_probe(struct i2c_client *client, const struct i2c_device_id *
 #endif
 		s32 err = 0;
 		s32 ret = 0;
-#ifdef CONFIG_GTP_PROXIMITY
-		struct hwmsen_object obj_ps;
-#endif
+
 
 	i2c_client_point = client;
 	of_get_gt9xx_platform_data(&client->dev);
@@ -1871,6 +1822,7 @@ static s32 tpd_i2c_probe(struct i2c_client *client, const struct i2c_device_id *
 	gtp_extents_init();
 	input_set_capability(tpd->dev, EV_KEY, KEY_F2);
 	input_set_capability(tpd->dev, EV_KEY, KEY_F3);
+    input_set_capability(tpd->dev, EV_KEY, KEY_POWER);
 #endif
 
 	msleep(50);
@@ -1891,15 +1843,7 @@ static s32 tpd_i2c_probe(struct i2c_client *client, const struct i2c_device_id *
 		GTP_ERROR("Create update thread error.");
 #endif
 
-#ifdef CONFIG_GTP_PROXIMITY
-	/* obj_ps.self = cm3623_obj; */
-	obj_ps.polling = 0;				 /* 0--interrupt mode;1--polling mode; */
-	obj_ps.sensor_operate = tpd_ps_operate;
 
-	err = hwmsen_attach(ID_PROXIMITY, &obj_ps);
-	if (err)
-		GTP_ERROR("hwmsen attach fail, return:%d.", err);
-#endif
 
     set_bit(EV_KEY, tpd->dev->evbit);
     __set_bit(KEY_POWER, tpd->dev->keybit);
@@ -2302,6 +2246,7 @@ static int touch_event_handler(void *unused)
 			GTP_READ_COOR_ADDR >> 8, GTP_READ_COOR_ADDR & 0xFF};
 		u8	touch_num = 0, finger = 0, key_value = 0, *coor_data = NULL;
 		static u8 pre_touch, pre_key;
+//		u8 proximity_status=0 ;
 
 		s32 input_x = 0, input_y = 0, input_w = 0;
 		s32 id = 0, i = 0, ret = -1;
@@ -2516,27 +2461,18 @@ static int touch_event_handler(void *unused)
 
 #ifdef CONFIG_GTP_PROXIMITY
 		if (tpd_proximity_flag == 1) {
-			struct hwm_sensor_data sensor_data;
-			u8 proximity_status = point_data[GTP_ADDR_LENGTH];
+			proximity_status = point_data[GTP_ADDR_LENGTH];
+			if (proximity_status & 0x40 || proximity_status & 0x06) {
+				 /* close. need lcd off */
+				tpd_proximity_detect = PS_NEAR;
+		    } else {
+				/* far away */
+				tpd_proximity_detect = PS_FAR_AWAY;
+			}
+			 GTP_DEBUG("[PROXIMITY] p-sensor state:%s", tpd_proximity_detect ? "AWAY" : "NEAR");
+			proximity_data.detect = tpd_proximity_detect;
+			ret = ps_report_interrupt_data(proximity_data.detect);
 
-			GTP_DEBUG("REG INDEX[0x814E]:0x%02X\n", proximity_status);
-			/* proximity or large touch detect,enable hwm_sensor. */
-			if (proximity_status & 0x60)
-				tpd_proximity_detect = 0;
-			else
-				tpd_proximity_detect = 1;
-
-			/* get raw data */
-			GTP_DEBUG("PS change,PROXIMITY STATUS:0x%02X\n", tpd_proximity_detect);
-			/* map and store data to hwm_sensor_data */
-			sensor_data.values[0] = tpd_get_ps_value();
-			sensor_data.value_divide = 1;
-			sensor_data.status = SENSOR_STATUS_ACCURACY_MEDIUM;
-			/* report to the up-layer */
-			ret = hwmsen_get_interrupt_data(ID_PROXIMITY, &sensor_data);
-
-			if (ret)
-				GTP_ERROR("Call hwmsen_get_interrupt_data fail = %d\n", ret);
 		}
 
 #endif
@@ -2921,7 +2857,10 @@ static s8 gtp_wakeup_sleep(struct i2c_client *client)
 		ret = gtp_i2c_test(client);
 		if (ret >= 0) {
 			GTP_INFO("GTP wakeup sleep.");
-#ifndef CONFIG_GTP_GESTURE_WAKEUP
+#ifdef CONFIG_GTP_GESTURE_WAKEUP
+        if (!gesture_data.enabled)
+			gtp_int_sync(25);
+#else
 			gtp_int_sync(25);
 #ifdef CONFIG_GTP_ESD_PROTECT
 			gtp_init_ext_watchdog(client);
@@ -2984,6 +2923,7 @@ static void tpd_suspend(struct device *h)
 #else
 	{
 #endif
+        GTP_ERROR("GTP before gtp_enter_sleep\n");
 		ret = gtp_enter_sleep(i2c_client_point);
 		if (ret < 0)
 			GTP_ERROR("GTP early suspend failed.");
@@ -3000,7 +2940,7 @@ static void tpd_resume(struct device *h)
 
 	GTP_INFO("System resume.");
 #ifdef CONFIG_GTP_PROXIMITY
-	if (tpd_proximity_flag == 1)
+	if ((tpd_proximity_flag == 1)&&(tpd_halt == 0))
 		return;
 #endif
 
@@ -3032,7 +2972,10 @@ static void tpd_resume(struct device *h)
 	}
 #endif
 
-#ifndef CONFIG_GTP_GESTURE_WAKEUP
+#ifdef CONFIG_GTP_GESTURE_WAKEUP
+    if (!gesture_data.enabled)
+        gtp_irq_enable();
+#else
 	gtp_irq_enable();
 #endif
 

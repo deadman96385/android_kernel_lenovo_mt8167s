@@ -179,7 +179,7 @@
 /*
  * auto upgrade
  */
-#define FTS_AUTO_UPGRADE_EN 0
+#define FTS_AUTO_UPGRADE_EN 1
 
 /*
  * auto upgrade for lcd cfg
@@ -210,7 +210,7 @@
  * You should rename fw to "focaltech_ts_fw_tianma", and push it into
  * etc/firmware or by customers
  */
-#define FTS_MODULE_NAME ""
+#define FTS_MODULE_NAME "PANEL"
 #define FTS_MODULE2_NAME ""
 #define FTS_MODULE3_NAME ""
 
@@ -220,21 +220,21 @@
  * NOTE: if FTS_GET_MODULE_NUM > 1, it's the fw corresponding with FTS_VENDOR_ID
  */
 #define FTS_UPGRADE_FW_FILE                                                    \
-	"include/firmware/HQ_M7_Lenovo6.95_BOE+FT3427_Ver0x03_20190401_app.i"
+	""
 
 /*
  * if FTS_GET_MODULE_NUM >= 2, fw corrsponding with FTS_VENDOR_ID2
  * define your own fw_file, the sample one is invalid
  */
 #define FTS_UPGRADE_FW2_FILE                                                   \
-	"include/firmware/HQ_M7_Lenovo6.95_BOE+FT3427_Ver0x03_20190401_app.i"
+	""
 
 /*
  * if FTS_GET_MODULE_NUM >= 3, fw corrsponding with FTS_VENDOR_ID3
  * define your own fw_file, the sample one is invalid
  */
 #define FTS_UPGRADE_FW3_FILE                                                   \
-	"include/firmware/HQ_M7_Lenovo6.95_BOE+FT3427_Ver0x03_20190401_app.i"
+	""
 
 /*********************************************************/
 

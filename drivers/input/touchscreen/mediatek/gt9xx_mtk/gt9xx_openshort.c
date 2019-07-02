@@ -137,6 +137,33 @@ extern  s32 Save_test_result_data(char *save_test_data_dir, int test_types);//, 
 #define UNIFORMITY_GROUP6 70 			// screen uniformity in percent
 
 #define CTP_TEST_CFG_GROUP6 {\
+}
+
+#define MAX_LIMIT_VALUE_GROUP7 3500 	// screen max limit
+#define MIN_LIMIT_VALUE_GROUP7 1000		// screen min limit
+#define MAX_LIMIT_KEY_GROUP7 3600		// key_val max limit
+#define MIN_LIMIT_KEY_GROUP7 1100		// key_val min limit
+#define UNIFORMITY_GROUP7 70 			// screen uniformity in percent
+
+#define CTP_TEST_CFG_GROUP7 {\
+}
+
+#define MAX_LIMIT_VALUE_GROUP8 3500 	// screen max limit
+#define MIN_LIMIT_VALUE_GROUP8 1000		// screen min limit
+#define MAX_LIMIT_KEY_GROUP8 3600		// key_val max limit
+#define MIN_LIMIT_KEY_GROUP8 1100		// key_val min limit
+#define UNIFORMITY_GROUP8 70 			// screen uniformity in percent
+
+#define CTP_TEST_CFG_GROUP8 {\
+}
+
+#define MAX_LIMIT_VALUE_GROUP9 3500 	// screen max limit
+#define MIN_LIMIT_VALUE_GROUP9 1000		// screen min limit
+#define MAX_LIMIT_KEY_GROUP9 3600		// key_val max limit
+#define MIN_LIMIT_KEY_GROUP9 1100		// key_val min limit
+#define UNIFORMITY_GROUP9 70 			// screen uniformity in percent
+
+#define CTP_TEST_CFG_GROUP9 {\
     0x00,0x58,0x02,0x00,0x04,0x0A,0x05,0x00,0x01,0x08,0x5A,\
     0x05,0x50,0x32,0x03,0x05,0x00,0x00,0x00,0x00,0x00,0x00,\
     0x00,0x00,0x00,0x00,0x00,0x8D,0x2D,0x0F,0x48,0x4A,0x8D,\
@@ -174,7 +201,10 @@ static u16 max_limit_value_info[] = {
 	MAX_LIMIT_VALUE_GROUP3,
 	MAX_LIMIT_VALUE_GROUP4,
 	MAX_LIMIT_VALUE_GROUP5,
-	MAX_LIMIT_VALUE_GROUP6
+	MAX_LIMIT_VALUE_GROUP6,
+	MAX_LIMIT_VALUE_GROUP7,
+	MAX_LIMIT_VALUE_GROUP8,
+	MAX_LIMIT_VALUE_GROUP9,
 };
 
 static u16 min_limit_value_info[] = {
@@ -183,7 +213,10 @@ static u16 min_limit_value_info[] = {
 	MIN_LIMIT_VALUE_GROUP3,
 	MIN_LIMIT_VALUE_GROUP4,
 	MIN_LIMIT_VALUE_GROUP5,
-	MIN_LIMIT_VALUE_GROUP6
+	MIN_LIMIT_VALUE_GROUP6,
+	MIN_LIMIT_VALUE_GROUP7,
+	MIN_LIMIT_VALUE_GROUP8,
+	MIN_LIMIT_VALUE_GROUP9,
 };
 
 static u16 max_limit_key_info[] = {
@@ -192,7 +225,11 @@ static u16 max_limit_key_info[] = {
 	MIN_LIMIT_KEY_GROUP3,
 	MAX_LIMIT_KEY_GROUP4,
 	MAX_LIMIT_KEY_GROUP5,
-	MAX_LIMIT_KEY_GROUP6
+	MAX_LIMIT_KEY_GROUP6,
+	MAX_LIMIT_KEY_GROUP7,
+	MAX_LIMIT_KEY_GROUP8,
+	MAX_LIMIT_KEY_GROUP9,
+
 };
 
 static u16 min_limit_key_info[] = {
@@ -201,7 +238,10 @@ static u16 min_limit_key_info[] = {
 	MIN_LIMIT_KEY_GROUP3,
 	MIN_LIMIT_KEY_GROUP4,
 	MIN_LIMIT_KEY_GROUP5,
-	MIN_LIMIT_KEY_GROUP6
+	MIN_LIMIT_KEY_GROUP6,
+	MIN_LIMIT_KEY_GROUP7,
+	MIN_LIMIT_KEY_GROUP8,
+	MIN_LIMIT_KEY_GROUP9,
 };
 
 static u16 uniformity_lmt_info[] = {
@@ -210,7 +250,10 @@ static u16 uniformity_lmt_info[] = {
 	UNIFORMITY_GROUP3,
 	UNIFORMITY_GROUP4,
 	UNIFORMITY_GROUP5,
-	UNIFORMITY_GROUP6
+	UNIFORMITY_GROUP6,
+	UNIFORMITY_GROUP7,
+	UNIFORMITY_GROUP8,
+	UNIFORMITY_GROUP9,
 };
 
 static u8 test_cfg_info_group1[] =  CTP_TEST_CFG_GROUP1;
@@ -219,6 +262,9 @@ static u8 test_cfg_info_group3[] =  CTP_TEST_CFG_GROUP3;
 static u8 test_cfg_info_group4[] =  CTP_TEST_CFG_GROUP4;
 static u8 test_cfg_info_group5[] =  CTP_TEST_CFG_GROUP5;
 static u8 test_cfg_info_group6[] =  CTP_TEST_CFG_GROUP6;
+static u8 test_cfg_info_group7[] =  CTP_TEST_CFG_GROUP7;
+static u8 test_cfg_info_group8[] =  CTP_TEST_CFG_GROUP8;
+static u8 test_cfg_info_group9[] =  CTP_TEST_CFG_GROUP9;
 
 static u8 *send_test_cfg_buf[] = {
 	test_cfg_info_group1,
@@ -227,6 +273,9 @@ static u8 *send_test_cfg_buf[] = {
 	test_cfg_info_group4,
 	test_cfg_info_group5,
 	test_cfg_info_group6,
+	test_cfg_info_group7,
+	test_cfg_info_group8,
+	test_cfg_info_group9,
 };
 
 static u8 tset_cfg_info_len[] = {
@@ -235,7 +284,10 @@ static u8 tset_cfg_info_len[] = {
         CFG_GROUP_LEN(test_cfg_info_group3),
         CFG_GROUP_LEN(test_cfg_info_group4),
         CFG_GROUP_LEN(test_cfg_info_group5),
-        CFG_GROUP_LEN(test_cfg_info_group6)
+        CFG_GROUP_LEN(test_cfg_info_group6),
+		CFG_GROUP_LEN(test_cfg_info_group7),
+		CFG_GROUP_LEN(test_cfg_info_group8),
+		CFG_GROUP_LEN(test_cfg_info_group9),
 };
 
 u16 max_limit_value = 3500;     // screen max limit
@@ -916,7 +968,7 @@ static void gtp_open_test_init(struct i2c_client *client)
 	else
 	{
 		sensor_id = tmp[GTP_ADDR_LENGTH];
-         if (sensor_id >= 0x06)
+         if (sensor_id >= 0x09)
          {
                 GTP_ERROR("Invalid sensor_id(0x%02X), No Config Sent!", sensor_id);
                 return;
@@ -977,7 +1029,7 @@ static void gtp_open_test_init(struct i2c_client *client)
 				memcpy(&min_limit_vale_re[0], &min_limit_vale_id4[0], (2 * gt9xx_pixel_cnt));
 				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id4[0], (2 * gt9xx_pixel_cnt));
 				break;
-			case 5:
+			case 8:
 				GTP_ERROR("GTP:Use sensor_id 5 standard");
 				memcpy(&max_limit_vale_re[0], &max_limit_vale_id5[0], (2 * gt9xx_pixel_cnt));
 				memcpy(&min_limit_vale_re[0], &min_limit_vale_id5[0], (2 * gt9xx_pixel_cnt));
@@ -3153,11 +3205,21 @@ static int gtp_ito_test_show(struct seq_file *file, void* data)
  gtptest_irq_enable(i2c_client_point);//
     return count;
 }
+static int gtp_info_show(struct seq_file *file, void* data)
+{
+	seq_printf(file,"KD_gt9293");
+    return 0;
+}
 
 static int gtp_ito_test_open_on (struct inode* inode, struct file* file)
 {
 	return single_open(file, gtp_ito_test_show, NULL);
 }
+static int gtp_info_open (struct inode* inode, struct file* file)
+{
+	return single_open(file, gtp_info_show, NULL);
+}
+
 static int gtp_ito_test_open_off (struct inode* inode, struct file* file)
 {
 	return single_open(file, gtp_ito_test_off_start, NULL);
@@ -3171,6 +3233,14 @@ static const struct file_operations ito_test_ops_on = {
     .read = seq_read,
     .write = gtp_ito_test_write,
 };
+
+//lcmon
+static const struct file_operations gtp_info = {
+    .owner = THIS_MODULE,
+    .open = gtp_info_open,
+    .read = seq_read,
+};
+
 
 //lcmoff
 static const struct file_operations ito_test_ops_off = {
@@ -3194,6 +3264,15 @@ int gtp_create_ito_test_proc(struct i2c_client *client)
 		  else {
 			dev_info(&client->dev, "create proc entry %s success\n",
 				 GTP_ITO_TEST_lcmon);
+	            }
+	gtp_ito_test_proc_on = proc_create(TP_INFO, 0666,
+					      gtp_android_touch_proc, &gtp_info);
+		if (!gtp_ito_test_proc_on){
+			dev_err(&client->dev, "create_proc_entry %s failed\n",
+				TP_INFO);}
+		  else {
+			dev_info(&client->dev, "create proc entry %s success\n",
+				 TP_INFO);
 	            }
    //lcmoff
 	gtp_ito_test_proc_off = proc_create(GTP_ITO_TEST_lcmoff, 0666,
