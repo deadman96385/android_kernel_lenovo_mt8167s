@@ -437,6 +437,8 @@ static struct LCM_setting_table lcm_initialization_setting[] = {
 	{0x2B, 1, {0x2B} },
 	{0x2E, 1, {0x44} },
 	{0x41, 1, {0xFF} },
+	{0xE0, 1, {0x05} },
+	{0x13, 1, {0x1D} },
 	{0xE0, 1, {0x00} },
 	{0xE6, 1, {0x02} },
 	{0xE7, 1, {0x0C} },
@@ -551,6 +553,16 @@ static void lcm_get_params(LCM_PARAMS *params)
 	params->dsi.PS = LCM_PACKED_PS_24BIT_RGB888;
 
 	params->dsi.ssc_disable = 1;
+	params->dsi.HS_PRPR = 5;
+	params->dsi.HS_TRAIL = 6;
+	params->dsi.pll_select = 0; /* 0: MIPI_PLL; 1: LVDS_PLL */
+	params->dsi.PLL_CLOCK = 202; /* this value must in MTK suggested table */
+
+	params->dsi.esd_check_enable = 1;
+	params->dsi.customization_esd_check_enable = 1;
+	params->dsi.lcm_esd_check_table[0].cmd = 0x0A;
+	params->dsi.lcm_esd_check_table[0].count = 1;
+	params->dsi.lcm_esd_check_table[0].para_list[0] = 0x9C;
 
 	params->dsi.pll_select = 0;
 	params->dsi.PLL_CLOCK = 202;
