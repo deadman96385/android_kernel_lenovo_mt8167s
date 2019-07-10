@@ -271,6 +271,12 @@
 	};
 };
 
+&reserved_memory {
+	secure-carveout {
+		size = <0 0x6c00000>;
+	};
+};
+
 &spi {
 	status = "okay";
 };
