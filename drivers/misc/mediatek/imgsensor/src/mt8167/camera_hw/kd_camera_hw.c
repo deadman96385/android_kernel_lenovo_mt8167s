@@ -1066,7 +1066,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 	}
 
 	else {		/* power OFF */
-		ISP_MCLK1_EN(0);
+		if (strcmp(currSensorName, SENSOR_DRVNAME_GC2375H_MIPI_RAW))
+			ISP_MCLK1_EN(0);
+
 		if (pinSetIdx == 0 && currSensorName
 		    && (strcmp(currSensorName, SENSOR_DRVNAME_IMX219_MIPI_RAW) == 0)) {
 			/* Set Power Pin low and Reset Pin Low */
@@ -1235,6 +1237,8 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 			if (pinSet[pinSetIdx][IDX_PS_CMRST] != GPIO_CAMERA_INVALID)
 				mtkcam_gpio_set(pinSetIdx, CAMRST, 0);
 
+			ISP_MCLK1_EN(0);
+
 			if (_hwPowerDownCnt(pinSetIdx, VCAMA, mode_name) != TRUE) {
 				PK_DBG
 				    ("[CAMERA SENSOR] Fail to OFF analog power (VCAM_A), power id = %d\n",
@@ -1256,6 +1260,9 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 				     VCAMIO);
 				goto _kdCISModulePowerOn_exit_;
 			}
+
+			if (pinSet[pinSetIdx][IDX_PS_CMPDN] != GPIO_CAMERA_INVALID)
+				mtkcam_gpio_set(pinSetIdx, CAMPDN, 0);
 		}
         else if (pinSetIdx == 1 && currSensorName
 			 && (strcmp(currSensorName, SENSOR_DRVNAME_GC2355_MIPI_RAW) == 0)) {
