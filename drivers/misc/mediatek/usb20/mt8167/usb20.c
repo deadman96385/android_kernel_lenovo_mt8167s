@@ -39,6 +39,9 @@ struct clk *icusb_clk;
 #endif
 #include "usb20.h"
 
+bool mtk_otg_enable = false;
+bool usb_c_switch_enable = false;
+
 #ifdef CONFIG_OF
 #ifndef CONFIG_MTK_LEGACY
 #endif
@@ -757,12 +760,11 @@ static irqreturn_t mt_usb_interrupt(int irq, void *dev_id)
 			status = tmp_status;
 	}
 
-#ifdef CONFIG_USB_MTK_OTG
-	if (usb_l1_ints & IDDIG_INT_STATUS) {
+	if (mtk_otg_enable &&
+		(usb_l1_ints & IDDIG_INT_STATUS)) {
 		mt_usb_iddig_int(musb);
 		status = IRQ_HANDLED;
 	}
-#endif
 
 	return status;
 }
@@ -810,8 +812,8 @@ static ssize_t mt_usb_store_cmode(struct device *dev, struct device_attribute *a
 			usb_reconnect();
 			mdelay(10);
 
-#ifdef CONFIG_USB_MTK_OTG
-			if (cmode == CABLE_MODE_CHRG_ONLY) {
+			if (mtk_otg_enable &&
+				cmode == CABLE_MODE_CHRG_ONLY) {
 				if (mtk_musb && mtk_musb->is_host) { /* shut down USB host for IPO*/
 					if (wake_lock_active(&mtk_musb->usb_lock))
 						wake_unlock(&mtk_musb->usb_lock);
@@ -828,10 +830,10 @@ static ssize_t mt_usb_store_cmode(struct device *dev, struct device_attribute *a
 				}
 				/* mask ID pin interrupt even if A-cable is not plugged in*/
 				switch_int_to_host_and_mask(mtk_musb);
-			} else {
+			} else if (mtk_otg_enable) {
 				switch_int_to_host(mtk_musb); /* resotre ID pin interrupt*/
 			}
-#endif
+
 			if (mtk_musb)
 				up(&mtk_musb->musb_lock);
 		}
@@ -1402,10 +1404,12 @@ static int __init mt_usb_init(struct musb *musb)
 
 	DBG(0, "%s, init_otg before\n", __func__);
 
-#ifdef CONFIG_USB_MTK_OTG
-	DBG(0, "%s, init_otg\n", __func__);
-	mt_usb_otg_init(musb);
-#endif
+
+	if (mtk_otg_enable) {
+		DBG(0, "%s, init_otg\n", __func__);
+		mt_usb_otg_init(musb);
+	}
+
 	if (mt_typec_enable())
 		mtk_typec_host_init();
 
@@ -1570,11 +1574,20 @@ static int mt_usb_probe(struct platform_device *pdev)
 		goto err2;
 	}
 
-#ifdef CONFIG_USB_MTK_OTG
-	pdata->mode = MUSB_OTG;
-#else
-	of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
-#endif
+	if (of_property_read_bool(pdev->dev.of_node, "mediatek,otg-enable"))
+		mtk_otg_enable = true;
+
+	if (of_property_read_bool(pdev->dev.of_node, "mediatek,c-switch"))
+		usb_c_switch_enable = true;
+
+	DBG(0, "otg %s, typec %s\n",
+		mtk_otg_enable? "enable": "disable",
+		usb_c_switch_enable? "enable": "disable");
+
+	if (mtk_otg_enable)
+		pdata->mode = MUSB_OTG;
+	else
+		of_property_read_u32(np, "mode", (u32 *)&pdata->mode);
 
 	/*of_property_read_u32(np, "dma_channels",    (u32 *)&config->dma_channels);*/
 	of_property_read_u32(np, "num_eps", (u32 *)&config->num_eps);
@@ -1635,8 +1648,6 @@ static int mt_usb_probe(struct platform_device *pdev)
 #ifdef CONFIG_MTK_MUSB_SW_WITCH_MODE
 	ret = device_create_file(&pdev->dev, &dev_attr_swmode);
 #endif
-
-
 	if (ret) {
 		dev_err(&pdev->dev, "failed to create musb device\n");
 		goto err2;

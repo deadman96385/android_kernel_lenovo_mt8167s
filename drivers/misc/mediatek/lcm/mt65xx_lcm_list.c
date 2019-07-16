@@ -1130,12 +1130,12 @@ LCM_DRIVER *lcm_driver_list[] = {
 	&st7701s_t400_wvga_dsi_vdo_lcm_drv,
 #endif
 
-#if defined(NT51021B_WSVGA_DSI_GX)
-	&nt51021b_wsvga_dsi_gx_lcm_drv,
-#endif
-
 #if defined(JD9364_WSVGA_DSI_BOE)
 	&jd9364_wsvga_dsi_boe_lcm_drv,
+#endif
+
+#if defined(NT51021B_WSVGA_DSI_GX)
+	&nt51021b_wsvga_dsi_gx_lcm_drv,
 #endif
 };
 

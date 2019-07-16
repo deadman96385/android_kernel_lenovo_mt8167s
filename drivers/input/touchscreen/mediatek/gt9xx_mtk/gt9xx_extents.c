@@ -13,7 +13,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
  *
- * Version: V2.6
+ * Version: V2.6.0.3
  */
 
 #include <linux/interrupt.h>
@@ -166,14 +166,13 @@ s32 gesture_event_handler(struct input_dev * dev)
 
             doze_buf[2] &= ~0x30;
             doze_buf[2] |= extra_len > 0 ? 0x20 : 0x10;
-            
 			gesture_data.data[0] = doze_buf[0];	/* gesture type*/
 			gesture_data.data[1] = len;	/* gesture points number*/
 			gesture_data.data[2] = doze_buf[2];
 			gesture_data.data[3] = extra_len;
 			mutex_unlock(&gesture_data_mutex);
 
-			key_code = doze_buf[0] < 16 ?  KEY_F3: KEY_POWER;
+			key_code = doze_buf[0] < 16 ?  KEY_F3: KEY_F2;
 			GTP_DEBUG("Gesture: 0x%02X, points: %d", doze_buf[0], doze_buf[1]);
 
 			doze_buf[0] = 0;
@@ -183,7 +182,6 @@ s32 gesture_event_handler(struct input_dev * dev)
 			input_sync(dev);
 			input_report_key(dev, key_code, 0);
 			input_sync(dev);
-			gesture_data.doze_status = DOZE_DISABLED;
 			return 2; /* doze enabled and get valid gesture data*/
 		}
 		return 1; /* doze enabled, but no invalid gesutre data*/
@@ -319,7 +317,7 @@ static long gtp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		ret = io_iic_write(data);
 		break;
 
-	case IO_RESET_GUITAR: 
+	case IO_RESET_GUITAR:
 		gtp_reset_guitar(i2c_client_point, 10);
 		break;
 
@@ -328,6 +326,9 @@ static long gtp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 #ifdef CONFIG_GTP_ESD_PROTECT
 		gtp_esd_switch(i2c_client_point, SWITCH_OFF);
 #endif
+#ifdef CONFIG_GTP_CHARGER_DETECT
+		gtp_charger_switch(1);
+#endif
 		break;
 		}
 	case IO_ENABLE_IRQ: {
@@ -335,6 +336,9 @@ static long gtp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 #ifdef CONFIG_GTP_ESD_PROTECT
 		gtp_esd_switch(i2c_client_point ,SWITCH_ON);
+#endif
+#ifdef CONFIG_GTP_CHARGER_DETECT
+		gtp_charger_switch(1);
 #endif
 		break;
 
@@ -361,7 +365,6 @@ static long gtp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case GESTURE_DISABLE_PARTLY:
 		CLEARBIT(gestures_flag, (u8) value);
-		gesture_data.enabled = 0;
 		GTP_DEBUG("DISABLE_GESTURE_PARTLY, gesture = 0x%02X, gesture_data.enabled = %d", value, gesture_data.enabled);
 		break;
 
@@ -422,7 +425,7 @@ static int gtp_gesture_open(struct inode *node, struct file *flip) {
 
 static int gtp_gesture_release(struct inode *node, struct file *filp) {
         GTP_DEBUG("gesture node is closed.");
-        return 0;  
+        return 0;
 }
 
 static const struct file_operations gtp_fops = {

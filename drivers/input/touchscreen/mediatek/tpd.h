@@ -100,6 +100,11 @@ struct tpd_device {
 	struct timer_list timer;
 	struct tasklet_struct tasklet;
 	int btn_state;
+	/*Begin:add by wy, for CTP Hardwareinfo store, 201903017*/
+	char *hq_ctp_module_name;
+	int hq_ctp_module_id;
+	int hq_ctp_firmware_version;
+	/*End:add by wy, for CTP Hardwareinfo store, 201903017*/
 };
 struct tpd_key_dim_local {
 	int key_x;

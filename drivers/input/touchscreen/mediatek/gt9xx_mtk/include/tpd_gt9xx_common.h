@@ -11,9 +11,9 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
- * Version: V2.6
+ * Version: V2.6.0.3
  */
- 
+
 #ifndef TPD_CUSTOM_GT9XX_H__
 #define TPD_CUSTOM_GT9XX_H__
 
@@ -39,13 +39,16 @@
 #endif
 #include <linux/interrupt.h>
 #include <linux/time.h>
-
+#include <linux/string.h>
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
 #include <linux/jiffies.h>
 
 /* Pre-defined definition */
- #define UPDATE_FUNCTIONS
+#define UPDATE_FUNCTIONS
+#define  GTP_ANDROID_TOUCH   "android_touch"
+#define  GTP_ITO_TEST_lcmon        "self_test"
+#define  GTP_ITO_TEST_lcmoff       "gtp_ito_lcm_off"
 
 #define GTP_CONFIG_MIN_LENGTH       186
 #define GTP_CONFIG_MAX_LENGTH       240
@@ -75,12 +78,12 @@ extern void force_reset_guitar(void);
 #endif
 /* STEP_3(optional):Custom set some config by themself,if need. */
 #ifdef CONFIG_GTP_CUSTOM_CFG
-#define GTP_MAX_HEIGHT   1920
-#define GTP_MAX_WIDTH    1080
+#define GTP_MAX_HEIGHT   1024
+#define GTP_MAX_WIDTH    600
 #define GTP_INT_TRIGGER  0    /* 0:Rising 1:Falling */
 #else
-#define GTP_MAX_HEIGHT   1280
-#define GTP_MAX_WIDTH    800
+#define GTP_MAX_HEIGHT   1024
+#define GTP_MAX_WIDTH    600
 #define GTP_INT_TRIGGER  1
 #endif
 #define GTP_MAX_TOUCH      5
@@ -94,13 +97,13 @@ extern void force_reset_guitar(void);
 
 /* STEP_4(optional):If this project have touch key,Set touch key config. */
 #ifdef CONFIG_GTP_HAVE_TOUCH_KEY
-#define TPD_KEY_COUNT   4
-#define TPD_KEYS        {KEY_BACK, KEY_HOMEPAGE, KEY_MENU, KEY_SEARCH}
-#define GTP_KEY_TAB	 {KEY_MENU, KEY_HOMEPAGE, KEY_BACK, KEY_SEND}
+#define TPD_KEY_COUNT   7
+#define TPD_KEYS        {KEY_BACK, KEY_HOMEPAGE, KEY_MENU, KEY_SEARCH, KEY_F1, KEY_F2, KEY_F3}
+#define GTP_KEY_TAB	 {KEY_MENU, KEY_HOMEPAGE, KEY_BACK, KEY_SEND, KEY_F1, KEY_F2, KEY_F3}
 #endif
 
 /* ***************************PART3:OTHER define********************************* */
-#define GTP_DRIVER_VERSION          "V2.6<2016/07/28>"
+#define GTP_DRIVER_VERSION          "V2.6.0.3<2016/10/09>"
 #define GTP_I2C_NAME                "Goodix-TS"
 #define GT91XX_CONFIG_PROC_FILE     "gt9xx_config"
 #define GTP_POLL_TIME               10
@@ -201,11 +204,11 @@ enum chip_type_t {
 #endif
 
 /* Log define */
-#define GTP_INFO(fmt, arg...)           pr_info("<<-GTP-INFO->> "fmt"\n", ##arg)
+#define GTP_INFO(fmt, arg...)           pr_warn("<<-GTP-INFO->> "fmt"\n", ##arg)
 #define GTP_ERROR(fmt, arg...)          pr_err("<<-GTP-ERROR->> "fmt"\n", ##arg)
 #define GTP_DEBUG(fmt, arg...)	do {\
 	if (GTP_DEBUG_ON)\
-		pr_info("<<-GTP-DEBUG->> [%d]"fmt"\n", __LINE__, ##arg);\
+		pr_warn("<<-GTP-DEBUG->> [%d]"fmt"\n", __LINE__, ##arg);\
 } while (0)
 #define GTP_DEBUG_ARRAY(array, num)	do {\
 	s32 i;\
@@ -273,8 +276,6 @@ extern s32 gup_update_proc(void *dir);
 extern u8 gtp_updating_fw;
 
 #ifdef CONFIG_GTP_HOTKNOT
-u8 *gup_load_calibration_from_file(char *filepath);
-s32 gup_load_calibration(u8 *firmware, s32 length, u8 need_check);
 extern s32 gup_load_hotknot_fw(void);
 extern s32 gup_load_authorization_fw(void);
 extern s32 gup_recovery_touch(void);
@@ -302,6 +303,7 @@ s32 i2c_dma_write(struct i2c_client *client, u16 addr, u8 *txbuf, s32 len);
 s32 i2c_dma_read(struct i2c_client *client, u16 addr, u8 *rxbuf, s32 len);
 #endif
 #ifdef CONFIG_GTP_CHARGER_DETECT
+extern void gtp_charger_switch(int on);
 extern bool upmu_is_chr_det(void);
 extern bool upmu_get_pchr_chrdet(void);
 #endif
