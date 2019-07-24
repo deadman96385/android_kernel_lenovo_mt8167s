@@ -34,7 +34,16 @@
 	status = "okay";
 	clock-frequency = <400000>;
 
-	cap_touch@38 {
+	cap_touch_a@14 {
+		compatible = "mediatek,GT9XX_MTK";
+		reg = <0x14>;
+		interrupt-parent = <&pio>;
+		interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
+		int-gpio = <&pio 18 0>;
+		rst-gpio = <&pio 24 0>;
+	};
+
+	cap_touch_b@38 {
 		compatible = "mediatek,FT3427";
 		reg = <0x38>;
 		interrupt-parent = <&pio>;
