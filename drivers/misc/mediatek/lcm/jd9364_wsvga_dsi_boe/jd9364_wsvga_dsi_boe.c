@@ -270,6 +270,7 @@ static struct LCM_setting_table lcm_suspend_setting[] = {
 };
 
 static struct LCM_setting_table lcm_initialization_setting[] = {
+#if 0
 	{0xE0, 1, {0x00} },
 	{0xE1, 1, {0x93} },
 	{0xE2, 1, {0x65} },
@@ -442,10 +443,20 @@ static struct LCM_setting_table lcm_initialization_setting[] = {
 	{0xE0, 1, {0x00} },
 	{0xE6, 1, {0x02} },
 	{0xE7, 1, {0x0C} },
+#endif
 
+	{0xE0,1,{0x00}},
+	{0xE1,1,{0x93}},
+	{0xE2,1,{0x65}},
+	{0xE3,1,{0xF8}},
 	// Sleep Out
 	{0x11, 0, {0x00} },
 	{REGFLAG_DELAY, 120, {0} },
+
+	{0xE0,1,{0x04}},
+	{0x2D,1,{0x03}},
+	{0xE0,1,{0x00}},
+	{0x80,1,{0x03}},
 	// Display ON
 	{0x29, 0, {0x00} },
 	{REGFLAG_DELAY, 20, {0} },
@@ -536,7 +547,7 @@ static void lcm_get_params(LCM_PARAMS *params)
 	params->dsi.mode = BURST_VDO_MODE;
 
 	/* Command mode setting */
-	params->dsi.LANE_NUM				= LCM_THREE_LANE;
+	params->dsi.LANE_NUM				= LCM_FOUR_LANE;
 	params->dsi.data_format.format		= LCM_DSI_FORMAT_RGB888;
 	/* Highly depends on LCD driver capability. */
 	params->dsi.packet_size             = 256;
@@ -556,7 +567,7 @@ static void lcm_get_params(LCM_PARAMS *params)
 	params->dsi.HS_PRPR = 5;
 	params->dsi.HS_TRAIL = 6;
 	params->dsi.pll_select = 0; /* 0: MIPI_PLL; 1: LVDS_PLL */
-	params->dsi.PLL_CLOCK = 202; /* this value must in MTK suggested table */
+	params->dsi.PLL_CLOCK = 150; /* this value must in MTK suggested table */
 
 	params->dsi.esd_check_enable = 1;
 	params->dsi.customization_esd_check_enable = 1;
@@ -565,7 +576,7 @@ static void lcm_get_params(LCM_PARAMS *params)
 	params->dsi.lcm_esd_check_table[0].para_list[0] = 0x9C;
 
 	params->dsi.pll_select = 0;
-	params->dsi.PLL_CLOCK = 202;
+	params->dsi.PLL_CLOCK = 150;
 	params->dsi.cont_clock = 1;
 }
 
