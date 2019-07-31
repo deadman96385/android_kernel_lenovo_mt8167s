@@ -59,6 +59,10 @@
 
 #define TZ_DEVNAME "mtk_tz"
 
+#if defined(CONFIG_MTEE_CMA_SECURE_MEMORY)
+#define NO_CMA_RELEASE_THROUGH_SHRINKER_FOR_EARLY_STAGE
+#endif
+
 /**Used for mapping user space address to physical memory
 */
 struct MTIOMMU_PIN_RANGE_T {

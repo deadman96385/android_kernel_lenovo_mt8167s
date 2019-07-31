@@ -308,6 +308,12 @@
 	};
 };
 
+&reserved_memory {
+	secure-carveout {
+		size = <0 0x6c00000>;
+	};
+};
+
 &touch {
 	vtouch-supply = <&mt6392_vgp1_reg>;
 	tpd-resolution = <600 1024>;
