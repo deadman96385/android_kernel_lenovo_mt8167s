@@ -33,6 +33,16 @@
 &i2c0 {
 	status = "okay";
 	clock-frequency = <400000>;
+	clock-div = <2>;
+	ac-timing =  /bits/ 16 <
+		0x8001
+		0x0000
+		0x0000
+		0x0000
+		0x3030
+		0x0000
+		0x0000
+	>;
 
 	cap_touch_a@14 {
 		compatible = "mediatek,GT9XX_MTK";
@@ -59,6 +69,16 @@
 	pinctrl-0 = <&i2c1_pins_a>;
 	status = "okay";
 	clock-frequency = <400000>;
+	ac-timing =  /bits/ 16 <
+		0x8001
+		0x0000
+		0x0000
+		0x0000
+		0x3030
+		0x0000
+		0x0000
+	>;
+
 	kd_camera_hw1@36 {
 		compatible = "mediatek,camera_main";
 		reg = <0x36>;
@@ -76,6 +96,16 @@
 &i2c2 {
 	status = "okay";
 	clock-frequency = <400000>;
+	clock-div = <2>;
+	ac-timing =  /bits/ 16 <
+		0x8001
+		0x0000
+		0x0000
+		0x0000
+		0x3030
+		0x0000
+		0x0000
+	>;
 };
 
 /* Main Cam */
