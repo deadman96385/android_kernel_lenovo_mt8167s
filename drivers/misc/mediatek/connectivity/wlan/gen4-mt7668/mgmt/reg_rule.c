@@ -203,7 +203,7 @@ const struct ieee80211_regdomain regdom_tw = {
 	.dfs_region = NL80211_DFS_FCC,
 	.reg_rules = {
 	/* channels 1..11 */
-	REG_RULE_LIGHT(2412-10, 2474+10, 40, 0),
+	REG_RULE_LIGHT(2412-10, 2462+10, 40, 0),
 	/* channels 36..48 */
 	REG_RULE_LIGHT(5160-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
@@ -230,6 +230,20 @@ const struct ieee80211_regdomain regdom_us = {
 	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
 
+const struct ieee80211_regdomain regdom_sn = {
+	.n_reg_rules = 4,
+	.dfs_region = NL80211_DFS_FCC,
+	.reg_rules = {
+	/* channels 1..11 */
+	REG_RULE_LIGHT(2412-10, 2472+10, 20, 0),
+	/* channels 36..48 */
+	REG_RULE_LIGHT(5180-10, 5240+10, 80, KAL_RRF_AUTO_BW),
+	/* channels 52..64 */
+	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
+	/* channels 100..144 */
+	REG_RULE_LIGHT(5500-10, 5700+10, 80, KAL_RRF_DFS) }
+};
+
 const struct ieee80211_regdomain regdom_ca = {
 	.n_reg_rules = 6,
 	.dfs_region = NL80211_DFS_FCC,
@@ -242,7 +256,7 @@ const struct ieee80211_regdomain regdom_ca = {
 	REG_RULE_LIGHT(5260-10, 5340+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
 	REG_RULE_LIGHT(5460+10, 5590+10, 80, KAL_RRF_DFS),
 	/* channels 100..144 */
-	REG_RULE_LIGHT(5660-10, 5720+10, 80, KAL_RRF_DFS),
+	REG_RULE_LIGHT(5500-10, 5720+10, 80, KAL_RRF_DFS),
 	/* channels 149..165 */
 	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
@@ -261,8 +275,24 @@ const struct ieee80211_regdomain regdom_cn = {
 	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
 
-const struct ieee80211_regdomain regdom_pa = {
+const struct ieee80211_regdomain regdom_zm = {
 	.n_reg_rules = 5,
+	.dfs_region = NL80211_DFS_FCC,
+	.reg_rules = {
+	/* channels 1..13 */
+	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
+	/* channels 36..48 */
+	REG_RULE_LIGHT(5180-10, 5240+10, 80, KAL_RRF_AUTO_BW),
+	/* channels 52..64 */
+	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
+	/* channels 100..140 */
+	REG_RULE_LIGHT(5500-10, 5720+10, 80, KAL_RRF_DFS),
+	/* channels 149..165 */
+	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
+};
+
+const struct ieee80211_regdomain regdom_pa = {
+	.n_reg_rules = 4,
 	.dfs_region = NL80211_DFS_FCC,
 	.reg_rules = {
 	/* channels 1..13 */
@@ -271,14 +301,12 @@ const struct ieee80211_regdomain regdom_pa = {
 	REG_RULE_LIGHT(5160-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5340+10, 80, KAL_RRF_AUTO_BW),
-	/* channels 52..64 */
-	REG_RULE_LIGHT(5480-10, 5715+10, 160, 0),
 	/* channels 149..165 */
-	REG_RULE_LIGHT(5735-10, 5840+10, 80, 0) }
+	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
 
 const struct ieee80211_regdomain regdom_cz_nl = {
-	.n_reg_rules = 5,
+	.n_reg_rules = 4,
 	.dfs_region = NL80211_DFS_ETSI,
 	.reg_rules = {
 	/* channels 1..13 */
@@ -286,27 +314,21 @@ const struct ieee80211_regdomain regdom_cz_nl = {
 	/* channels 36..48 */
 	REG_RULE_LIGHT(5160-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
-	REG_RULE_LIGHT(5260-10, 5340+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
+	REG_RULE_LIGHT(5260-10, 5340+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW) ,
 	/* channels 100..140 */
-	REG_RULE_LIGHT(5480-10, 5715+10, 160, KAL_RRF_DFS),
-	/* channels 100..140 */
-	REG_RULE_LIGHT(5735-10, 5865+10, 80, 0) }
+	REG_RULE_LIGHT(5500-10, 5700+10, 160, KAL_RRF_DFS) }
 };
 
 const struct ieee80211_regdomain regdom_cz_no = {
-	.n_reg_rules = 5,
+	.n_reg_rules = 3,
 	.dfs_region = NL80211_DFS_ETSI,
 	.reg_rules = {
 	/* channels 1..13 */
-	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
+	REG_RULE_LIGHT(2412-10, 2472+10, 20, 0),
 	/* channels 36..48 */
 	REG_RULE_LIGHT(5160-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
-	REG_RULE_LIGHT(5260-10, 5340+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
-	/* channels 100..140 */
-	REG_RULE_LIGHT(5480-10, 5785+10, 160, KAL_RRF_DFS),
-	/* channels 100..140 */
-	REG_RULE_LIGHT(5825-10, 5840+10, 35, KAL_RRF_DFS) }
+	REG_RULE_LIGHT(5260-10, 5340+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW) }
 };
 
 const struct ieee80211_regdomain regdom_hr = {
@@ -321,6 +343,22 @@ const struct ieee80211_regdomain regdom_hr = {
 	REG_RULE_LIGHT(5260-10, 5340+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
 	/* channels 100..140 */
 	REG_RULE_LIGHT(5480-10, 5715+10, 160, KAL_RRF_DFS) }
+};
+
+const struct ieee80211_regdomain regdom_kz = {
+	.n_reg_rules = 5,
+	.dfs_region = NL80211_DFS_ETSI,
+	.reg_rules = {
+	/* channels 1..13 */
+	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
+	/* channels 36..48 */
+	REG_RULE_LIGHT(5160-10, 5240+10, 80, KAL_RRF_AUTO_BW),
+	/* channels 52..64 */
+	REG_RULE_LIGHT(5260-10, 5340+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
+	/* channels 100..140 */
+	REG_RULE_LIGHT(5500-10, 5720+10, 80, KAL_RRF_DFS),
+	/* channels 149..165 */
+	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
 
 const struct ieee80211_regdomain regdom_at = {
@@ -338,7 +376,7 @@ const struct ieee80211_regdomain regdom_at = {
 };
 
 const struct ieee80211_regdomain regdom_nl = {
-	.n_reg_rules = 5,
+	.n_reg_rules = 4,
 	.dfs_region = NL80211_DFS_ETSI,
 	.reg_rules = {
 	/* channels 1..13 */
@@ -346,11 +384,9 @@ const struct ieee80211_regdomain regdom_nl = {
 	/* channels 36..48 */
 	REG_RULE_LIGHT(5180-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
-	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
+	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW) ,
 	/* channels 100..140 */
-	REG_RULE_LIGHT(5500-10, 5700+10, 160, KAL_RRF_DFS),
-	/* channels 100..140 */
-	REG_RULE_LIGHT(5735-10, 5865+10, 80, 0) }
+	REG_RULE_LIGHT(5500-10, 5700+10, 160, KAL_RRF_DFS) }
 };
 
 const struct ieee80211_regdomain regdom_jp = {
@@ -370,7 +406,7 @@ const struct ieee80211_regdomain regdom_jp = {
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
 	/* channels 100..140 */
-	REG_RULE_LIGHT(5500-10, 5700+10, 160, KAL_RRF_DFS) }
+	REG_RULE_LIGHT(5500-10, 5720+10, 160, KAL_RRF_DFS) }
 };
 
 const struct ieee80211_regdomain regdom_tr = {
@@ -388,7 +424,7 @@ const struct ieee80211_regdomain regdom_tr = {
 };
 
 const struct ieee80211_regdomain regdom_mx = {
-	.n_reg_rules = 5,
+	.n_reg_rules = 4,
 	.dfs_region = NL80211_DFS_FCC,
 	.reg_rules = {
 	/* channels 1..13 */
@@ -397,8 +433,6 @@ const struct ieee80211_regdomain regdom_mx = {
 	REG_RULE_LIGHT(5180-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_AUTO_BW),
-	/* channels 100..140 */
-	REG_RULE_LIGHT(5500-10, 5720+10, 160, KAL_RRF_DFS),
 	/* channels 149..165 */
 	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
@@ -430,7 +464,7 @@ const struct ieee80211_regdomain regdom_ru = {
 	REG_RULE_LIGHT(5180-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
-	REG_RULE_LIGHT(5660-10, 5720+10, 80, KAL_RRF_DFS),
+	REG_RULE_LIGHT(5500-10, 5720+10, 80, KAL_RRF_DFS),
 	/* channels 149..165 */
 	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
@@ -448,6 +482,18 @@ const struct ieee80211_regdomain regdom_ng = {
 };
 
 const struct ieee80211_regdomain regdom_ae = {
+	.n_reg_rules = 3,
+	.dfs_region = NL80211_DFS_FCC,
+	.reg_rules = {
+	/* channels 1..13 */
+	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
+	/* channels 36..48 */
+	REG_RULE_LIGHT(5180-10, 5240+10, 80, KAL_RRF_AUTO_BW),
+	/* channels 52..64 */
+	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW) }
+};
+
+const struct ieee80211_regdomain regdom_gt = {
 	.n_reg_rules = 5,
 	.dfs_region = NL80211_DFS_FCC,
 	.reg_rules = {
@@ -458,13 +504,13 @@ const struct ieee80211_regdomain regdom_ae = {
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
 	/* channels 100..144 */
-	REG_RULE_LIGHT(5500-10, 5720+10, 160, KAL_RRF_DFS),
+	REG_RULE_LIGHT(5500-10, 5700+10, 80, KAL_RRF_DFS),
 	/* channels 149..161 */
 	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
 
-const struct ieee80211_regdomain regdom_gt = {
-	.n_reg_rules = 4,
+const struct ieee80211_regdomain regdom_dm = {
+	.n_reg_rules = 5,
 	.dfs_region = NL80211_DFS_FCC,
 	.reg_rules = {
 	/* channels 1..13 */
@@ -473,12 +519,15 @@ const struct ieee80211_regdomain regdom_gt = {
 	REG_RULE_LIGHT(5180-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
+	/* channels 100..144 */
+	REG_RULE_LIGHT(5500-10, 5720+10, 80, KAL_RRF_DFS),
 	/* channels 149..161 */
 	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
 
+
 const struct ieee80211_regdomain regdom_sg = {
-	.n_reg_rules = 4,
+	.n_reg_rules = 5,
 	.dfs_region = NL80211_DFS_FCC,
 	.reg_rules = {
 	/* channels 1..13 */
@@ -487,11 +536,26 @@ const struct ieee80211_regdomain regdom_sg = {
 	REG_RULE_LIGHT(5160-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5340+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
+	REG_RULE_LIGHT(5500-10, 5720+10, 80, KAL_RRF_DFS),
 	/* channels 149..161 */
 	REG_RULE_LIGHT(5735-10, 5840+10, 80, 0) }
 };
 
 const struct ieee80211_regdomain regdom_my = {
+	.n_reg_rules = 4,
+	.dfs_region = NL80211_DFS_FCC,
+	.reg_rules = {
+	/* channels 1..13 */
+	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
+	/* channels 36..48 */
+	REG_RULE_LIGHT(5180-10, 5240+10, 80, KAL_RRF_AUTO_BW),
+	/* channels 52..64 */
+	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
+	/* channels 149..165 */
+	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
+};
+
+const struct ieee80211_regdomain regdom_ph = {
 	.n_reg_rules = 5,
 	.dfs_region = NL80211_DFS_FCC,
 	.reg_rules = {
@@ -501,13 +565,23 @@ const struct ieee80211_regdomain regdom_my = {
 	REG_RULE_LIGHT(5180-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
-	REG_RULE_LIGHT(5500-10, 5640+10, 160, KAL_RRF_DFS),
+	REG_RULE_LIGHT(5500-10, 5700+10, 160, KAL_RRF_DFS),
 	/* channels 149..165 */
 	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
 
 const struct ieee80211_regdomain regdom_hn = {
-	.n_reg_rules = 5,
+	.n_reg_rules = 2,
+	.dfs_region = NL80211_DFS_FCC,
+	.reg_rules = {
+	/* channels 1..13 */
+	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
+	/* channels 149..165 */
+	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
+};
+
+const struct ieee80211_regdomain regdom_gh = {
+	.n_reg_rules = 4,
 	.dfs_region = NL80211_DFS_FCC,
 	.reg_rules = {
 	/* channels 1..13 */
@@ -516,9 +590,8 @@ const struct ieee80211_regdomain regdom_hn = {
 	REG_RULE_LIGHT(5180-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
-	REG_RULE_LIGHT(5500-10, 5720+10, 160, KAL_RRF_DFS),
-	/* channels 149..165 */
-	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
+	/* channels 100..140 */
+	REG_RULE_LIGHT(5500-10, 5700+10, 160, KAL_RRF_DFS)}
 };
 
 const struct ieee80211_regdomain regdom_ua = {
@@ -531,21 +604,20 @@ const struct ieee80211_regdomain regdom_ua = {
 	REG_RULE_LIGHT(5160-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5340+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
-	REG_RULE_LIGHT(5500-10, 5660+10, 160, KAL_RRF_DFS),
+	REG_RULE_LIGHT(5500-10, 5700+10, 160, KAL_RRF_DFS),
 	/* channels 149..165 */
 	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
 };
 
 const struct ieee80211_regdomain regdom_in = {
-	.n_reg_rules = 5,
+	.n_reg_rules = 4,
 	.reg_rules = {
 	/* channels 1..13 */
-	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
+	REG_RULE_LIGHT(2412-10, 2472+10, 20, 0),
 	/* channels 36..48 */
 	REG_RULE_LIGHT(5160-10, 5240+10, 80, 0),
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5340+10, 80, 0),
-	REG_RULE_LIGHT(5480-10, 5715+10, 160, 0),
 	/* channels 149..165 */
 	REG_RULE_LIGHT(5735-10, 5865+10, 80, 0) }
 };
@@ -569,14 +641,11 @@ const struct ieee80211_regdomain regdom_ao = {
 };
 
 const struct ieee80211_regdomain regdom_qa = {
-	.n_reg_rules = 5,
+	.n_reg_rules = 2,
 	.dfs_region = NL80211_DFS_ETSI,
 	.reg_rules = {
 	/* channels 1..13 */
 	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
-	REG_RULE_LIGHT(5160-10, 5240+10, 80, KAL_RRF_AUTO_BW),
-	REG_RULE_LIGHT(5260-10, 5340+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
-	REG_RULE_LIGHT(5480-10, 5715+10, 160, KAL_RRF_AUTO_BW),
 	/* channels 149..165 */
 	REG_RULE_LIGHT(5735-10, 5865+10, 80, 0) }
 };
@@ -592,9 +661,9 @@ const struct ieee80211_regdomain regdom_kr = {
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
 	/* channels 100..128 */
-	REG_RULE_LIGHT(5500-10, 5700+10, 160, KAL_RRF_DFS),
+	REG_RULE_LIGHT(5500-10, 5720+10, 160, KAL_RRF_DFS),
 	/* channels 149..161 */
-	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
+	REG_RULE_LIGHT(5745-10, 5805+10, 80, 0) }
 };
 
 const struct ieee80211_regdomain regdom_ke = {
@@ -602,13 +671,13 @@ const struct ieee80211_regdomain regdom_ke = {
 	.dfs_region = NL80211_DFS_JP,
 	.reg_rules = {
 	/* channels 1..13 */
-	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
+	REG_RULE_LIGHT(2412-10, 2472+10, 20, 0),
 	/* channels 36..48 */
 	REG_RULE_LIGHT(5180-10, 5240+10, 80, 0),
-	/* channels 100..128 */
-	REG_RULE_LIGHT(5500-10, 5560+10, 80, KAL_RRF_DFS),
-	/* channels 149..161 */
-	REG_RULE_LIGHT(5745-10, 5765+10, 40, 0) }
+	/* channels 52..64 */
+	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
+	/* channels 100..140 */
+	REG_RULE_LIGHT(5500-10, 5720+10, 80, KAL_RRF_DFS) }
 };
 
 const struct ieee80211_regdomain regdom_jo = {
@@ -621,23 +690,6 @@ const struct ieee80211_regdomain regdom_jo = {
 	REG_RULE_LIGHT(5180-10, 5240+10, 80, 0),
 	/* channels 149..165 */
 	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
-};
-
-const struct ieee80211_regdomain regdom_ir = {
-	.n_reg_rules = 2,
-	.dfs_region = NL80211_DFS_JP,
-	.reg_rules = {
-	/* channels 1..13 */
-	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0),
-	/* channels 149..165 */
-	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
-};
-
-const struct ieee80211_regdomain regdom_sy = {
-	.n_reg_rules = 1,
-	.reg_rules = {
-	/* channels 1..13 */
-	REG_RULE_LIGHT(2412-10, 2472+10, 40, 0) }
 };
 
 const struct ieee80211_regdomain regdom_il = {
@@ -665,7 +717,7 @@ const struct ieee80211_regdomain regdom_eg = {
 };
 
 const struct ieee80211_regdomain regdom_sa = {
-	.n_reg_rules = 4,
+	.n_reg_rules = 5,
 	.dfs_region = NL80211_DFS_ETSI,
 	.reg_rules = {
 	/* channels 1..13 */
@@ -674,11 +726,13 @@ const struct ieee80211_regdomain regdom_sa = {
 	REG_RULE_LIGHT(5180-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 52..64 */
 	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
-	REG_RULE_LIGHT(5500-10, 5700+10, 160, KAL_RRF_DFS) }
+	REG_RULE_LIGHT(5500-10, 5720+10, 80, KAL_RRF_DFS),
+	/* channels 149..165 */
+	REG_RULE_LIGHT(5745-10, 5805+10, 80, 0)}
 };
 
 const struct ieee80211_regdomain regdom_bh = {
-	.n_reg_rules = 4,
+	.n_reg_rules = 3,
 	.dfs_region = NL80211_DFS_JP,
 	.reg_rules = {
 	/* channels 1..13 */
@@ -686,9 +740,7 @@ const struct ieee80211_regdomain regdom_bh = {
 	/* channels 36..48 */
 	REG_RULE_LIGHT(5180-10, 5240+10, 20, 0),
 	/* channels 36..48 */
-	REG_RULE_LIGHT(5260-10, 5320+10, 20, KAL_RRF_DFS),
-	/* channels 52..64 */
-	REG_RULE_LIGHT(5745-10, 5825+10, 80, 0) }
+	REG_RULE_LIGHT(5260-10, 5320+10, 20, KAL_RRF_DFS)}
 };
 
 const struct ieee80211_regdomain regdom_dz = {
@@ -701,8 +753,8 @@ const struct ieee80211_regdomain regdom_dz = {
 	REG_RULE_LIGHT(5180-10, 5240+10, 80, KAL_RRF_AUTO_BW),
 	/* channels 36..48 */
 	REG_RULE_LIGHT(5260-10, 5320+10, 80, KAL_RRF_DFS | KAL_RRF_AUTO_BW),
-	/* channels 52..64 */
-	REG_RULE_LIGHT(5500-10, 5660+10, 160, KAL_RRF_DFS) }
+	/* channels 100..140 */
+	REG_RULE_LIGHT(5500-10, 5700+10, 160, KAL_RRF_DFS) }
 };
 
 /*
@@ -746,7 +798,7 @@ const struct mtk_regdomain my_regdom_qa = {
 
 const struct mtk_regdomain my_regdom_pk = {
 	.country_code = "PK",
-	.prRegdRules = &regdom_ir
+	.prRegdRules = &regdom_hn
 };
 
 const struct mtk_regdomain my_regdom_hn = {
@@ -821,7 +873,7 @@ const struct mtk_regdomain my_regdom_eg = {
 
 const struct mtk_regdomain my_regdom_zm = {
 	.country_code = "ZM",
-	.prRegdRules = &regdom_cn
+	.prRegdRules = &regdom_zm
 };
 
 const struct mtk_regdomain my_regdom_nl = {
@@ -916,7 +968,7 @@ const struct mtk_regdomain my_regdom_ve = {
 
 const struct mtk_regdomain my_regdom_ph = {
 	.country_code = "PH",
-	.prRegdRules = &regdom_hn
+	.prRegdRules = &regdom_ph
 };
 
 const struct mtk_regdomain my_regdom_in = {
@@ -971,12 +1023,12 @@ const struct mtk_regdomain my_regdom_pe = {
 
 const struct mtk_regdomain my_regdom_th = {
 	.country_code = "TH",
-	.prRegdRules = &regdom_hn
+	.prRegdRules = &regdom_ph
 };
 
 const struct mtk_regdomain my_regdom_ae = {
 	.country_code = "AE",
-	.prRegdRules = &regdom_hn
+	.prRegdRules = &regdom_ae
 };
 
 const struct mtk_regdomain my_regdom_tr = {
@@ -1099,24 +1151,9 @@ const struct mtk_regdomain my_regdom_za = {
 	.prRegdRules = &regdom_at
 };
 
-const struct mtk_regdomain my_regdom_ir = {
-	.country_code = "IR",
-	.prRegdRules = &regdom_ir
-};
-
 const struct mtk_regdomain my_regdom_ps = {
 	.country_code = "PS",
-	.prRegdRules = &regdom_ir
-};
-
-const struct mtk_regdomain my_regdom_sd = {
-	.country_code = "SD",
-	.prRegdRules = &regdom_ir
-};
-
-const struct mtk_regdomain my_regdom_sy = {
-	.country_code = "SY",
-	.prRegdRules = &regdom_sy
+	.prRegdRules = &regdom_hn
 };
 
 const struct mtk_regdomain my_regdom_il = {
@@ -1156,12 +1193,17 @@ const struct mtk_regdomain my_regdom_ua = {
 
 const struct mtk_regdomain my_regdom_kz = {
 	.country_code = "KZ",
-	.prRegdRules = &regdom_hr
+	.prRegdRules = &regdom_kz
 };
 
 const struct mtk_regdomain my_regdom_dm = {
 	.country_code = "DM",
-	.prRegdRules = &regdom_gt
+	.prRegdRules = &regdom_dm
+};
+
+const struct mtk_regdomain my_regdom_gh = {
+	.country_code = "GH",
+	.prRegdRules = &regdom_gh
 };
 
 /*
@@ -1206,7 +1248,6 @@ const struct mtk_regdomain *g_prRegRuleTable[] = {
 	&my_regdom_sn,
 	&my_regdom_jo,
 	&my_regdom_za,
-	&my_regdom_ir,
 	&my_regdom_il,
 	&my_regdom_br,
 	&my_regdom_ar,
@@ -1240,9 +1281,7 @@ const struct mtk_regdomain *g_prRegRuleTable[] = {
 	&my_regdom_lb,
 	&my_regdom_ke,
 	&my_regdom_zm,
-	&my_regdom_sd,
 	&my_regdom_dz,
-	&my_regdom_sy,
 	&my_regdom_co,
 	&my_regdom_eg,
 	&my_regdom_ma,
@@ -1261,6 +1300,7 @@ const struct mtk_regdomain *g_prRegRuleTable[] = {
 	&my_regdom_hk,
 	&my_regdom_cr,
 	&my_regdom_fi,
+	&my_regdom_gh,
 	NULL /* this NULL SHOULD be at the end of the array */
 };
 
