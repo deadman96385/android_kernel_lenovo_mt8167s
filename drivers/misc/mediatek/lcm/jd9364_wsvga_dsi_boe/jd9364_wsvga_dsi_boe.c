@@ -564,8 +564,8 @@ static void lcm_get_params(LCM_PARAMS *params)
 	params->dsi.PS = LCM_PACKED_PS_24BIT_RGB888;
 
 	params->dsi.ssc_disable = 1;
-	params->dsi.HS_PRPR = 5;
-	params->dsi.HS_TRAIL = 6;
+	params->dsi.HS_PRPR = 3;
+	params->dsi.HS_TRAIL = 4;
 	params->dsi.pll_select = 0; /* 0: MIPI_PLL; 1: LVDS_PLL */
 	params->dsi.PLL_CLOCK = 150; /* this value must in MTK suggested table */
 
