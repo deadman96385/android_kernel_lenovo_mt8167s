@@ -225,7 +225,7 @@ static imgsensor_info_struct imgsensor_info = {
 	.sensor_interface_type = SENSOR_INTERFACE_TYPE_MIPI,
 	.mipi_sensor_type = MIPI_OPHY_NCSI2,	/* 0,MIPI_OPHY_NCSI2;  1,MIPI_OPHY_CSI2 */
 	.mipi_settle_delay_mode = MIPI_SETTLEDELAY_MANUAL,
-	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_B,
+	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_Gb,
 	.mclk = 24,
 	.mipi_lane_num = SENSOR_MIPI_1_LANE,
 	.i2c_addr_table = {0x7a, 0xff},
@@ -612,7 +612,7 @@ static void sensor_init(void)
 	write_cmos_sensor(0x30, 0x1d);
 	write_cmos_sensor(0x33, 0x05);
 	write_cmos_sensor(0xfd, 0x01);
-	write_cmos_sensor(0x3f, 0x00);	/* sanford.lin mirror */
+	write_cmos_sensor(0x3f, 0x01);	/* sanford.lin mirror */
 	write_cmos_sensor(0x44, 0x00);
 	write_cmos_sensor(0x2a, 0x4c);	/* 9.29canshu 7c */
 	write_cmos_sensor(0x2b, 0x1e);
