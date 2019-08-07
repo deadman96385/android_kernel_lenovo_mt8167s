@@ -133,6 +133,11 @@
 			input-enable;
 			bias-pull-up;
 		};
+		mic_adc_high {
+			pins = <MT8167_PIN_19_EINT19__FUNC_GPIO19>;
+			slew-rate = <1>;
+			output-low;
+		};
 	};
 
 	usb0_drvvbus: drvvbus_init {
