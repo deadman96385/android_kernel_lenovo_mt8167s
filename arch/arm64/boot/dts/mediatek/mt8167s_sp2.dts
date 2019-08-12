@@ -267,7 +267,7 @@
 
 	CTP_pins_default: eint0default {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_8_EINT8__FUNC_GPIO8>;
+			pins = <MT8167_PIN_18_EINT18__FUNC_GPIO18>;
 			slew-rate = <0>;
 			bias-disable;
 		};
@@ -275,8 +275,9 @@
 
 	CTP_pins_eint_as_int: eint@0 {
 		pins_cmd_dat {
-			pins = <MT8167_PIN_8_EINT8__FUNC_GPIO8>;
+			pins = <MT8167_PIN_18_EINT18__FUNC_GPIO18>;
 			slew-rate = <0>;
+			input-enable;
 			bias-disable;
 		};
 	};
