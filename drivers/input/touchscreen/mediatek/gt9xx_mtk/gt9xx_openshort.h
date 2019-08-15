@@ -362,9 +362,9 @@ const u8 dsp_short[] = {
 #define MAX_SENSOR_NUM            30
 
 unsigned short gt900_short_threshold = 10;
-unsigned short gt900_resistor_threshold = 800;
-unsigned short gt900_resistor_warn_threshold = 500;
-unsigned short gt900_gnd_resistor_threshold = 500;
+unsigned short gt900_resistor_threshold = 330;
+unsigned short gt900_resistor_warn_threshold = 330;
+unsigned short gt900_gnd_resistor_threshold = 330;
 
 //QFN88 package TX Pin, used for get channel number from Chip to Pad
 const u8 ChannelPackage_TX[MAX_DRIVER_NUM] =  {

@@ -13,7 +13,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
  *
- * Version:1.0
+ * Version:1.1
  * Author: meta@goodix.com
  * Accomplished Date:2012/10/20
  * Revision record:
@@ -26,10 +26,10 @@
 //add by 101003082 for ITO test at 2018/06/07 begin
 extern int current_data_index;
 int test_error_code;
-u8 gtp_ito_test_on = 0;
+//u8 gtp_ito_test_on = 0;
 char *ito_save_path="/sdcard/";
 static int gtp_ito_test_show(struct seq_file *file, void* data);
-
+int ITO_Sensor_ID = 0;
 extern int ITO_TEST_COUNT;
 
 extern  s32 Save_testing_data(char *save_test_data_dir, int test_types,u16 *current_rawdata_temp);
@@ -278,7 +278,7 @@ static u8 *send_test_cfg_buf[] = {
 	test_cfg_info_group9,
 };
 
-static u8 tset_cfg_info_len[] = {
+static u8 test_cfg_info_len[] = {
 	CFG_GROUP_LEN(test_cfg_info_group1),
         CFG_GROUP_LEN(test_cfg_info_group2),
         CFG_GROUP_LEN(test_cfg_info_group3),
@@ -936,6 +936,8 @@ static void gtp_hopping_switch(struct i2c_client *client, s32 on)
     }
 }
 */
+#define Drv_DrvNUM 26
+#define Drv_SenNUM 15
 static void gtp_open_test_init(struct i2c_client *client)
 {
 	u8 sensor_id = 0;
@@ -956,7 +958,18 @@ static void gtp_open_test_init(struct i2c_client *client)
                     + ((config[GTP_ADDR_LENGTH + GT9_REG_SEN_DRV_CNT+2-GT9_REG_CFG_BEG]>>4) & 0x0F);
 
     GTP_INFO("Driver num: %d, Sensor Num: %d", gt9xx_drv_num, gt9xx_sen_num);
-
+    if (gt9xx_drv_num < MIN_DRIVER_NUM || gt9xx_drv_num > MAX_DRIVER_NUM)
+    {
+        gt9xx_drv_num = Drv_DrvNUM;
+        SET_INFO_LINE_ERR("driver number error!");
+       // return FAIL;
+    }
+    if (gt9xx_sen_num < MIN_SENSOR_NUM || gt9xx_sen_num > MAX_SENSOR_NUM)
+    {
+        gt9xx_sen_num = Drv_SenNUM;
+        SET_INFO_LINE_ERR("sensor number error!");
+       // return FAIL;
+    }
     gt9xx_pixel_cnt = gt9xx_drv_num * gt9xx_sen_num;
 
 
@@ -968,6 +981,7 @@ static void gtp_open_test_init(struct i2c_client *client)
 	else
 	{
 		sensor_id = tmp[GTP_ADDR_LENGTH];
+         ITO_Sensor_ID = sensor_id;
          if (sensor_id >= 0x09)
          {
                 GTP_ERROR("Invalid sensor_id(0x%02X), No Config Sent!", sensor_id);
@@ -976,7 +990,7 @@ static void gtp_open_test_init(struct i2c_client *client)
 		SET_INFO_LINE_INFO("sensor_id: %d\n", sensor_id);
 	}
 
-	if (tset_cfg_info_len[sensor_id]!= 0)
+	if (test_cfg_info_len[sensor_id]!= 0)
 	{
 		max_limit_value = max_limit_value_info[sensor_id];     // screen max limit
 		min_limit_value = min_limit_value_info[sensor_id];     // screen min limit
@@ -985,7 +999,7 @@ static void gtp_open_test_init(struct i2c_client *client)
 		uniformity_lmt = uniformity_lmt_info[sensor_id];        // screen uniformity in percent
 
 		memset(&test_config[GTP_ADDR_LENGTH], 0, GTP_CONFIG_MAX_LENGTH);
-    		memcpy(&test_config[GTP_ADDR_LENGTH], send_test_cfg_buf[sensor_id], tset_cfg_info_len[sensor_id]);
+		memcpy(&test_config[GTP_ADDR_LENGTH], send_test_cfg_buf[sensor_id], test_cfg_info_len[sensor_id]);
 
 		SET_INFO_LINE_INFO("max_limit_value: %d\n", max_limit_value);
 		SET_INFO_LINE_INFO("min_limit_value: %d\n", min_limit_value);
@@ -993,7 +1007,7 @@ static void gtp_open_test_init(struct i2c_client *client)
 		SET_INFO_LINE_INFO("min_limit_key: %d\n", min_limit_key);
 		SET_INFO_LINE_INFO("uniformity_lmt %d\n", uniformity_lmt);
 
-		gtp_i2c_write(client, test_config, tset_cfg_info_len[sensor_id] + GTP_ADDR_LENGTH);
+		gtp_i2c_write(client, test_config, test_cfg_info_len[sensor_id] + GTP_ADDR_LENGTH);
 	}
     GTP_DEBUG("gtp_open_test_init-------sensor_id=%d, gt9xx_pixel_cnt=%d\n",sensor_id,gt9xx_pixel_cnt);
 	switch (sensor_id)
@@ -1030,7 +1044,7 @@ static void gtp_open_test_init(struct i2c_client *client)
 				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id4[0], (2 * gt9xx_pixel_cnt));
 				break;
 			case 8:
-				GTP_ERROR("GTP:Use sensor_id 5 standard");
+				GTP_ERROR("GTP:Use sensor_id 8 standard");
 				memcpy(&max_limit_vale_re[0], &max_limit_vale_id5[0], (2 * gt9xx_pixel_cnt));
 				memcpy(&min_limit_vale_re[0], &min_limit_vale_id5[0], (2 * gt9xx_pixel_cnt));
 				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id5[0], (2 * gt9xx_pixel_cnt));
@@ -1040,8 +1054,6 @@ static void gtp_open_test_init(struct i2c_client *client)
 				break;
 		}
 }
-
-
 
 s32 gtp_parse_config(struct i2c_client *client)
 {
@@ -1713,7 +1725,7 @@ void gt9xx_leave_short_test(struct i2c_client *client)
     gtp_reset_guitar(client, 60);
     msleep(100);
     printk("---gtp short test out reset---");
-    //gtp_send_cfg(client);
+    gtp_send_cfg(client);
     SET_INFO_LINE_INFO("");
     SET_INFO_LINE_INFO("---gtp short test end---");
 }
@@ -1757,7 +1769,7 @@ gtp_gpio_output(GTP_RST_GPIO, 0);
     msleep(2);
 	gtp_gpio_output(GTP_RST_GPIO, 1);
     msleep(6);
-
+    msleep((retry_load)*10);
     while(retry++ < 200)
     {
         // Hold ss51 & dsp
@@ -2564,7 +2576,8 @@ unsigned char AreaAccordCheck(u16* raw_buf)
 */
 static u32 gtp_raw_test_re(u16 *raw_buf, u32 check_types)
 {
-	s32 ret =0;
+    s32 ret =0;
+    s32 ret1 =0;
 
     if (raw_buf == NULL)
     {
@@ -2580,12 +2593,14 @@ static u32 gtp_raw_test_re(u16 *raw_buf, u32 check_types)
        //gexiantao@20180502-----------------------------
            if(ret)
             {
+                 ret1++;
                  Ito_result_info[RAWDATA_MAXDATA_ID].testitem=RAWDATA_MAXDATA_ID;
                  Ito_result_info[RAWDATA_MAXDATA_ID].result='P';
                  printk("gtp_raw_test_re max test result = pass\n");
             }
             else
             {
+                ret1=0;
                 Ito_result_info[RAWDATA_MAXDATA_ID].testitem=RAWDATA_MAXDATA_ID;
                 Ito_result_info[RAWDATA_MAXDATA_ID].result='F';
 				test_error_code|=0x01;
@@ -2597,17 +2612,19 @@ static u32 gtp_raw_test_re(u16 *raw_buf, u32 check_types)
     if (check_types & _MIN_TEST)
     {
     GTP_INFO("accord min test");
-        ret += gtp_raw_min_test_re(raw_buf);//0x02:SUCCESS;0:FAIL
+        ret = gtp_raw_min_test_re(raw_buf);//0x02:SUCCESS;0:FAIL
          GTP_INFO("accord---min ret = %d", ret);
 //gexiantao@20180502-----------------------------
           if(ret)
             {
+                 ret1++;
                  Ito_result_info[RAWDATA_MINDATA_ID].testitem=RAWDATA_MINDATA_ID;
                  Ito_result_info[RAWDATA_MINDATA_ID].result='P';
                  printk("gtp_raw_test_re min test result = pass\n");
             }
             else
             {
+                ret1=0;
                 Ito_result_info[RAWDATA_MINDATA_ID].testitem=RAWDATA_MINDATA_ID;
                 Ito_result_info[RAWDATA_MINDATA_ID].result='F';
 				test_error_code|=0x02;
@@ -2615,24 +2632,23 @@ static u32 gtp_raw_test_re(u16 *raw_buf, u32 check_types)
             }
             //gexiantao@20180502-----------------------------
     }
-    if(ret != 2){
-    ret =0;
-    }
 
     if (check_types & _ACCORD_TEST)//_UNIFORMITY_TEST)     // accord
     {
         GTP_INFO("accord check");
-      ret += AreaAccordCheck(raw_buf);			// //0x04:SUCCESS;0:FAIL //\CF\E0\C1\DA\CA\FD\BE\DDƫ\B2\EE\B2\E2\CA\D4
+      ret = AreaAccordCheck(raw_buf);			// //0x04:SUCCESS;0:FAIL //\CF\E0\C1\DA\CA\FD\BE\DDƫ\B2\EE\B2\E2\CA\D4
        GTP_INFO("accord---accord ret = %d", ret);
       //gexiantao@20180502-----------------------------
           if(ret)
             {
+                 ret1++;
                  Ito_result_info[RAWDATA_ACCORD_ID].testitem=RAWDATA_ACCORD_ID;
                  Ito_result_info[RAWDATA_ACCORD_ID].result='P';
                  printk("gtp_raw_test_re check result = pass\n");
             }
             else
             {
+                ret1=0;
                 Ito_result_info[RAWDATA_ACCORD_ID].testitem=RAWDATA_ACCORD_ID;
                 Ito_result_info[RAWDATA_ACCORD_ID].result='F';
 				test_error_code|=0x04;
@@ -2642,7 +2658,7 @@ static u32 gtp_raw_test_re(u16 *raw_buf, u32 check_types)
     }
 	GTP_INFO("gtp_raw_test_re result ret = %d", ret);
 
-	if (ret == 0x03)
+	if (ret1 == 3)
 	{
 	    SET_INFO_LINE_INFO("  PASS!");
 	    ret = SUCCESS;
@@ -2727,7 +2743,9 @@ void gtp_opentest_arch_raw(void)
             avrg_min = avrg_raw_buf[i];
         }
     }
-    avrg_arg = tmp / avrg_raw_len;
+    if(avrg_raw_len != 0){
+       avrg_arg = tmp / avrg_raw_len;
+     }
 
     sprintf(line_buf, "\nAverage Raw Data(Drv*Sen: %d*%d, Key:%d): \n", gt9xx_drv_num, gt9xx_sen_num, have_key);
     gtp_arch_file_append_no_len(line_buf);
@@ -2854,11 +2872,11 @@ s32 gt9xx_open_test(struct i2c_client * client)
 
         SET_INFO_LINE_ERR("GXT SAVE DATA!");
 
-        if(current_data_index==15)
+        if(current_data_index==(GTP_OPEN_SAMPLE_NUM -1))
         {
         	Save_test_result_data("/sdcard/", 0x0057);//0x0057--short+jitter+max+min+accord
         }
-        //msleep(80);
+        msleep(80);
 #endif
         if (ret == FAIL)
         {
@@ -2893,9 +2911,9 @@ open_test_exit:
     //gtptest_irq_enable(client);
     gtp_rawdiff_mode = 0;
     gt9_read_coor_cmd(client);	// back to read coordinates data
-    //msleep(50);
+    msleep(50);
     gtp_reset_guitar(client, 20);
-    //msleep(100);
+    msleep(100);
     gtp_send_cfg(client);
 		msleep(300);
     return ret;
@@ -3149,9 +3167,9 @@ static int gtp_ito_test_show(struct seq_file *file, void* data)
 #ifdef CONFIG_GTP_ESD_PROTECT
     gtp_esd_switch(i2c_client_point, SWITCH_OFF);
 #endif
-    gtp_ito_test_on=1;
+    //gtp_ito_test_on=1;
     gtptest_irq_disable(i2c_client_point);
-    msleep(30);//delay 2s for esd close
+    msleep(2500);//delay 2s for esd close
     trytimes=0;
     Ito_result_info= (struct gt9xx_iot_result_info*) kmalloc(sizeof(struct gt9xx_iot_result_info) * 5, GFP_KERNEL);
     memset(Ito_result_info, 0, sizeof(struct gt9xx_iot_result_info) * 5);
@@ -3201,7 +3219,7 @@ static int gtp_ito_test_show(struct seq_file *file, void* data)
 #ifdef CONFIG_GTP_ESD_PROTECT
      gtp_esd_switch(i2c_client_point, SWITCH_ON);
 #endif
-  gtp_ito_test_on=0;
+ // gtp_ito_test_on=0;
  gtptest_irq_enable(i2c_client_point);//
     return count;
 }
