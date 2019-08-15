@@ -48,7 +48,7 @@ static DECLARE_WAIT_QUEUE_HEAD(waiter);
 static DEFINE_MUTEX(i2c_access);
 static atomic_t  irq_enabled = ATOMIC_INIT(0);
 static unsigned int touch_irq;
-int ITO_Sensor_ID;
+//int ITO_Sensor_ID;
 int ITO_TEST_COUNT;
 extern int gtp_create_ito_test_proc(struct i2c_client *client);
 #ifdef CONFIG_GTP_HAVE_TOUCH_KEY

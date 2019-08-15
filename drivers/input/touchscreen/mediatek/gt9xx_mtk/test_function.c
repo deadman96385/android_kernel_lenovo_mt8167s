@@ -6,6 +6,12 @@
 #include "test_function.h"
 #define GT_Drvnum  26
 #define GT_Sennum  15
+#define module_sensor0    0
+#define module_sensor1    1
+#define module_sensor2    2
+#define module_sensor3    3
+#define module_sensor4    4
+#define module_sensor8    8
 #define GT_Config_Len  228
 extern int test_error_code;
  int current_data_index=0;
@@ -16,9 +22,9 @@ extern  u16 min_limit_vale_id0[];
 extern  u16 accord_limit_vale_id0[];
 extern  u16 jitter_limit_vale_id0[];
 
-extern  u16 max_limit_vale_id2[];
-extern  u16 min_limit_vale_id2[];
-extern  u16 accord_limit_vale_id2[];
+extern  u16 max_limit_vale_id5[];
+extern  u16 min_limit_vale_id5[];
+extern  u16 accord_limit_vale_id5[];
 
 extern int ITO_Sensor_ID;
 
@@ -51,7 +57,15 @@ const u8 module_cfg0[]={\
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,\
     0x00,0x00,0x00,0x00,0x00,0x00,0x0B,0x01\
 };
+const u8 module_cfg1[]={\
+};
 const u8 module_cfg2[]={\
+};
+const u8 module_cfg3[]={\
+};
+const u8 module_cfg4[]={\
+};
+const u8 module_cfg5[]={\
     0x00,0x58,0x02,0x00,0x04,0x0A,0x05,0x00,0x01,0x08,0x5A,\
     0x05,0x50,0x32,0x03,0x05,0x00,0x00,0x00,0x00,0x00,0x00,\
     0x00,0x00,0x00,0x00,0x00,0x8D,0x2D,0x0F,0x48,0x4A,0x8D,\
@@ -206,18 +220,18 @@ extern int gtp_ito_lcmoff_flag;
 	if (current_data_index == 0) {
 		bytes = (s32) sprintf((char *)data, "Device Type:%s\n", "GT917D");
 		bytes += (s32) sprintf((char *)&data[bytes], "Config:\n");
-		if(ITO_Sensor_ID==0)
+		if(ITO_Sensor_ID==module_sensor0)
 			{
 			for (i = 0; i < GT_Config_Len; i++)
 				{
 					bytes += (s32) sprintf((char *)&data[bytes], "0x%02X,", module_cfg0[i]);
 				}
 			}
-		if(ITO_Sensor_ID==2)
+		if(ITO_Sensor_ID==module_sensor8)
 			{
 			for (i = 0; i < GT_Config_Len; i++)
 				{
-					bytes += (s32) sprintf((char *)&data[bytes], "0x%02X,", module_cfg2[i]);
+					bytes += (s32) sprintf((char *)&data[bytes], "0x%02X,", module_cfg5[i]);
 				}
 			}
 
@@ -234,13 +248,13 @@ extern int gtp_ito_lcmoff_flag;
 			bytes = (s32) sprintf((char *)data, "Channel maximum:\n");
 			for (i = 0; i <  GT_Sennum; i++) {
 				for (j = 0; j < GT_Drvnum; j++) {
-					if(ITO_Sensor_ID==0)
+					if(ITO_Sensor_ID==module_sensor0)
 						{
 						bytes += (s32) sprintf((char *)&data[bytes], "%d,", max_limit_vale_id0[i + j * GT_Sennum]);
 						}
-					if(ITO_Sensor_ID==2)
+					if(ITO_Sensor_ID==module_sensor8)
 						{
-						bytes += (s32) sprintf((char *)&data[bytes], "%d,", max_limit_vale_id2[i + j * GT_Sennum]);
+						bytes += (s32) sprintf((char *)&data[bytes], "%d,", max_limit_vale_id5[i + j * GT_Sennum]);
 						}
 
 				}
@@ -279,13 +293,13 @@ extern int gtp_ito_lcmoff_flag;
 			bytes = (s32) sprintf((char *)data, "\nChannel minimum:\n");
 			for (i = 0; i < GT_Sennum; i++) {
 				for (j = 0; j < GT_Drvnum; j++) {
-					if(ITO_Sensor_ID==0)
+					if(ITO_Sensor_ID==module_sensor0)
 						{
 						bytes += (s32) sprintf((char *)&data[bytes], "%d,", min_limit_vale_id0[i + j * GT_Sennum]);
 						}
-					if(ITO_Sensor_ID==2)
+					if(ITO_Sensor_ID==module_sensor8)
 						{
-						bytes += (s32) sprintf((char *)&data[bytes], "%d,", min_limit_vale_id2[i + j * GT_Sennum]);
+						bytes += (s32) sprintf((char *)&data[bytes], "%d,", min_limit_vale_id5[i + j * GT_Sennum]);
 						}
 
 					//bytes += (s32) sprintf((char *)&data[bytes], "%d,", min_limit_vale_re[i + j * 30]);
@@ -322,13 +336,13 @@ extern int gtp_ito_lcmoff_flag;
 			bytes = (s32) sprintf((char *)data, "\nChannel average:(%d)\n", FLOAT_AMPLIFIER);
 			for (i = 0; i < GT_Sennum; i++) {
 				for (j = 0; j < GT_Drvnum; j++) {
-					if(ITO_Sensor_ID==0)
+					if(ITO_Sensor_ID==module_sensor0)
 						{
 						bytes += (s32) sprintf((char *)&data[bytes], "%d,", accord_limit_vale_id0[i + j * GT_Sennum]);
 						}
-					if(ITO_Sensor_ID==2)
+					if(ITO_Sensor_ID==module_sensor8)
 						{
-						bytes += (s32) sprintf((char *)&data[bytes], "%d,", accord_limit_vale_id2[i + j * GT_Sennum]);
+						bytes += (s32) sprintf((char *)&data[bytes], "%d,", accord_limit_vale_id5[i + j * GT_Sennum]);
 						}
 					//bytes += (s32) sprintf((char *)&data[bytes], "%d,", accord_limit_vale_re[i + j * 30]);
 				}
@@ -366,8 +380,8 @@ extern int gtp_ito_lcmoff_flag;
 		goto exit_save_testing_data;
 	}
 
-	max=1000;
-	min=5000;
+	max=100;
+	min=10000;
 	average = 0;
 
 	for (i = 0; i < GT_Sennum; i++) {
