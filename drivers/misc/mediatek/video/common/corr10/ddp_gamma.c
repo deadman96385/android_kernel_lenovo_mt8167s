@@ -998,6 +998,8 @@ static int disp_ccorr_bypass(enum DISP_MODULE_ENUM module, int bypass)
 
 static int disp_ccorr_power_on(enum DISP_MODULE_ENUM module, void *handle)
 {
+	struct DISP_CCORR_COEF_T user_color_corr;
+
 #if defined(CONFIG_MACH_MT6759) || defined(CONFIG_MACH_MT6758) || defined(CONFIG_MACH_MT6775) || \
 	defined(CONFIG_MACH_MT6763) || defined(CONFIG_MACH_MT6739) || defined(CONFIG_MACH_MT6771)
 	ddp_clk_prepare_enable(ddp_get_module_clk_id(module));
@@ -1023,6 +1025,14 @@ static int disp_ccorr_power_on(enum DISP_MODULE_ENUM module, void *handle)
 #endif
 
 	atomic_set(&g_ccorr_is_clock_on[index_of_ccorr(module)], 1);
+
+	if (g_disp_ccorr_coef[DISP_CCORR0] == NULL) {
+		user_color_corr.hw_id = DISP_CCORR0;
+		memcpy(user_color_corr.coef, g_ccorr_color_matrix,
+				sizeof(g_ccorr_color_matrix));
+		disp_ccorr_set_coef(&user_color_corr,
+				DISP_MODULE_CCORR, handle);
+	}
 
 	return 0;
 }

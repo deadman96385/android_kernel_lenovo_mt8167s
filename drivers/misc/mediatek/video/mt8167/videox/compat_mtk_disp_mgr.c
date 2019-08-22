@@ -253,15 +253,39 @@ static int compat_get_disp_input_config(struct compat_disp_input_config __user *
 	err |= get_user(c, &(data32->src_direct_link));
 	err |= put_user(c, &(data->src_direct_link));
 
+	err |= get_user(c, &(data32->isTdshp));
+	err |= put_user(c, &(data->isTdshp));
+
 	err |= get_user(c, &(data32->identity));
 	err |= put_user(c, &(data->identity));
 
 	err |= get_user(c, &(data32->connected_type));
 	err |= put_user(c, &(data->connected_type));
 
-	err |= get_user(c, &(data32->isTdshp));
-	err |= put_user(c, &(data->isTdshp));
+	err |= get_user(c, &(data32->ext_sel_layer));
+	err |= put_user(c, &(data->ext_sel_layer));
 
+	return err;
+}
+
+static int compat_get_disp_ccorr_config(struct compat_disp_ccorr_config __user *data32,
+		struct disp_ccorr_config __user *data)
+{
+	compat_uint_t u;
+	bool l;
+	int err = 0;
+	int j;
+
+	err |= get_user(l, &(data32->is_dirty));
+	err |= put_user(l, &(data->is_dirty));
+
+	err |= get_user(u, &(data32->mode));
+	err |= put_user(u, &(data->mode));
+
+	for (j = 0; j < ARRAY_SIZE(data32->color_matrix); j++) {
+		err |= get_user(u, &(data32->color_matrix[j]));
+		err |= put_user(u, &(data->color_matrix[j]));
+	}
 	return err;
 }
 
@@ -284,6 +308,8 @@ static int compat_get_disp_session_input_config(struct compat_disp_session_input
 
 	for (j = 0; j < ARRAY_SIZE(data32->config); j++)
 		err |= compat_get_disp_input_config(&data32->config[j], &data->config[j]);
+
+	err |= compat_get_disp_ccorr_config(&data32->ccorr_config, &data->ccorr_config);
 
 	return err;
 }
