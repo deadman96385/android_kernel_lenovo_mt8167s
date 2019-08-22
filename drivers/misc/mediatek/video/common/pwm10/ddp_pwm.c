@@ -122,6 +122,18 @@ static bool g_pwm_first_config[PWM_TOTAL_MODULE_NUM];
 #endif		/* CONFIG_FPGA_EARLY_PORTING */
 static int g_pwm_log_num = PWM_LOG_BUFFER_SIZE;
 
+#define PWM_LEVEL_SIZE 10
+struct PWM_LEVEL {
+	u32 level;
+	u32 step;
+	u32 offset;
+};
+static struct PWM_LEVEL pwm_level_remap_data[PWM_LEVEL_SIZE] = {{ 0 }};
+static int pwm_level_remap_data_count = 0;
+static void disp_pwm_get_mapping_config(struct device_node *);
+static bool read_offset_backlight(void);
+static bool is_offset_backlight = false;
+
 int disp_pwm_get_cust_led(unsigned int *clocksource, unsigned int *clockdiv)
 {
 	struct device_node *led_node = NULL;
@@ -154,7 +166,9 @@ int disp_pwm_get_cust_led(unsigned int *clocksource, unsigned int *clockdiv)
 				PWM_ERR("led dts can not get led mode data.\n");
 			}
 		}
+		disp_pwm_get_mapping_config(led_node);
 	}
+        is_offset_backlight = read_offset_backlight();
 
 	if (ret)
 		PWM_ERR("get pwm cust info fail");
@@ -292,6 +306,47 @@ static int disp_pwm_config(enum DISP_MODULE_ENUM module, struct disp_ddp_path_co
 	return ret;
 }
 
+static bool read_offset_backlight() {
+	struct device_node *np;
+
+	np = of_find_compatible_node(NULL, NULL, ddp_get_reg_module_name(DISP_REG_PWM));
+	if (np == NULL) {
+		PWM_MSG("DT %s is not found from DTS\n", ddp_get_reg_module_name(DISP_REG_PWM));
+		return false;
+	}
+
+	return of_property_read_bool(np, "offset-backlight");
+}
+
+static void disp_pwm_get_mapping_config(struct device_node *led_node) {
+	int elements = 0;
+	int ret;
+
+	PWM_NOTICE("Reading mapping data from dts.\n");
+	elements = of_property_count_elems_of_size(
+			led_node, "pwm_level_remap", sizeof(struct PWM_LEVEL));
+	if (elements <= 0) {
+		PWM_ERR("Failed to get size of pwm_level_data: %d\n", elements);
+		return;
+	}
+	if (elements > PWM_LEVEL_SIZE) {
+		elements = PWM_LEVEL_SIZE;
+	}
+	PWM_NOTICE("Reading %d records of PWM level remap data\n", elements);
+	ret = of_property_read_u32_array(
+			led_node,
+			"pwm_level_remap",
+			(u32 *)&pwm_level_remap_data,
+			elements * sizeof(struct PWM_LEVEL) / sizeof(u32));
+	if (ret == 0) {
+		pwm_level_remap_data_count = elements;
+	} else {
+		pwm_level_remap_data_count = 0;
+		PWM_ERR("Failed to read pwm_level_data. No mapping will take place.\n");
+		return;
+	}
+}
+
 static void disp_pwm_trigger_refresh(enum disp_pwm_id_t id, int quick)
 {
 	if (g_ddp_notify != NULL) {
@@ -390,6 +445,28 @@ static void disp_pwm_set_enabled(struct cmdqRecStruct *cmdq, enum disp_pwm_id_t 
  */
 static int disp_pwm_level_remap(enum disp_pwm_id_t id, int level_1024)
 {
+	int i;
+	int max_level_1024 = disp_pwm_get_max_backlight(id);
+	// Convert to AT's 1-256 levels then remap to 1024 because we have the
+	// technology to adjust the mapping concentrating on the dimmer end.
+	int level = level_1024 / 4;
+	if (level_1024 != 0 && level < 1) {
+		level = 1;
+	}
+	// Now map back to 1024 smoothly.
+	for (i=0; i < pwm_level_remap_data_count; i++) {
+		struct PWM_LEVEL *data = &pwm_level_remap_data[i];
+		if (level <= data->level) {
+			level_1024 = level * data->step + data->offset;
+			break;
+		}
+	}
+	// Clamp the values, just in case
+	if (level_1024 < 0) {
+		level_1024 = 0;
+	} else if (level_1024 > max_level_1024) {
+		level_1024 = max_level_1024;
+	}
 	return level_1024;
 }
 
@@ -551,10 +628,20 @@ int disp_pwm_set_backlight_cmdq(enum disp_pwm_id_t id, int level_1024, void *cmd
 		reg_base = pwm_get_reg_base(id);
 		DISP_REG_MASK(cmdq, reg_base + DISP_PWM_CON_1_OFF, level_1024 << 16, 0x1fff << 16);
 
-		if (level_1024 > 0)
+		if (level_1024 > 0) {
+                        if (level_1024 == 1 && is_offset_backlight) {
+                                DISP_REG_MASK(cmdq, reg_base + DISP_PWM_CON_1_OFF, 4095, 0xfff);
+                                PWM_NOTICE("1==level_1024=%d DISP_PWM_CON_1_OFF=0x%x",
+                                           level_1024, DISP_REG_GET(reg_base + DISP_PWM_CON_1_OFF));
+                        } else {
+                                DISP_REG_MASK(cmdq, reg_base + DISP_PWM_CON_1_OFF, 1023, 0xfff);
+                                PWM_NOTICE("1!=level_1024=%d DISP_PWM_CON_1_OFF=0x%x",
+                                           level_1024, DISP_REG_GET(reg_base + DISP_PWM_CON_1_OFF));
+                        }
 			disp_pwm_set_enabled(cmdq, id, 1);
-		else
+		} else {
 			disp_pwm_set_enabled(cmdq, id, 0);	/* To save power */
+		}
 
 		DISP_REG_MASK(cmdq, reg_base + DISP_PWM_COMMIT_OFF, 1, ~0);
 		DISP_REG_MASK(cmdq, reg_base + DISP_PWM_COMMIT_OFF, 0, ~0);
@@ -697,7 +784,7 @@ struct DDP_MODULE_DRIVER ddp_driver_pwm = {
 };
 
 /* ---------------------------------------------------------------------- */
-/* disp pwm clock source query api                                                              */
+/* disp pwm clock source query api                                        */
 /* ---------------------------------------------------------------------- */
 
 bool disp_pwm_is_osc(void)
