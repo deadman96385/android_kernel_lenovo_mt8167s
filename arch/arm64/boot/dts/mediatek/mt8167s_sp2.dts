@@ -30,6 +30,10 @@
 	};
 };
 
+&disp_pwm0 {
+	offset-backlight;
+};
+
 &i2c0 {
 	status = "okay";
 	clock-frequency = <400000>;
@@ -146,6 +150,15 @@
 
 &led6 {
 	status = "okay";
+	/* If this exceeds 10 entries then
+	 * change PWM_LEVEL_SIZE in ddp_pwm.c */
+	pwm_level_remap =
+	<
+	/* level <= [0] then level * [1] + [2]*/
+	30 1 0 /* map to 0 - 30 */
+	65 2 (-30) /* map to 32 - 100 */
+	249 5 (-255) /* map to 105 - 1020 */
+	>;
 };
 
 &mt6392keys {
