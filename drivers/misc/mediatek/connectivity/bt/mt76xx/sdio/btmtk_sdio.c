@@ -1085,6 +1085,13 @@ static int btmtk_sdio_recv_rx_data(void)
 		}
 
 		if ((RX_DONE&u32ReadCRValue) && rx_length) {
+			if (rx_length > MTK_RXDATA_SIZE) {
+				pr_warn("%s: rx_length %d is bigger than MTK_RXDATA_SIZE %d\n",
+					__func__, rx_length, MTK_RXDATA_SIZE);
+				ret = -EIO;
+				break;
+			}
+
 			pr_debug("%s: u32ReadCRValue = %08X\n",
 				__func__, u32ReadCRValue);
 			u32ReadCRValue &= 0xFFFB;
