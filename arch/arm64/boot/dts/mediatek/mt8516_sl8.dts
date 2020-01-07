@@ -89,6 +89,11 @@
 	status="okay";
 };
 
+&usb0 {
+	mediatek,otg-enable;
+	status = "okay";
+};
+
 &usb1 {
 	status = "okay";
 };
