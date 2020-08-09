@@ -4083,6 +4083,56 @@ VOID wlanoidClearTimeoutCheck(IN P_ADAPTER_T prAdapter)
 	cnmTimerStopTimer(prAdapter, &(prAdapter->rOidTimeoutTimer));
 }
 
+
+/*----------------------------------------------------------------------------*/
+/*!
+* @brief This function is used to write mac address to efuse
+*
+* @param prAdapter          Pointer to the Adapter structure.
+*
+* @return none
+*/
+/*----------------------------------------------------------------------------*/
+VOID wlanWriteMacAddressToEfuse(IN P_ADAPTER_T prAdapter,
+	IN UINT_8 addr,
+	IN PARAM_MAC_ADDRESS mac_bytes, IN UINT_8 mac_byte_len)
+{
+	PARAM_CUSTOM_ACCESS_EFUSE_T rAccessEfuseInfo;
+	UINT_8 u4Index;
+	WLAN_STATUS rStatus = WLAN_STATUS_SUCCESS;
+	UINT_32 u4BufLen = 0;
+	UINT_16 address_in_block = 0;
+
+
+	kalMemSet(&rAccessEfuseInfo, 0, sizeof(PARAM_CUSTOM_ACCESS_EFUSE_T));
+	rAccessEfuseInfo.u4Address = (addr / EFUSE_BLOCK_SIZE) * EFUSE_BLOCK_SIZE;
+	address_in_block = rAccessEfuseInfo.u4Address;
+	u4Index = addr % EFUSE_BLOCK_SIZE;
+
+	/*Read efuse block first*/
+	rStatus = kalIoctl(prAdapter->prGlueInfo,
+				wlanoidQueryProcessAccessEfuseRead,
+				&rAccessEfuseInfo,
+				sizeof(PARAM_CUSTOM_ACCESS_EFUSE_T),
+				TRUE, TRUE, TRUE, &u4BufLen);
+	DBGLOG(INIT, WARN, "Read back effuse address:%d\n", rStatus);
+
+	/*Copy mac address*/
+	memcpy(rAccessEfuseInfo.aucData + address_in_block,
+		mac_bytes, mac_byte_len);
+	DBGLOG(INIT, WARN, "MAC address:%d:%d:%d:%d:%d:%d\n",
+		mac_bytes[0], mac_bytes[1], mac_bytes[2],
+		mac_bytes[3], mac_bytes[4], mac_bytes[5]);
+
+	/*Write block to effuse back*/
+	rStatus = kalIoctl(prAdapter->prGlueInfo,
+				wlanoidQueryProcessAccessEfuseWrite,
+				&rAccessEfuseInfo,
+				sizeof(PARAM_CUSTOM_ACCESS_EFUSE_T), FALSE, FALSE, TRUE, &u4BufLen);
+	DBGLOG(INIT, WARN, "Write back effuse address:%d\n", rStatus);
+
+}
+
 /*----------------------------------------------------------------------------*/
 /*!
 * @brief This function is called to override network address
@@ -4120,11 +4170,15 @@ WLAN_STATUS wlanUpdateNetworkAddress(IN P_ADAPTER_T prAdapter)
 			/* dynamic generate */
 			u4SysTime = (UINT_32) kalGetTimeTick();
 
-			rMacAddr[0] = 0x00;
-			rMacAddr[1] = 0x08;
-			rMacAddr[2] = 0x22;
+			/*Reset the random address*/
+			rMacAddr[0] = 0xB4;
+			rMacAddr[1] = 0xB8;
+			rMacAddr[2] = 0xB8;
 
 			kalMemCopy(&rMacAddr[3], &u4SysTime, 3);
+
+			wlanWriteMacAddressToEfuse(prAdapter, 4,
+				rMacAddr, PARAM_MAC_ADDR_LEN);
 
 	} else {
 #if CFG_SHOW_MACADDR_SOURCE
