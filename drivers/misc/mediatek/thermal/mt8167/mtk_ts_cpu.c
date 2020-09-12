@@ -3997,6 +3997,7 @@ const long tscpu_dev_alloc_module_base_by_name(const char *name)
 static int get_io_reg_base(struct platform_device *pdev)
 {
 		struct device_node *node = pdev->dev.of_node;
+		struct device_node *apmixedsys;
 
 		/* Setup IO addresses */
 		thermal_base = of_iomap(node, 0);
@@ -4018,11 +4019,21 @@ static int get_io_reg_base(struct platform_device *pdev)
 		tscpu_printk("[THERM_CTRL] auxadc_ts_phy_base=0x%lx\n",
 						(unsigned long)auxadc_ts_phy_base);
 #endif
-		apmixed_base = of_parse_phandle(node, "apmixedsys", 0);
-		tscpu_printk("[THERM_CTRL] apmixed_base=0x%lx\n", (unsigned long)apmixed_base);
+		apmixedsys = of_parse_phandle(node, "apmixedsys", 0);
 
-		apmixed_phy_base = of_get_phys_base(apmixed_base);
-		tscpu_printk("[THERM_CTRL] apmixed_phy_base=0x%lx\n", (unsigned long)apmixed_phy_base);
+		if (!apmixedsys) {
+			dev_err(&pdev->dev, "missing apmixedsys node\n");
+			return 0;
+		}
+
+		apmixed_base = of_iomap(apmixedsys, 0);
+
+		tscpu_printk("[THERM_CTRL] apmixed_base=0x%lx\n",
+			(unsigned long)apmixed_base);
+
+		apmixed_phy_base = of_get_phys_base(apmixedsys);
+		tscpu_printk("[THERM_CTRL] apmixed_phy_base=0x%lx\n",
+			(unsigned long)apmixed_phy_base);
 
 #if 0
 		pericfg_base = of_parse_phandle(node, "pericfg", 0);
@@ -4030,6 +4041,11 @@ static int get_io_reg_base(struct platform_device *pdev)
 #endif
 
 		node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-auxadc");
+
+		if (!node) {
+			dev_err(&pdev->dev, "missing mediatek,mt8167-auxadc node\n");
+			return 0;
+		}
 
 		auxadc_ts_base = of_iomap(node, 0);
 
@@ -4040,6 +4056,11 @@ static int get_io_reg_base(struct platform_device *pdev)
 								(unsigned long)auxadc_ts_phy_base);
 
 		node = of_find_compatible_node(NULL, NULL, "mediatek,mt8167-infracfg");
+
+		if (!node) {
+			dev_err(&pdev->dev, "missing mediatek,mt8167-infracfg node\n");
+			return 0;
+		}
 
 		INFRACFG_AO_BASE = of_iomap(node, 0);
 
