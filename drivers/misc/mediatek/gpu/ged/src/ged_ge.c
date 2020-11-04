@@ -201,6 +201,8 @@ int ged_ge_alloc(int region_num, uint32_t *region_sizes)
 		goto err_kmalloc;
 	}
 
+	region_num = GE_ALLOC_STRUCT_NUM;
+
 	entry->region_sizes = (uint32_t *)entry->data;
 	entry->region_data = (uint32_t **)(entry->region_sizes + region_num);
 	for (i = 0; i < region_num; ++i)

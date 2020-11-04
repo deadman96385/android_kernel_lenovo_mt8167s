@@ -111,6 +111,7 @@ static long ged_dispatch(struct file *pFile, GED_BRIDGE_PACKAGE *psBridgePackage
 	typedef int (ged_bridge_func_type)(void *, void *);
 	ged_bridge_func_type* pFunc = NULL;
 	int bridge_id = -1;
+	int32_t inputBufferSize = 0;
 
 	/* We make sure the both size are GE 0 integer.
 	 */
@@ -119,14 +120,21 @@ static long ged_dispatch(struct file *pFile, GED_BRIDGE_PACKAGE *psBridgePackage
 		psBridgePackageKM->i32OutBufferSize > 0) {
 
 		if (psBridgePackageKM->i32InBufferSize > 0) {
-			pvIn = kmalloc(psBridgePackageKM->i32InBufferSize, GFP_KERNEL);
+			inputBufferSize =
+					psBridgePackageKM->i32InBufferSize;
+
+			if (bridge_id == GED_BRIDGE_COMMAND_GE_ALLOC) {
+				inputBufferSize = sizeof(int) +
+				sizeof(uint32_t) * GE_ALLOC_STRUCT_NUM;
+			}
+			pvIn = kmalloc(inputBufferSize, GFP_KERNEL);
 
 			if (pvIn == NULL)
 				goto dispatch_exit;
 
 			if (ged_copy_from_user(pvIn,
 						psBridgePackageKM->pvParamIn,
-						psBridgePackageKM->i32InBufferSize) != 0) {
+						inputBufferSize) != 0) {
 				GED_LOGE("ged_copy_from_user fail\n");
 				goto dispatch_exit;
 			}
