@@ -4110,27 +4110,20 @@ VOID wlanWriteMacAddressToEfuse(IN P_ADAPTER_T prAdapter,
 	u4Index = addr % EFUSE_BLOCK_SIZE;
 
 	/*Read efuse block first*/
-	rStatus = kalIoctl(prAdapter->prGlueInfo,
-				wlanoidQueryProcessAccessEfuseRead,
-				&rAccessEfuseInfo,
-				sizeof(PARAM_CUSTOM_ACCESS_EFUSE_T),
-				TRUE, TRUE, TRUE, &u4BufLen);
-	DBGLOG(INIT, WARN, "Read back effuse address:%d\n", rStatus);
+	rStatus = wlanoidQueryAccessEfuseRead(prAdapter,
+		&rAccessEfuseInfo, sizeof(PARAM_CUSTOM_ACCESS_EFUSE_T), &u4BufLen);
 
 	/*Copy mac address*/
-	memcpy(rAccessEfuseInfo.aucData + address_in_block,
+	memcpy(rAccessEfuseInfo.aucData + u4Index,
 		mac_bytes, mac_byte_len);
-	DBGLOG(INIT, WARN, "MAC address:%d:%d:%d:%d:%d:%d\n",
-		mac_bytes[0], mac_bytes[1], mac_bytes[2],
-		mac_bytes[3], mac_bytes[4], mac_bytes[5]);
+
+	DBGLOG(INIT, WARN, "MAC address 2:%d:%d:%d:%d:%d:%d\n",
+		rAccessEfuseInfo.aucData[4], rAccessEfuseInfo.aucData[5], rAccessEfuseInfo.aucData[6],
+		rAccessEfuseInfo.aucData[7], rAccessEfuseInfo.aucData[8], rAccessEfuseInfo.aucData[9]);
 
 	/*Write block to effuse back*/
-	rStatus = kalIoctl(prAdapter->prGlueInfo,
-				wlanoidQueryProcessAccessEfuseWrite,
-				&rAccessEfuseInfo,
-				sizeof(PARAM_CUSTOM_ACCESS_EFUSE_T), FALSE, FALSE, TRUE, &u4BufLen);
-	DBGLOG(INIT, WARN, "Write back effuse address:%d\n", rStatus);
-
+	rStatus = wlanoidQueryAccessEfuseWrite(prAdapter,
+		&rAccessEfuseInfo, sizeof(PARAM_CUSTOM_ACCESS_EFUSE_T), &u4BufLen);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -4171,7 +4164,7 @@ WLAN_STATUS wlanUpdateNetworkAddress(IN P_ADAPTER_T prAdapter)
 			u4SysTime = (UINT_32) kalGetTimeTick();
 
 			/*Reset the random address*/
-			rMacAddr[0] = 0xB4;
+			rMacAddr[0] = 0x84;
 			rMacAddr[1] = 0xB8;
 			rMacAddr[2] = 0xB8;
 

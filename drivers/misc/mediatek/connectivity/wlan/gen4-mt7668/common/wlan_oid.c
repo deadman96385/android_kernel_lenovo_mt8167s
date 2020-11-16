@@ -4549,7 +4549,7 @@ wlanoidSetEfusBufferMode(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT
 */
 /*----------------------------------------------------------------------------*/
 WLAN_STATUS
-wlanoidQueryProcessAccessEfuseRead(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen,
+wlanoidQueryAccessEfuseRead(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen,
 			 OUT PUINT_32 pu4SetInfoLen)
 {
 	P_PARAM_CUSTOM_ACCESS_EFUSE_T prSetAccessEfuseInfo;
@@ -4575,6 +4575,130 @@ wlanoidQueryProcessAccessEfuseRead(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffe
 	rCmdSetAccessEfuse.u4Address = prSetAccessEfuseInfo->u4Address;
 	rCmdSetAccessEfuse.u4Valid = prSetAccessEfuseInfo->u4Valid;
 
+	kalMemCopy(rCmdSetAccessEfuse.aucData, prSetAccessEfuseInfo->aucData,
+	       sizeof(UINT_8) * 16);
+
+	rWlanStatus = wlanSendSetQueryExtCmd(prAdapter,
+					CMD_ID_LAYER_0_EXT_MAGIC_NUM,
+					EXT_CMD_ID_EFUSE_ACCESS,
+					FALSE,   /* Query Bit:  True->write  False->read*/
+					TRUE,
+					FALSE,
+					NULL, /* No Tx done function wait until fw ack */
+					nicOidCmdTimeoutCommon,
+					sizeof(CMD_ACCESS_EFUSE_T),
+					(PUINT_8) (&rCmdSetAccessEfuse), pvSetBuffer, u4SetBufferLen);
+
+	return rWlanStatus;
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief This routine is called to write efuse content.
+*
+* \param[in] pvAdapter Pointer to the Adapter structure.
+* \param[out] pvQueryBuf A pointer to the buffer that holds the result of
+*                           the query.
+* \param[in] u4QueryBufLen The length of the query buffer.
+* \param[out] pu4QueryInfoLen If the call is successful, returns the number of
+*                            bytes written into the query buffer. If the call
+*                            failed due to invalid length of the query buffer,
+*                            returns the amount of storage needed.
+*
+* \retval WLAN_STATUS_SUCCESS
+* \retval WLAN_STATUS_INVALID_LENGTH
+*/
+/*----------------------------------------------------------------------------*/
+WLAN_STATUS
+wlanoidQueryAccessEfuseWrite(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen,
+			 OUT PUINT_32 pu4SetInfoLen)
+{
+	P_PARAM_CUSTOM_ACCESS_EFUSE_T prSetAccessEfuseInfo;
+	CMD_ACCESS_EFUSE_T rCmdSetAccessEfuse;
+	WLAN_STATUS rWlanStatus = WLAN_STATUS_SUCCESS;
+
+	DEBUGFUNC("wlanoidQueryProcessAccessEfuseWrite");
+
+	ASSERT(prAdapter);
+	ASSERT(pu4SetInfoLen);
+
+	*pu4SetInfoLen = sizeof(PARAM_CUSTOM_ACCESS_EFUSE_T);
+
+	if (u4SetBufferLen < sizeof(PARAM_CUSTOM_ACCESS_EFUSE_T))
+		return WLAN_STATUS_INVALID_LENGTH;
+
+	ASSERT(pvSetBuffer);
+
+	prSetAccessEfuseInfo = (P_PARAM_CUSTOM_ACCESS_EFUSE_T) pvSetBuffer;
+
+	kalMemSet(&rCmdSetAccessEfuse, 0, sizeof(CMD_ACCESS_EFUSE_T));
+
+	rCmdSetAccessEfuse.u4Address = prSetAccessEfuseInfo->u4Address;
+	rCmdSetAccessEfuse.u4Valid = prSetAccessEfuseInfo->u4Valid;
+
+	kalMemCopy(rCmdSetAccessEfuse.aucData, prSetAccessEfuseInfo->aucData,
+		sizeof(UINT_8) * 16);
+
+	rWlanStatus = wlanSendSetQueryExtCmd(prAdapter,
+					CMD_ID_LAYER_0_EXT_MAGIC_NUM,
+					EXT_CMD_ID_EFUSE_ACCESS,
+					TRUE,   /* Query Bit:  True->write  False->read*/
+					TRUE,
+					FALSE,
+					NULL, /* No Tx done function wait until fw ack */
+					nicOidCmdTimeoutCommon,
+					sizeof(CMD_ACCESS_EFUSE_T),
+					(PUINT_8) (&rCmdSetAccessEfuse), pvSetBuffer, u4SetBufferLen);
+
+	return rWlanStatus;
+}
+
+
+/*#if (CFG_EEPROM_PAGE_ACCESS == 1)*/
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief This routine is called to read efuse content.
+*
+* \param[in] pvAdapter Pointer to the Adapter structure.
+* \param[out] pvQueryBuf A pointer to the buffer that holds the result of
+*                           the query.
+* \param[in] u4QueryBufLen The length of the query buffer.
+* \param[out] pu4QueryInfoLen If the call is successful, returns the number of
+*                            bytes written into the query buffer. If the call
+*                            failed due to invalid length of the query buffer,
+*                            returns the amount of storage needed.
+*
+* \retval WLAN_STATUS_SUCCESS
+* \retval WLAN_STATUS_INVALID_LENGTH
+*/
+/*----------------------------------------------------------------------------*/
+WLAN_STATUS
+wlanoidQueryProcessAccessEfuseRead(IN P_ADAPTER_T prAdapter, IN PVOID pvSetBuffer, IN UINT_32 u4SetBufferLen,
+			 OUT PUINT_32 pu4SetInfoLen)
+{
+	P_PARAM_CUSTOM_ACCESS_EFUSE_T prSetAccessEfuseInfo;
+	CMD_ACCESS_EFUSE_T rCmdSetAccessEfuse;
+	WLAN_STATUS rWlanStatus = WLAN_STATUS_SUCCESS;
+
+	DEBUGFUNC("wlanoidQueryProcessAccessEfuseRead");
+	DBGLOG(INIT, WARN, "BwlanoidQueryProcessAccessEfuseRead");
+
+	ASSERT(prAdapter);
+	ASSERT(pu4SetInfoLen);
+
+	*pu4SetInfoLen = sizeof(PARAM_CUSTOM_ACCESS_EFUSE_T);
+
+	if (u4SetBufferLen < sizeof(PARAM_CUSTOM_ACCESS_EFUSE_T))
+		return WLAN_STATUS_INVALID_LENGTH;
+
+	ASSERT(pvSetBuffer);
+
+	prSetAccessEfuseInfo = (P_PARAM_CUSTOM_ACCESS_EFUSE_T) pvSetBuffer;
+
+	kalMemSet(&rCmdSetAccessEfuse, 0, sizeof(CMD_ACCESS_EFUSE_T));
+
+	rCmdSetAccessEfuse.u4Address = prSetAccessEfuseInfo->u4Address;
+	rCmdSetAccessEfuse.u4Valid = prSetAccessEfuseInfo->u4Valid;
 
 	DBGLOG(INIT, INFO, "MT6632 : wlanoidQueryProcessAccessEfuseRead, address=%d\n", rCmdSetAccessEfuse.u4Address);
 
