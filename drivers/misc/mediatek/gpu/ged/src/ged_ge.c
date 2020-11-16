@@ -194,14 +194,14 @@ int ged_ge_alloc(int region_num, uint32_t *region_sizes)
 		goto err_entry_file;
 	}
 
+	region_num = GE_ALLOC_STRUCT_NUM;
+
 	entry->region_num = region_num;
 	entry->data = kzalloc((sizeof(uint32_t) + sizeof(uint32_t *)) * region_num, GFP_KERNEL);
 	if (!entry->data) {
 		GE_PERR("alloc data fail, size:%zu\n", sizeof(void *) * region_num);
 		goto err_kmalloc;
 	}
-
-	region_num = GE_ALLOC_STRUCT_NUM;
 
 	entry->region_sizes = (uint32_t *)entry->data;
 	entry->region_data = (uint32_t **)(entry->region_sizes + region_num);
