@@ -12,8 +12,8 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
- *
- * Version:1.1
+ * 
+ * Version:1.1  
  * Author: meta@goodix.com
  * Accomplished Date:2012/10/20
  * Revision record:
@@ -26,7 +26,7 @@
 //add by 101003082 for ITO test at 2018/06/07 begin
 extern int current_data_index;
 int test_error_code;
-//u8 gtp_ito_test_on = 0;
+
 char *ito_save_path="/sdcard/";
 static int gtp_ito_test_show(struct seq_file *file, void* data);
 int ITO_Sensor_ID = 0;
@@ -775,6 +775,7 @@ static u8 cfg_sen_order[MAX_SENSOR_NUM];
 
 static void gtptest_irq_disable(struct i2c_client * client)
 {
+        GTP_INFO("gtptest_irq_disable ");
 	gtp_irq_disable();
 }
 
@@ -783,6 +784,7 @@ static void gtptest_irq_enable(struct i2c_client * client)
     //mt_eint_unmask(CUST_EINT_TOUCH_PANEL_NUM);
     //struct goodix_ts_data *ts;
 	//ts = i2c_get_clientdata(client);
+       GTP_INFO("gtptest_irq_enable");
 	gtp_irq_enable();
 }
 
@@ -936,9 +938,10 @@ static void gtp_hopping_switch(struct i2c_client *client, s32 on)
     }
 }
 */
-#define Drv_DrvNUM 26
-#define Drv_SenNUM 15
-static void gtp_open_test_init(struct i2c_client *client)
+
+#define Sparrow_DrvNUM 26 
+#define Sparrow_SenNUM 15 
+static void  gtp_open_test_init(struct i2c_client *client)
 {
 	u8 sensor_id = 0;
 	u8 tmp[4] = {(u8)(GTP_REG_SENSOR_ID >> 8), (u8)GTP_REG_SENSOR_ID, 0};
@@ -946,8 +949,7 @@ static void gtp_open_test_init(struct i2c_client *client)
 	u8 test_config[GTP_CONFIG_MAX_LENGTH + GTP_ADDR_LENGTH] = {
 	    (u8)(GTP_REG_CONFIG_DATA >> 8), (u8)GTP_REG_CONFIG_DATA, 0};
 
-			if (gtp_i2c_read(i2c_client_point, config, GTP_CONFIG_MAX_LENGTH + GTP_ADDR_LENGTH) <= 0)
-    	{
+	if (gtp_i2c_read(i2c_client_point, config, GTP_CONFIG_MAX_LENGTH + GTP_ADDR_LENGTH) <= 0){
         	SET_INFO_LINE_ERR("Failed to read config!");
         	return ;
     	}
@@ -959,14 +961,14 @@ static void gtp_open_test_init(struct i2c_client *client)
 
     GTP_INFO("Driver num: %d, Sensor Num: %d", gt9xx_drv_num, gt9xx_sen_num);
     if (gt9xx_drv_num < MIN_DRIVER_NUM || gt9xx_drv_num > MAX_DRIVER_NUM)
-    {
-        gt9xx_drv_num = Drv_DrvNUM;
+    {   
+        gt9xx_drv_num = Sparrow_DrvNUM;
         SET_INFO_LINE_ERR("driver number error!");
        // return FAIL;
     }
     if (gt9xx_sen_num < MIN_SENSOR_NUM || gt9xx_sen_num > MAX_SENSOR_NUM)
     {
-        gt9xx_sen_num = Drv_SenNUM;
+        gt9xx_sen_num = Sparrow_SenNUM;
         SET_INFO_LINE_ERR("sensor number error!");
        // return FAIL;
     }
@@ -981,7 +983,7 @@ static void gtp_open_test_init(struct i2c_client *client)
 	else
 	{
 		sensor_id = tmp[GTP_ADDR_LENGTH];
-         ITO_Sensor_ID = sensor_id;
+        ITO_Sensor_ID = sensor_id;
          if (sensor_id >= 0x09)
          {
                 GTP_ERROR("Invalid sensor_id(0x%02X), No Config Sent!", sensor_id);
@@ -999,7 +1001,7 @@ static void gtp_open_test_init(struct i2c_client *client)
 		uniformity_lmt = uniformity_lmt_info[sensor_id];        // screen uniformity in percent
 
 		memset(&test_config[GTP_ADDR_LENGTH], 0, GTP_CONFIG_MAX_LENGTH);
-		memcpy(&test_config[GTP_ADDR_LENGTH], send_test_cfg_buf[sensor_id], test_cfg_info_len[sensor_id]);
+    	memcpy(&test_config[GTP_ADDR_LENGTH], send_test_cfg_buf[sensor_id], test_cfg_info_len[sensor_id]);
 
 		SET_INFO_LINE_INFO("max_limit_value: %d\n", max_limit_value);
 		SET_INFO_LINE_INFO("min_limit_value: %d\n", min_limit_value);
@@ -1009,51 +1011,53 @@ static void gtp_open_test_init(struct i2c_client *client)
 
 		gtp_i2c_write(client, test_config, test_cfg_info_len[sensor_id] + GTP_ADDR_LENGTH);
 	}
-    GTP_DEBUG("gtp_open_test_init-------sensor_id=%d, gt9xx_pixel_cnt=%d\n",sensor_id,gt9xx_pixel_cnt);
+    GTP_INFO("gtp_open_test_init-------sensor_id=%d, gt9xx_pixel_cnt=%d\n",sensor_id,gt9xx_pixel_cnt);
 	switch (sensor_id)
 		{
-           GTP_DEBUG("sensor_id=%d, gt9xx_pixel_cnt=%d\n",sensor_id,gt9xx_pixel_cnt);
+           GTP_INFO("sensor_id=%d, gt9xx_pixel_cnt=%d\n",sensor_id,gt9xx_pixel_cnt);
 			case 0:
-				GTP_ERROR("GTP:Use sensor_id 0 standard");
-				memcpy(&max_limit_vale_re[0], &max_limit_vale_id0[0], (2 * gt9xx_pixel_cnt));
-				memcpy(&min_limit_vale_re[0], &min_limit_vale_id0[0], (2 * gt9xx_pixel_cnt));
-				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id0[0], (2 * gt9xx_pixel_cnt));
+				GTP_INFO("GTP:Use sensor_id 0 standard");			
+				memcpy(&max_limit_vale_re[0], &max_limit_vale_id0[0], (2 * gt9xx_pixel_cnt ));
+				memcpy(&min_limit_vale_re[0], &min_limit_vale_id0[0], (2 * gt9xx_pixel_cnt ));
+				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id0[0], (2 * gt9xx_pixel_cnt ));		
 				break;
 			case 1:
-				GTP_ERROR("GTP:Use sensor_id 1 standard");
-				memcpy(&max_limit_vale_re[0], &max_limit_vale_id1[0], (2 * gt9xx_pixel_cnt));
-				memcpy(&min_limit_vale_re[0], &min_limit_vale_id1[0], (2 * gt9xx_pixel_cnt));
-				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id1[0], (2 * gt9xx_pixel_cnt));
+				GTP_INFO("GTP:Use sensor_id 1 standard"); 
+				memcpy(&max_limit_vale_re[0], &max_limit_vale_id1[0], (2 * gt9xx_pixel_cnt ));
+				memcpy(&min_limit_vale_re[0], &min_limit_vale_id1[0], (2 * gt9xx_pixel_cnt ));
+				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id1[0], (2 * gt9xx_pixel_cnt));				
 				break;
 			case 2:
-				GTP_ERROR("GTP:Use sensor_id 2 standard");
-				memcpy(&max_limit_vale_re[0], &max_limit_vale_id2[0], (2 * gt9xx_pixel_cnt));
-				memcpy(&min_limit_vale_re[0], &min_limit_vale_id2[0], (2 * gt9xx_pixel_cnt));
-				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id2[0], (2 * gt9xx_pixel_cnt));
+				GTP_INFO("GTP:Use sensor_id 2 standard"); 
+				memcpy(&max_limit_vale_re[0], &max_limit_vale_id2[0], (2 * gt9xx_pixel_cnt ));
+				memcpy(&min_limit_vale_re[0], &min_limit_vale_id2[0], (2 * gt9xx_pixel_cnt ));
+				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id2[0], (2 * gt9xx_pixel_cnt));	
 				break;
 			case 3:
-				GTP_ERROR("GTP:Use sensor_id 3 standard");
+				GTP_INFO("GTP:Use sensor_id 3 standard"); 
 				memcpy(&max_limit_vale_re[0], &max_limit_vale_id3[0], (2 * gt9xx_pixel_cnt));
 				memcpy(&min_limit_vale_re[0], &min_limit_vale_id3[0], (2 * gt9xx_pixel_cnt));
 				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id3[0], (2 * gt9xx_pixel_cnt));
 				break;
 			case 4:
-				GTP_ERROR("GTP:Use sensor_id 4 standard");
-				memcpy(&max_limit_vale_re[0], &max_limit_vale_id4[0], (2 * gt9xx_pixel_cnt));
-				memcpy(&min_limit_vale_re[0], &min_limit_vale_id4[0], (2 * gt9xx_pixel_cnt));
-				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id4[0], (2 * gt9xx_pixel_cnt));
+				GTP_INFO("GTP:Use sensor_id 4 standard"); 
+				memcpy(&max_limit_vale_re[0], &max_limit_vale_id4[0], (2 * gt9xx_pixel_cnt ));
+				memcpy(&min_limit_vale_re[0], &min_limit_vale_id4[0], (2 * gt9xx_pixel_cnt ));
+				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id4[0], (2 * gt9xx_pixel_cnt ));				
 				break;
 			case 8:
-				GTP_ERROR("GTP:Use sensor_id 8 standard");
+				GTP_INFO("GTP:Use sensor_id 8 standard"); 
 				memcpy(&max_limit_vale_re[0], &max_limit_vale_id5[0], (2 * gt9xx_pixel_cnt));
 				memcpy(&min_limit_vale_re[0], &min_limit_vale_id5[0], (2 * gt9xx_pixel_cnt));
 				memcpy(&accord_limit_vale_re[0], &accord_limit_vale_id5[0], (2 * gt9xx_pixel_cnt));
 				break;
 			default:
-				GTP_ERROR("GTP:Unrecognized sensor_id,keep last!");
+				GTP_INFO("GTP:Unrecognized sensor_id,keep last!");			
 				break;
 		}
 }
+
+
 
 s32 gtp_parse_config(struct i2c_client *client)
 {
@@ -1063,8 +1067,7 @@ s32 gtp_parse_config(struct i2c_client *client)
     u8 config[256] = {(u8)(GTP_REG_CONFIG_DATA >> 8), (u8)GTP_REG_CONFIG_DATA, 0};
     u8 type_buf[12] = {0x80, 0x00};
 
-    if (gtp_i2c_read(client, config, GTP_CONFIG_MAX_LENGTH + GTP_ADDR_LENGTH) <= 0)
-    {
+    if (gtp_i2c_read(client, config, GTP_CONFIG_MAX_LENGTH + GTP_ADDR_LENGTH) <= 0){
         SET_INFO_LINE_ERR("Failed to read config!");
         return FAIL;
     }
@@ -1076,7 +1079,8 @@ s32 gtp_parse_config(struct i2c_client *client)
 
     GTP_INFO("Driver num: %d, Sensor Num: %d", gt9xx_drv_num, gt9xx_sen_num);
     if (gt9xx_drv_num < MIN_DRIVER_NUM || gt9xx_drv_num > MAX_DRIVER_NUM)
-    {
+    {   
+      
         SET_INFO_LINE_ERR("driver number error!");
         return FAIL;
     }
@@ -1751,7 +1755,7 @@ s32 gt9xx_short_test(struct i2c_client * client)
     u8 retry_load = 0;
     u8 old_i2c_addr = client->addr;
     // step 1: reset guitar, delay 1ms,  hang up ss51 and dsp
-    SET_INFO_LINE_INFO("---gtp short test---");
+    SET_INFO_LINE_INFO("gtp short test  IN+ ");
     SET_INFO_LINE_INFO("Step 1: reset guitar, hang up ss51 dsp");
     ret = gt9xx_short_parse_cfg();
     if (FAIL == ret)
@@ -1763,13 +1767,15 @@ s32 gt9xx_short_test(struct i2c_client * client)
 load_dsp_again:
     // RST output low last at least 2ms
 
-gtp_gpio_output(GTP_RST_GPIO, 0);
+    gtp_gpio_output(GTP_RST_GPIO, 0);
     msleep(30);
 	gtp_gpio_output(GTP_IRQ_GPIO, client->addr == 0x14);
     msleep(2);
 	gtp_gpio_output(GTP_RST_GPIO, 1);
     msleep(6);
+
     msleep((retry_load)*10);
+
     while(retry++ < 200)
     {
         // Hold ss51 & dsp
@@ -1808,8 +1814,8 @@ gtp_gpio_output(GTP_RST_GPIO, 0);
     ret2 = gtp_write_register(client, 0x4010, 0x00);
     if (ret2 <= 0)
     {
-	SET_INFO_LINE_ERR("Enter update PowerOn DSP failed.");
-	goto short_test_exit;
+        SET_INFO_LINE_ERR("Enter update PowerOn DSP failed.");
+        goto short_test_exit;
     }
     // step2: burn dsp_short code
     GTP_INFO("step 2: burn dsp_short code");
@@ -2576,51 +2582,51 @@ unsigned char AreaAccordCheck(u16* raw_buf)
 */
 static u32 gtp_raw_test_re(u16 *raw_buf, u32 check_types)
 {
-    s32 ret =0;
+	s32 ret =0;
     s32 ret1 =0;
-
     if (raw_buf == NULL)
     {
-        GTP_DEBUG("Invalid raw buffer pointer!");
+        GTP_INFO("Invalid raw buffer pointer!");
         return FAIL;
     }
 
     if (check_types & _MAX_TEST)
     {
-        GTP_INFO("accord max test");
+        GTP_INFO("Rawdata  Max Test IN+");
         ret = gtp_raw_max_test_re(raw_buf);
-        GTP_INFO("accord---max ret = %d", ret);
+        GTP_INFO("Rawdata  Max Test OUT  ret = %d", ret);
        //gexiantao@20180502-----------------------------
            if(ret)
             {
                  ret1++;
                  Ito_result_info[RAWDATA_MAXDATA_ID].testitem=RAWDATA_MAXDATA_ID;
                  Ito_result_info[RAWDATA_MAXDATA_ID].result='P';
-                 printk("gtp_raw_test_re max test result = pass\n");
+                 GTP_INFO("Rawdata  Max Test = pass\n");
             }
             else
-            {
+            {   
                 ret1=0;
                 Ito_result_info[RAWDATA_MAXDATA_ID].testitem=RAWDATA_MAXDATA_ID;
                 Ito_result_info[RAWDATA_MAXDATA_ID].result='F';
 				test_error_code|=0x01;
-                printk("gtp_raw_test_re max test result = failed\n");
+                GTP_INFO("Rawdata  Max Test = failed\n");
             }
-            //gexiantao@20180502-----------------------------
+            //-----------------------------
     }
 
     if (check_types & _MIN_TEST)
     {
-    GTP_INFO("accord min test");
+       
+        GTP_INFO("Rawdata Min Test IN+");
         ret = gtp_raw_min_test_re(raw_buf);//0x02:SUCCESS;0:FAIL
-         GTP_INFO("accord---min ret = %d", ret);
-//gexiantao@20180502-----------------------------
+        GTP_INFO("Rawdata Min Test OUT- ret = %d", ret);
+            //gexiantao@20180502-----------------------------
           if(ret)
             {
                  ret1++;
                  Ito_result_info[RAWDATA_MINDATA_ID].testitem=RAWDATA_MINDATA_ID;
                  Ito_result_info[RAWDATA_MINDATA_ID].result='P';
-                 printk("gtp_raw_test_re min test result = pass\n");
+                 GTP_INFO("Rawdata Min Test = pass\n");
             }
             else
             {
@@ -2628,43 +2634,45 @@ static u32 gtp_raw_test_re(u16 *raw_buf, u32 check_types)
                 Ito_result_info[RAWDATA_MINDATA_ID].testitem=RAWDATA_MINDATA_ID;
                 Ito_result_info[RAWDATA_MINDATA_ID].result='F';
 				test_error_code|=0x02;
-                printk("gtp_raw_test_re min test result = failed\n");
+                GTP_INFO("Rawdata Min Test = failed\n");
             }
-            //gexiantao@20180502-----------------------------
+            //-----------------------------
     }
+ 
 
     if (check_types & _ACCORD_TEST)//_UNIFORMITY_TEST)     // accord
     {
-        GTP_INFO("accord check");
-      ret = AreaAccordCheck(raw_buf);			// //0x04:SUCCESS;0:FAIL //\CF\E0\C1\DA\CA\FD\BE\DDƫ\B2\EE\B2\E2\CA\D4
-       GTP_INFO("accord---accord ret = %d", ret);
-      //gexiantao@20180502-----------------------------
+      GTP_INFO("Rawdata Accord Test IN+");
+       ret = AreaAccordCheck(raw_buf);			// //0x04:SUCCESS;0:FAIL //\CF\E0\C1\DA\CA\FD\BE\DDƫ\B2\EE\B2\E2\CA\D4
+       GTP_INFO("Rawdata Accord Test  OUT-  ret = %d", ret);
+      //----------------------------
           if(ret)
             {
                  ret1++;
                  Ito_result_info[RAWDATA_ACCORD_ID].testitem=RAWDATA_ACCORD_ID;
                  Ito_result_info[RAWDATA_ACCORD_ID].result='P';
-                 printk("gtp_raw_test_re check result = pass\n");
+                 GTP_INFO("Rawdata Accord Test  = pass\n");
             }
             else
-            {
+            {   
                 ret1=0;
                 Ito_result_info[RAWDATA_ACCORD_ID].testitem=RAWDATA_ACCORD_ID;
                 Ito_result_info[RAWDATA_ACCORD_ID].result='F';
 				test_error_code|=0x04;
-                printk("gtp_raw_test_re check result = failed\n");
+                GTP_INFO("Rawdata Accord Test  = failed\n");
             }
-       //gexiantao@20180502-----------------------------
+       //-----------------------------
     }
-	GTP_INFO("gtp_raw_test_re result ret = %d", ret);
+	GTP_INFO("gtp_raw_test_re result ret1 = %d", ret1);
 
 	if (ret1 == 3)
 	{
-	    SET_INFO_LINE_INFO("  PASS!");
+	    SET_INFO_LINE_INFO(" OPEN TEST PASS!");
 	    ret = SUCCESS;
 	}
 	else
 	{
+        SET_INFO_LINE_INFO("  OPEN TEST FAIL !");
 	    ret = FAIL;
 	}
     return ret;
@@ -2744,8 +2752,8 @@ void gtp_opentest_arch_raw(void)
         }
     }
     if(avrg_raw_len != 0){
-       avrg_arg = tmp / avrg_raw_len;
-     }
+		avrg_arg = tmp / avrg_raw_len;
+    }
 
     sprintf(line_buf, "\nAverage Raw Data(Drv*Sen: %d*%d, Key:%d): \n", gt9xx_drv_num, gt9xx_sen_num, have_key);
     gtp_arch_file_append_no_len(line_buf);
@@ -2805,13 +2813,12 @@ s32 gt9xx_open_test(struct i2c_client * client)
     gtp_rawdiff_mode = 1;
 	//add by 101003082 for ITO test at 2018/06/07 begin
 	ITO_TEST_COUNT++;
-	if(ITO_TEST_COUNT>50)
-		{
+	if(ITO_TEST_COUNT>50){
 		ITO_TEST_COUNT=0;
-		}
+	}
 	//add by 101003082 for ITO test at 2018/06/07 end
     SET_INFO_LINE_INFO("---gtp open test---");
-    GTP_INFO("Parsing configuration...");
+
     gtp_open_test_init(client);
     ret = gtp_parse_config(client);
     if (ret == FAIL)
@@ -2849,9 +2856,10 @@ s32 gt9xx_open_test(struct i2c_client * client)
     {
         //gtp_rawdiff_mode = 1;
         rslt_buf_idx = i;
+         GTP_INFO(" Read Rawdata");
         ret = gtp_read_rawdata(client, raw_buf);
         current_data_index=i;
-	gtp_set_avrg_rawbuf(raw_buf, i);
+	    gtp_set_avrg_rawbuf(raw_buf, i);
        // ret = gtp_raw_test(raw_buf, DEFAULT_TEST_ITEMS);
         ret = gtp_raw_test_re(raw_buf, DEFAULT_TEST_ITEMS);
         //jitter test start
@@ -2870,7 +2878,7 @@ s32 gt9xx_open_test(struct i2c_client * client)
         }
 #if GTP_SAVE_TEST_DATA
 
-        SET_INFO_LINE_ERR("GXT SAVE DATA!");
+        SET_INFO_LINE_ERR("GTP SAVE DATA!");
 
         if(current_data_index==(GTP_OPEN_SAMPLE_NUM -1))
         {
@@ -3167,31 +3175,27 @@ static int gtp_ito_test_show(struct seq_file *file, void* data)
 #ifdef CONFIG_GTP_ESD_PROTECT
     gtp_esd_switch(i2c_client_point, SWITCH_OFF);
 #endif
-    //gtp_ito_test_on=1;
     gtptest_irq_disable(i2c_client_point);
     msleep(2500);//delay 2s for esd close
     trytimes=0;
     Ito_result_info= (struct gt9xx_iot_result_info*) kmalloc(sizeof(struct gt9xx_iot_result_info) * 5, GFP_KERNEL);
     memset(Ito_result_info, 0, sizeof(struct gt9xx_iot_result_info) * 5);
-    printk("gtp_ito_test_show enter!!\n");
-    for(i=0;i<ITO_TEST_ITEM_NUM-1;i++)
-    {
+    GTP_INFO("gtp_ito_test_show enter!!\n");
+    for(i=0; i<ITO_TEST_ITEM_NUM-1 ;i++){
         Ito_result_info[i].stringline='-';
     }
 	test_error_code=0;//init error code
     ret = gt9xx_short_test(i2c_client_point);
-    if(ret)
-    {
+    GTP_INFO("short test return ret = %d ",ret);
+    if(ret){
          Ito_result_info[SHORT_TEST_ID].testitem=SHORT_TEST_ID;
          Ito_result_info[SHORT_TEST_ID].result='P';
-         printk("gtp_ito_test_show short test result = pass \n");
-    }
-    else
-    {
+         GTP_INFO("gtp_ito_test_show short test result = pass ");
+    }else{
         Ito_result_info[SHORT_TEST_ID].testitem=SHORT_TEST_ID;
         Ito_result_info[SHORT_TEST_ID].result='F';
         test_error_code|=0x20;
-        printk("gtp_ito_test_show short test result = failed \n");
+        GTP_INFO("gtp_ito_test_show short test result = failed ");
     }
     do{
     // open test
@@ -3199,8 +3203,9 @@ static int gtp_ito_test_show(struct seq_file *file, void* data)
         trytimes++;
     }while((((test_error_code&0x01)==0x01)||((test_error_code&0x02)==0x02)||((test_error_code&0x04)==0x04))&&(trytimes<1));
 
-    printk("gtp_ito_test_show();\n");
-    if (ret > 1) {
+    GTP_INFO("open test return ret = %d ",ret);
+    
+      if (ret > 1) {
         for(i=0;i<ITO_TEST_ITEM_NUM;i++){
 	        printk("%d%c",Ito_result_info[i].testitem,Ito_result_info[i].result);
 		    seq_printf(file,"%d%c",Ito_result_info[i].testitem,Ito_result_info[i].result);
@@ -3215,12 +3220,13 @@ static int gtp_ito_test_show(struct seq_file *file, void* data)
     }
 	seq_printf(file,"\t\n");
 
-	printk("\ngtp_ito_test_show end!!\n");
+	GTP_INFO("\ngtp_ito_test_show end!!\n");
 #ifdef CONFIG_GTP_ESD_PROTECT
      gtp_esd_switch(i2c_client_point, SWITCH_ON);
 #endif
- // gtp_ito_test_on=0;
+
  gtptest_irq_enable(i2c_client_point);//
+ GTP_INFO("gtp_ito_test_show end OUT -");
     return count;
 }
 static int gtp_info_show(struct seq_file *file, void* data)

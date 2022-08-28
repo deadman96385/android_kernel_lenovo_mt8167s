@@ -5,7 +5,7 @@ if TOUCHSCREEN_MTK_GT9XX
 
 config GTP_USE_PINCTRL
 	bool "GT9 GPIO use Pinctrl"
-	default n
+	default y
 	help
 	Say Y here if you build GT9 driver on MTK Phone platform.
 

@@ -48,7 +48,6 @@ static DECLARE_WAIT_QUEUE_HEAD(waiter);
 static DEFINE_MUTEX(i2c_access);
 static atomic_t  irq_enabled = ATOMIC_INIT(0);
 static unsigned int touch_irq;
-//int ITO_Sensor_ID;
 int ITO_TEST_COUNT;
 extern int gtp_create_ito_test_proc(struct i2c_client *client);
 #ifdef CONFIG_GTP_HAVE_TOUCH_KEY
@@ -176,7 +175,9 @@ static void gtp_recovery_reset(struct i2c_client *client);
 #endif
 
 static struct proc_dir_entry *gt91xx_config_proc;
-
+#ifndef CONFIG_GTP_USE_PINCTRL
+#define CONFIG_GTP_USE_PINCTRL
+#endif
 struct i2c_client *i2c_client_point = NULL;
 static const struct i2c_device_id tpd_i2c_id[] = {{"gt9xx", 0}, {} };
 static unsigned short force[] = {0, 0xBA, I2C_CLIENT_END, I2C_CLIENT_END};
@@ -273,7 +274,9 @@ void gtp_gpio_output(int gpio_type, int level)
 void gtp_gpio_input(int gpio_type)
 {
 #ifdef CONFIG_GTP_USE_PINCTRL
+ 
 	if (gpio_type == GTP_IRQ_GPIO)
+        GTP_INFO("gtp_gpio_input int_pin\n");
 		tpd_gpio_as_int(GTP_IRQ_GPIO);
 #else
 	if (gpio_type == GTP_RST_GPIO)
@@ -1288,7 +1291,7 @@ Note:
 	Pull low the INT pin manaully for FW sync.
 *******************************************************/
 void gtp_int_sync(s32 ms)
-{
+{		
 	gtp_gpio_output(GTP_IRQ_GPIO, 0);
 	msleep(ms);
 	gtp_gpio_input(GTP_IRQ_GPIO);
@@ -1318,7 +1321,6 @@ void gtp_reset_guitar(struct i2c_client *client, s32 ms)
 		return;
 	}
 #endif
-
 	gtp_int_sync(50);
 #ifdef CONFIG_GTP_ESD_PROTECT
 	gtp_init_ext_watchdog(i2c_client_point);

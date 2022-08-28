@@ -849,6 +849,16 @@
 				      "main-sel",
 				      "main",
 				      "dma";
+			ac-timing =  /bits/ 16 <
+				0x8001
+				0x0002
+				0x0000
+				0x0000
+				0x0000
+				0x3030
+				0x0000
+				0x0000
+			>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -867,6 +877,16 @@
 				      "main-sel",
 				      "main",
 				      "dma";
+			ac-timing =  /bits/ 16 <
+				0x8001
+				0x0002
+				0x0000
+				0x0000
+				0x0000
+				0x3030
+				0x0000
+				0x0000
+			>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -885,6 +905,16 @@
 				      "main-sel",
 				      "main",
 				      "dma";
+			ac-timing =  /bits/ 16 <
+				0x8001
+				0x0002
+				0x0000
+				0x0000
+				0x0000
+				0x3030
+				0x0000
+				0x0000
+			>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";

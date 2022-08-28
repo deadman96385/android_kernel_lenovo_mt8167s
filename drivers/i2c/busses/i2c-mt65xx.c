@@ -307,17 +307,21 @@ static void mtk_i2c_init_hw(struct mtk_i2c *i2c)
 	if (i2c->dev_comp->dcm)
 		writew(I2C_DCM_DISABLE, i2c->base + OFFSET_DCM_EN);
 
+	//if (i2c->dev_comp->timing_adjust)
+		//writew((i2c->clk_src_div - 1), i2c->base + OFFSET_CLOCK_DIV);
+
 	writew(i2c->timing_reg, i2c->base + OFFSET_TIMING);
 	writew(i2c->high_speed_reg, i2c->base + OFFSET_HS);
 
-	writew(i2c->ac_timing.ext, i2c->base + OFFSET_EXT_CONF);
-
 	if (i2c->dev_comp->timing_adjust) {
-		writew(i2c->clk_src_div - 1, i2c->base + OFFSET_CLOCK_DIV);
+		writew(i2c->ac_timing.ext, i2c->base + OFFSET_EXT_CONF);
+		writew(i2c->ac_timing.inter_clk_div - 1,
+			       i2c->base + OFFSET_CLOCK_DIV);
 		writew(i2c->ac_timing.scl_mis_comp,
-				   i2c->base + OFFSET_SCL_MIS_COMP_POINT);
+			       i2c->base + OFFSET_SCL_MIS_COMP_POINT);
 		writew(i2c->ac_timing.sda_timing,
-				   i2c->base + OFFSET_SDA_TIMING);
+			       i2c->base + OFFSET_SDA_TIMING);
+
 		writew(i2c->ac_timing.scl_hl_ratio,
 				   i2c->base + OFFSET_SCL_HIGH_LOW_RATIO);
 		writew(i2c->ac_timing.hs_scl_hl_ratio,
@@ -498,6 +502,12 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
 		control_reg |= I2C_CONTROL_DIR_CHANGE | I2C_CONTROL_RS;
 
 	writew(control_reg, i2c->base + OFFSET_CONTROL);
+
+	/* set start condition */
+	/* if (i2c->speed_hz <= 100000)
+		writew(I2C_ST_START_CON, i2c->base + OFFSET_EXT_CONF);
+	else
+		writew(I2C_FS_START_CON, i2c->base + OFFSET_EXT_CONF); */
 
 	addr_reg = msgs->addr << 1;
 	if (i2c->op == I2C_MASTER_RD)
@@ -785,36 +795,43 @@ static const struct i2c_algorithm mtk_i2c_algorithm = {
 
 static int mtk_i2c_parse_dt(struct device_node *np, struct mtk_i2c *i2c)
 {
-	u16 ac_timing[7] = {0};
 	int ret;
+	u16 ac_timing[8] = {0};
 
 	ret = of_property_read_u32(np, "clock-frequency", &i2c->speed_hz);
 	if (ret < 0)
 		i2c->speed_hz = I2C_DEFAULT_SPEED;
 
-	ret = of_property_read_u32(np, "clock-div", &i2c->clk_src_div);
-	if (ret < 0)
-		return ret;
+	if (!i2c->dev_comp->timing_adjust) {
+		ret = of_property_read_u32(np, "clock-div", &i2c->clk_src_div);
+		if (ret < 0)
+			return ret;
 
-	if (i2c->clk_src_div == 0)
-		return -EINVAL;
+		if (i2c->clk_src_div == 0)
+			return -EINVAL;
+	}
 
-	ret = of_property_read_u16_array(np, "ac-timing", ac_timing,
-					 ARRAY_SIZE(ac_timing));
+	if (i2c->dev_comp->timing_adjust) {
+		ret = of_property_read_u16_array(np, "ac-timing", ac_timing,
+						 ARRAY_SIZE(ac_timing));
 
-	if (ret < 0) {
-		if (i2c->speed_hz <= I2C_DEFAULT_SPEED)
-			i2c->ac_timing.ext = I2C_ST_START_CON;
-		else
-			i2c->ac_timing.ext = I2C_FS_START_CON;
-	} else {
-		i2c->ac_timing.ext = ac_timing[0];
-		i2c->ac_timing.scl_hl_ratio = ac_timing[1];
-		i2c->ac_timing.hs_scl_hl_ratio = ac_timing[2];
-		i2c->ac_timing.scl_mis_comp = ac_timing[3];
-		i2c->ac_timing.sta_stop = ac_timing[4];
-		i2c->ac_timing.hs_sta_stop = ac_timing[5];
-		i2c->ac_timing.sda_timing = ac_timing[6];
+		if (ret < 0) {
+			if (i2c->speed_hz <= I2C_DEFAULT_SPEED)
+				i2c->ac_timing.ext = I2C_ST_START_CON;
+			else
+				i2c->ac_timing.ext = I2C_FS_START_CON;
+
+			i2c->ac_timing.inter_clk_div = I2C_DEFAULT_CLK_DIV;
+		} else {
+			i2c->ac_timing.ext = ac_timing[0];
+			i2c->ac_timing.inter_clk_div = ac_timing[1];
+			i2c->ac_timing.scl_hl_ratio = ac_timing[2];
+			i2c->ac_timing.hs_scl_hl_ratio = ac_timing[3];
+			i2c->ac_timing.scl_mis_comp = ac_timing[4];
+			i2c->ac_timing.sta_stop = ac_timing[5];
+			i2c->ac_timing.hs_sta_stop = ac_timing[6];
+			i2c->ac_timing.sda_timing = ac_timing[7];
+		}
 	}
 
 	i2c->have_pmic = of_property_read_bool(np, "mediatek,have-pmic");
@@ -864,12 +881,16 @@ static int mtk_i2c_probe(struct platform_device *pdev)
 	i2c->adap.owner = THIS_MODULE;
 	i2c->adap.algo = &mtk_i2c_algorithm;
 	i2c->adap.quirks = i2c->dev_comp->quirks;
-	i2c->adap.timeout = 10 * HZ;
+	i2c->adap.timeout = 2 * HZ;
 	i2c->adap.retries = 1;
 
 	ret = mtk_i2c_parse_dt(pdev->dev.of_node, i2c);
 	if (ret)
 		return -EINVAL;
+
+	if (i2c->dev_comp->timing_adjust)
+		//i2c->clk_src_div = I2C_DEFAULT_CLK_DIV;
+		i2c->clk_src_div = i2c->ac_timing.inter_clk_div;
 
 	if (i2c->have_pmic && !i2c->dev_comp->pmic_i2c)
 		return -EINVAL;

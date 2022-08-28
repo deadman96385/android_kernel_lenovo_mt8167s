@@ -247,7 +247,7 @@
 		pins_cmd_dat {
 			pins = <MT8167_PIN_18_EINT18__FUNC_GPIO18>;
 			slew-rate = <0>;
-			input-enable;
+                        input-enable;
 			bias-disable;
 		};
 	};

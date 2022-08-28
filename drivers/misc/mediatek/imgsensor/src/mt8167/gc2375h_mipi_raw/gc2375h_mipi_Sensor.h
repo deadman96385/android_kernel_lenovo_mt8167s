@@ -16,8 +16,10 @@
 #ifndef _GC2375HMIPI_SENSOR_H
 #define _GC2375HMIPI_SENSOR_H
 
+//modify by zhangziran@huaqin.com to change mirror of camera start on 19.08.06
 //#define GC2375H_MIRROR_NORMAL
 #define GC2375H_MIRROR_H
+//modify by zhangziran@huaqin.com end
 //#define GC2375H_MIRROR_V
 //#define GC2375H_MIRROR_HV
 
